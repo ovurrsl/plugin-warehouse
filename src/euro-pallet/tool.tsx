@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { euroPalletDefinition } from './definition'
-import { WarehousePlacementTool } from '../../components/warehouse-placement-tool'
+import { WarehousePlacementTool } from '../components/warehouse-placement-tool'
 
 export default function EuroPalletTool() {
   return (

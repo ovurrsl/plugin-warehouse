@@ -6,6 +6,7 @@ import { Tool, Preview } from './tool';
 
 export const definition = {
   kind: KIND,
+  schemaVersion: 1,
   schema: WarehouseNodeSchema,
   parametrics: Parametrics,
   renderer: Renderer,

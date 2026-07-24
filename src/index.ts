@@ -1,10 +1,14 @@
 import type { Plugin, AnyNodeDefinition } from '@pascal-app/core';
 import { definition } from './definition';
+import { euroPalletDefinition } from './euro-pallet/definition';
 
 export const warehousePlugin: Plugin = {
   id: 'pascal:warehouse',
   apiVersion: 1,
-  nodes: [definition as unknown as AnyNodeDefinition],
+  nodes: [
+    definition as unknown as AnyNodeDefinition,
+    euroPalletDefinition as unknown as AnyNodeDefinition
+  ],
 };
 
 // Panel configuration for the editor's left rail
@@ -23,5 +27,5 @@ export const warehouseHostPanel = {
   defaultInstalled: true,
 };
 
-export { definition };
+export { definition, euroPalletDefinition };
 export * from './schema';

@@ -16,4 +16,9 @@ export const definition = {
   parentKinds: ['floor'],
   // How it should be named in generic UI
   label: 'Warehouse Equipment',
+  capabilities: {
+    selectable: { hitVolume: 'bbox' },
+    deletable: true,
+    duplicable: true,
+  },
 };

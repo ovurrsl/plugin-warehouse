@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type BaseNode, BaseNodeSchema } from '@pascal-app/core';
+import { BaseNode, nodeType, objectId } from '@pascal-app/core';
 
 // Define the unique kind for our nodes
 export const KIND = 'warehouse:equipment';
@@ -9,8 +9,9 @@ export const PRESETS = ['rack', 'pallet', 'forklift'] as const;
 export type EquipmentPreset = (typeof PRESETS)[number];
 
 // Our node schema extends the base node schema
-export const WarehouseNodeSchema = BaseNodeSchema.extend({
-  type: z.literal(KIND),
+export const WarehouseNodeSchema = BaseNode.extend({
+  id: objectId('warehouse_equipment'),
+  type: nodeType(KIND),
   preset: z.enum(PRESETS),
   // Add parametrics
   width: z.number().default(2),

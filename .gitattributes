@@ -1,0 +1,10 @@
+# Normalise every text file to LF in the repository, regardless of the
+# contributor's `core.autocrlf` setting. Biome formats to LF, so without this a
+# Windows checkout produces a CRLF working tree that fails `biome check` on
+# every single file — the failure mode the editor monorepo currently has.
+* text=auto eol=lf
+
+*.png binary
+*.webp binary
+*.jpg binary
+*.glb binary

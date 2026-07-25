@@ -1,0 +1,79 @@
+/**
+ * The catalog the panel browses: which node kinds exist, how they group, and
+ * what each one is for.
+ *
+ * Kept as plain data separate from the node definitions so the panel can render
+ * the full catalog — including sections whose kinds have not landed yet —
+ * without importing any renderer or geometry module. Adding a kind means adding
+ * its definition to the manifest and one entry here.
+ *
+ * All dimensions quoted in descriptions are metres, matching the host's
+ * convention. Published warehouse specs are millimetres; divide by 1000.
+ */
+
+export type CatalogSection = {
+  id: string
+  label: string
+  /** Iconify name, rendered by the panel. */
+  icon: string
+  blurb: string
+}
+
+export type CatalogItem = {
+  /** Node kind to arm for placement. Must match a registered `NodeDefinition.kind`. */
+  kind: string
+  label: string
+  sectionId: string
+  description: string
+  icon: string
+}
+
+export const CATALOG_SECTIONS: readonly CatalogSection[] = [
+  {
+    id: 'unit-loads',
+    label: 'Unit loads',
+    icon: 'lucide:package',
+    blurb: 'Pallets and containers — the footprint every other dimension follows from.',
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    icon: 'lucide:layout-grid',
+    blurb: 'Pallet racking and shelving. The source of every capacity figure.',
+  },
+  {
+    id: 'handling',
+    label: 'Handling',
+    icon: 'lucide:forklift',
+    blurb: 'Trucks and carts. Each variant carries the aisle width it needs.',
+  },
+  {
+    id: 'conveyance',
+    label: 'Conveyance',
+    icon: 'lucide:move-right',
+    blurb: 'Conveyors and sortation.',
+  },
+  {
+    id: 'stations',
+    label: 'Stations',
+    icon: 'lucide:table-2',
+    blurb: 'Packing, dispatch, and processing benches.',
+  },
+  {
+    id: 'layout',
+    label: 'Layout',
+    icon: 'lucide:route',
+    blurb: 'Floor markings and aisles.',
+  },
+] as const
+
+/**
+ * Populated one phase at a time. An entry here without a matching registered
+ * kind would arm a tool that cannot place anything, so entries land in the same
+ * change as their `NodeDefinition`.
+ */
+export const CATALOG_ITEMS: readonly CatalogItem[] = [] as const
+
+export function itemsInSection(sectionId: string): CatalogItem[] {
+  return CATALOG_ITEMS.filter((item) => item.sectionId === sectionId)
+}

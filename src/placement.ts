@@ -1,7 +1,22 @@
 'use client'
 
-import { emitter, type GridEvent, sceneRegistry, snapPointToGrid } from '@pascal-app/core'
-import { useEditor } from '@pascal-app/editor'
+import {
+  type AlignmentAnchor,
+  type AlignmentGuide,
+  type AnyNode,
+  emitter,
+  type GridEvent,
+  movingFootprintAnchors,
+  resolveAlignment,
+  sceneRegistry,
+  snapPointToGrid,
+} from '@pascal-app/core'
+import {
+  isAlignmentGuideActive,
+  isGridSnapActive,
+  isMagneticSnapActive,
+  useEditor,
+} from '@pascal-app/editor'
 import { Vector3 } from 'three'
 import { asSlab, type SlabLike, slabAt } from './host-adapter'
 
@@ -54,18 +69,82 @@ export function subscribePlacementClicks(
   }
 }
 
-/** Snap a planar position when grid snapping is the active mode, reading the
- * same toggle and step the built-in item tools use so plugin nodes snap like
- * every other item rather than inventing their own behaviour. */
+/**
+ * Snap a planar position when grid snapping is the active mode.
+ *
+ * `isGridSnapActive()` is the host's own choke point: it resolves the snapping
+ * mode for whatever context is active, which for an armed tool comes from the
+ * kind's `snapProfile`. Reading it rather than the underlying store fields
+ * means the four modes (grid / lines / angles / off) keep behaving correctly
+ * here even if the host rearranges how they are stored — an earlier version
+ * poked at `snappingModeByContext.item` directly and would have silently
+ * reverted to always-on grid snap the moment that shape changed.
+ */
 export function snapXZ(x: number, z: number): readonly [number, number] {
-  const editor = useEditor.getState() as ReturnType<typeof useEditor.getState> & {
-    snappingModeByContext?: { item?: string }
+  if (!isGridSnapActive()) return [x, z]
+  return snapPointToGrid([x, z], useEditor.getState().gridSnapStep)
+}
+
+/**
+ * Figma-style alignment threshold in metres, matching the host's own move tool.
+ * 8 cm pulls without fighting grid snap.
+ */
+export const ALIGNMENT_THRESHOLD_M = 0.08
+
+export type AlignedPlacement = {
+  position: [number, number, number]
+  guides: AlignmentGuide[]
+}
+
+/**
+ * Grid snap, then alignment against every other object on the level.
+ *
+ * The host has this exact routine — `resolveAlignedFloorPlacement` in
+ * `packages/nodes/src/shared/floor-placement` — but that module is internal to
+ * `@pascal-app/nodes` and not published, so the composition is re-derived here
+ * from the three primitives that *are* public. Those primitives are the load
+ * bearing part: `movingFootprintAnchors` reads this kind's declared footprint
+ * through the registry, so the guides stay correct for every pallet preset
+ * without listing dimensions twice.
+ *
+ * Display and pull are deliberately separate, matching the host: guides are
+ * drawn in every mode except when no snap context is active, but the magnetic
+ * delta is applied only in `lines` mode. So the user always sees what the
+ * pallet lines up with, and only gets pulled onto it when they asked for it.
+ */
+export function resolveAlignedPlacement({
+  candidates,
+  node,
+  rawX,
+  rawZ,
+  rotationY,
+}: {
+  candidates: readonly AlignmentAnchor[]
+  node: AnyNode
+  rawX: number
+  rawZ: number
+  rotationY: number
+}): AlignedPlacement {
+  const [x, z] = snapXZ(rawX, rawZ)
+  if (!isAlignmentGuideActive() || candidates.length === 0) {
+    return { position: [x, 0, z], guides: [] }
   }
-  const gridActive = editor.snappingModeByContext
-    ? editor.snappingModeByContext.item === 'grid'
-    : editor.magneticSnap
-  if (!gridActive) return [x, z]
-  return snapPointToGrid([x, z], editor.gridSnapStep)
+
+  const moving = movingFootprintAnchors(node, x, z, rotationY)
+  if (moving.length === 0) return { position: [x, 0, z], guides: [] }
+
+  const result = resolveAlignment({
+    moving,
+    candidates: candidates as AlignmentAnchor[],
+    threshold: ALIGNMENT_THRESHOLD_M,
+  })
+  if (result.snap && isMagneticSnapActive()) {
+    return {
+      position: [x + result.snap.dx, 0, z + result.snap.dz],
+      guides: result.guides,
+    }
+  }
+  return { position: [x, 0, z], guides: result.guides }
 }
 
 /** Convert a world-space grid hit into the active level's local frame, which is
@@ -110,10 +189,15 @@ export function electSupportSlab(
   return slabAt(slabs, x, z)?.id ?? null
 }
 
-export type GridMoveHandler = (levelLocal: [number, number, number], event: GridEvent) => void
+export type GridMoveHandler = (rawLevelLocal: [number, number, number], event: GridEvent) => void
 
 /**
- * Subscribe to cursor movement over the grid, snapped.
+ * Subscribe to cursor movement over the grid, **unsnapped**.
+ *
+ * Snapping is left to the caller because grid quantize and alignment have to be
+ * applied in that order against the same point — snapping here would hand the
+ * alignment resolver an already-quantized cursor and the two would fight,
+ * showing a guide the pallet never actually reaches.
  *
  * Commits elsewhere use the position from the last move rather than the click
  * event's own: a click reports the ray's hit point, which on a vertical face is
@@ -122,8 +206,7 @@ export type GridMoveHandler = (levelLocal: [number, number, number], event: Grid
 export function subscribeGridMove(handler: GridMoveHandler): () => void {
   const onMove = (event: GridEvent) => {
     const [lx, , lz] = event.localPosition
-    const [sx, sz] = snapXZ(lx, lz)
-    handler([sx, 0, sz], event)
+    handler([lx, 0, lz], event)
   }
   emitter.on('grid:move', onMove)
   return () => emitter.off('grid:move', onMove)

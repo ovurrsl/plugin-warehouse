@@ -198,7 +198,7 @@ describe('UV classification', () => {
     let checked = 0
     for (let t = 0; t < tris.length; t++) {
       const tri = tris[t]
-      if (!tri || tri.region !== 'wood' || tri.ny < 0.9) continue
+      if (tri?.region !== 'wood' || tri.ny < 0.9) continue
       const i0 = t * 3
       if (pos.getY(i0) < 0.14) continue
       const vs = [uv.getY(i0), uv.getY(i0 + 1), uv.getY(i0 + 2)]

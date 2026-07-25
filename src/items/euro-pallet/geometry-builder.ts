@@ -216,8 +216,9 @@ export function getOrCreateEPALGeometry(): THREE.BufferGeometry {
   // ═══════════════════════════════════════════════════════════════════════
   let merged = mergeGeometries(geometries, false)
   if (merged.index) merged = merged.toNonIndexed()
-
   merged.computeVertexNormals()
+  merged.computeBoundingBox()
+  merged.computeBoundingSphere()
   applyPerTriangleUVProjection(merged)
 
   cachedEPALGeometry = merged

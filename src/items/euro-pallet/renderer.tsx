@@ -42,6 +42,7 @@ export function EuroPallet3DGeometry() {
       geometry={geometry}
       material={material}
       receiveShadow
+      dispose={null}
     />
   )
 }

@@ -80,6 +80,29 @@ Use `extendPluginDiscovery`, never `setPluginDiscovery` — the latter replaces 
 
 > **This requires a host you can edit.** Plugin API v1 has no URL-manifest loader: discovery is a function somebody has to call, and the bootstrap module is the only call site. So the plugin drops into your own build or fork of the editor, but not into a hosted editor whose source you do not control.
 
+## Known host limitation: duplicating plugin nodes
+
+`packages/editor/src/lib/scene-clipboard.ts` validates clipboard nodes with `AnyNode.parse`. `AnyNode` is the host's hand-maintained union of built-in kinds, so a plugin-contributed kind can never be a member of it — the registry validates those against `def.schema` at runtime instead. The result: **`capabilities.duplicable` cannot be honoured for any plugin**, including the first-party `pascal:trees` pack, which declares it and fails identically.
+
+Nothing in the plugin API works around it. `DuplicableConfig` exposes only `subtree` and `prepareSubtreeClone`, and both run *after* the parse that throws.
+
+The host needs a fallback to the registry schema, at both call sites (the `remapNodeReferences` return, and the system-clipboard parse in `readClipboardPayload`):
+
+```ts
+function parseClipboardNode(candidate: unknown): AnyNode {
+  const builtin = AnyNode.safeParse(candidate)
+  if (builtin.success) return builtin.data
+  const type = (candidate as { type?: unknown } | null)?.type
+  const definition = typeof type === 'string' ? nodeRegistry.get(type) : undefined
+  if (definition) return definition.schema.parse(candidate) as AnyNode
+  throw builtin.error
+}
+```
+
+Built-in behaviour is unchanged — `AnyNode` is tried first — and an unknown type still raises the original error.
+
+> **Currently applied as a local patch to the host checkout.** It is not part of this package and does not travel with it: pulling a newer editor reverts it and duplicate silently starts failing again. Sending it upstream is what makes it durable.
+
 ## Extracting to a standalone repository
 
 The package is written to make this a copy, not a port:

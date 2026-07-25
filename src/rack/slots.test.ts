@@ -3,14 +3,20 @@ import { PalletRackNode } from './schema'
 import {
   autoPalletsPerLevel,
   bayCenterX,
+  depthPositionZ,
+  directAccessSlotCount,
   fittedLevelCount,
   formatSlotAddress,
   frameCentersX,
+  hasUnsupportedPallets,
   levelClearHeight,
   levelSurfaceY,
   orientedPalletFootprint,
+  palletSupportBarCount,
   parseSlotAddress,
+  requiresPalletSupportBars,
   rowCenterZ,
+  rowDepth,
   slotCount,
   slotOffsetsX,
   slotsOf,
@@ -210,6 +216,7 @@ describe('slot enumeration', () => {
         bay: slot.bay,
         level: slot.level,
         position: slot.position,
+        depth: slot.depth,
       })
     }
   })
@@ -219,7 +226,7 @@ describe('slot enumeration', () => {
     // pallet stored at R1-B2-L1-P1 must still mean the same shelf afterwards.
     const single = rack({ bayCount: 3, levels: 2, uprightHeight: 12 })
     const twin = rack({ bayCount: 3, levels: 2, uprightHeight: 12, backToBack: true })
-    const address = formatSlotAddress({ row: 1, bay: 2, level: 1, position: 1 })
+    const address = formatSlotAddress({ row: 1, bay: 2, level: 1, position: 1, depth: 1 })
 
     const before = slotsOf(single).find((slot) => slot.id === address)
     const after = slotsOf(twin).find((slot) => slot.id === address)
@@ -231,10 +238,11 @@ describe('slot enumeration', () => {
   })
 
   test('a malformed address is rejected rather than half-parsed', () => {
-    expect(parseSlotAddress('B2-L1-P1')).toBeNull()
+    expect(parseSlotAddress('B2-L1-P1-D1')).toBeNull()
     expect(parseSlotAddress('R1-B2-L1')).toBeNull()
+    expect(parseSlotAddress('R1-B2-L1-P1')).toBeNull()
     expect(parseSlotAddress('')).toBeNull()
-    expect(parseSlotAddress('R1-B2-L1-Px')).toBeNull()
+    expect(parseSlotAddress('R1-B2-L1-Px-D1')).toBeNull()
   })
 
   test('slots sit on their level surface and inside the run footprint', () => {
@@ -245,5 +253,101 @@ describe('slot enumeration', () => {
       const [x] = slot.localPosition
       expect(Math.abs(x)).toBeLessThanOrEqual(halfWidth)
     }
+  })
+})
+
+describe('double-deep', () => {
+  test('a second depth position doubles capacity but halves direct access', () => {
+    const single = rack({ bayCount: 3, levels: 2, uprightHeight: 12 })
+    const deep = rack({ bayCount: 3, levels: 2, uprightHeight: 12, depthPositions: 2 })
+    expect(slotCount(deep)).toBe(slotCount(single) * 2)
+    // The trade the headline "locations" figure hides: the extra capacity is
+    // bought entirely with positions nothing can reach directly.
+    expect(directAccessSlotCount(deep)).toBe(slotCount(single))
+    expect(deep.depthPositions).toBe(2)
+  })
+
+  test('only the front position of a bay has direct access', () => {
+    const deep = rack({ bayCount: 1, levels: 1, uprightHeight: 12, depthPositions: 2 })
+    for (const slot of slotsOf(deep)) {
+      expect(slot.directAccess).toBe(slot.depth === 1)
+    }
+  })
+
+  test('depth positions sit one behind the other with the declared gap', () => {
+    const deep = rack({ depthPositions: 2, depth: 1.1, depthGap: 0.05 })
+    const front = depthPositionZ(deep, 1, 1)
+    const rear = depthPositionZ(deep, 1, 2)
+    // Front is nearer the aisle (+Z for row 1), and the faces are depthGap apart.
+    expect(front).toBeGreaterThan(rear)
+    expect(front - deep.depth / 2 - (rear + deep.depth / 2)).toBeCloseTo(0.05, 9)
+  })
+
+  test('each row of a back-to-back island numbers depth from its own aisle', () => {
+    // Row 1 opens onto +Z and row 2 onto −Z, so "D1 is the reachable one" has
+    // to hold on both sides — a global axis would make D1 the buried pallet on
+    // one of them.
+    const twin = rack({ backToBack: true, depthPositions: 2, depth: 1.1 })
+    expect(depthPositionZ(twin, 1, 1)).toBeGreaterThan(depthPositionZ(twin, 1, 2))
+    expect(depthPositionZ(twin, 2, 1)).toBeLessThan(depthPositionZ(twin, 2, 2))
+  })
+
+  test('back-to-back double-deep is four pallets deep and stays inside the footprint', () => {
+    const twin = rack({ backToBack: true, depthPositions: 2, depth: 1.1, depthGap: 0.05 })
+    expect(rowDepth(twin)).toBeCloseTo(2.25, 9)
+    expect(totalDepth(twin)).toBeCloseTo(4.7, 9)
+    const half = totalDepth(twin) / 2
+    for (const slot of slotsOf(twin)) {
+      const z = slot.localPosition[2]
+      expect(Math.abs(z) + twin.depth / 2).toBeLessThanOrEqual(half + 1e-9)
+    }
+  })
+
+  test('the two rows never overlap', () => {
+    const twin = rack({ backToBack: true, depthPositions: 2, depth: 1.1, backToBackGap: 0.2 })
+    const innerRow1 = depthPositionZ(twin, 1, 2) - twin.depth / 2
+    const innerRow2 = depthPositionZ(twin, 2, 2) + twin.depth / 2
+    expect(innerRow1 - innerRow2).toBeCloseTo(0.2, 9)
+  })
+})
+
+describe('pallet support bars', () => {
+  test('long-side-out requires bars, narrow-side-out does not', () => {
+    // A Euro pallet's bottom deckboards run along its 1200 mm length: across
+    // the beams when narrow-side-out, along them when turned.
+    expect(requiresPalletSupportBars(rack({ palletOrientation: 'short-side-out' }))).toBe(false)
+    expect(requiresPalletSupportBars(rack({ palletOrientation: 'long-side-out' }))).toBe(true)
+  })
+
+  test('bars are derived from the orientation when not declared', () => {
+    expect(palletSupportBarCount(rack({ palletOrientation: 'short-side-out' }))).toBe(0)
+    expect(palletSupportBarCount(rack({ palletOrientation: 'long-side-out' }))).toBe(2)
+  })
+
+  test('an explicit count overrides the derived one in both directions', () => {
+    expect(
+      palletSupportBarCount(rack({ palletOrientation: 'long-side-out', palletSupportBars: 3 })),
+    ).toBe(3)
+    expect(
+      palletSupportBarCount(rack({ palletOrientation: 'short-side-out', palletSupportBars: 1 })),
+    ).toBe(1)
+  })
+
+  test('removing the bars from a turned rack is reported, not silently corrected', () => {
+    const unsound = rack({ palletOrientation: 'long-side-out', palletSupportBars: 0 })
+    expect(hasUnsupportedPallets(unsound)).toBe(true)
+    // Every other combination is sound.
+    expect(hasUnsupportedPallets(rack({ palletOrientation: 'long-side-out' }))).toBe(false)
+    expect(
+      hasUnsupportedPallets(rack({ palletOrientation: 'short-side-out', palletSupportBars: 0 })),
+    ).toBe(false)
+  })
+
+  test('a square pallet needs bars in neither orientation by geometry alone', () => {
+    // 1200 × 1200 is the one preset where turning it changes nothing across the
+    // run, so the requirement is driven purely by the declared orientation.
+    const square = rack({ palletPreset: 'euro-1200x1200', palletOrientation: 'short-side-out' })
+    expect(orientedPalletFootprint(square)).toEqual([1.2, 1.2])
+    expect(requiresPalletSupportBars(square)).toBe(false)
   })
 })

@@ -10,14 +10,27 @@
  * property of the rack, not of the pallet — see the rack's `palletOrientation`.
  */
 
-export type PalletPreset =
-  | 'epal-1'
-  | 'epal-2'
-  | 'epal-3'
-  | 'epal-6'
-  | 'quarter'
-  | 'gma-48x40'
-  | 'plastic-euro'
+/**
+ * The single list of preset ids.
+ *
+ * Both the pallet schema and the rack schema validate against this rather than
+ * repeating the literals. They were written out twice, and adding a preset then
+ * updated one enum and not the other — the pallet accepted the new value and
+ * the rack rejected it, which surfaces as a validation error naming a field the
+ * user never touched.
+ */
+export const PALLET_PRESET_IDS = [
+  'epal-1',
+  'epal-2',
+  'epal-3',
+  'epal-6',
+  'euro-1200x1200',
+  'quarter',
+  'gma-48x40',
+  'plastic-euro',
+] as const
+
+export type PalletPreset = (typeof PALLET_PRESET_IDS)[number]
 
 export type PalletSpec = {
   label: string
@@ -83,6 +96,20 @@ export const PALLET_PRESETS: Record<PalletPreset, PalletSpec> = {
     staticLoad: 1500,
     rackingLoad: 500,
     branded: true,
+  },
+  'euro-1200x1200': {
+    // Same construction standard as EPAL 1, in the largest of the three sizes
+    // the catalogue lists (800, 1000 and 1200 × 1200). Square, so it is the one
+    // preset where the two orientations give the same across-run footprint.
+    label: 'Euro 1200×1200',
+    length: 1.2,
+    width: 1.2,
+    height: 0.162,
+    tare: 40,
+    dynamicLoad: 1500,
+    staticLoad: 4000,
+    rackingLoad: 1250,
+    branded: false,
   },
   quarter: {
     label: 'Quarter pallet',

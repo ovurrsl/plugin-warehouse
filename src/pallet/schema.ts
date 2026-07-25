@@ -1,5 +1,6 @@
 import { BaseNode, nodeType, objectId } from '@pascal-app/core'
 import { z } from 'zod'
+import { PALLET_PRESET_IDS } from './presets'
 
 /**
  * One kind covers both the empty pallet and an occupied rack position:
@@ -20,9 +21,7 @@ export const PalletNode = BaseNode.extend({
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
 
-  preset: z
-    .enum(['epal-1', 'epal-2', 'epal-3', 'epal-6', 'quarter', 'gma-48x40', 'plastic-euro'])
-    .default('epal-1'),
+  preset: z.enum(PALLET_PRESET_IDS).default('epal-1'),
 
   /** Height of the goods stacked on the deck, metres. 0 is an empty pallet. */
   loadHeight: z.number().min(0).max(2.4).default(0),

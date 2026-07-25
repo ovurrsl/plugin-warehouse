@@ -1,5 +1,6 @@
 import { BaseNode, nodeType, objectId } from '@pascal-app/core'
 import { z } from 'zod'
+import { PALLET_PRESET_IDS } from '../pallet/presets'
 
 /**
  * Adjustable pallet racking — a single continuous run of bays.
@@ -41,6 +42,23 @@ export const PalletRackNode = BaseNode.extend({
   backToBack: z.boolean().default(false),
   backToBackGap: z.number().min(0).max(1.5).default(0.2),
 
+  /**
+   * Pallets stored one behind another on the same accessible face.
+   *
+   * Not the same thing as `backToBack`, and the difference is the aisle:
+   * back-to-back is two runs each served from its own aisle, every position
+   * directly reachable. Double-deep is two positions served from *one* aisle,
+   * so the rear pallet cannot be reached until the front one is moved. It needs
+   * telescopic double-depth forks and suits SKUs held several pallets deep.
+   *
+   * Both can be on at once — a back-to-back double-deep island is four pallets
+   * deep across two aisles.
+   */
+  depthPositions: z.number().int().min(1).max(2).default(1),
+
+  /** Gap between the front and rear pallet positions of a double-deep bay. */
+  depthGap: z.number().min(0).max(0.5).default(0.05),
+
   // ── Levels ────────────────────────────────────────────────────────────────
 
   /**
@@ -75,12 +93,26 @@ export const PalletRackNode = BaseNode.extend({
   bracing: z.enum(['z-bracing', 'x-bracing', 'open']).default('z-bracing'),
   decking: z.enum(['wire-mesh', 'steel', 'timber', 'open']).default('wire-mesh'),
 
+  /**
+   * Bars fitted perpendicular to the beams, under each pallet.
+   *
+   * Needed when the pallet's bottom deckboards run *parallel* to the beams
+   * instead of across them, which is exactly what turning a Euro pallet
+   * long-side-out does: its three bottom boards run along the 1200 mm length,
+   * so long-side-out leaves them lying on the beams lengthwise with nothing
+   * under the middle. The catalogue calls for one to three bars per pallet
+   * depending on pallet quality and weight.
+   *
+   * Null derives it from the orientation, which is the case that actually
+   * matters — a user who flips to long-side-out for picking should not have to
+   * know this rule to get a rack that would stand up.
+   */
+  palletSupportBars: z.number().int().min(0).max(3).nullable().default(null),
+
   // ── Slots ─────────────────────────────────────────────────────────────────
 
   /** Pallet standard the slots are laid out for. */
-  palletPreset: z
-    .enum(['epal-1', 'epal-2', 'epal-3', 'epal-6', 'quarter', 'gma-48x40', 'plastic-euro'])
-    .default('epal-1'),
+  palletPreset: z.enum(PALLET_PRESET_IDS).default('epal-1'),
 
   /**
    * Which pallet face looks at the aisle.

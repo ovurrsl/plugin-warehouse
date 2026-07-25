@@ -14,7 +14,7 @@ import type { PalletRackNode } from './schema'
  */
 
 export type SlotAddress = {
-  /** 1-based. Always present; a single run is row 1. */
+  /** 1-based back-to-back side. Always present; a single run is row 1. */
   row: number
   /** 1-based along the run. */
   bay: number
@@ -22,6 +22,9 @@ export type SlotAddress = {
   level: number
   /** 1-based across the bay, left to right in the rack's local +X. */
   position: number
+  /** 1-based into the bay from the aisle. 1 is the front, 2 the rear of a
+   *  double-deep bay. */
+  depth: number
 }
 
 export type Slot = SlotAddress & {
@@ -32,27 +35,44 @@ export type Slot = SlotAddress & {
   footprint: [number, number]
   /** Clear height above the slot surface before the next beam. */
   clearHeight: number
+  /**
+   * Whether a truck can reach this pallet without first moving another.
+   *
+   * False only for the rear position of a double-deep bay. Worth carrying on
+   * the slot rather than recomputing: "how many locations, and how many of them
+   * directly accessible" is the pair of numbers that actually describes a
+   * high-density layout, and reporting only the total flatters it.
+   */
+  directAccess: boolean
 }
 
-/** `R1-B2-L3-P1`. Stable across a `backToBack` toggle, which is why the row is
- *  always written even for a single run — otherwise every stored address on
- *  every pallet would shift meaning the moment the rack gained a second row. */
-export function formatSlotAddress({ row, bay, level, position }: SlotAddress): string {
-  return `R${row}-B${bay}-L${level}-P${position}`
+/**
+ * `R1-B2-L3-P1-D1`.
+ *
+ * Every component is always written, including the ones that are constant in a
+ * simple rack. That is deliberate: a single run is row 1, a single-deep bay is
+ * depth 1, so turning on `backToBack` or `depthPositions` cannot change what an
+ * already-stored address means. Omitting the constant parts would save a few
+ * characters and silently re-point every pallet in the scene the first time
+ * somebody widened a rack.
+ */
+export function formatSlotAddress({ row, bay, level, position, depth }: SlotAddress): string {
+  return `R${row}-B${bay}-L${level}-P${position}-D${depth}`
 }
 
-const ADDRESS_PATTERN = /^R(\d+)-B(\d+)-L(\d+)-P(\d+)$/
+const ADDRESS_PATTERN = /^R(\d+)-B(\d+)-L(\d+)-P(\d+)-D(\d+)$/
 
 export function parseSlotAddress(address: string): SlotAddress | null {
   const match = ADDRESS_PATTERN.exec(address)
   if (!match) return null
-  const [, row, bay, level, position] = match
-  if (!row || !bay || !level || !position) return null
+  const [, row, bay, level, position, depth] = match
+  if (!row || !bay || !level || !position || !depth) return null
   return {
     row: Number(row),
     bay: Number(bay),
     level: Number(level),
     position: Number(position),
+    depth: Number(depth),
   }
 }
 
@@ -68,9 +88,15 @@ export function totalWidth(rack: PalletRackNode): number {
   return rack.bayCount * bayPitch(rack) + rack.uprightWidth
 }
 
+/** Depth of one run, including its rear position when double-deep. */
+export function rowDepth(rack: PalletRackNode): number {
+  return rack.depthPositions * rack.depth + (rack.depthPositions - 1) * rack.depthGap
+}
+
 /** Outer depth, counting the second run and the gap when back to back. */
 export function totalDepth(rack: PalletRackNode): number {
-  return rack.backToBack ? 2 * rack.depth + rack.backToBackGap : rack.depth
+  const single = rowDepth(rack)
+  return rack.backToBack ? 2 * single + rack.backToBackGap : single
 }
 
 export function rowCount(rack: PalletRackNode): number {
@@ -80,8 +106,23 @@ export function rowCount(rack: PalletRackNode): number {
 /** Local Z of a row's centreline. Row 1 sits on +Z, row 2 on −Z. */
 export function rowCenterZ(rack: PalletRackNode, row: number): number {
   if (!rack.backToBack) return 0
-  const offset = (rack.depth + rack.backToBackGap) / 2
+  const offset = (rowDepth(rack) + rack.backToBackGap) / 2
   return row === 1 ? offset : -offset
+}
+
+/**
+ * Local Z of a depth position's centre.
+ *
+ * Depth 1 is the aisle side, and each row faces its own aisle: row 1 opens onto
+ * +Z, row 2 onto −Z. Numbering both rows from their own aisle rather than from
+ * a global axis is what makes "D1 is the one you can reach" true on both sides
+ * of a back-to-back island.
+ */
+export function depthPositionZ(rack: PalletRackNode, row: number, depth: number): number {
+  const centre = rowCenterZ(rack, row)
+  const fromAisle = (depth - 0.5) * rack.depth + (depth - 1) * rack.depthGap
+  const outward = rowDepth(rack) / 2 - fromAisle
+  return row === 1 ? centre + outward : centre - outward
 }
 
 /** Local X of every upright frame centreline, left to right. */
@@ -225,22 +266,25 @@ export function slotsOf(rack: PalletRackNode): Slot[] {
   const slots: Slot[] = []
 
   for (let row = 1; row <= rowCount(rack); row++) {
-    const z = rowCenterZ(rack, row)
     for (let bay = 1; bay <= rack.bayCount; bay++) {
       const centreX = bayCenterX(rack, bay)
       for (const level of levels) {
         const y = levelSurfaceY(rack, level)
         const clearHeight = levelClearHeight(rack, level)
-        offsets.forEach((offset, index) => {
-          const address = { row, bay, level, position: index + 1 }
-          slots.push({
-            ...address,
-            id: formatSlotAddress(address),
-            localPosition: [centreX + offset, y, z],
-            footprint,
-            clearHeight,
+        for (let depth = 1; depth <= rack.depthPositions; depth++) {
+          const z = depthPositionZ(rack, row, depth)
+          offsets.forEach((offset, index) => {
+            const address = { row, bay, level, position: index + 1, depth }
+            slots.push({
+              ...address,
+              id: formatSlotAddress(address),
+              localPosition: [centreX + offset, y, z],
+              footprint,
+              clearHeight,
+              directAccess: depth === 1,
+            })
           })
-        })
+        }
       }
     }
   }
@@ -249,7 +293,59 @@ export function slotsOf(rack: PalletRackNode): Slot[] {
 
 /** Total storage positions — the denominator of every occupancy figure. */
 export function slotCount(rack: PalletRackNode): number {
-  return rowCount(rack) * rack.bayCount * storageLevels(rack).length * palletsPerLevel(rack)
+  return (
+    rowCount(rack) *
+    rack.bayCount *
+    storageLevels(rack).length *
+    palletsPerLevel(rack) *
+    rack.depthPositions
+  )
+}
+
+/**
+ * Positions a truck can reach without relocating another pallet.
+ *
+ * Reported alongside the total because a double-deep layout buys capacity by
+ * spending accessibility, and a single "locations" figure hides the trade
+ * entirely.
+ */
+export function directAccessSlotCount(rack: PalletRackNode): number {
+  return slotCount(rack) / rack.depthPositions
+}
+
+// ── Pallet support bars ─────────────────────────────────────────────────────
+
+/**
+ * Whether the pallets need bars under them to sit safely on the beams.
+ *
+ * A Euro pallet's three bottom deckboards run along its 1200 mm length. Stored
+ * narrow-side-out those boards cross the beams and carry the load. Turned
+ * long-side-out they lie *along* the beams, so the pallet is supported only at
+ * its two outer boards with nothing under the middle — which is why the
+ * catalogue makes support bars a requirement for that orientation rather than
+ * an accessory.
+ */
+export function requiresPalletSupportBars(rack: PalletRackNode): boolean {
+  return rack.palletOrientation === 'long-side-out'
+}
+
+/** Bars per pallet when the schema leaves it to be derived. */
+export function autoPalletSupportBars(rack: PalletRackNode): number {
+  return requiresPalletSupportBars(rack) ? 2 : 0
+}
+
+/** Declared bar count when set, otherwise the derived one. */
+export function palletSupportBarCount(rack: PalletRackNode): number {
+  return rack.palletSupportBars ?? autoPalletSupportBars(rack)
+}
+
+/**
+ * A rack turned long-side-out with the bars explicitly removed. Surfaced rather
+ * than silently corrected: the user may be modelling a rack that really is
+ * built that way, but nothing should report it as a sound configuration.
+ */
+export function hasUnsupportedPallets(rack: PalletRackNode): boolean {
+  return requiresPalletSupportBars(rack) && palletSupportBarCount(rack) === 0
 }
 
 export function slotById(rack: PalletRackNode, address: string): Slot | null {

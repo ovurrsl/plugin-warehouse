@@ -1,31 +1,37 @@
-import type { Plugin, AnyNodeDefinition } from '@pascal-app/core';
-import { definition } from './definition';
-import { euroPalletDefinition } from './euro-pallet/definition';
+import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
+import { registerEditorHostPanel } from '@pascal-app/editor'
+
+import { conveyorDefinition } from './items/conveyor/definition'
+import { euroPalletDefinition } from './items/euro-pallet/definition'
+import { loadedEuroPalletDefinition } from './items/loaded-euro-pallet/definition'
+import { palletRackDefinition } from './items/pallet-rack/definition'
+import { toteCartDefinition } from './items/tote-cart/definition'
+import { warehouseHostPanel, warehousePanel } from './panel'
+
+// Register the custom plugin panel in the editor's left sidebar
+if (typeof registerEditorHostPanel === 'function') {
+  registerEditorHostPanel(warehouseHostPanel)
+}
 
 export const warehousePlugin: Plugin = {
-  id: 'pascal:warehouse',
+  id: 'ovurr:warehouse',
   apiVersion: 1,
   nodes: [
-    definition as unknown as AnyNodeDefinition,
-    euroPalletDefinition as unknown as AnyNodeDefinition
+    palletRackDefinition as unknown as AnyNodeDefinition,
+    euroPalletDefinition as unknown as AnyNodeDefinition,
+    loadedEuroPalletDefinition as unknown as AnyNodeDefinition,
+    conveyorDefinition as unknown as AnyNodeDefinition,
+    toteCartDefinition as unknown as AnyNodeDefinition,
   ],
-};
+}
 
-// Panel configuration for the editor's left rail
-export const warehouseHostPanel = {
-  id: 'pascal:warehouse:panel',
-  label: 'Warehouse',
-  icon: { kind: 'url', src: 'https://cdn.jsdelivr.net/npm/@mdi/svg@7.2.96/svg/warehouse.svg' }, // Example icon
-  component: () => import('./presets-panel'),
-  pluginId: warehousePlugin.id,
-  description: 'Logistics and warehouse equipment.',
-  creator: {
-    name: 'Pascal',
-    url: 'https://github.com/pascalorg',
-  },
-  pluginUrl: 'https://github.com/pascalorg/plugin-warehouse',
-  defaultInstalled: true,
-};
-
-export { definition, euroPalletDefinition };
-export * from './schema';
+export {
+  conveyorDefinition,
+  euroPalletDefinition,
+  loadedEuroPalletDefinition,
+  palletRackDefinition,
+  toteCartDefinition,
+  warehouseHostPanel,
+  warehousePanel,
+}
+export default warehousePlugin

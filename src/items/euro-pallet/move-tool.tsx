@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react'
 import type { AssetInput } from '@pascal-app/core'
 import type { EuroPalletNode } from './schema'
-import { WarehouseMoveTool } from '../components/warehouse-move-tool'
+import { WarehouseMoveTool } from '../../components/warehouse-move-tool'
 
 export function EuroPalletMoveTool({ node }: { node: EuroPalletNode }) {
   const dummyAsset = useMemo<AssetInput>(

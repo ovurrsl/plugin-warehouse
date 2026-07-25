@@ -2,8 +2,7 @@
 
 import { emitter, type GridEvent, sceneRegistry, snapPointToGrid } from '@pascal-app/core'
 import { useEditor } from '@pascal-app/editor'
-import { useEffect, useRef, useState } from 'react'
-import { type Group, Vector3 } from 'three'
+import { Vector3 } from 'three'
 import { asSlab, type SlabLike, slabAt } from './host-adapter'
 
 /**
@@ -17,6 +16,43 @@ import { asSlab, type SlabLike, slabAt } from './host-adapter'
  */
 
 const worldVec = new Vector3()
+
+/**
+ * Kinds whose click event must also commit a placement.
+ *
+ * Listening only to `grid:click` looks correct and quietly loses commits: R3F
+ * dispatches a click to the nearest mesh, so a click on what the user reads as
+ * "the floor" is usually a slab, and over a placed object it is that object.
+ * Mirrors the host's own trigger list, plus this plugin's kinds so a pallet can
+ * be placed while the cursor is over another one.
+ */
+const CLICK_TRIGGER_KINDS = [
+  'grid',
+  'shelf',
+  'item',
+  'slab',
+  'ceiling',
+  'wall',
+  'fence',
+  'column',
+  'roof',
+  'roof-segment',
+  'stair',
+  'stair-segment',
+  'warehouse:pallet',
+] as const
+
+export type PlacementClickEvent = { stopPropagation?: () => void }
+
+export function subscribePlacementClicks(
+  handler: (event: PlacementClickEvent) => void,
+): () => void {
+  const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
+  for (const name of events) emitter.on(name as never, handler as never)
+  return () => {
+    for (const name of events) emitter.off(name as never, handler as never)
+  }
+}
 
 /** Snap a planar position when grid snapping is the active mode, reading the
  * same toggle and step the built-in item tools use so plugin nodes snap like
@@ -55,7 +91,7 @@ export function toLevelLocal(
  * centimetre past a slab edge would silently leave the count.
  *
  * Reads host slabs through the adapter, so a change to the slab schema costs
- * the pallet its `supportSlabId` and nothing more.
+ * the node its `supportSlabId` and nothing more.
  */
 export function electSupportSlab(
   nodes: Readonly<Record<string, unknown>>,
@@ -74,52 +110,21 @@ export function electSupportSlab(
   return slabAt(slabs, x, z)?.id ?? null
 }
 
+export type GridMoveHandler = (levelLocal: [number, number, number], event: GridEvent) => void
+
 /**
- * Ghosts a preview at the snapped cursor and commits on click.
+ * Subscribe to cursor movement over the grid, snapped.
  *
- * `onCommit` is read through a ref so a tool can close over live brush state
- * without re-subscribing to the emitter on every render.
- *
- * Commits use the position from the last `grid:move`, not the click event's
- * own. A click reports the ray's hit point, which on a vertical face is
+ * Commits elsewhere use the position from the last move rather than the click
+ * event's own: a click reports the ray's hit point, which on a vertical face is
  * somewhere up a wall rather than on the floor the user was aiming at.
  */
-export function usePlacement(
-  activeLevelId: string | null,
-  onCommit: (levelLocalPosition: [number, number, number]) => void,
-) {
-  const cursorRef = useRef<Group>(null)
-  const [cursorVisible, setCursorVisible] = useState(false)
-  const commitRef = useRef(onCommit)
-  commitRef.current = onCommit
-
-  useEffect(() => {
-    if (!activeLevelId) return
-    setCursorVisible(false)
-    let lastWorld: [number, number, number] | null = null
-
-    const onMove = (event: GridEvent) => {
-      setCursorVisible(true)
-      const [lx, , lz] = event.localPosition
-      const [sx, sz] = snapXZ(lx, lz)
-      cursorRef.current?.position.set(sx, 0, sz)
-      lastWorld = event.position
-    }
-
-    const onClick = (event: GridEvent) => {
-      const world = lastWorld ?? event.position
-      const [lx, , lz] = toLevelLocal(activeLevelId, world)
-      const [sx, sz] = snapXZ(lx, lz)
-      commitRef.current([sx, 0, sz])
-    }
-
-    emitter.on('grid:move', onMove)
-    emitter.on('grid:click', onClick)
-    return () => {
-      emitter.off('grid:move', onMove)
-      emitter.off('grid:click', onClick)
-    }
-  }, [activeLevelId])
-
-  return { cursorRef, cursorVisible }
+export function subscribeGridMove(handler: GridMoveHandler): () => void {
+  const onMove = (event: GridEvent) => {
+    const [lx, , lz] = event.localPosition
+    const [sx, sz] = snapXZ(lx, lz)
+    handler([sx, 0, sz], event)
+  }
+  emitter.on('grid:move', onMove)
+  return () => emitter.off('grid:move', onMove)
 }

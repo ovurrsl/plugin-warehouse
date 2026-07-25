@@ -43,13 +43,16 @@ const ROTATION_STEP = Math.PI / 4
  * rack snaps, aligns, measures and refuses overlaps exactly like a built-in
  * kind rather than approximately like one.
  *
- * The one addition is Shift-click, which places a row of parallel runs in a
- * single gesture. That exists because of a design decision this node made
- * deliberately: one node is one run, rather than one node holding N parallel
- * rows. Separate nodes are what let identical racks share a mesh, keep aisles
- * genuinely empty for collision, and let runs differ in length around columns —
- * but they cost the convenience of typing "5 rows". This gesture buys it back
- * without giving up any of that.
+ * `[` and `]` change the bay count while placing, which is the dimension you
+ * actually adjust against a wall you can see. Length comes from bays rather
+ * than from placing several runs: bays share their frames, so one node of
+ * twenty bays is one merged mesh and one draw call, where twenty single-bay
+ * nodes would be twenty of each.
+ *
+ * There is deliberately no Shift gesture here. The host binds Shift to cycling
+ * the snapping mode whenever a snap context is active, and this kind declares
+ * `snapProfile: 'item'`, so a tool-local Shift would fire both at once — the
+ * user reaching for one behaviour and silently getting the other as well.
  */
 export default function PalletRackTool() {
   const activeLevelId = useViewer((s) => s.selection.levelId)
@@ -65,7 +68,6 @@ export default function PalletRackTool() {
   const rotationRef = useRef(0)
   const validRef = useRef(true)
   const altRef = useRef(false)
-  const shiftRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
 
@@ -90,7 +92,6 @@ export default function PalletRackTool() {
     previousSnapRef.current = null
     rotationRef.current = 0
     altRef.current = false
-    shiftRef.current = false
     validRef.current = true
     setCursorRotationY(0)
 
@@ -185,45 +186,8 @@ export default function PalletRackTool() {
       }
 
       const placed: string[] = []
-      const first = commitAt(position)
-      if (first) placed.push(first)
-
-      if (shiftRef.current) {
-        // A row of parallel runs, marching away from the aisle face. Each is a
-        // separate node, so they still share one mesh and each aisle between
-        // them stays free for anything else to be placed in.
-        const store = useWarehouseStore.getState()
-        const stride = totalDepth(previewNode) + store.rackAisleGap
-        const forward: [number, number] = [
-          -Math.sin(rotationRef.current),
-          -Math.cos(rotationRef.current),
-        ]
-        for (let index = 1; index < store.rackRowRepeat; index++) {
-          const next: [number, number, number] = [
-            position[0] + forward[0] * stride * index,
-            position[1],
-            position[2] + forward[1] * stride * index,
-          ]
-          const visual = getFloorStackPreviewPosition({
-            node: previewNode as unknown as AnyNode,
-            position: next,
-            rotation: [0, rotationRef.current, 0],
-            levelId: activeLevelId,
-          })
-          // Stop at the first blocked position rather than skipping it and
-          // carrying on — a row with a hole in it is never what was meant.
-          const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
-            activeLevelId,
-            visual,
-            boxDimensions,
-            [0, rotationRef.current, 0],
-            [],
-          )
-          if (!placeable) break
-          const id = commitAt(next)
-          if (id) placed.push(id)
-        }
-      }
+      const committed = commitAt(position)
+      if (committed) placed.push(committed)
 
       useViewer.getState().setSelection({ selectedIds: placed as AnyNodeId[] })
       triggerSFX('sfx:item-place')
@@ -239,9 +203,8 @@ export default function PalletRackTool() {
     })
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Alt' || event.key === 'Shift') {
-        if (event.key === 'Alt') altRef.current = true
-        else shiftRef.current = true
+      if (event.key === 'Alt') {
+        altRef.current = true
         const position = lastPositionRef.current
         if (position) applyCursor(position)
         return
@@ -271,9 +234,8 @@ export default function PalletRackTool() {
     }
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === 'Alt') altRef.current = false
-      else if (event.key === 'Shift') shiftRef.current = false
-      else return
+      if (event.key !== 'Alt') return
+      altRef.current = false
       const position = lastPositionRef.current
       if (position) applyCursor(position)
     }

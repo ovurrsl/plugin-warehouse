@@ -91,7 +91,7 @@ export const palletRackDefinition = {
     { key: 'Left click', label: 'Place rack' },
     { key: 'R / T', label: 'Rotate 45°' },
     { key: '[ / ]', label: 'Bays' },
-    { key: 'Shift+click', label: 'Place a row of racks' },
+    { key: 'Shift', label: 'Cycle snapping mode' },
     { key: 'Alt', label: 'Force place' },
     { key: 'Esc', label: 'Cancel' },
   ],

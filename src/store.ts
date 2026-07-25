@@ -58,12 +58,6 @@ type WarehouseStore = {
    */
   rackBrush: RackBrush
   setRackBrush: (patch: Partial<RackBrush>) => void
-
-  /** Runs placed by one Shift-click, and the clear aisle left between them. */
-  rackRowRepeat: number
-  setRackRowRepeat: (count: number) => void
-  rackAisleGap: number
-  setRackAisleGap: (gap: number) => void
 }
 
 export type RackBrush = Pick<
@@ -121,12 +115,4 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     ghostFill: 0,
   },
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
-
-  // A reach-truck aisle. Wide enough that the default row actually works, and
-  // the one figure most likely to be changed per warehouse.
-  rackRowRepeat: 4,
-  setRackRowRepeat: (rackRowRepeat) =>
-    set({ rackRowRepeat: Math.max(1, Math.round(rackRowRepeat)) }),
-  rackAisleGap: 2.8,
-  setRackAisleGap: (rackAisleGap) => set({ rackAisleGap: Math.max(0, rackAisleGap) }),
 }))

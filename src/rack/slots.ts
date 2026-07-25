@@ -138,6 +138,118 @@ export function bayCenterX(rack: PalletRackNode, bay: number): number {
   return -totalWidth(rack) / 2 + rack.uprightWidth / 2 + (bay - 1) * pitch + pitch / 2
 }
 
+// ── Bays ────────────────────────────────────────────────────────────────────
+
+export type BayOverride = NonNullable<PalletRackNode['bayOverrides'][string]>
+
+/** `R1-B3`. Same form the slot addresses use, so a bay key and a slot address
+ *  name the same bay and both survive a `backToBack` toggle. */
+export function formatBayAddress(row: number, bay: number): string {
+  return `R${row}-B${bay}`
+}
+
+const BAY_ADDRESS = /^R(\d+)-B(\d+)$/
+
+export function parseBayAddress(address: string): { row: number; bay: number } | null {
+  const match = BAY_ADDRESS.exec(address)
+  if (!match) return null
+  const [, row, bay] = match
+  if (!row || !bay) return null
+  return { row: Number(row), bay: Number(bay) }
+}
+
+export function bayOverrideOf(rack: PalletRackNode, row: number, bay: number): BayOverride {
+  return rack.bayOverrides[formatBayAddress(row, bay)] ?? {}
+}
+
+/** A skipped bay is a deliberate gap — for a column, a doorway — so the run
+ *  keeps its length and only this bay's contents are omitted. */
+export function isBaySkipped(rack: PalletRackNode, row: number, bay: number): boolean {
+  return bayOverrideOf(rack, row, bay).skipped === true
+}
+
+/** Lowest levels of a bay left open as a walkway. The frames stay: they carry
+ *  the levels above. */
+export function bayTunnelLevels(rack: PalletRackNode, row: number, bay: number): number {
+  return Math.max(0, bayOverrideOf(rack, row, bay).tunnelLevels ?? 0)
+}
+
+/** Beam levels present in a bay, never more than the run's own fitted count. */
+export function bayLevelCount(rack: PalletRackNode, row: number, bay: number): number {
+  const override = bayOverrideOf(rack, row, bay).levels
+  const fitted = fittedLevelCount(rack)
+  return override === undefined ? fitted : Math.max(0, Math.min(fitted, override))
+}
+
+/** Storage levels actually present in a bay, floor first when enabled. */
+export function bayStorageLevels(rack: PalletRackNode, row: number, bay: number): number[] {
+  if (isBaySkipped(rack, row, bay)) return []
+  const tunnel = bayTunnelLevels(rack, row, bay)
+  return storageLevels(rack).filter(
+    (level) => level >= tunnel && level <= bayLevelCount(rack, row, bay),
+  )
+}
+
+/** Decking for a bay, falling back to the run's. */
+export function bayDecking(
+  rack: PalletRackNode,
+  row: number,
+  bay: number,
+): PalletRackNode['decking'] {
+  return bayOverrideOf(rack, row, bay).decking ?? rack.decking
+}
+
+/**
+ * Whether an upright frame is worth erecting.
+ *
+ * Frames are shared, so frame `index` stands between bay `index` and bay
+ * `index + 1`. It is needed when either neighbour is present — which means a
+ * skipped bay in the middle of a run keeps both its frames (they carry the bays
+ * either side), while a skipped bay at the end takes the outermost frame with
+ * it. Erecting all of them regardless would leave a post standing in the gap
+ * the skip was cut for.
+ */
+export function isFramePresent(rack: PalletRackNode, row: number, index: number): boolean {
+  const left = index >= 1 && !isBaySkipped(rack, row, index)
+  const right = index + 1 <= rack.bayCount && !isBaySkipped(rack, row, index + 1)
+  return left || right
+}
+
+/** Bays that are actually built, 1-based. */
+export function presentBays(rack: PalletRackNode, row: number): number[] {
+  const bays: number[] = []
+  for (let bay = 1; bay <= rack.bayCount; bay++) {
+    if (!isBaySkipped(rack, row, bay)) bays.push(bay)
+  }
+  return bays
+}
+
+/**
+ * The bay a point in the rack's local frame falls in, or null for the gap
+ * between runs and beyond the ends.
+ *
+ * This is what makes per-bay selection cost nothing. The host has no sub-node
+ * selection, and the alternative — one child node per bay, the way cabinet
+ * modules work — is one more draw call per bay, so a twenty-bay run in a
+ * thousand-rack warehouse would add twenty thousand. A click already carries
+ * its hit point in the node's local frame, so the bay is arithmetic.
+ */
+export function bayAt(
+  rack: PalletRackNode,
+  localX: number,
+  localZ: number,
+): { row: number; bay: number } | null {
+  const row = rowCount(rack) === 1 ? 1 : localZ >= 0 ? 1 : 2
+  const centre = rowCenterZ(rack, row)
+  if (Math.abs(localZ - centre) > rowDepth(rack) / 2) return null
+
+  const pitch = bayPitch(rack)
+  const fromLeft = localX + totalWidth(rack) / 2 - rack.uprightWidth / 2
+  const bay = Math.floor(fromLeft / pitch) + 1
+  if (bay < 1 || bay > rack.bayCount) return null
+  return { row, bay }
+}
+
 // ── Levels ──────────────────────────────────────────────────────────────────
 
 export type LevelType = 'pallet' | 'picking'
@@ -441,8 +553,13 @@ export function palletSlotsOf(rack: PalletRackNode): Slot[] {
 
   for (let row = 1; row <= rowCount(rack); row++) {
     for (let bay = 1; bay <= rack.bayCount; bay++) {
+      // A skipped bay holds nothing, and a tunnel's open levels hold nothing —
+      // counting them would report capacity the rack does not have.
+      const present = new Set(bayStorageLevels(rack, row, bay))
+      if (present.size === 0) continue
       const centreX = bayCenterX(rack, bay)
       for (const level of levels) {
+        if (!present.has(level)) continue
         const y = levelSurfaceY(rack, level)
         const clearHeight = levelClearHeight(rack, level)
         for (let depth = 1; depth <= rack.depthPositions; depth++) {
@@ -467,13 +584,10 @@ export function palletSlotsOf(rack: PalletRackNode): Slot[] {
 
 /** Total pallet positions — the denominator of every pallet occupancy figure. */
 export function palletSlotCount(rack: PalletRackNode): number {
-  return (
-    rowCount(rack) *
-    rack.bayCount *
-    palletLevels(rack).length *
-    palletsPerLevel(rack) *
-    rack.depthPositions
-  )
+  // Counted from the enumeration rather than multiplied out. The moment bays
+  // can differ — a skip here, a tunnel there — a product of totals stops
+  // describing the rack, and it fails silently: the figure stays plausible.
+  return palletSlotsOf(rack).length
 }
 
 /**
@@ -535,13 +649,7 @@ export function pickingSlotsOf(rack: PalletRackNode): Slot[] {
 
 /** Total container positions across every picking level. */
 export function pickingSlotCount(rack: PalletRackNode): number {
-  return (
-    rowCount(rack) *
-    rack.bayCount *
-    pickingLevelsOf(rack).length *
-    pickingBoxesAcross(rack) *
-    pickingBoxesDeep(rack)
-  )
+  return pickingSlotsOf(rack).length
 }
 
 // ── Pallet support bars ─────────────────────────────────────────────────────

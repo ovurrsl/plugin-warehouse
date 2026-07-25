@@ -227,6 +227,7 @@ describe('cache key coverage', () => {
     ['levelClear', 1.7],
     ['groundLevelStorage', false],
     ['hasGroundBeam', true],
+    ['bayOverrides', { 'R1-B2': { skipped: true } }],
     ['pickingLevels', 2],
     ['levelTypes', ['picking', 'pallet', 'pallet', 'pallet']],
     ['pickingLevelClear', 0.8],

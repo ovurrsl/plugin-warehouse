@@ -79,6 +79,49 @@ export const PalletRackNode = BaseNode.extend({
   /** Rated load per beam level, kg. Reported by the capacity panel. */
   levelCapacity: z.number().min(0).max(20_000).default(3000),
 
+  // ── Per-bay overrides ─────────────────────────────────────────────────────
+
+  /**
+   * Departures from the run's uniform shape, keyed `R1-B3`.
+   *
+   * Real runs are not uniform: a column lands mid-aisle, a door needs a gap, a
+   * fire route crosses the block. Rather than forcing the user to break one run
+   * into three, a bay can opt out or shorten.
+   *
+   * Uses the same `R{row}-B{bay}` form the slot addresses do, so a bay key and
+   * a slot address name the same bay, and both stay meaningful when
+   * `backToBack` is switched on.
+   *
+   * Keeping this empty is the fast path: an override makes a rack's geometry
+   * unique, so a run of fifty identical racks that would share one mesh becomes
+   * fifty meshes. Uniform racks are unaffected.
+   */
+  bayOverrides: z
+    .record(
+      z.string(),
+      z.object({
+        /**
+         * The bay is left out entirely — no beams, no decking, no goods. The
+         * run keeps its overall length: a skipped bay is a deliberate gap for
+         * a column or a doorway, not a shortening.
+         */
+        skipped: z.boolean().optional(),
+        /**
+         * Lowest N levels left open as a walkway through the run.
+         *
+         * A safety passageway, which regulations require through long blocks.
+         * The frames stay — they carry the levels above — but the beams and
+         * everything on them are omitted below this height.
+         */
+        tunnelLevels: z.number().int().min(0).max(15).optional(),
+        /** Fewer beam levels than the run, e.g. under a sloping roof. */
+        levels: z.number().int().min(0).max(15).optional(),
+        /** Decking that differs from the run's. */
+        decking: z.enum(['wire-mesh', 'steel', 'timber', 'open']).optional(),
+      }),
+    )
+    .default({}),
+
   // ── Picking levels ────────────────────────────────────────────────────────
 
   /**

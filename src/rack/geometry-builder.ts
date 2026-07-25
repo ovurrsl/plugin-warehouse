@@ -260,6 +260,14 @@ export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): strin
     rack.bracing,
     rack.decking,
     rack.hasGroundBeam ? 1 : 0,
+    // Skips, tunnels and per-bay levels each cut real steel out of the mesh, so
+    // a rack carrying one cannot share a geometry with a uniform one. Serialised
+    // in key order so two racks with the same overrides written in a different
+    // order still collapse onto one mesh.
+    Object.keys(rack.bayOverrides)
+      .sort()
+      .map((key) => `${key}:${JSON.stringify(rack.bayOverrides[key])}`)
+      .join(';'),
     rowCount(rack),
     rack.depthPositions,
     // Only reaches the geometry when there is a second run / a second position

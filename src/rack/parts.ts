@@ -1,9 +1,13 @@
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
+  bayDecking,
+  bayStorageLevels,
   beamedLevels,
   depthPositionZ,
   frameCentersX,
+  isBaySkipped,
+  isFramePresent,
   levelBeamHeight,
   levelHasShelf,
   levelSurfaceY,
@@ -86,7 +90,10 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
       const centerZ = depthPositionZ(rack, row, position)
       const postZ = [centerZ + postOffset, centerZ - postOffset]
 
-      for (const x of frames) {
+      frames.forEach((x, frameIndex) => {
+        // A frame only stands where a bay needs it. Erecting all of them
+        // regardless leaves a post in the gap a skip was cut for.
+        if (!isFramePresent(rack, row, frameIndex)) return
         postZ.forEach((z, side) => {
           if (full) {
             pushUprightSection(parts, x, z, rack, side === 0 ? 1 : -1)
@@ -114,11 +121,17 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
         if (full && rack.bracing !== 'open') {
           pushFrameBracing(parts, x, centerZ, rack)
         }
-      }
+      })
 
       for (let bay = 1; bay <= rack.bayCount; bay++) {
+        if (isBaySkipped(rack, row, bay)) continue
         const centerX = bayCenterX(rack, bay)
+        // Per-bay levels: a tunnel omits the lowest ones, an override can stop
+        // the bay short. Intersected with the run's beamed levels so a bay can
+        // never gain a level the frame does not carry.
+        const bayLevels = new Set(bayStorageLevels(rack, row, bay))
         for (const level of levels) {
+          if (!bayLevels.has(level)) continue
           const beamHeight = levelBeamHeight(rack, level)
           const surface = levelSurfaceY(rack, level)
           // Every other level hangs its beam under the load surface; a ground
@@ -164,8 +177,8 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
             }
           }
 
-          if (full && levelHasShelf(rack, level)) {
-            const thickness = shelfThickness(rack, level)
+          if (full && levelHasShelf(rack, level) && bayDecking(rack, row, bay) !== 'open') {
+            const thickness = shelfThickness(rack, level, bayDecking(rack, row, bay))
             // Flush-mounted: the panel drops between the beams and its top
             // finishes level with them, so the load surface stays exactly where
             // `levelSurfaceY` says it is and pallets do not float on a lip.
@@ -221,9 +234,13 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
 }
 
 /** Chipboard is three times a steel or mesh panel and it shows at the edge. */
-function shelfThickness(rack: PalletRackNode, level: number): number {
+function shelfThickness(
+  rack: PalletRackNode,
+  level: number,
+  decking: PalletRackNode['decking'],
+): number {
   if (levelBeamHeight(rack, level) === rack.pickingBeamHeight) return rack.pickingShelfThickness
-  return rack.decking === 'timber' ? 0.018 : 0.006
+  return decking === 'timber' ? 0.018 : 0.006
 }
 
 /**

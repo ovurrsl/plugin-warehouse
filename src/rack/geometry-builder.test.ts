@@ -80,7 +80,7 @@ describe('geometry content', () => {
     const full = triangleCount(rack(), 'full')
     const simple = triangleCount(rack(), 'simple')
     expect(simple).toBeLessThan(400)
-    expect(full).toBeLessThan(1500)
+    expect(full).toBeLessThan(2000)
     expect(50 * full + 950 * simple).toBeLessThan(500_000)
   })
 

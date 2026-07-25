@@ -1,13 +1,8 @@
 import * as THREE from 'three'
+import { type RackDetail, type RackPart, type RackPartRole, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
-  bayCenterX,
-  bayPitch,
   beamedLevels,
-  depthPositionZ,
-  frameCentersX,
-  levelBeamHeight,
-  levelHasShelf,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
@@ -42,8 +37,22 @@ type Sink = {
   positions: number[]
   normals: number[]
   colors: number[]
+  uvs: number[]
   indices: number[]
 }
+
+/**
+ * The material's map is a two-column atlas: the left column is blank and the
+ * right carries the punched slot pattern. Steering UVs into one column or the
+ * other is what lets an upright show its perforations while every other part
+ * stays plain — without a second material, and so without a second draw call
+ * per rack.
+ */
+const ATLAS_BLANK_U = 0.25
+const ATLAS_SLOT_U0 = 0.52
+const ATLAS_SLOT_U1 = 0.98
+/** Upright slots are punched every 50 mm, so the pattern repeats at that rate. */
+const SLOT_PITCH = 0.05
 
 /** Unit-cube faces as outward normal plus four CCW corners in half-extents. */
 const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, number]> }> = [
@@ -104,50 +113,23 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
 ]
 
 /**
- * Append an axis-aligned box.
+ * Append one part.
  *
  * Written straight into flat arrays rather than built from `BoxGeometry` and
- * merged: a merge allocates one geometry per part and then throws all 250 away,
- * where this touches only the arrays it fills. Flat normals need four vertices
- * per face, which is why the corners are not shared.
+ * merged: a merge allocates one geometry per part and then discards all 250.
+ * Flat normals need four vertices per face, which is why corners are not
+ * shared. `tiltX` is folded in here so bracing needs no separate path.
  */
-function emitBox(
-  sink: Sink,
-  center: readonly [number, number, number],
-  size: readonly [number, number, number],
-  color: readonly [number, number, number],
-): void {
-  const [cx, cy, cz] = center
-  const [hx, hy, hz] = [size[0] / 2, size[1] / 2, size[2] / 2]
-
-  for (const face of FACES) {
-    const base = sink.positions.length / 3
-    for (const corner of face.c) {
-      sink.positions.push(cx + corner[0] * hx, cy + corner[1] * hy, cz + corner[2] * hz)
-      sink.normals.push(face.n[0], face.n[1], face.n[2])
-      sink.colors.push(color[0], color[1], color[2])
-    }
-    sink.indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
-  }
-}
-
-/**
- * Append a box rotated about X, for frame bracing.
- *
- * Bracing runs diagonally in the frame's depth/height plane, so a single X
- * rotation covers it and a full matrix would be dead weight.
- */
-function emitTiltedBox(
-  sink: Sink,
-  center: readonly [number, number, number],
-  size: readonly [number, number, number],
-  angleX: number,
-  color: readonly [number, number, number],
-): void {
-  const [cx, cy, cz] = center
-  const [hx, hy, hz] = [size[0] / 2, size[1] / 2, size[2] / 2]
-  const cos = Math.cos(angleX)
-  const sin = Math.sin(angleX)
+function emitPart(sink: Sink, part: RackPart, color: readonly [number, number, number]): void {
+  const [cx, cy, cz] = part.center
+  const [hx, hy, hz] = [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
+  const tilt = part.tiltX ?? 0
+  const cos = Math.cos(tilt)
+  const sin = Math.sin(tilt)
+  // Repeat the pattern along the part's own height, so the slot pitch is the
+  // real 50 mm whatever the post length — a 0..1 map would stretch the holes
+  // further apart on a taller frame.
+  const vSpan = part.size[1] / SLOT_PITCH
 
   for (const face of FACES) {
     const base = sink.positions.length / 3
@@ -159,50 +141,19 @@ function emitTiltedBox(
       sink.positions.push(cx + corner[0] * hx, cy + y * cos - z * sin, cz + y * sin + z * cos)
       sink.normals.push(face.n[0], ny, nz)
       sink.colors.push(color[0], color[1], color[2])
+      if (part.perforated) {
+        // Only the broad faces carry holes; the paper-thin edges of a folded
+        // section would smear one pixel of the pattern across them.
+        const broad = Math.abs(face.n[1]) < 0.5
+        const u = broad
+          ? ATLAS_SLOT_U0 + (corner[0] > 0 ? 1 : 0) * (ATLAS_SLOT_U1 - ATLAS_SLOT_U0)
+          : ATLAS_BLANK_U
+        sink.uvs.push(u, broad ? (corner[1] > 0 ? 1 : 0) * vSpan : 0)
+      } else {
+        sink.uvs.push(ATLAS_BLANK_U, 0)
+      }
     }
     sink.indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
-  }
-}
-
-/**
- * A lipped C-section post, the shape racking uprights actually are.
- *
- * Five thin walls rather than a solid block: the web on the outer face, two
- * flanges reaching inward, and the return lips that stiffen them. Close up the
- * difference is obvious — you can see through the frame between the lips, and
- * the beam connectors have something to sit against. `simple` detail keeps the
- * solid box, since none of this survives past a few tens of metres.
- *
- * `facing` is +1 when the post's open side looks toward −Z and −1 when it looks
- * toward +Z, so the two posts of a frame mirror each other and both open inward.
- */
-function emitUpright(
-  sink: Sink,
-  x: number,
-  z: number,
-  width: number,
-  depth: number,
-  height: number,
-  facing: number,
-  color: readonly [number, number, number],
-): void {
-  const wall = 0.003
-  const lip = Math.min(0.02, width / 4)
-  const midY = height / 2
-
-  // Web, on the closed outer face.
-  emitBox(sink, [x, midY, z + facing * (depth / 2 - wall / 2)], [width, height, wall], color)
-
-  // Flanges, running the depth on both sides.
-  for (const side of [-1, 1]) {
-    emitBox(sink, [x + (side * (width - wall)) / 2, midY, z], [wall, height, depth - wall], color)
-    // Return lips, folded back in at the open edge.
-    emitBox(
-      sink,
-      [x + side * (width / 2 - lip / 2), midY, z - facing * (depth / 2 - wall / 2)],
-      [lip, height, wall],
-      color,
-    )
   }
 }
 
@@ -227,216 +178,39 @@ function toLinear(hex: string): [number, number, number] {
   return linear
 }
 
-const BRACING_COLOR = '#94a3b8'
-const FOOTPLATE_COLOR = '#334155'
-const SHELF_COLOR = '#9aa5b1'
-const SUPPORT_BAR_COLOR = '#cbd5e1'
+const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam'>, string> = {
+  footplate: '#334155',
+  brace: '#94a3b8',
+  connector: '#475569',
+  shelf: '#9aa5b1',
+  'support-bar': '#cbd5e1',
+  'row-spacer': '#94a3b8',
+}
 
-// ── Detail ──────────────────────────────────────────────────────────────────
-
-/**
- * How much of the rack to build.
- *
- * `simple` keeps the silhouette — posts and beams — and drops the bracing,
- * footplates, decking and support bars, which is around two thirds of the
- * parts and none of the readable shape past a few tens of metres. In a
- * warehouse most racks are always far away, so this is the difference between
- * the far field costing more than the near one and it costing almost nothing.
- */
-export type RackDetail = 'full' | 'simple'
+export type { RackDetail } from './parts'
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
 function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeometry {
-  const sink: Sink = { positions: [], normals: [], colors: [], indices: [] }
+  const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
   const uprightColor = toLinear(rack.uprightColor)
   const beamColor = toLinear(rack.beamColor)
-  const bracingColor = toLinear(BRACING_COLOR)
-  const footplateColor = toLinear(FOOTPLATE_COLOR)
-  const shelfColor = toLinear(SHELF_COLOR)
-  const barColor = toLinear(SUPPORT_BAR_COLOR)
 
-  const frames = frameCentersX(rack)
-  // The floor carries no beam unless asked — one there would block a truck
-  // reaching the ground position.
-  const levels = beamedLevels(rack)
-  const rows = rowCount(rack)
-  const { uprightWidth, uprightDepth, depth, uprightHeight } = rack
-  const halfPost = depth / 2 - uprightDepth / 2
-
-  for (let row = 1; row <= rows; row++) {
-    for (let position = 1; position <= rack.depthPositions; position++) {
-      const centerZ = depthPositionZ(rack, row, position)
-      const postZ = [centerZ + halfPost, centerZ - halfPost]
-
-      // Frames: two posts per line per depth position.
-      for (const x of frames) {
-        postZ.forEach((z, side) => {
-          if (detail === 'full') {
-            // Posts of a frame mirror each other so both open toward the bay.
-            emitUpright(
-              sink,
-              x,
-              z,
-              uprightWidth,
-              uprightDepth,
-              uprightHeight,
-              side === 0 ? 1 : -1,
-              uprightColor,
-            )
-          } else {
-            emitBox(
-              sink,
-              [x, uprightHeight / 2, z],
-              [uprightWidth, uprightHeight, uprightDepth],
-              uprightColor,
-            )
-          }
-          if (detail === 'full') {
-            // Catalogue footplates are wider than the post they carry — 175 ×
-            // 119 mm under a 122 × 80 upright — so they overhang it by about
-            // 26 mm each side. Real, and the reason the built mesh is slightly
-            // wider at the floor than the declared footprint.
-            emitBox(
-              sink,
-              [x, 0.01, z],
-              [uprightWidth + 0.053, 0.02, uprightDepth + 0.039],
-              footplateColor,
-            )
-          }
-        })
-
-        // Frame bracing zig-zags between the two posts, in the depth/height
-        // plane. Panel count follows the height so tall frames do not end up
-        // with a handful of very shallow diagonals.
-        if (detail === 'full' && rack.bracing !== 'open') {
-          // Bracing runs between nodes clear of both ends of the post: the
-          // lowest sits above the footplate and the highest below the top beam,
-          // which is how a frame is actually built. It also keeps the diagonals
-          // — whose rotated cross-section reaches a centimetre past their end
-          // nodes — from poking through the floor.
-          const braceBottom = 0.15
-          const braceTop = Math.max(braceBottom + 0.3, uprightHeight - 0.1)
-          const bracedHeight = braceTop - braceBottom
-          const panels = Math.max(3, Math.round(bracedHeight / 0.9))
-          const step = bracedHeight / panels
-          const span = depth - uprightDepth
-          const length = Math.hypot(step, span)
-          // The brace's local +Y must land on the (step, span) diagonal, so the
-          // rotation is atan2(span, step). Using its complement instead — the
-          // easy slip — swaps the two projections: the brace then spans the
-          // frame's depth vertically, overshooting one panel's height, and the
-          // bottom one drives 10 cm through the floor.
-          const angle = Math.atan2(span, step)
-
-          // Horizontal ties close the frame at both ends of the braced run.
-          // A frame with only diagonals reads as unfinished, and on the real
-          // article these are what the diagonals terminate into.
-          for (const y of [braceBottom, braceTop]) {
-            emitBox(sink, [x, y, centerZ], [0.03, 0.03, span], bracingColor)
-          }
-
-          for (let panel = 0; panel < panels; panel++) {
-            const midY = braceBottom + (panel + 0.5) * step
-            const sign = panel % 2 === 0 ? 1 : -1
-            emitTiltedBox(
-              sink,
-              [x, midY, centerZ],
-              [0.03, length, 0.03],
-              sign * angle,
-              bracingColor,
-            )
-            if (rack.bracing === 'x-bracing') {
-              emitTiltedBox(
-                sink,
-                [x, midY, centerZ],
-                [0.03, length, 0.03],
-                -sign * angle,
-                bracingColor,
-              )
-            }
-          }
-        }
-      }
-
-      // Beams, shelves and support bars, per bay per level.
-      for (let bay = 1; bay <= rack.bayCount; bay++) {
-        const centerX = bayCenterX(rack, bay)
-        for (const level of levels) {
-          const beamHeight = levelBeamHeight(rack, level)
-          const surface = levelSurfaceY(rack, level)
-          // Every other level hangs its beam under the load surface; the
-          // ground beam has no surface above it to hang from, so it sits on the
-          // floor instead of half-buried in it.
-          const beamY = level === 0 ? beamHeight / 2 : surface - beamHeight / 2
-          for (const z of postZ) {
-            emitBox(
-              sink,
-              [centerX, beamY, z],
-              [bayPitch(rack), beamHeight, rack.beamThickness],
-              beamColor,
-            )
-          }
-
-          // Decking is a thin plate tucked between the beams — invisible past a
-          // few tens of metres, and nine of them on a three-bay rack. Dropping
-          // it from the far tier is most of what makes that tier cheap.
-          if (detail === 'full' && levelHasShelf(rack, level)) {
-            // Chipboard is three times the thickness of a steel or mesh panel,
-            // and it is visible at the shelf edge.
-            const thickness =
-              levelBeamHeight(rack, level) === rack.pickingBeamHeight
-                ? rack.pickingShelfThickness
-                : rack.decking === 'timber'
-                  ? 0.018
-                  : 0.006
-            emitBox(
-              sink,
-              [centerX, surface + thickness / 2, centerZ],
-              [rack.bayClearWidth, thickness, depth - uprightDepth],
-              shelfColor,
-            )
-          }
-
-          if (detail === 'full') {
-            const bars = palletSupportBarCount(rack)
-            if (bars > 0) {
-              for (const offset of slotOffsetsX(rack)) {
-                const inset = ((bars - 1) / 2) * 0.25
-                for (let bar = 0; bar < bars; bar++) {
-                  emitBox(
-                    sink,
-                    [centerX + offset - inset + bar * 0.25, surface + 0.015, centerZ],
-                    [0.04, 0.03, depth - uprightDepth],
-                    barColor,
-                  )
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  // Row spacers tie a back-to-back pair together. Two ties per frame line is
-  // what the catalogue shows, near the base and near the top.
-  if (detail === 'full' && rack.backToBack) {
-    const innerZ1 = depthPositionZ(rack, 1, rack.depthPositions) - depth / 2
-    const innerZ2 = depthPositionZ(rack, 2, rack.depthPositions) + depth / 2
-    const spanZ = innerZ1 - innerZ2
-    const midZ = (innerZ1 + innerZ2) / 2
-    for (const x of frames) {
-      for (const y of [uprightHeight * 0.15, uprightHeight * 0.85]) {
-        emitBox(sink, [x, y, midZ], [uprightWidth * 0.6, 0.05, spanZ], bracingColor)
-      }
-    }
+  for (const part of rackParts(rack, detail)) {
+    const color =
+      part.role === 'upright'
+        ? uprightColor
+        : part.role === 'beam'
+          ? beamColor
+          : toLinear(ROLE_COLORS[part.role])
+    emitPart(sink, part, color)
   }
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(sink.positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(sink.normals, 3))
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(sink.colors, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(sink.uvs, 2))
   geometry.setIndex(sink.indices)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()

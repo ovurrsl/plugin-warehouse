@@ -1,9 +1,9 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { type RackPart, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
   depthPositionZ,
-  frameCentersX,
   orientedPalletFootprint,
   rowCount,
   slotOffsetsX,
@@ -12,18 +12,34 @@ import {
 } from './slots'
 
 /**
- * The plan symbol: the run outline, every upright frame, and the pallet
- * positions inside each bay.
+ * The plan symbol, projected from the same part list the 3D model is built
+ * from.
  *
- * A rack in plan is read for two things — where the steel is and how many
- * positions it holds — so both are drawn rather than a filled rectangle. The
- * positions come from the same `slotOffsetsX` the 3D geometry and the capacity
- * count use, so a bay that reports three pallets always shows three.
+ * That is the point of it. "The plan matches the model" is only a fact if there
+ * is one description of where the steel is. The earlier version recomputed
+ * frame positions here from the same inputs, which agrees exactly until one of
+ * the two files is edited — and then disagrees silently, because nothing
+ * compares them. A test now asserts every part drawn in plan sits where its 3D
+ * box does.
  *
  * SVG `rotate()` is clockwise with y pointing down while three.js rotates
- * counter-clockwise about +Y, so the plan rotation negates the node's. Invisible
- * at 0° and obvious at 90°.
+ * counter-clockwise about +Y, so the plan rotation negates the node's.
+ * Invisible at 0° and obvious at 90°.
  */
+
+/**
+ * Roles worth drawing in plan.
+ *
+ * A brace is a diagonal in the frame's vertical plane, so seen from above it is
+ * a line the posts already cover; footplates hide under them. Drawing either
+ * only thickens the symbol without adding information.
+ */
+export const PLAN_ROLES: ReadonlySet<RackPart['role']> = new Set<RackPart['role']>([
+  'upright',
+  'beam',
+  'row-spacer',
+])
+
 export function buildPalletRackFloorplan(
   node: PalletRackNode,
   ctx: GeometryContext,
@@ -35,8 +51,9 @@ export function buildPalletRackFloorplan(
 
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#1e40af'
   const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#dbeafe'
-  const steelStroke = selected ? stroke : '#1e3a8a'
   const palletStroke = selected ? stroke : '#b45309'
+  const steelFill = selected ? stroke : '#1e3a8a'
+  const beamFill = selected ? stroke : '#c2410c'
 
   const children: FloorplanGeometry[] = [
     {
@@ -54,33 +71,31 @@ export function buildPalletRackFloorplan(
     },
   ]
 
-  const halfPost = node.depth / 2 - node.uprightDepth / 2
+  // Steel, straight off the 3D part list. Always full detail: the plan shows
+  // the frames whatever tier the 3D viewport happens to be drawing.
+  for (const part of rackParts(node, 'full')) {
+    if (!PLAN_ROLES.has(part.role)) continue
+    const partFill = part.role === 'beam' ? beamFill : steelFill
+    children.push({
+      kind: 'rect',
+      x: part.center[0] - part.size[0] / 2,
+      y: part.center[2] - part.size[2] / 2,
+      width: part.size[0],
+      height: part.size[2],
+      fill: partFill,
+      stroke: partFill,
+      strokeWidth: 0.004,
+    })
+  }
 
+  // Pallet positions. Outline-only: a plan is read for how the positions divide
+  // the bay, and filling them buries the frames at the zoom a layout is
+  // actually worked at.
+  const offsets = slotOffsetsX(node)
+  const [alongRun, intoDepth] = orientedPalletFootprint(node)
   for (let row = 1; row <= rowCount(node); row++) {
     for (let position = 1; position <= node.depthPositions; position++) {
       const centerZ = depthPositionZ(node, row, position)
-
-      // Upright frames, at the same X the 3D builder puts them.
-      for (const x of frameCentersX(node)) {
-        for (const z of [centerZ + halfPost, centerZ - halfPost]) {
-          children.push({
-            kind: 'rect',
-            x: x - node.uprightWidth / 2,
-            y: z - node.uprightDepth / 2,
-            width: node.uprightWidth,
-            height: node.uprightDepth,
-            fill: steelStroke,
-            stroke: steelStroke,
-            strokeWidth: 0.005,
-          })
-        }
-      }
-
-      // Pallet positions. Drawn outline-only: a plan is read for how the
-      // positions divide the bay, and filling them buries the frames under
-      // them at the zoom a layout is actually worked at.
-      const offsets = slotOffsetsX(node)
-      const [alongRun, intoDepth] = orientedPalletFootprint(node)
       for (let bay = 1; bay <= node.bayCount; bay++) {
         const centerX = bayCenterX(node, bay)
         for (const offset of offsets) {

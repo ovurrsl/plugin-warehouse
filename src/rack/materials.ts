@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { getRackUprightTexture } from './upright-texture'
 
 /**
  * One material for every rack in the scene.
@@ -17,6 +18,11 @@ let cachedPreviewMaterial: THREE.MeshStandardMaterial | null = null
 export function getRackMaterial(): THREE.MeshStandardMaterial {
   if (cachedMaterial) return cachedMaterial
   cachedMaterial = new THREE.MeshStandardMaterial({
+    // A two-column atlas: blank for most parts, the punched slot pattern for
+    // the upright faces. The geometry picks a column per part through its UVs,
+    // which is what lets the perforations exist without a second material — and
+    // so without a second draw call on every rack in the warehouse.
+    map: getRackUprightTexture(),
     // Racking is powder-coated steel, not bare metal. The earlier version used
     // metalness 0.75 with a flat colour, which is wrong twice: painted steel is
     // a dielectric, and a near-metal surface with no environment map to reflect

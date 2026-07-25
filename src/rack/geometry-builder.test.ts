@@ -72,10 +72,16 @@ describe('geometry content', () => {
     expect(simple).toBeGreaterThan(0)
   })
 
-  test('the default rack stays well under a thousand triangles', () => {
-    // A thousand racks at this size is under a million triangles, which is the
-    // budget that makes a 15,000 m2 warehouse viable at all.
-    expect(triangleCount(rack())).toBeLessThan(1000)
+  test('a warehouse-sized scene stays inside a sane triangle budget', () => {
+    // The number that matters is the far tier, because in a 15,000 m2 warehouse
+    // almost every rack is always far away. A thousand racks with fifty of them
+    // near works out at well under half a million triangles, which any GPU that
+    // can open the editor will draw without noticing.
+    const full = triangleCount(rack(), 'full')
+    const simple = triangleCount(rack(), 'simple')
+    expect(simple).toBeLessThan(400)
+    expect(full).toBeLessThan(1500)
+    expect(50 * full + 950 * simple).toBeLessThan(500_000)
   })
 
   test('geometry grows with bays but the mesh count does not', () => {

@@ -80,6 +80,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description: 'EPAL, GMA and plastic pallets. Set a load height to fill a rack position.',
     icon: 'lucide:package',
   },
+  {
+    kind: 'warehouse:pallet-rack',
+    label: 'Pallet Rack',
+    sectionId: 'storage',
+    description:
+      'Adjustable racking. Bays share their frames; the pallet standard and orientation set how many positions a level holds.',
+    icon: 'lucide:rows-3',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

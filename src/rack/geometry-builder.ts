@@ -164,6 +164,48 @@ function emitTiltedBox(
   }
 }
 
+/**
+ * A lipped C-section post, the shape racking uprights actually are.
+ *
+ * Five thin walls rather than a solid block: the web on the outer face, two
+ * flanges reaching inward, and the return lips that stiffen them. Close up the
+ * difference is obvious — you can see through the frame between the lips, and
+ * the beam connectors have something to sit against. `simple` detail keeps the
+ * solid box, since none of this survives past a few tens of metres.
+ *
+ * `facing` is +1 when the post's open side looks toward −Z and −1 when it looks
+ * toward +Z, so the two posts of a frame mirror each other and both open inward.
+ */
+function emitUpright(
+  sink: Sink,
+  x: number,
+  z: number,
+  width: number,
+  depth: number,
+  height: number,
+  facing: number,
+  color: readonly [number, number, number],
+): void {
+  const wall = 0.003
+  const lip = Math.min(0.02, width / 4)
+  const midY = height / 2
+
+  // Web, on the closed outer face.
+  emitBox(sink, [x, midY, z + facing * (depth / 2 - wall / 2)], [width, height, wall], color)
+
+  // Flanges, running the depth on both sides.
+  for (const side of [-1, 1]) {
+    emitBox(sink, [x + (side * (width - wall)) / 2, midY, z], [wall, height, depth - wall], color)
+    // Return lips, folded back in at the open edge.
+    emitBox(
+      sink,
+      [x + side * (width / 2 - lip / 2), midY, z - facing * (depth / 2 - wall / 2)],
+      [lip, height, wall],
+      color,
+    )
+  }
+}
+
 // ── Palette ─────────────────────────────────────────────────────────────────
 
 const colorCache = new Map<string, [number, number, number]>()
@@ -229,13 +271,27 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
 
       // Frames: two posts per line per depth position.
       for (const x of frames) {
-        for (const z of postZ) {
-          emitBox(
-            sink,
-            [x, uprightHeight / 2, z],
-            [uprightWidth, uprightHeight, uprightDepth],
-            uprightColor,
-          )
+        postZ.forEach((z, side) => {
+          if (detail === 'full') {
+            // Posts of a frame mirror each other so both open toward the bay.
+            emitUpright(
+              sink,
+              x,
+              z,
+              uprightWidth,
+              uprightDepth,
+              uprightHeight,
+              side === 0 ? 1 : -1,
+              uprightColor,
+            )
+          } else {
+            emitBox(
+              sink,
+              [x, uprightHeight / 2, z],
+              [uprightWidth, uprightHeight, uprightDepth],
+              uprightColor,
+            )
+          }
           if (detail === 'full') {
             // Catalogue footplates are wider than the post they carry — 175 ×
             // 119 mm under a 122 × 80 upright — so they overhang it by about
@@ -248,7 +304,7 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
               footplateColor,
             )
           }
-        }
+        })
 
         // Frame bracing zig-zags between the two posts, in the depth/height
         // plane. Panel count follows the height so tall frames do not end up

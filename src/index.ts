@@ -2,6 +2,7 @@ import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
+import { palletRackDefinition } from './rack/definition'
 
 /**
  * The manifest barrel — the entire public surface of this package.
@@ -25,7 +26,10 @@ export const warehousePlugin: Plugin = {
   // The cast mirrors the built-in bundle's. `AnyNode` is a hand-maintained
   // discriminated union of host kinds, so it cannot by construction know about
   // a plugin's — the registry validates against `def.schema` at runtime.
-  nodes: [palletDefinition as unknown as AnyNodeDefinition],
+  nodes: [
+    palletDefinition as unknown as AnyNodeDefinition,
+    palletRackDefinition as unknown as AnyNodeDefinition,
+  ],
 }
 
 export const warehouseCatalogPanel: EditorHostPanel = {
@@ -38,7 +42,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   icon: { kind: 'iconify', name: 'lucide:warehouse' },
   // Kept in sync with the manifest so `panelForKind` can route the host's
   // "find in catalog" action to this panel.
-  kinds: ['warehouse:pallet'],
+  kinds: ['warehouse:pallet', 'warehouse:pallet-rack'],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild
   // the lazy boundary on every render.
@@ -53,4 +57,6 @@ export { palletDefinition } from './pallet/definition'
 export { PALLET_PRESETS, type PalletPreset } from './pallet/presets'
 export { PalletNode } from './pallet/schema'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
+export { palletRackDefinition } from './rack/definition'
+export { PalletRackNode } from './rack/schema'
 export default warehousePlugin

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { PalletPreset } from './pallet/presets'
+import type { PalletRackNode } from './rack/schema'
 
 /**
  * The plugin's own state. Plugins do not extend `useScene` / `useEditor` /
@@ -46,7 +47,38 @@ type WarehouseStore = {
   /** Load height, metres. 0 places a bare pallet. */
   palletLoadHeight: number
   setPalletLoadHeight: (height: number) => void
+
+  /**
+   * Shape of the next placed rack.
+   *
+   * Held as a partial node rather than a handful of loose fields: a rack has
+   * enough dimensions that mirroring each one here would be a second schema to
+   * keep in step, and the tool parses this straight through
+   * `PalletRackNode.parse` so anything missing takes the schema's own default.
+   */
+  rackBrush: RackBrush
+  setRackBrush: (patch: Partial<RackBrush>) => void
+
+  /** Runs placed by one Shift-click, and the clear aisle left between them. */
+  rackRowRepeat: number
+  setRackRowRepeat: (count: number) => void
+  rackAisleGap: number
+  setRackAisleGap: (gap: number) => void
 }
+
+export type RackBrush = Pick<
+  PalletRackNode,
+  | 'bayCount'
+  | 'bayClearWidth'
+  | 'depth'
+  | 'uprightHeight'
+  | 'levels'
+  | 'backToBack'
+  | 'palletPreset'
+  | 'palletOrientation'
+  | 'pickingLevels'
+  | 'ghostFill'
+>
 
 export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   tab: 'catalog',
@@ -75,4 +107,26 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   palletLoadHeight: 0,
   setPalletLoadHeight: (palletLoadHeight) =>
     set({ palletLoadHeight: Math.max(0, palletLoadHeight) }),
+
+  rackBrush: {
+    bayCount: 3,
+    bayClearWidth: 2.7,
+    depth: 1.1,
+    uprightHeight: 5,
+    levels: 3,
+    backToBack: false,
+    palletPreset: 'epal-1',
+    palletOrientation: 'short-side-out',
+    pickingLevels: 0,
+    ghostFill: 0,
+  },
+  setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
+
+  // A reach-truck aisle. Wide enough that the default row actually works, and
+  // the one figure most likely to be changed per warehouse.
+  rackRowRepeat: 4,
+  setRackRowRepeat: (rackRowRepeat) =>
+    set({ rackRowRepeat: Math.max(1, Math.round(rackRowRepeat)) }),
+  rackAisleGap: 2.8,
+  setRackAisleGap: (rackAisleGap) => set({ rackAisleGap: Math.max(0, rackAisleGap) }),
 }))

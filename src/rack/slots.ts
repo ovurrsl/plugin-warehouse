@@ -212,10 +212,7 @@ export function slotOffsetsX(rack: PalletRackNode): number[] {
   const actualBetween = between * scale
 
   const start = -bayClearWidth / 2 + actualToUpright + alongRun / 2
-  return Array.from(
-    { length: count },
-    (_, index) => start + index * (alongRun + actualBetween),
-  )
+  return Array.from({ length: count }, (_, index) => start + index * (alongRun + actualBetween))
 }
 
 // ── Slot enumeration ────────────────────────────────────────────────────────

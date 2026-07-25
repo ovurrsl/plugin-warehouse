@@ -38,8 +38,12 @@ describe('run geometry', () => {
     const first = frames[0] ?? 0
     const last = frames[frames.length - 1] ?? 0
     expect(first).toBeCloseTo(-last, 9)
+    // Derived, not hardcoded: the pitch is clear width plus one post, so
+    // pinning a literal here just re-asserts whatever the default happens to be
+    // and breaks whenever a profile default is corrected.
+    const expectedPitch = r.bayClearWidth + r.uprightWidth
     const pitches = frames.slice(1).map((x, i) => x - (frames[i] ?? 0))
-    for (const pitch of pitches) expect(pitch).toBeCloseTo(2.82, 9)
+    for (const pitch of pitches) expect(pitch).toBeCloseTo(expectedPitch, 9)
   })
 
   test('each bay centre sits midway between its two frames', () => {

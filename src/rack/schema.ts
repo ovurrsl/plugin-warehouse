@@ -63,8 +63,8 @@ export const PalletRackNode = BaseNode.extend({
 
   // ── Steel profiles ────────────────────────────────────────────────────────
 
-  /** Upright section across the run (local X). */
-  uprightWidth: z.number().min(0.05).max(0.25).default(0.12),
+  /** Upright section across the run (local X). Defaults to the A127 profile. */
+  uprightWidth: z.number().min(0.05).max(0.25).default(0.122),
   /** Upright section through the frame (local Z). */
   uprightDepth: z.number().min(0.05).max(0.25).default(0.08),
   /** Beam profile height. */

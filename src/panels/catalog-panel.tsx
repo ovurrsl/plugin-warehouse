@@ -2,17 +2,24 @@
 
 import { Icon } from '@iconify/react'
 import { useScene } from '@pascal-app/core'
-import { SegmentedControl, useEditor } from '@pascal-app/editor'
+import { PanelSection, PanelWrapper, SegmentedControl, useEditor } from '@pascal-app/editor'
 import { useEffect } from 'react'
 import { CATALOG_SECTIONS, type CatalogItem, itemsInSection } from '../catalog'
 import { reportHostCompatibility } from '../compat'
 import { KIND_PREFIX } from '../plugin-id'
 import { type PanelTab, useWarehouseStore } from '../store'
+import { tile, tileGrid, tokens } from './styles'
 
 /**
  * The plugin's rail panel. Two tabs share one rail slot: browse-and-place, and
  * the capacity readout. The host mounts this lazily inside an error boundary
  * and passes no props.
+ *
+ * Chrome is composed from the host's own exported components — `PanelWrapper`,
+ * `PanelSection`, `SegmentedControl` — so the panel matches the native ones
+ * exactly and inherits any future host restyle without a change here. Only the
+ * catalog tiles, which the host has no component for, are styled locally, and
+ * those resolve host CSS variables so they follow the theme too.
  */
 export default function WarehousePanel() {
   const tab = useWarehouseStore((s) => s.tab)
@@ -32,63 +39,51 @@ export default function WarehousePanel() {
   )
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 text-sidebar-foreground">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-base">Warehouse</h2>
-          <span className="rounded-full bg-sidebar-accent px-2 py-0.5 text-sidebar-foreground/70 text-xs">
-            {placed} placed
-          </span>
+    <PanelWrapper icon={<Icon height={16} icon="lucide:warehouse" width={16} />} title="Warehouse">
+      <div style={tokens.body}>
+        <div style={tokens.headerRow}>
+          <SegmentedControl
+            onChange={(value: PanelTab) => setTab(value)}
+            options={[
+              { label: 'Catalog', value: 'catalog' },
+              { label: 'Stats', value: 'stats' },
+            ]}
+            value={tab}
+          />
+          <span style={tokens.countChip}>{placed} placed</span>
         </div>
-        <SegmentedControl
-          onChange={(value: PanelTab) => setTab(value)}
-          options={[
-            { label: 'Catalog', value: 'catalog' },
-            { label: 'Stats', value: 'stats' },
-          ]}
-          value={tab}
-        />
-      </header>
+      </div>
 
       {tab === 'catalog' ? <CatalogTab /> : <StatsTab />}
-    </div>
+    </PanelWrapper>
   )
 }
 
 function CatalogTab() {
   return (
-    <div className="flex flex-col gap-5">
+    <>
       {CATALOG_SECTIONS.map((section) => {
         const items = itemsInSection(section.id)
         return (
-          <section className="flex flex-col gap-2" key={section.id}>
-            <div className="flex items-center gap-2">
-              <Icon
-                className="text-sidebar-foreground/60"
-                height={14}
-                icon={section.icon}
-                width={14}
-              />
-              <h3 className="font-medium text-sidebar-foreground/80 text-xs uppercase tracking-wider">
-                {section.label}
-              </h3>
+          // Sections with nothing in them start collapsed so the panel stays
+          // scannable while the catalog is still filling out.
+          <PanelSection defaultExpanded={items.length > 0} key={section.id} title={section.label}>
+            <div style={tokens.sectionBody}>
+              <p style={tokens.blurb}>{section.blurb}</p>
+              {items.length > 0 ? (
+                <div style={tileGrid}>
+                  {items.map((item) => (
+                    <CatalogTile item={item} key={item.kind} />
+                  ))}
+                </div>
+              ) : (
+                <div style={tokens.empty}>Nothing here yet.</div>
+              )}
             </div>
-            <p className="text-sidebar-foreground/45 text-xs leading-relaxed">{section.blurb}</p>
-            {items.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {items.map((item) => (
-                  <CatalogTile item={item} key={item.kind} />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-lg border border-sidebar-border border-dashed px-3 py-2.5 text-sidebar-foreground/40 text-xs">
-                Nothing here yet.
-              </div>
-            )}
-          </section>
+          </PanelSection>
         )
       })}
-    </div>
+    </>
   )
 }
 
@@ -97,7 +92,10 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   const arming = activeTool === item.kind
 
   const arm = () => {
-    const editor = useEditor.getState() as {
+    // The host types `tool` as its own built-in union, which by construction
+    // cannot know about plugin-contributed kinds. Arming by kind string is the
+    // path a catalog panel is expected to use.
+    const editor = useEditor.getState() as unknown as {
       setTool: (value: string) => void
       setMode: (value: string) => void
     }
@@ -106,26 +104,17 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   }
 
   return (
-    <button
-      className={`group flex flex-col gap-2 rounded-xl border p-2.5 text-left transition-all ${
-        arming
-          ? 'border-sidebar-ring bg-sidebar-accent shadow-sm'
-          : 'border-sidebar-border hover:border-sidebar-ring/50 hover:bg-sidebar-accent/40'
-      }`}
-      onClick={arm}
-      title={item.description}
-      type="button"
-    >
-      <Icon className="text-sidebar-foreground/70" height={20} icon={item.icon} width={20} />
-      <span className="font-medium text-xs">{item.label}</span>
+    <button onClick={arm} style={tile(arming)} title={item.description} type="button">
+      <Icon height={20} icon={item.icon} style={tokens.tileIcon} width={20} />
+      <span style={tokens.tileLabel}>{item.label}</span>
     </button>
   )
 }
 
 function StatsTab() {
   return (
-    <div className="rounded-lg border border-sidebar-border border-dashed px-3 py-2.5 text-sidebar-foreground/40 text-xs leading-relaxed">
-      Capacity and area figures appear here once racking is placed.
+    <div style={tokens.sectionBody}>
+      <div style={tokens.empty}>Capacity and area figures appear here once racking is placed.</div>
     </div>
   )
 }

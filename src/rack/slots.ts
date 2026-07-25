@@ -14,7 +14,8 @@ import type { PalletRackNode } from './schema'
  */
 
 export type SlotAddress = {
-  /** 1-based back-to-back side. Always present; a single run is row 1. */
+  /** 1-based run within the block, counting from the +Z side. A lone run is
+   *  row 1. */
   row: number
   /** 1-based along the run. */
   bay: number
@@ -51,7 +52,7 @@ export type Slot = SlotAddress & {
  *
  * Every component is always written, including the ones that are constant in a
  * simple rack. That is deliberate: a single run is row 1, a single-deep bay is
- * depth 1, so turning on `backToBack` or `depthPositions` cannot change what an
+ * depth 1, so raising `rowCount` or `depthPositions` cannot change what an
  * already-stored address means. Omitting the constant parts would save a few
  * characters and silently re-point every pallet in the scene the first time
  * somebody widened a rack.
@@ -93,36 +94,97 @@ export function rowDepth(rack: PalletRackNode): number {
   return rack.depthPositions * rack.depth + (rack.depthPositions - 1) * rack.depthGap
 }
 
-/** Outer depth, counting the second run and the gap when back to back. */
+/**
+ * Clear space in front of a row, between it and the row before it.
+ *
+ * Zero for row 1, which has nothing in front of it inside the block. A
+ * back-to-back pattern pairs the rows — (1,2), (3,4), … — so an even row closes
+ * a pair and stands against its partner across the spine gap, while an odd row
+ * opens the next pair across a working aisle. That alternation is the whole
+ * layout: pair, aisle, pair, aisle.
+ */
+export function rowGapBefore(rack: PalletRackNode, row: number): number {
+  if (row <= 1) return 0
+  if (rack.rowPattern === 'back-to-back' && row % 2 === 0) return rack.backToBackGap
+  return rack.aisleWidth
+}
+
+/** Outer depth of the block, over every row and the gaps between them. */
 export function totalDepth(rack: PalletRackNode): number {
-  const single = rowDepth(rack)
-  return rack.backToBack ? 2 * single + rack.backToBackGap : single
+  let total = rack.rowCount * rowDepth(rack)
+  for (let row = 2; row <= rack.rowCount; row++) total += rowGapBefore(rack, row)
+  return total
 }
 
-export function rowCount(rack: PalletRackNode): number {
-  return rack.backToBack ? 2 : 1
-}
-
-/** Local Z of a row's centreline. Row 1 sits on +Z, row 2 on −Z. */
+/** Local Z of a row's centreline. Row 1 is the +Z-most; rows count toward −Z. */
 export function rowCenterZ(rack: PalletRackNode, row: number): number {
-  if (!rack.backToBack) return 0
-  const offset = (rowDepth(rack) + rack.backToBackGap) / 2
-  return row === 1 ? offset : -offset
+  const single = rowDepth(rack)
+  let z = totalDepth(rack) / 2
+  for (let index = 1; index <= row; index++) {
+    z -= rowGapBefore(rack, index)
+    if (index === row) return z - single / 2
+    z -= single
+  }
+  return 0
+}
+
+/**
+ * Which way a row's aisle face looks: +1 toward +Z, −1 toward −Z.
+ *
+ * In a back-to-back pair the two rows turn their backs on each other and open
+ * onto the aisles either side, so odd rows face +Z and even rows face −Z. Under
+ * the `aisle` pattern every row has its own aisle in front of it and they all
+ * face the same way.
+ */
+export function rowFacing(rack: PalletRackNode, row: number): 1 | -1 {
+  if (rack.rowPattern !== 'back-to-back') return 1
+  return row % 2 === 1 ? 1 : -1
 }
 
 /**
  * Local Z of a depth position's centre.
  *
- * Depth 1 is the aisle side, and each row faces its own aisle: row 1 opens onto
- * +Z, row 2 onto −Z. Numbering both rows from their own aisle rather than from
- * a global axis is what makes "D1 is the one you can reach" true on both sides
- * of a back-to-back island.
+ * Depth 1 is the aisle side of whichever row it belongs to. Numbering every row
+ * from its own aisle rather than from a global axis is what makes "D1 is the one
+ * you can reach" true on both sides of every pair in the block.
  */
 export function depthPositionZ(rack: PalletRackNode, row: number, depth: number): number {
   const centre = rowCenterZ(rack, row)
   const fromAisle = (depth - 0.5) * rack.depth + (depth - 1) * rack.depthGap
   const outward = rowDepth(rack) / 2 - fromAisle
-  return row === 1 ? centre + outward : centre - outward
+  return centre + rowFacing(rack, row) * outward
+}
+
+/**
+ * Offset from the block's anchor point to its centre, in the rack's local frame.
+ *
+ * The block is always centred on the node position, because that is what the
+ * host's footprint contract means: `spatial-grid-manager` and the alignment
+ * anchor bridge both read `floorPlaced.footprint` as a rectangle centred on the
+ * node, and the bridge ignores the optional `position` field entirely — an
+ * off-centre block would collide and align against a rectangle it does not
+ * occupy. So anchoring moves the node rather than the geometry, and this is the
+ * vector between the two.
+ */
+export function anchorOffset(rack: PalletRackNode): [number, number] {
+  const halfWidth = totalWidth(rack) / 2
+  const halfDepth = totalDepth(rack) / 2
+  const dx = rack.bayAnchor === 'left' ? halfWidth : rack.bayAnchor === 'right' ? -halfWidth : 0
+  const dz = rack.rowAnchor === 'front' ? -halfDepth : rack.rowAnchor === 'back' ? halfDepth : 0
+  return [dx, dz]
+}
+
+/** Where the block's centre lands when its anchor point sits at `(x, z)`. */
+export function centerFromAnchor(
+  rack: PalletRackNode,
+  x: number,
+  z: number,
+  rotationY: number,
+): [number, number] {
+  const [dx, dz] = anchorOffset(rack)
+  const cos = Math.cos(rotationY)
+  const sin = Math.sin(rotationY)
+  return [x + dx * cos + dz * sin, z - dx * sin + dz * cos]
 }
 
 /** Local X of every upright frame centreline, left to right. */
@@ -143,7 +205,7 @@ export function bayCenterX(rack: PalletRackNode, bay: number): number {
 export type BayOverride = NonNullable<PalletRackNode['bayOverrides'][string]>
 
 /** `R1-B3`. Same form the slot addresses use, so a bay key and a slot address
- *  name the same bay and both survive a `backToBack` toggle. */
+ *  name the same bay and both survive a change to the row count. */
 export function formatBayAddress(row: number, bay: number): string {
   return `R${row}-B${bay}`
 }
@@ -224,9 +286,18 @@ export function presentBays(rack: PalletRackNode, row: number): number[] {
   return bays
 }
 
+/** The row a local Z falls in, or null for an aisle between rows. */
+export function rowAt(rack: PalletRackNode, localZ: number): number | null {
+  const half = rowDepth(rack) / 2
+  for (let row = 1; row <= rack.rowCount; row++) {
+    if (Math.abs(localZ - rowCenterZ(rack, row)) <= half) return row
+  }
+  return null
+}
+
 /**
- * The bay a point in the rack's local frame falls in, or null for the gap
- * between runs and beyond the ends.
+ * The bay a point in the rack's local frame falls in, or null for the aisles
+ * between rows and beyond the ends.
  *
  * This is what makes per-bay selection cost nothing. The host has no sub-node
  * selection, and the alternative — one child node per bay, the way cabinet
@@ -239,9 +310,8 @@ export function bayAt(
   localX: number,
   localZ: number,
 ): { row: number; bay: number } | null {
-  const row = rowCount(rack) === 1 ? 1 : localZ >= 0 ? 1 : 2
-  const centre = rowCenterZ(rack, row)
-  if (Math.abs(localZ - centre) > rowDepth(rack) / 2) return null
+  const row = rowAt(rack, localZ)
+  if (row === null) return null
 
   const pitch = bayPitch(rack)
   const fromLeft = localX + totalWidth(rack) / 2 - rack.uprightWidth / 2
@@ -551,7 +621,7 @@ export function palletSlotsOf(rack: PalletRackNode): Slot[] {
   const footprint = orientedPalletFootprint(rack)
   const slots: Slot[] = []
 
-  for (let row = 1; row <= rowCount(rack); row++) {
+  for (let row = 1; row <= rack.rowCount; row++) {
     for (let bay = 1; bay <= rack.bayCount; bay++) {
       // A skipped bay holds nothing, and a tunnel's open levels hold nothing —
       // counting them would report capacity the rack does not have.
@@ -616,7 +686,7 @@ export function pickingSlotsOf(rack: PalletRackNode): Slot[] {
   const footprint: [number, number] = [rack.pickingBoxWidth, rack.pickingBoxDepth]
   const slots: Slot[] = []
 
-  for (let row = 1; row <= rowCount(rack); row++) {
+  for (let row = 1; row <= rack.rowCount; row++) {
     for (let bay = 1; bay <= rack.bayCount; bay++) {
       const centreX = bayCenterX(rack, bay)
       for (const level of levels) {

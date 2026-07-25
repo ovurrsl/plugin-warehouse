@@ -115,7 +115,7 @@ describe('geometry content', () => {
   })
 
   test('a back-to-back rack is twice as deep and still centred', () => {
-    const twin = getRackGeometry(rack({ backToBack: true }), 'full').boundingBox
+    const twin = getRackGeometry(rack({ rowCount: 2 }), 'full').boundingBox
     const single = getRackGeometry(rack(), 'full').boundingBox
     const twinDepth = (twin?.max.z ?? 0) - (twin?.min.z ?? 0)
     const singleDepth = (single?.max.z ?? 0) - (single?.min.z ?? 0)
@@ -124,7 +124,7 @@ describe('geometry content', () => {
   })
 
   test('every triangle index addresses a real vertex', () => {
-    const geometry = getRackGeometry(rack({ bayCount: 2, backToBack: true }), 'full')
+    const geometry = getRackGeometry(rack({ bayCount: 2, rowCount: 2 }), 'full')
     const index = geometry.getIndex()
     const vertices = geometry.getAttribute('position').count
     expect(index).not.toBeNull()
@@ -218,7 +218,7 @@ describe('cache key coverage', () => {
     ['bayClearWidth', 3.3],
     ['depth', 1.2],
     ['uprightHeight', 8],
-    ['backToBack', true],
+    ['rowCount', 2],
     ['backToBackGap', 0.4],
     ['depthPositions', 2],
     ['depthGap', 0.12],

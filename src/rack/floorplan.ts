@@ -3,9 +3,9 @@ import { type RackPart, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
+  bayStorageLevels,
   depthPositionZ,
   orientedPalletFootprint,
-  rowCount,
   slotOffsetsX,
   totalDepth,
   totalWidth,
@@ -93,10 +93,14 @@ export function buildPalletRackFloorplan(
   // actually worked at.
   const offsets = slotOffsetsX(node)
   const [alongRun, intoDepth] = orientedPalletFootprint(node)
-  for (let row = 1; row <= rowCount(node); row++) {
+  for (let row = 1; row <= node.rowCount; row++) {
     for (let position = 1; position <= node.depthPositions; position++) {
       const centerZ = depthPositionZ(node, row, position)
       for (let bay = 1; bay <= node.bayCount; bay++) {
+        // A bay with nothing left to store — skipped outright, or tunnelled all
+        // the way up — holds no pallets, and drawing its positions anyway is
+        // exactly the plan-against-model disagreement this file exists to stop.
+        if (bayStorageLevels(node, row, bay).length === 0) continue
         const centerX = bayCenterX(node, bay)
         for (const offset of offsets) {
           children.push({

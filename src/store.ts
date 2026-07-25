@@ -67,7 +67,11 @@ export type RackBrush = Pick<
   | 'depth'
   | 'uprightHeight'
   | 'levels'
-  | 'backToBack'
+  | 'rowCount'
+  | 'rowPattern'
+  | 'aisleWidth'
+  | 'bayAnchor'
+  | 'rowAnchor'
   | 'palletPreset'
   | 'palletOrientation'
   | 'pickingLevels'
@@ -108,7 +112,11 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     depth: 1.1,
     uprightHeight: 5,
     levels: 3,
-    backToBack: false,
+    rowCount: 1,
+    rowPattern: 'back-to-back',
+    aisleWidth: 3.2,
+    bayAnchor: 'center',
+    rowAnchor: 'front',
     palletPreset: 'epal-1',
     palletOrientation: 'short-side-out',
     pickingLevels: 0,

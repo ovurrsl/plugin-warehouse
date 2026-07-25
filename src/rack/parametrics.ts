@@ -1,5 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
+import { exceedsPartBudget, fullPartCount, PART_BUDGET } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   autoPalletsPerLevel,
@@ -10,6 +11,10 @@ import {
 import { en15620Clearance } from './standards'
 
 const PRESET_KEYS = Object.keys(PALLET_PRESETS) as (keyof typeof PALLET_PRESETS)[]
+
+/** A turret truck works the narrowest aisle of anything that serves a pallet
+ *  rack — roughly 1.6 m. Below that nothing can turn a pallet into the bay. */
+const NARROWEST_WORKING_AISLE = 1.6
 
 /**
  * Auto-derived inspector fields rather than a `customPanel`, for the reason the
@@ -46,12 +51,49 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
       ],
     },
     {
+      label: 'Rows',
+      fields: [
+        { key: 'rowCount', kind: 'number', min: 1, max: 20, step: 1 },
+        {
+          key: 'rowPattern',
+          kind: 'enum',
+          options: ['back-to-back', 'aisle'],
+          display: 'select',
+        },
+        {
+          key: 'backToBackGap',
+          kind: 'number',
+          unit: 'm',
+          min: 0,
+          max: 1.5,
+          step: 0.05,
+          // Nothing stands spine to spine in an `aisle` block, so the field
+          // would sit there reading as a dimension that does nothing.
+          visibleIf: (node) => node.rowPattern === 'back-to-back' && node.rowCount > 1,
+        },
+        {
+          key: 'aisleWidth',
+          kind: 'number',
+          unit: 'm',
+          min: 0.8,
+          max: 8,
+          step: 0.1,
+          visibleIf: (node) => node.rowCount > (node.rowPattern === 'back-to-back' ? 2 : 1),
+        },
+      ],
+    },
+    {
       label: 'Depth',
       fields: [
-        { key: 'backToBack', kind: 'boolean' },
-        { key: 'backToBackGap', kind: 'number', unit: 'm', min: 0, max: 1.5, step: 0.05 },
         { key: 'depthPositions', kind: 'number', min: 1, max: 2, step: 1 },
         { key: 'depthGap', kind: 'number', unit: 'm', min: 0, max: 0.5, step: 0.01 },
+      ],
+    },
+    {
+      label: 'Growth',
+      fields: [
+        { key: 'bayAnchor', kind: 'enum', options: ['left', 'center', 'right'], display: 'select' },
+        { key: 'rowAnchor', kind: 'enum', options: ['front', 'center', 'back'], display: 'select' },
       ],
     },
     {
@@ -157,6 +199,28 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           field: 'palletsPerLevel',
           severity: 'warning',
           msg: `${node.palletsPerLevel} pallets per level exceeds the ${auto} this bay fits at the declared clearances.`,
+        })
+      }
+
+      // A block big enough to blow the merge budget still draws, but only as
+      // its silhouette — so say so here rather than leaving the user to notice
+      // that the bracing and the decking stopped appearing.
+      if (exceedsPartBudget(node)) {
+        issues.push({
+          field: 'rowCount',
+          severity: 'warning',
+          msg: `This block is ${fullPartCount(node).toLocaleString()} parts, past the ${PART_BUDGET.toLocaleString()} one mesh holds, so it draws as posts and beams only. Split it into separate blocks to keep the detail.`,
+        })
+      }
+
+      // An aisle narrower than the truck cannot be worked, and the figure that
+      // decides which truck is the aisle rather than anything about the rack.
+      const usesAisle = node.rowCount > (node.rowPattern === 'back-to-back' ? 2 : 1)
+      if (usesAisle && node.aisleWidth < NARROWEST_WORKING_AISLE) {
+        issues.push({
+          field: 'aisleWidth',
+          severity: 'warning',
+          msg: `A ${node.aisleWidth.toFixed(2)} m aisle is below the ${NARROWEST_WORKING_AISLE.toFixed(2)} m a turret truck needs — the narrowest truck that works a pallet rack. Anything less is a walkway, not an aisle.`,
         })
       }
 

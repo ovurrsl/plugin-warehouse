@@ -12,7 +12,6 @@ import {
   levelHasShelf,
   levelSurfaceY,
   palletSupportBarCount,
-  rowCount,
   slotOffsetsX,
 } from './slots'
 
@@ -85,7 +84,7 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
   const { uprightWidth, uprightDepth, depth, uprightHeight, beamThickness } = rack
   const postOffset = depth / 2 - uprightDepth / 2
 
-  for (let row = 1; row <= rowCount(rack); row++) {
+  for (let row = 1; row <= rack.rowCount; row++) {
     for (let position = 1; position <= rack.depthPositions; position++) {
       const centerZ = depthPositionZ(rack, row, position)
       const postZ = [centerZ + postOffset, centerZ - postOffset]
@@ -214,23 +213,71 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
     }
   }
 
-  if (full && rack.backToBack) {
-    const innerZ1 = depthPositionZ(rack, 1, rack.depthPositions) - depth / 2
-    const innerZ2 = depthPositionZ(rack, 2, rack.depthPositions) + depth / 2
-    const spanZ = innerZ1 - innerZ2
-    const midZ = (innerZ1 + innerZ2) / 2
-    for (const x of frames) {
-      for (const y of [uprightHeight * 0.15, uprightHeight * 0.85]) {
-        parts.push({
-          role: 'row-spacer',
-          center: [x, y, midZ],
-          size: [uprightWidth * 0.6, 0.05, spanZ],
-        })
-      }
+  // Spacers tie the two runs of a back-to-back pair together across the spine.
+  // Only *within* a pair: rows either side of a working aisle are separate
+  // structures, and a tie spanning an aisle would be a bar through the traffic.
+  if (full && rack.rowPattern === 'back-to-back') {
+    for (let row = 2; row <= rack.rowCount; row += 2) {
+      const innerFront = depthPositionZ(rack, row - 1, rack.depthPositions) - depth / 2
+      const innerBack = depthPositionZ(rack, row, rack.depthPositions) + depth / 2
+      const spanZ = innerFront - innerBack
+      const midZ = (innerFront + innerBack) / 2
+      frames.forEach((x, frameIndex) => {
+        // Needs a post at both ends. A skip that removed one row's end frame
+        // would otherwise leave a spacer reaching out to nothing.
+        if (!isFramePresent(rack, row - 1, frameIndex)) return
+        if (!isFramePresent(rack, row, frameIndex)) return
+        for (const y of [uprightHeight * 0.15, uprightHeight * 0.85]) {
+          parts.push({
+            role: 'row-spacer',
+            center: [x, y, midZ],
+            size: [uprightWidth * 0.6, 0.05, spanZ],
+          })
+        }
+      })
     }
   }
 
   return parts
+}
+
+/**
+ * Boxes a single merged geometry is allowed to hold.
+ *
+ * Each box costs 24 vertices × 11 floats, so 12 000 of them is about 12 MB of
+ * buffer and 144 000 triangles — already a large single mesh, and the point at
+ * which one block starts to cost more than the draw calls merging it saved.
+ *
+ * A block can ask for far more than that: 40 bays × 20 rows × 4 levels comes to
+ * roughly 39 000 boxes and 41 MB. Rather than build that, the full tier falls
+ * back to the silhouette — one box per post instead of five, and no footplates,
+ * bracing, connectors or decking. The block still draws, still in one call; it
+ * just stops carrying detail nobody can resolve from where a block that size is
+ * looked at. `exceedsPartBudget` reports it so the inspector can say so instead
+ * of leaving the user to notice the bracing went missing.
+ */
+export const PART_BUDGET = 12_000
+
+/**
+ * Boxes the full tier would emit.
+ *
+ * Memoised on the node object, because building the list in order to count it is
+ * exactly the work the budget exists to avoid and the inspector asks on every
+ * render. The store replaces nodes rather than mutating them, so the key is
+ * exact: a stale count is not reachable.
+ */
+const partCounts = new WeakMap<PalletRackNode, number>()
+
+export function fullPartCount(rack: PalletRackNode): number {
+  const cached = partCounts.get(rack)
+  if (cached !== undefined) return cached
+  const count = rackParts(rack, 'full').length
+  partCounts.set(rack, count)
+  return count
+}
+
+export function exceedsPartBudget(rack: PalletRackNode): boolean {
+  return fullPartCount(rack) > PART_BUDGET
 }
 
 /** Chipboard is three times a steel or mesh panel and it shows at the edge. */

@@ -114,18 +114,31 @@ export type AlignedPlacement = {
  */
 export function resolveAlignedPlacement({
   candidates,
+  centerOffset,
   node,
   rawX,
   rawZ,
   rotationY,
 }: {
   candidates: readonly AlignmentAnchor[]
+  /**
+   * World-space vector from the cursor to the node's centre.
+   *
+   * For a kind that grows from an edge rather than about its middle. Applied
+   * after the grid quantize and before alignment, which is the only order that
+   * behaves: the cursor is what the user is aiming, so that is what lands on the
+   * grid line, while alignment compares the footprint — which is centred — with
+   * its neighbours.
+   */
+  centerOffset?: readonly [number, number]
   node: AnyNode
   rawX: number
   rawZ: number
   rotationY: number
 }): AlignedPlacement {
-  const [x, z] = snapXZ(rawX, rawZ)
+  const [snappedX, snappedZ] = snapXZ(rawX, rawZ)
+  const x = snappedX + (centerOffset?.[0] ?? 0)
+  const z = snappedZ + (centerOffset?.[1] ?? 0)
   if (!isAlignmentGuideActive() || candidates.length === 0) {
     return { position: [x, 0, z], guides: [] }
   }

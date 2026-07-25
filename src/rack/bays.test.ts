@@ -149,12 +149,12 @@ describe('hit testing a bay', () => {
     expect(bayAt(node, -half - 0.5, 0)).toBeNull()
     expect(bayAt(node, half + 0.5, 0)).toBeNull()
     // And the aisle-side gap between the two runs of an island.
-    const twin = rack({ bayCount: 3, backToBack: true, backToBackGap: 0.6 })
+    const twin = rack({ bayCount: 3, rowCount: 2, backToBackGap: 0.6 })
     expect(bayAt(twin, 0, 0)).toBeNull()
   })
 
   test('each row of an island resolves to its own side', () => {
-    const twin = rack({ bayCount: 3, backToBack: true })
+    const twin = rack({ bayCount: 3, rowCount: 2 })
     expect(bayAt(twin, bayCenterX(twin, 2), rowCenterZ(twin, 1))).toEqual({ row: 1, bay: 2 })
     expect(bayAt(twin, bayCenterX(twin, 2), rowCenterZ(twin, 2))).toEqual({ row: 2, bay: 2 })
   })

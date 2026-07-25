@@ -24,7 +24,7 @@ describe('the plan is projected from the model, not recomputed', () => {
     for (const config of [
       {},
       { bayCount: 6 },
-      { backToBack: true },
+      { rowCount: 2 },
       { depthPositions: 2 },
       { hasGroundBeam: true },
     ]) {
@@ -56,12 +56,12 @@ describe('the plan is projected from the model, not recomputed', () => {
     // catches the projection silently falling behind the model.
     const plain = rects(rack()).length
     expect(rects(rack({ bayCount: 6 })).length).toBeGreaterThan(plain)
-    expect(rects(rack({ backToBack: true })).length).toBeGreaterThan(plain)
+    expect(rects(rack({ rowCount: 2 })).length).toBeGreaterThan(plain)
     expect(rects(rack({ hasGroundBeam: true })).length).toBeGreaterThan(plain)
   })
 
   test('the outline is the collision footprint', () => {
-    const node = rack({ bayCount: 4, backToBack: true })
+    const node = rack({ bayCount: 4, rowCount: 2 })
     const outline = rects(node)[0]
     expect(outline?.width).toBeCloseTo(totalWidth(node), 9)
     expect(outline?.height).toBeCloseTo(totalDepth(node), 9)
@@ -69,7 +69,7 @@ describe('the plan is projected from the model, not recomputed', () => {
   })
 
   test('steel stays inside the outline; pallets overhang it, as they really do', () => {
-    const node = rack({ bayCount: 3, backToBack: true })
+    const node = rack({ bayCount: 3, rowCount: 2 })
     const halfWidth = totalWidth(node) / 2
     const halfDepth = totalDepth(node) / 2
     const [, palletDepth] = orientedPalletFootprint(node)

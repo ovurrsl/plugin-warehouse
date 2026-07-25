@@ -111,6 +111,6 @@ export const palletRackDefinition = {
 
   mcp: {
     description:
-      'Adjustable pallet racking, one continuous run of bays sharing their upright frames. `bayCount`, `levels`, `bayClearWidth` and `uprightHeight` set the frame; `palletPreset` and `palletOrientation` set how many pallets a level holds (a 2.7 m bay takes three EPAL 1 short-side-out, two long-side-out). `backToBack` adds a second run served from its own aisle; `depthPositions: 2` stores a second pallet behind the first on the same aisle. `pickingLevels` converts the lowest levels to hand-picked container shelves. Dimensions are metres.',
+      'Adjustable pallet racking. One node is a whole block: `bayCount` bays along the run sharing their upright frames, and `rowCount` runs stacked into the depth. `rowPattern: "back-to-back"` pairs the rows spine to spine with `aisleWidth` between pairs; `"aisle"` gives every row its own aisle and points them all the same way. `levels`, `bayClearWidth` and `uprightHeight` set the frame; `palletPreset` and `palletOrientation` set how many pallets a level holds (a 2.7 m bay takes three EPAL 1 short-side-out, two long-side-out). `depthPositions: 2` stores a second pallet behind the first on the same aisle. `pickingLevels` converts the lowest levels to hand-picked container shelves. `bayOverrides` skips a bay or opens a tunnel through it, keyed `R1-B3`. Prefer one block over many nodes: a block is one merged mesh whatever its size. Dimensions are metres.',
   },
 } satisfies NodeDefinition<typeof PalletRackNode>

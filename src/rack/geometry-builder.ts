@@ -1,12 +1,14 @@
 import * as THREE from 'three'
-import { type RackDetail, type RackPart, type RackPartRole, rackParts } from './parts'
+import type { RackDetail, RackPart, RackPartRole } from './parts'
+import { PART_BUDGET, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   beamedLevels,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
-  rowCount,
+  rowFacing,
+  rowGapBefore,
   slotOffsetsX,
 } from './slots'
 
@@ -191,12 +193,12 @@ export type { RackDetail } from './parts'
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
-function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeometry {
+function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.BufferGeometry {
   const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
   const uprightColor = toLinear(rack.uprightColor)
   const beamColor = toLinear(rack.beamColor)
 
-  for (const part of rackParts(rack, detail)) {
+  for (const part of parts) {
     const color =
       part.role === 'upright'
         ? uprightColor
@@ -225,7 +227,7 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
  * Built from the values the builder actually consumes rather than from the raw
  * schema fields, which buys two things a hand-listed key cannot.
  *
- * It cannot over-report: `backToBackGap` moves no vertex while the rack is a
+ * It cannot over-report: the row gaps move no vertex while the block is a
  * single run, and `depthGap` moves none while it is single-deep, so listing
  * them raw split the cache between racks whose meshes were byte-identical.
  * Passing them through the same helpers the builder uses collapses those back
@@ -268,11 +270,18 @@ export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): strin
       .sort()
       .map((key) => `${key}:${JSON.stringify(rack.bayOverrides[key])}`)
       .join(';'),
-    rowCount(rack),
+    rack.rowCount,
+    // The gap sequence the block actually uses, rather than the two gap fields
+    // and the pattern raw. A single run consumes neither gap, a back-to-back
+    // pair never opens an aisle, and a two-row `aisle` block never uses the
+    // spine gap — listing the fields would split the cache between blocks whose
+    // meshes are byte-identical. `rowPattern` reaches the key through this.
+    Array.from({ length: Math.max(0, rack.rowCount - 1) }, (_, index) =>
+      rowGapBefore(rack, index + 2),
+    ).join(','),
+    // Which way each row faces decides where its beams and pallets sit.
+    Array.from({ length: rack.rowCount }, (_, index) => rowFacing(rack, index + 1)).join(''),
     rack.depthPositions,
-    // Only reaches the geometry when there is a second run / a second position
-    // to separate.
-    rack.backToBack ? rack.backToBackGap : 0,
     rack.depthPositions > 1 ? rack.depthGap : 0,
     levels,
     // Picking sections and shelf panels are only emitted where a picking level
@@ -306,7 +315,18 @@ export function getRackGeometry(rack: PalletRackNode, detail: RackDetail): THREE
   const key = rackGeometryKey(rack, detail)
   const cached = cache.get(key)
   if (cached) return cached
-  const geometry = buildRack(rack, detail)
+
+  // The budget test is exact rather than estimated, which means building the
+  // part list — so it runs only here, past the cache, where the list is about to
+  // be built anyway. An estimate would be cheaper and would drift from what the
+  // builder actually emits the first time either side gained a part.
+  const parts = rackParts(rack, detail)
+  const geometry =
+    detail === 'full' && parts.length > PART_BUDGET
+      ? // Both tiers resolve to the same silhouette; the two keys share one
+        // geometry object rather than building it twice.
+        getRackGeometry(rack, 'simple')
+      : buildFrom(rack, parts)
   cache.set(key, geometry)
   return geometry
 }
@@ -318,6 +338,7 @@ export function rackGeometryCacheSize(): number {
 }
 
 export function clearRackGeometryCache(): void {
-  for (const geometry of cache.values()) geometry.dispose()
+  // Deduped: an over-budget block files the same geometry under both tiers.
+  for (const geometry of new Set(cache.values())) geometry.dispose()
   cache.clear()
 }

@@ -36,11 +36,58 @@ export const PalletRackNode = BaseNode.extend({
   uprightHeight: z.number().min(1).max(20).default(5),
 
   /**
-   * Two runs stood back to back, sharing an aisle on each outer face — the
-   * standard double-sided island. Doubles depth; the runs do not share frames.
+   * Runs stacked into the depth, sharing one node.
+   *
+   * The same reasoning as `bayCount`, one axis over: a block of twenty runs
+   * built as twenty nodes is twenty meshes and twenty draw calls, and at
+   * warehouse scale the draw calls are what costs the frame. As one node it is
+   * one merged mesh, and the whole block still shares that mesh with every other
+   * block of the same shape.
+   *
+   * Row 1 is the +Z-most run and they count back toward −Z, so a row index means
+   * the same thing however many rows there are.
    */
-  backToBack: z.boolean().default(false),
+  rowCount: z.number().int().min(1).max(20).default(1),
+
+  /**
+   * How the rows are grouped across the depth.
+   *
+   * `back-to-back` pairs them — (1,2), (3,4), … — each pair standing spine to
+   * spine with an aisle between pairs, which is how a high-density block is
+   * actually laid out: one aisle serves the two rows either side of it.
+   * `aisle` gives every row its own aisle and points them all the same way,
+   * for a run of racks along a one-directional picking route.
+   */
+  rowPattern: z.enum(['back-to-back', 'aisle']).default('back-to-back'),
+
+  /** Spine-to-spine gap inside a back-to-back pair. */
   backToBackGap: z.number().min(0).max(1.5).default(0.2),
+
+  /**
+   * Working aisle between pairs (or between every row in `aisle` pattern).
+   *
+   * 3.2 m is a reach truck's working aisle. A counterbalanced forklift needs
+   * about 3.5 m and a turret truck as little as 1.6 m, so this is the field that
+   * decides which truck the block can actually be served by.
+   */
+  aisleWidth: z.number().min(0.8).max(8).default(3.2),
+
+  /**
+   * Which end of the block stays put when it grows.
+   *
+   * The block itself is always centred on the node's position — the host reads
+   * a footprint as a rectangle centred there, and an offset one would put the
+   * collision box and the alignment guides in the wrong place. So the anchor
+   * moves the *node* instead: place with `left` and the click marks the run's
+   * left end, add bays from the layout popover and the left end does not budge.
+   *
+   * The inspector's raw `bayCount` / `rowCount` fields do not consult this; they
+   * grow the block about its centre, which is what editing a number in a list of
+   * numbers reads as.
+   */
+  bayAnchor: z.enum(['left', 'center', 'right']).default('center'),
+  /** `front` is the +Z face — the aisle side of row 1. */
+  rowAnchor: z.enum(['front', 'center', 'back']).default('front'),
 
   /**
    * Pallets stored one behind another on the same accessible face.

@@ -35,6 +35,33 @@ const LOD_FAR_SQ = 45 * 45
 const LOD_NEAR_SQ = 35 * 35
 
 /**
+ * Frames between distance tests, and how the racks are spread across them.
+ *
+ * The test is cheap but there is one per rack per frame, and a warehouse has
+ * thousands. Testing every eighth frame is imperceptible at ten metres of
+ * hysteresis — a camera would have to cross the band in under a tenth of a
+ * second — and staggering by a per-instance phase keeps a thousand racks from
+ * all recomputing on the same frame, which is what turns a small cost into a
+ * periodic hitch.
+ */
+const LOD_INTERVAL = 8
+
+/** Shared by every rack's picking collider, scaled per node. A box geometry per
+ *  rack is a thousand allocations that all describe the same cube. */
+const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
+
+/**
+ * Invisible, and deliberately so.
+ *
+ * `visible = false` takes the collider out of `WebGLRenderer.projectObject`
+ * entirely — no colour pass, no shadow pass — while three's raycaster and R3F's
+ * event layer both ignore `visible` and keep hitting it. A `colorWrite: false`
+ * material still costs a draw call per rack in both passes, which on a thousand
+ * racks is a thousand draws that paint nothing.
+ */
+const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
+
+/**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
  * `def.geometry`, for the same reason the pallet is.
  *
@@ -71,10 +98,25 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
   const geometry = useMemo(() => getRackGeometry(node, 'full'), [node])
   const material = getRackMaterial()
 
+  const frameRef = useRef(0)
+  // Spread the checks across the interval so the racks do not all land on the
+  // same frame. Derived from the id rather than counted, so it survives a
+  // remount and needs no shared state.
+  const phase = useMemo(() => hashPhase(node.id), [node.id])
+
   useFrame(({ camera }) => {
     const mesh = steelRef.current
     if (!mesh || isExporting) return
-    const distanceSq = camera.position.distanceToSquared(mesh.getWorldPosition(worldPosition))
+    frameRef.current += 1
+    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
+
+    // Straight off the world matrix R3F has already updated this frame.
+    // `getWorldPosition` would walk and re-multiply the whole ancestor chain
+    // per rack per check, which is the actual cost at warehouse scale.
+    const { elements } = mesh.matrixWorld
+    const distanceSq = camera.position.distanceToSquared(
+      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+    )
     const current = detailRef.current
     const next =
       current === 'full'
@@ -87,6 +129,9 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getRackGeometry(node, next)
+    // A rack far enough away to lose its bracing is far enough that its shadow
+    // is a smudge, and every caster is a second draw call in the shadow pass.
+    mesh.castShadow = next === 'full'
   })
 
   const width = totalWidth(node)
@@ -101,12 +146,14 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
           silhouette rather than this box. */}
       {!isExporting && (
         <mesh
+          dispose={null}
+          geometry={UNIT_COLLIDER}
+          material={COLLIDER_MATERIAL}
           position={[position[0], position[1] + node.uprightHeight / 2, position[2]]}
           rotation={rotation}
-        >
-          <boxGeometry args={[width, node.uprightHeight, depth]} />
-          <meshBasicMaterial colorWrite={false} depthWrite={false} />
-        </mesh>
+          scale={[width, node.uprightHeight, depth]}
+          visible={false}
+        />
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
@@ -127,6 +174,17 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
 }
 
 const worldPosition = new THREE.Vector3()
+
+/** A stable 0..LOD_INTERVAL-1 bucket for an id. FNV-1a, the same hash the ghost
+ *  fill uses — cheap, and identical for the same rack on every mount. */
+function hashPhase(id: string): number {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < id.length; index++) {
+    hash ^= id.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0) % LOD_INTERVAL
+}
 
 /**
  * Illustrative stock in slots no real pallet occupies.

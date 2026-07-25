@@ -22,6 +22,7 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
+import { mountOverlay } from '../overlay'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
@@ -29,9 +30,10 @@ import {
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
+import RackLayoutPopover from './layout-popover'
 import PalletRackPreview from './preview'
 import { PalletRackNode } from './schema'
-import { totalDepth, totalWidth } from './slots'
+import { anchorOffset, totalDepth, totalWidth } from './slots'
 
 /** 45° steps, matching the R / T rotation every built-in placement tool uses. */
 const ROTATION_STEP = Math.PI / 4
@@ -84,6 +86,15 @@ export default function PalletRackTool() {
     ],
     [previewNode],
   )
+
+  // The block layout card, in a React DOM root of its own — a tool renders
+  // inside the R3F tree, where a `<div>` is not a div. See `../overlay`.
+  // Gated on the level for the same reason the tool itself is: with nowhere to
+  // place, the card would offer to configure a block that cannot be committed.
+  useEffect(() => {
+    if (!activeLevelId) return
+    return mountOverlay('rack-layout', <RackLayoutPopover />)
+  }, [activeLevelId])
 
   useEffect(() => {
     if (!activeLevelId) return
@@ -140,8 +151,15 @@ export default function PalletRackTool() {
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
+      // The block is centred on its position, because that is the rectangle the
+      // host collides and aligns against — so growing "from the left end" means
+      // offsetting the centre from the cursor, not offsetting the geometry.
+      const [dx, dz] = anchorOffset(previewNode)
+      const cos = Math.cos(rotationRef.current)
+      const sin = Math.sin(rotationRef.current)
       const { position, guides } = resolveAlignedPlacement({
         candidates: alignmentCandidates,
+        centerOffset: [dx * cos + dz * sin, -dx * sin + dz * cos],
         node: previewNode as unknown as AnyNode,
         rawX,
         rawZ,

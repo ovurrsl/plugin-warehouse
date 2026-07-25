@@ -71,7 +71,7 @@ describe('beam to upright fit', () => {
       {},
       { bayCount: 1 },
       { bayCount: 8, bayClearWidth: 3.6 },
-      { backToBack: true },
+      { rowCount: 2 },
       { depthPositions: 2 },
       { hasGroundBeam: true },
       { pickingLevels: 2 },
@@ -103,7 +103,7 @@ describe('beam to upright fit', () => {
 
 describe('nothing escapes the declared envelope', () => {
   test('every part except the footplates fits the collision footprint', () => {
-    const r = rack({ bayCount: 4, backToBack: true })
+    const r = rack({ bayCount: 4, rowCount: 2 })
     const halfWidth = totalWidth(r) / 2
     const halfDepth = totalDepth(r) / 2
     for (const part of rackParts(r, 'full')) {

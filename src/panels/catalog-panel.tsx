@@ -114,8 +114,6 @@ function CatalogTile({ item }: { item: CatalogItem }) {
 
 function StatsTab() {
   return (
-    <div style={tokens.empty}>
-      Capacity and area figures appear here once racking is placed.
-    </div>
+    <div style={tokens.empty}>Capacity and area figures appear here once racking is placed.</div>
   )
 }

@@ -1,5 +1,6 @@
-import type { Plugin } from '@pascal-app/core'
+import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
+import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 
 /**
@@ -21,7 +22,10 @@ export const warehousePlugin: Plugin = {
   // behaviour: a host that has moved on should refuse this plugin loudly
   // rather than load it against a contract it no longer honours.
   apiVersion: 1,
-  nodes: [],
+  // The cast mirrors the built-in bundle's. `AnyNode` is a hand-maintained
+  // discriminated union of host kinds, so it cannot by construction know about
+  // a plugin's — the registry validates against `def.schema` at runtime.
+  nodes: [palletDefinition as unknown as AnyNodeDefinition],
 }
 
 export const warehouseCatalogPanel: EditorHostPanel = {
@@ -34,7 +38,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   icon: { kind: 'iconify', name: 'lucide:warehouse' },
   // Kept in sync with the manifest so `panelForKind` can route the host's
   // "find in catalog" action to this panel.
-  kinds: [],
+  kinds: ['warehouse:pallet'],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild
   // the lazy boundary on every render.
@@ -42,5 +46,11 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   defaultInstalled: true,
 }
 
+// No re-export of `./pallet/geometry-builder` or `./pallet/epal-textures`:
+// the atlas touches `document`, and this barrel is imported eagerly during
+// server prerender. The lazy renderer/tool modules import them directly.
+export { palletDefinition } from './pallet/definition'
+export { PALLET_PRESETS, type PalletPreset } from './pallet/presets'
+export { PalletNode } from './pallet/schema'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
 export default warehousePlugin

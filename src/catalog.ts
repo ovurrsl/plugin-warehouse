@@ -72,7 +72,15 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
  * kind would arm a tool that cannot place anything, so entries land in the same
  * change as their `NodeDefinition`.
  */
-export const CATALOG_ITEMS: readonly CatalogItem[] = [] as const
+export const CATALOG_ITEMS: readonly CatalogItem[] = [
+  {
+    kind: 'warehouse:pallet',
+    label: 'Pallet',
+    sectionId: 'unit-loads',
+    description: 'EPAL, GMA and plastic pallets. Set a load height to fill a rack position.',
+    icon: 'lucide:package',
+  },
+] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {
   return CATALOG_ITEMS.filter((item) => item.sectionId === sectionId)

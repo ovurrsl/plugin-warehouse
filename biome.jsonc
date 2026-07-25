@@ -1,0 +1,61 @@
+{
+  // Mirrors the host editor's formatting so a file moved between the two repos
+  // does not churn. The linter rules are Biome's recommended set plus the
+  // handful the host disables — kept in sync deliberately rather than by
+  // extending the host config, which would reintroduce the workspace
+  // dependency this package exists without.
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "formatter": {
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "quoteStyle": "single",
+      "jsxQuoteStyle": "double"
+    }
+  },
+  "linter": {
+    "rules": {
+      "style": {
+        "useConsistentTypeDefinitions": "off",
+        "useConsistentArrayType": "off",
+        "noNestedTernary": "off",
+        "useBlockStatements": "off",
+        "noNonNullAssertion": "off",
+        "noMagicNumbers": "off"
+      },
+      "performance": {
+        "noNamespaceImport": "off",
+        "noBarrelFile": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noConsole": "off",
+        "noArrayIndexKey": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off",
+        "noForEach": "off"
+      }
+    }
+  },
+  "files": {
+    "includes": ["src/**"]
+  }
+}

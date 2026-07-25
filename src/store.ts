@@ -1,13 +1,14 @@
 import { create } from 'zustand'
+import type { PalletPreset } from './pallet/presets'
 
 /**
  * The plugin's own state. Plugins do not extend `useScene` / `useEditor` /
  * `useViewer`; they keep a module-level store of their own, which is what the
  * plugin-authoring contract prescribes and what the reference plugin does.
  *
- * It holds view state only — which tab is open, what the stats readout is
- * scoped to. Node data lives on the nodes; nothing here is persisted, and
- * losing it on reload costs the user one click.
+ * It holds view state and the placement "brush" — what the next placed item
+ * looks like. The panel writes it, the tools read it. Node data lives on the
+ * nodes; nothing here is persisted, and losing it on reload costs one click.
  *
  * It deliberately lives outside the panel component: the panel unmounts
  * whenever the user switches rail tabs, and a scope selection that reset every
@@ -37,6 +38,14 @@ type WarehouseStore = {
   slabFilter: ReadonlySet<string> | null
   setSlabFilter: (ids: ReadonlySet<string> | null) => void
   toggleSlab: (id: string, allIds: readonly string[]) => void
+
+  // ── Placement brush ────────────────────────────────────────────────────
+  /** Preset the next placed pallet uses. */
+  palletPreset: PalletPreset
+  setPalletPreset: (preset: PalletPreset) => void
+  /** Load height, metres. 0 places a bare pallet. */
+  palletLoadHeight: number
+  setPalletLoadHeight: (height: number) => void
 }
 
 export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
@@ -60,4 +69,10 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     // slabs are included by default instead of silently missing from the total.
     set({ slabFilter: next.size === allIds.length ? null : next })
   },
+
+  palletPreset: 'epal-1',
+  setPalletPreset: (palletPreset) => set({ palletPreset }),
+  palletLoadHeight: 0,
+  setPalletLoadHeight: (palletLoadHeight) =>
+    set({ palletLoadHeight: Math.max(0, palletLoadHeight) }),
 }))

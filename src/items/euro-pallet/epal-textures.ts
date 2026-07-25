@@ -20,7 +20,6 @@ let cachedAtlas: EPALTextureAtlas | null = null
  *    - Mapped EXCLUSIVELY to outward-facing outer perimeter vertical faces of the 9 blocks.
  */
 export function getOrCreateEPALTextureAtlas(): EPALTextureAtlas {
-  if (cachedAtlas) return cachedAtlas
 
   const size = 1024
 
@@ -170,6 +169,5 @@ export function getOrCreateEPALTextureAtlas(): EPALTextureAtlas {
   const metalnessMap = new THREE.CanvasTexture(mCanvas)
   metalnessMap.anisotropy = 16
 
-  cachedAtlas = { map, roughnessMap, metalnessMap }
-  return cachedAtlas
+  return { map, roughnessMap, metalnessMap }
 }

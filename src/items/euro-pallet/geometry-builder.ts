@@ -70,7 +70,6 @@ function findBlock(x: number, z: number): BlockDef | null {
  *   top boards, stringers, bottom boards, or internal tunnel faces.
  */
 export function getOrCreateEPALGeometry(): THREE.BufferGeometry {
-  if (cachedEPALGeometry) return cachedEPALGeometry
 
   const geometries: THREE.BufferGeometry[] = []
 
@@ -221,8 +220,7 @@ export function getOrCreateEPALGeometry(): THREE.BufferGeometry {
   merged.computeBoundingSphere()
   applyPerTriangleUVProjection(merged)
 
-  cachedEPALGeometry = merged
-  return cachedEPALGeometry
+  return merged
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

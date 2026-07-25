@@ -40,11 +40,10 @@ export function EuroPallet3DGeometry() {
     <mesh
       castShadow
       geometry={geometry}
+      material={material}
       receiveShadow
       dispose={null}
-    >
-      <meshStandardMaterial color="red" />
-    </mesh>
+    />
   )
 }
 

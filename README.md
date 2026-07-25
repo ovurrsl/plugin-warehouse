@@ -43,15 +43,29 @@ src/
 
 The package is **self-contained** — its `tsconfig.json` extends nothing, its dependencies pin real versions, and it bundles no assets (panel icons are Iconify names the host resolves). It works identically as a monorepo workspace and as a git dependency, which is what lets it be developed here and shipped from its own repository without a rewrite.
 
-Four edits in the host app:
+Three edits in the host app:
 
 **1. Depend on it**
 
 ```jsonc
-// package.json
-"@ovurrsl/plugin-warehouse": "github:ovurrsl/plugin-warehouse#<commit-sha>"
+// package.json — this repository is private, so use the git+ssh form
+"@ovurrsl/plugin-warehouse": "git+ssh://git@github.com/ovurrsl/plugin-warehouse.git#<commit-sha>"
+// …public repo: "github:owner/repo#<commit-sha>"
 // …or, inside the editor monorepo: "*"
 ```
+
+> **`github:` does not work for a private repository.** Bun resolves that
+> shorthand through `api.github.com/repos/.../tarball/…` and fetches it
+> unauthenticated, so a private repo answers `404` and the install fails with
+> `failed to resolve`. Bun 1.3 has no token setting that changes this —
+> `GITHUB_TOKEN`, `GH_TOKEN`, `BUN_CONFIG_TOKEN`, `BUN_AUTH_TOKEN`,
+> `NPM_CONFIG_TOKEN` and `~/.netrc` were each verified to make no difference,
+> and `git+https://github.com/…` is rewritten to the same tarball URL.
+>
+> The `git+ssh://` form is what makes bun shell out to `git` instead, and git
+> authenticates the way it already does for `push` — through the credential
+> helper. On a machine where `git push` works this installs with no extra
+> setup and **no SSH key is required**, despite the scheme name.
 
 **2. Transpile it** — the package ships TypeScript source, not built JS:
 
@@ -60,14 +74,7 @@ Four edits in the host app:
 transpilePackages: ['@ovurrsl/plugin-warehouse', /* … */]
 ```
 
-**3. Let Tailwind see the panel's classes** — omit this and the panel renders completely unstyled, with no error:
-
-```css
-/* globals.css */
-@source "../../../node_modules/@ovurrsl/plugin-warehouse/src";
-```
-
-**4. Register it, before the bootstrap kicks off discovery**
+**3. Register it, before the bootstrap kicks off discovery**
 
 ```ts
 import { warehouseCatalogPanel, warehousePlugin } from '@ovurrsl/plugin-warehouse'
@@ -101,7 +108,9 @@ function parseClipboardNode(candidate: unknown): AnyNode {
 
 Built-in behaviour is unchanged — `AnyNode` is tried first — and an unknown type still raises the original error.
 
-> **Currently applied as a local patch to the host checkout.** It is not part of this package and does not travel with it: pulling a newer editor reverts it and duplicate silently starts failing again. Sending it upstream is what makes it durable.
+Submitted upstream as [pascalorg/editor#547](https://github.com/pascalorg/editor/pull/547), with a test that registers a definition the way a plugin does and fails without the fallback.
+
+> **Until that lands it is a local patch to the host checkout.** It is not part of this package and does not travel with it: pulling a newer editor reverts it and duplicate silently starts failing again — with the error pointing at the plugin, so anyone debugging it without this note looks in the wrong place.
 
 ## Extracting to a standalone repository
 
@@ -115,13 +124,14 @@ bun run check-types && bun test
 
 Nothing needs editing. `.github/workflows/ci.yml` is inert inside the monorepo (GitHub only reads workflows from a repo root) and starts running on the first push.
 
-Then point the host at the new repo by swapping the dependency to `github:ovurrsl/plugin-warehouse#<sha>` and the `@source` path to `node_modules/@ovurrsl/plugin-warehouse/src`.
+Then point the host at the new repo by swapping the dependency to the git URL from step 1.
 
-To keep it extractable, three rules hold for anything added here:
+To keep it extractable, four rules hold for anything added here:
 
 - **Import from package barrels only** — `@pascal-app/core`, never `@pascal-app/core/src/...`. Deep paths are outside the `exports` map and break on the first release.
 - **No workspace-only dependencies** — nothing resolved by `"*"` or by a path inside the editor monorepo.
 - **No host assets.** `/icons/shelf.webp` exists in the editor app's `public/`, not in a consumer's. Icons are Iconify names; anything else must be bundled or inlined.
+- **No Tailwind classes in panel markup.** Panels style themselves with inline styles resolving the host's own CSS variables (`src/panels/styles.ts`), which is why installing needs no `@source` line. Tailwind v4 does not scan symlinked directories, and a git dependency is *always* a symlink into bun's store — so a utility class written here is silently never compiled. There is no error; the panel simply renders unstyled. Verified both ways: pointing `@source` at the store's real path emits the class, pointing it at the symlink emits nothing, and neither a `**/*` glob nor `bun install --backend=copyfile` changes it. The first-party `plugin-trees` pack has the same problem.
 
 ## Verifying
 

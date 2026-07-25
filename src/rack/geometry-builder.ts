@@ -3,15 +3,16 @@ import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
   bayPitch,
+  beamedLevels,
   depthPositionZ,
   frameCentersX,
   levelBeamHeight,
   levelHasShelf,
   levelSurfaceY,
+  levelTypeOf,
   palletSupportBarCount,
   rowCount,
   slotOffsetsX,
-  storageLevels,
 } from './slots'
 
 /**
@@ -214,7 +215,9 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
   const barColor = toLinear(SUPPORT_BAR_COLOR)
 
   const frames = frameCentersX(rack)
-  const levels = storageLevels(rack).filter((level) => level > 0)
+  // The floor carries no beam unless asked — one there would block a truck
+  // reaching the ground position.
+  const levels = beamedLevels(rack)
   const rows = rowCount(rack)
   const { uprightWidth, uprightDepth, depth, uprightHeight } = rack
   const halfPost = depth / 2 - uprightDepth / 2
@@ -269,6 +272,14 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
           // frame's depth vertically, overshooting one panel's height, and the
           // bottom one drives 10 cm through the floor.
           const angle = Math.atan2(span, step)
+
+          // Horizontal ties close the frame at both ends of the braced run.
+          // A frame with only diagonals reads as unfinished, and on the real
+          // article these are what the diagonals terminate into.
+          for (const y of [braceBottom, braceTop]) {
+            emitBox(sink, [x, y, centerZ], [0.03, 0.03, span], bracingColor)
+          }
+
           for (let panel = 0; panel < panels; panel++) {
             const midY = braceBottom + (panel + 0.5) * step
             const sign = panel % 2 === 0 ? 1 : -1
@@ -298,7 +309,10 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
         for (const level of levels) {
           const beamHeight = levelBeamHeight(rack, level)
           const surface = levelSurfaceY(rack, level)
-          const beamY = surface - beamHeight / 2
+          // Every other level hangs its beam under the load surface; the
+          // ground beam has no surface above it to hang from, so it sits on the
+          // floor instead of half-buried in it.
+          const beamY = level === 0 ? beamHeight / 2 : surface - beamHeight / 2
           for (const z of postZ) {
             emitBox(
               sink,
@@ -312,10 +326,14 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
           // few tens of metres, and nine of them on a three-bay rack. Dropping
           // it from the far tier is most of what makes that tier cheap.
           if (detail === 'full' && levelHasShelf(rack, level)) {
+            // Chipboard is three times the thickness of a steel or mesh panel,
+            // and it is visible at the shelf edge.
             const thickness =
               levelBeamHeight(rack, level) === rack.pickingBeamHeight
                 ? rack.pickingShelfThickness
-                : 0.02
+                : rack.decking === 'timber'
+                  ? 0.018
+                  : 0.006
             emitBox(
               sink,
               [centerX, surface + thickness / 2, centerZ],
@@ -374,45 +392,62 @@ function buildRack(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeomet
 /**
  * Identity of a rack's *shape*.
  *
- * Every field that changes a vertex, and nothing else. Id, name, position,
- * rotation, `supportSlabId` and the ghost-fill fraction are all excluded, which
- * is the entire point: two racks that look the same must produce the same key
- * so they share one geometry. Including the node itself would give every rack
- * in the warehouse a private mesh and defeat the cache silently — it would
- * still be correct, just slow, which is the worst way for this to fail.
+ * Built from the values the builder actually consumes rather than from the raw
+ * schema fields, which buys two things a hand-listed key cannot.
+ *
+ * It cannot over-report: `backToBackGap` moves no vertex while the rack is a
+ * single run, and `depthGap` moves none while it is single-deep, so listing
+ * them raw split the cache between racks whose meshes were byte-identical.
+ * Passing them through the same helpers the builder uses collapses those back
+ * together.
+ *
+ * And it cannot under-report as easily: the level structure is encoded as the
+ * type and elevation of each level, so a new field that changes level layout —
+ * `hasGroundBeam` was one, and it shipped missing from the hand-listed version —
+ * reaches the key through `levelSurfaceY` without anyone remembering to add it.
+ *
+ * Id, name, position, rotation, `supportSlabId` and `ghostFill` are all absent
+ * on purpose: two racks that look the same must share one geometry.
  */
 export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): string {
+  const bars = palletSupportBarCount(rack)
+  const beamed = beamedLevels(rack)
+  const hasPicking = beamed.some((level) => levelTypeOf(rack, level) === 'picking')
+  const levels = beamed
+    .map((level) => `${levelTypeOf(rack, level)}@${levelSurfaceY(rack, level).toFixed(5)}`)
+    .join(',')
+
   return [
     detail,
     rack.bayCount,
     rack.bayClearWidth,
     rack.depth,
     rack.uprightHeight,
-    rack.backToBack ? 1 : 0,
-    rack.backToBackGap,
-    rack.depthPositions,
-    rack.depthGap,
-    rack.levels,
-    rack.firstLevelClear,
-    rack.levelClear,
-    rack.groundLevelStorage ? 1 : 0,
-    rack.pickingLevels,
-    rack.levelTypes?.join('') ?? '',
-    rack.pickingLevelClear,
-    rack.pickingBeamHeight,
-    rack.pickingShelfThickness,
     rack.uprightWidth,
     rack.uprightDepth,
     rack.beamHeight,
     rack.beamThickness,
     rack.bracing,
     rack.decking,
-    rack.palletPreset,
-    rack.palletOrientation,
-    rack.palletsPerLevel ?? '',
-    rack.palletSupportBars ?? '',
-    rack.clearanceToUpright,
-    rack.clearanceBetweenPallets,
+    rack.hasGroundBeam ? 1 : 0,
+    rowCount(rack),
+    rack.depthPositions,
+    // Only reaches the geometry when there is a second run / a second position
+    // to separate.
+    rack.backToBack ? rack.backToBackGap : 0,
+    rack.depthPositions > 1 ? rack.depthGap : 0,
+    levels,
+    // Picking sections and shelf panels are only emitted where a picking level
+    // exists; on an all-pallet rack these move nothing.
+    hasPicking ? `${rack.pickingBeamHeight}/${rack.pickingShelfThickness}` : '',
+    bars,
+    // Bar positions follow the pallet layout, so those fields matter only when
+    // bars are actually drawn.
+    bars > 0
+      ? slotOffsetsX(rack)
+          .map((offset) => offset.toFixed(5))
+          .join(',')
+      : '',
     rack.uprightColor,
     rack.beamColor,
   ].join('|')

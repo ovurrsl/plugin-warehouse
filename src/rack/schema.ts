@@ -143,6 +143,15 @@ export const PalletRackNode = BaseNode.extend({
   decking: z.enum(['wire-mesh', 'steel', 'timber', 'open']).default('wire-mesh'),
 
   /**
+   * A beam pair at floor level.
+   *
+   * Off by default because it obstructs the ground position: a truck placing a
+   * pallet on the floor of the bay has to clear it. Racks that carry nothing on
+   * the floor use it as a bottom tie.
+   */
+  hasGroundBeam: z.boolean().default(false),
+
+  /**
    * Bars fitted perpendicular to the beams, under each pallet.
    *
    * Needed when the pallet's bottom deckboards run *parallel* to the beams

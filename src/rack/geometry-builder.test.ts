@@ -26,29 +26,13 @@ describe('geometry sharing', () => {
     expect(rackGeometryCacheSize()).toBe(1)
   })
 
-  test('the key ignores identity and placement but tracks every shape field', () => {
+  test('the key ignores identity and placement', () => {
+    // Which fields must and must not reach the key is asserted exhaustively in
+    // 'cache key coverage' below, against the built mesh rather than a list
+    // somebody has to remember to update.
     const base = rack()
     const moved = rack({ id: 'pallet_rack_other', name: 'Aisle 4', position: [9, 0, 3] })
     expect(rackGeometryKey(moved, 'full')).toBe(rackGeometryKey(base, 'full'))
-
-    // A field that changes a vertex must change the key, or racks that look
-    // different would silently share a mesh.
-    for (const change of [
-      { bayCount: 4 },
-      { bayClearWidth: 3.3 },
-      { depth: 1.2 },
-      { uprightHeight: 7 },
-      { levels: 4 },
-      { backToBack: true },
-      { depthPositions: 2 },
-      { bracing: 'x-bracing' },
-      { decking: 'open' },
-      { pickingLevels: 2 },
-      { uprightColor: '#ff0000' },
-      { palletOrientation: 'long-side-out' },
-    ]) {
-      expect(rackGeometryKey(rack(change), 'full')).not.toBe(rackGeometryKey(base, 'full'))
-    }
   })
 
   test('a hundred identical racks still build one geometry', () => {
@@ -152,6 +136,132 @@ describe('geometry content', () => {
     for (let i = 0; i < normals.count; i++) {
       const length = Math.hypot(normals.getX(i), normals.getY(i), normals.getZ(i))
       expect(length).toBeCloseTo(1, 6)
+    }
+  })
+})
+
+describe('frame detail parity', () => {
+  beforeEach(() => clearRackGeometryCache())
+
+  test('a ground beam is added only when asked for, and sits on the floor', () => {
+    const without = getRackGeometry(rack(), 'full')
+    const withBeam = getRackGeometry(rack({ hasGroundBeam: true }), 'full')
+    expect((withBeam.getIndex()?.count ?? 0) > (without.getIndex()?.count ?? 0)).toBe(true)
+    // Off by default: a beam at floor level blocks a truck reaching the ground
+    // position, which is the one every rack has.
+    expect(rack().hasGroundBeam).toBe(false)
+    // And it rests on the floor rather than hanging half-buried in it.
+    expect(withBeam.boundingBox?.min.y ?? -1).toBeGreaterThanOrEqual(-1e-9)
+  })
+
+  test('timber decking is visibly thicker than steel or mesh', () => {
+    // 18 mm chipboard against a 6 mm panel, and it shows at the shelf edge.
+    const timber = getRackGeometry(rack({ decking: 'timber' }), 'full')
+    const steel = getRackGeometry(rack({ decking: 'steel' }), 'full')
+    expect(timber).not.toBe(steel)
+    expect(timber.boundingBox?.max.y ?? 0).toBeCloseTo(steel.boundingBox?.max.y ?? 0, 5)
+  })
+
+  test('bracing closes with a horizontal tie at each end', () => {
+    const braced = getRackGeometry(rack(), 'full')
+    const open = getRackGeometry(rack({ bracing: 'open' }), 'full')
+    const bracedTris = (braced.getIndex()?.count ?? 0) / 3
+    const openTris = (open.getIndex()?.count ?? 0) / 3
+    // Diagonals plus two ties per frame line; without the ties a frame reads
+    // as unfinished and the diagonals terminate into nothing.
+    const frames = 4
+    expect(bracedTris - openTris).toBeGreaterThanOrEqual(frames * 2 * 12)
+  })
+
+  test('nothing escapes the floor in any bracing mode', () => {
+    for (const bracing of ['z-bracing', 'x-bracing', 'open'] as const) {
+      const box = getRackGeometry(rack({ bracing }), 'full').boundingBox
+      expect(box?.min.y ?? -1).toBeGreaterThanOrEqual(-1e-9)
+    }
+  })
+})
+
+describe('cache key coverage', () => {
+  /**
+   * Build without the cache, so two shapes that share a key can still be
+   * compared. Otherwise the second lookup returns the first one's mesh and the
+   * bug this guards against becomes invisible to the guard.
+   */
+  const buildFresh = (rackNode: ReturnType<typeof rack>): Float32Array => {
+    clearRackGeometryCache()
+    const geometry = getRackGeometry(rackNode, 'full')
+    // Positions and colours both: part colours are baked into the vertex colour
+    // attribute, so a recolour moves no vertex but still produces a different
+    // mesh. Comparing positions alone would call the colour fields redundant
+    // and invite removing them from the key.
+    const positions = geometry.getAttribute('position').array as ArrayLike<number>
+    const colors = geometry.getAttribute('color').array as ArrayLike<number>
+    const combined = new Float32Array(positions.length + colors.length)
+    combined.set(Float32Array.from(positions), 0)
+    combined.set(Float32Array.from(colors), positions.length)
+    return combined
+  }
+
+  const sameMesh = (a: Float32Array, b: Float32Array) =>
+    a.length === b.length && a.every((value, index) => value === b[index])
+
+  // One altered value per field. Kept explicit rather than generated so each
+  // stays inside its schema range.
+  const VARIANTS: Array<[string, unknown]> = [
+    ['bayCount', 5],
+    ['bayClearWidth', 3.3],
+    ['depth', 1.2],
+    ['uprightHeight', 8],
+    ['backToBack', true],
+    ['backToBackGap', 0.4],
+    ['depthPositions', 2],
+    ['depthGap', 0.12],
+    ['levels', 2],
+    ['firstLevelClear', 1.9],
+    ['levelClear', 1.7],
+    ['groundLevelStorage', false],
+    ['hasGroundBeam', true],
+    ['pickingLevels', 2],
+    ['levelTypes', ['picking', 'pallet', 'pallet', 'pallet']],
+    ['pickingLevelClear', 0.8],
+    ['pickingBeamHeight', 0.09],
+    ['pickingShelfThickness', 0.04],
+    ['uprightWidth', 0.101],
+    ['uprightDepth', 0.069],
+    ['beamHeight', 0.16],
+    ['beamThickness', 0.07],
+    ['bracing', 'x-bracing'],
+    ['decking', 'timber'],
+    ['palletSupportBars', 3],
+    ['palletPreset', 'epal-2'],
+    ['palletOrientation', 'long-side-out'],
+    ['palletsPerLevel', 2],
+    ['clearanceToUpright', 0.12],
+    ['clearanceBetweenPallets', 0.12],
+    ['uprightColor', '#00ff00'],
+    ['beamColor', '#ff00ff'],
+    // Fields that must NOT move a vertex — included so the test also catches a
+    // key that over-reports and needlessly splits the cache.
+    ['ghostFill', 0.8],
+    ['levelCapacity', 5000],
+    ['name', 'Aisle 7'],
+    ['position', [12, 0, 4]],
+  ]
+
+  test('every field that changes the mesh also changes the key, and none that do not', () => {
+    // The failure this exists for is silent and one-directional: a geometry
+    // field missing from the key makes two visibly different racks share one
+    // mesh, and nothing looks wrong until you notice a rack ignoring a setting.
+    // `hasGroundBeam` shipped exactly that way and this caught it.
+    const base = rack()
+    const baseMesh = buildFresh(base)
+    const baseKey = rackGeometryKey(base, 'full')
+
+    for (const [field, value] of VARIANTS) {
+      const variant = rack({ [field]: value })
+      const changesMesh = !sameMesh(buildFresh(variant), baseMesh)
+      const changesKey = rackGeometryKey(variant, 'full') !== baseKey
+      expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
     }
   })
 })

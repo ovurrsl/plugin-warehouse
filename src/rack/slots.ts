@@ -250,6 +250,19 @@ export function pickingLevelsOf(rack: PalletRackNode): number[] {
   return storageLevels(rack).filter((level) => levelTypeOf(rack, level) === 'picking')
 }
 
+/**
+ * Levels that carry a beam pair.
+ *
+ * The floor is a storage level but normally carries no beam, so this is not the
+ * same list as `storageLevels`. Shared by the geometry builder and its cache key
+ * so the two can never disagree about which levels exist — a key derived from
+ * the wider list reports a difference the mesh does not have, and splits the
+ * cache between racks whose geometry is byte-identical.
+ */
+export function beamedLevels(rack: PalletRackNode): number[] {
+  return storageLevels(rack).filter((level) => level > 0 || rack.hasGroundBeam)
+}
+
 /** A picking level always carries a shelf — containers cannot sit on beams. */
 export function levelHasShelf(rack: PalletRackNode, level: number): boolean {
   if (level <= 0) return false

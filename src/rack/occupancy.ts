@@ -27,7 +27,7 @@ function build(nodes: Readonly<Record<string, unknown>>): Map<string, Set<string
   const next = new Map<string, Set<string>>()
   for (const value of Object.values(nodes)) {
     const node = value as NodeLike | null
-    if (!node || node.type !== 'warehouse:pallet') continue
+    if (node?.type !== 'warehouse:pallet') continue
     const rackId = node.slotRackId
     const address = node.slotAddress
     // A pallet standing on the floor has neither, and a pallet that kept its

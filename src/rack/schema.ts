@@ -79,6 +79,55 @@ export const PalletRackNode = BaseNode.extend({
   /** Rated load per beam level, kg. Reported by the capacity panel. */
   levelCapacity: z.number().min(0).max(20_000).default(3000),
 
+  // ── Picking levels ────────────────────────────────────────────────────────
+
+  /**
+   * How many of the lowest storage levels are picked by hand rather than
+   * holding pallets.
+   *
+   * Counted from the floor because that is where picking physically happens —
+   * an operator on foot reaches the bottom one or two levels, and the pallets
+   * above replenish them. A count covers that case in one field and keeps every
+   * rack in a run identical, which is what lets them share geometry.
+   */
+  pickingLevels: z.number().int().min(0).max(15).default(0),
+
+  /**
+   * Explicit type per level, index 0 being the floor. Null derives from
+   * `pickingLevels`.
+   *
+   * The escape hatch for a rack that is genuinely mixed out of order. Use it
+   * sparingly: an explicit list makes the rack's geometry unique, so a run of
+   * fifty racks that would otherwise share one mesh becomes fifty meshes.
+   */
+  levelTypes: z
+    .array(z.enum(['pallet', 'picking']))
+    .nullable()
+    .default(null),
+
+  /** Clear opening above a picking level. */
+  pickingLevelClear: z.number().min(0.15).max(3).default(0.6),
+
+  /** Picking beam profile height — the ZS-60P is a 60 mm section, half a
+   *  pallet beam, because it carries shelves rather than unit loads. */
+  pickingBeamHeight: z.number().min(0.04).max(0.2).default(0.06),
+
+  /** Shelf panel thickness on a picking level. */
+  pickingShelfThickness: z.number().min(0.005).max(0.06).default(0.025),
+
+  /** Container size. Defaults to the 600 × 400 Euro footprint, which tiles an
+   *  EPAL 1 deck exactly four to a layer. */
+  pickingBoxWidth: z.number().min(0.1).max(1.5).default(0.6),
+  pickingBoxDepth: z.number().min(0.1).max(1.5).default(0.4),
+  pickingBoxHeight: z.number().min(0.05).max(1).default(0.22),
+
+  /** Clearance at the shelf edges and between containers. */
+  pickingBoxGap: z.number().min(0).max(0.2).default(0.02),
+
+  /** Overrides for the derived container grid. Null computes it from the size. */
+  pickingBoxesAcross: z.number().int().min(1).max(30).nullable().default(null),
+  pickingBoxesDeep: z.number().int().min(1).max(10).nullable().default(null),
+
   // ── Steel profiles ────────────────────────────────────────────────────────
 
   /** Upright section across the run (local X). Defaults to the A127 profile. */

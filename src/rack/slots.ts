@@ -140,6 +140,65 @@ export function bayCenterX(rack: PalletRackNode, bay: number): number {
 
 // ── Levels ──────────────────────────────────────────────────────────────────
 
+export type LevelType = 'pallet' | 'picking'
+
+/**
+ * What a level holds. Level 0 is the floor inside the bay.
+ *
+ * The explicit `levelTypes` list wins when present; otherwise the lowest
+ * `pickingLevels` levels are picked by hand and everything above them holds
+ * pallets, which is how a mixed rack is actually arranged.
+ */
+export function levelTypeOf(rack: PalletRackNode, level: number): LevelType {
+  const explicit = rack.levelTypes?.[level]
+  if (explicit) return explicit
+  return level < rack.pickingLevels ? 'picking' : 'pallet'
+}
+
+/** Beam profile carrying a level. Picking levels ride a shallower section. */
+export function levelBeamHeight(rack: PalletRackNode, level: number): number {
+  return levelTypeOf(rack, level) === 'picking' ? rack.pickingBeamHeight : rack.beamHeight
+}
+
+/**
+ * Clear opening above a level's surface, before the next beam.
+ *
+ * Level 0 takes `firstLevelClear` when it holds pallets, because the ground
+ * opening is usually set by the truck rather than by the goods. A ground
+ * picking level takes the picking opening instead — otherwise setting
+ * `pickingLevels` would leave the bottom level sized for a pallet it will never
+ * hold, and quietly cost a level's worth of height up the whole frame.
+ */
+export function levelClearOpening(rack: PalletRackNode, level: number): number {
+  const type = levelTypeOf(rack, level)
+  if (type === 'picking') return rack.pickingLevelClear
+  return level <= 0 ? rack.firstLevelClear : rack.levelClear
+}
+
+/**
+ * Surface height goods rest on. Level 0 is the floor; levels above it return
+ * the top of that level's beam pair.
+ *
+ * Accumulated rather than multiplied. A uniform pitch is only correct while
+ * every level is the same kind — as soon as a rack mixes picking and pallet
+ * levels the openings and the beam sections both differ per level, and a
+ * `first + (n-1) × step` formula puts every level above the mix at the wrong
+ * height.
+ */
+export function levelSurfaceY(rack: PalletRackNode, level: number): number {
+  if (level <= 0) return 0
+  let y = 0
+  for (let index = 1; index <= level; index++) {
+    y += levelClearOpening(rack, index - 1) + levelBeamHeight(rack, index)
+  }
+  return y
+}
+
+/** Underside of a beam level, which is where its clear opening starts. */
+export function beamUndersideY(rack: PalletRackNode, level: number): number {
+  return levelSurfaceY(rack, level) - levelBeamHeight(rack, level)
+}
+
 /**
  * Beam levels that actually fit inside `uprightHeight`.
  *
@@ -149,29 +208,12 @@ export function bayCenterX(rack: PalletRackNode, bay: number): number {
  * out of the top of the frame.
  */
 export function fittedLevelCount(rack: PalletRackNode): number {
-  const step = rack.levelClear + rack.beamHeight
   let fitted = 0
   for (let level = 1; level <= rack.levels; level++) {
-    const top = rack.firstLevelClear + rack.beamHeight + (level - 1) * step
-    if (top > rack.uprightHeight) break
+    if (levelSurfaceY(rack, level) > rack.uprightHeight) break
     fitted++
   }
   return fitted
-}
-
-/**
- * Surface height goods rest on for a storage level. Level 0 is the floor.
- * Levels are 1-based above that and return the top of the beam pair.
- */
-export function levelSurfaceY(rack: PalletRackNode, level: number): number {
-  if (level <= 0) return 0
-  const step = rack.levelClear + rack.beamHeight
-  return rack.firstLevelClear + rack.beamHeight + (level - 1) * step
-}
-
-/** Underside of a beam level, which is where its clear opening starts. */
-export function beamUndersideY(rack: PalletRackNode, level: number): number {
-  return levelSurfaceY(rack, level) - rack.beamHeight
 }
 
 /** Storage levels present, floor first when it is enabled. */
@@ -191,6 +233,27 @@ export function levelClearHeight(rack: PalletRackNode, level: number): number {
   const surface = levelSurfaceY(rack, level)
   if (level >= fitted) return Math.max(0, rack.uprightHeight - surface)
   return Math.max(0, beamUndersideY(rack, level + 1) - surface)
+}
+
+/**
+ * Levels of each kind that are actually present.
+ *
+ * Split rather than combined because the two are counted in different units —
+ * a picking level holds containers, not pallets — and a single "levels" figure
+ * would invite adding them together.
+ */
+export function palletLevels(rack: PalletRackNode): number[] {
+  return storageLevels(rack).filter((level) => levelTypeOf(rack, level) === 'pallet')
+}
+
+export function pickingLevelsOf(rack: PalletRackNode): number[] {
+  return storageLevels(rack).filter((level) => levelTypeOf(rack, level) === 'picking')
+}
+
+/** A picking level always carries a shelf — containers cannot sit on beams. */
+export function levelHasShelf(rack: PalletRackNode, level: number): boolean {
+  if (level <= 0) return false
+  return levelTypeOf(rack, level) === 'picking' || rack.decking !== 'open'
 }
 
 // ── Pallet fit ──────────────────────────────────────────────────────────────
@@ -237,31 +300,129 @@ export function palletsPerLevel(rack: PalletRackNode): number {
  * bay never renders its pallets bunched to one side with a visible gap at the
  * end. Straight from the rack spec's clearance-scaling rule.
  */
-export function slotOffsetsX(rack: PalletRackNode): number[] {
-  const count = palletsPerLevel(rack)
+/**
+ * Centres of `count` items of `size` laid across `span`, symmetric about zero.
+ *
+ * Shared by pallets across a bay and containers across a picking shelf, so both
+ * absorb leftover space the same way and neither can bunch to one end. Split
+ * out when picking arrived rather than copied — a second copy would be a second
+ * place for the clearance-scaling rule to have to be corrected.
+ */
+export function distributeAcross({
+  betweenGap,
+  count,
+  edgeGap,
+  size,
+  span,
+}: {
+  betweenGap: number
+  count: number
+  edgeGap: number
+  size: number
+  span: number
+}): number[] {
   if (count <= 0) return []
-  const [alongRun] = orientedPalletFootprint(rack)
-  const { bayClearWidth, clearanceToUpright: toUpright, clearanceBetweenPallets: between } = rack
-
-  const minClearance = 2 * toUpright + (count - 1) * between
-  const leftover = bayClearWidth - count * alongRun
-  // A manual override can ask for more pallets than fit; keep the declared
-  // count and let them touch rather than scaling the clearance negative, which
-  // would mirror the row about the bay centre.
+  const minClearance = 2 * edgeGap + (count - 1) * betweenGap
+  const leftover = span - count * size
+  // A manual override can ask for more items than fit; keep the declared count
+  // and let them touch rather than scaling the clearance negative, which would
+  // order the offsets backwards and mirror the row about the centre.
   const scale = minClearance > 0 ? Math.max(0, leftover / minClearance) : 0
-  const actualToUpright = toUpright * scale
-  const actualBetween = between * scale
+  const start = -span / 2 + edgeGap * scale + size / 2
+  return Array.from({ length: count }, (_, index) => start + index * (size + betweenGap * scale))
+}
 
-  const start = -bayClearWidth / 2 + actualToUpright + alongRun / 2
-  return Array.from({ length: count }, (_, index) => start + index * (alongRun + actualBetween))
+/** How many items of `size` fit across `span` at the declared clearances. */
+export function fitAcross({
+  betweenGap,
+  edgeGap,
+  size,
+  span,
+}: {
+  betweenGap: number
+  edgeGap: number
+  size: number
+  span: number
+}): number {
+  const step = size + betweenGap
+  if (step <= 0) return 0
+  // Epsilon because the catalogue cases divide exactly — 2.625 / 0.875 is 3 —
+  // and binary floating point lands such quotients either side of the integer
+  // depending on operand order. Losing one is invisible, because every figure
+  // downstream stays self-consistent.
+  return Math.max(0, Math.floor((span - 2 * edgeGap + betweenGap) / step + 1e-9))
+}
+
+export function slotOffsetsX(rack: PalletRackNode): number[] {
+  const [alongRun] = orientedPalletFootprint(rack)
+  return distributeAcross({
+    betweenGap: rack.clearanceBetweenPallets,
+    count: palletsPerLevel(rack),
+    edgeGap: rack.clearanceToUpright,
+    size: alongRun,
+    span: rack.bayClearWidth,
+  })
+}
+
+// ── Picking containers ──────────────────────────────────────────────────────
+
+/** Containers across the shelf width at the declared gaps. */
+export function autoPickingBoxesAcross(rack: PalletRackNode): number {
+  return fitAcross({
+    betweenGap: rack.pickingBoxGap,
+    edgeGap: rack.pickingBoxGap,
+    size: rack.pickingBoxWidth,
+    span: rack.bayClearWidth,
+  })
+}
+
+/** Containers into the shelf depth at the declared gaps. */
+export function autoPickingBoxesDeep(rack: PalletRackNode): number {
+  return fitAcross({
+    betweenGap: rack.pickingBoxGap,
+    edgeGap: rack.pickingBoxGap,
+    size: rack.pickingBoxDepth,
+    span: rack.depth,
+  })
+}
+
+export function pickingBoxesAcross(rack: PalletRackNode): number {
+  return rack.pickingBoxesAcross ?? autoPickingBoxesAcross(rack)
+}
+
+export function pickingBoxesDeep(rack: PalletRackNode): number {
+  return rack.pickingBoxesDeep ?? autoPickingBoxesDeep(rack)
+}
+
+export function pickingOffsetsX(rack: PalletRackNode): number[] {
+  return distributeAcross({
+    betweenGap: rack.pickingBoxGap,
+    count: pickingBoxesAcross(rack),
+    edgeGap: rack.pickingBoxGap,
+    size: rack.pickingBoxWidth,
+    span: rack.bayClearWidth,
+  })
+}
+
+/** Container centres into the depth, relative to the shelf centre. Index 0 is
+ *  the aisle side. */
+export function pickingOffsetsZ(rack: PalletRackNode): number[] {
+  return distributeAcross({
+    betweenGap: rack.pickingBoxGap,
+    count: pickingBoxesDeep(rack),
+    edgeGap: rack.pickingBoxGap,
+    size: rack.pickingBoxDepth,
+    span: rack.depth,
+  })
 }
 
 // ── Slot enumeration ────────────────────────────────────────────────────────
 
-/** Every storage position in the run, in a stable order. */
-export function slotsOf(rack: PalletRackNode): Slot[] {
+/** Every pallet position in the run, in a stable order. Picking levels hold
+ *  containers instead and are enumerated by `pickingSlotsOf`. */
+export function palletSlotsOf(rack: PalletRackNode): Slot[] {
   const offsets = slotOffsetsX(rack)
-  const levels = storageLevels(rack)
+  const levels = palletLevels(rack)
   const footprint = orientedPalletFootprint(rack)
   const slots: Slot[] = []
 
@@ -291,26 +452,83 @@ export function slotsOf(rack: PalletRackNode): Slot[] {
   return slots
 }
 
-/** Total storage positions — the denominator of every occupancy figure. */
-export function slotCount(rack: PalletRackNode): number {
+/** Total pallet positions — the denominator of every pallet occupancy figure. */
+export function palletSlotCount(rack: PalletRackNode): number {
   return (
     rowCount(rack) *
     rack.bayCount *
-    storageLevels(rack).length *
+    palletLevels(rack).length *
     palletsPerLevel(rack) *
     rack.depthPositions
   )
 }
 
 /**
- * Positions a truck can reach without relocating another pallet.
+ * Pallet positions a truck can reach without relocating another pallet.
  *
  * Reported alongside the total because a double-deep layout buys capacity by
  * spending accessibility, and a single "locations" figure hides the trade
  * entirely.
  */
 export function directAccessSlotCount(rack: PalletRackNode): number {
-  return slotCount(rack) / rack.depthPositions
+  return palletSlotCount(rack) / rack.depthPositions
+}
+
+/**
+ * Every container position on the run's picking levels.
+ *
+ * Addresses share the pallet format, and the components keep their meaning: P
+ * still counts across the bay, D still counts into the depth. Only the unit
+ * changes with the level's type, which is why a single address parser serves
+ * both and a stored location never has to say which kind it was.
+ */
+export function pickingSlotsOf(rack: PalletRackNode): Slot[] {
+  const offsetsX = pickingOffsetsX(rack)
+  const offsetsZ = pickingOffsetsZ(rack)
+  const levels = pickingLevelsOf(rack)
+  const footprint: [number, number] = [rack.pickingBoxWidth, rack.pickingBoxDepth]
+  const slots: Slot[] = []
+
+  for (let row = 1; row <= rowCount(rack); row++) {
+    for (let bay = 1; bay <= rack.bayCount; bay++) {
+      const centreX = bayCenterX(rack, bay)
+      for (const level of levels) {
+        // Containers stand on the shelf panel, not on the beam top.
+        const y = levelSurfaceY(rack, level) + (level > 0 ? rack.pickingShelfThickness : 0)
+        const clearHeight = levelClearHeight(rack, level)
+        for (let depth = 1; depth <= offsetsZ.length; depth++) {
+          // Row 1 faces +Z, row 2 faces −Z, and index 1 is the aisle side of
+          // whichever row it belongs to — the same convention pallet depth
+          // positions use, so "D1 is the one you reach first" holds throughout.
+          const offsetZ = offsetsZ[offsetsZ.length - depth] ?? 0
+          const z = rowCenterZ(rack, row) + (row === 1 ? offsetZ : -offsetZ)
+          offsetsX.forEach((offset, index) => {
+            const address = { row, bay, level, position: index + 1, depth }
+            slots.push({
+              ...address,
+              id: formatSlotAddress(address),
+              localPosition: [centreX + offset, y, z],
+              footprint,
+              clearHeight,
+              directAccess: depth === 1,
+            })
+          })
+        }
+      }
+    }
+  }
+  return slots
+}
+
+/** Total container positions across every picking level. */
+export function pickingSlotCount(rack: PalletRackNode): number {
+  return (
+    rowCount(rack) *
+    rack.bayCount *
+    pickingLevelsOf(rack).length *
+    pickingBoxesAcross(rack) *
+    pickingBoxesDeep(rack)
+  )
 }
 
 // ── Pallet support bars ─────────────────────────────────────────────────────
@@ -349,5 +567,5 @@ export function hasUnsupportedPallets(rack: PalletRackNode): boolean {
 }
 
 export function slotById(rack: PalletRackNode, address: string): Slot | null {
-  return slotsOf(rack).find((slot) => slot.id === address) ?? null
+  return palletSlotsOf(rack).find((slot) => slot.id === address) ?? null
 }

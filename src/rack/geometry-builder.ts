@@ -272,15 +272,21 @@ export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): strin
       .join(';'),
     rack.rowCount,
     // The gap sequence the block actually uses, rather than the two gap fields
-    // and the pattern raw. A single run consumes neither gap, a back-to-back
-    // pair never opens an aisle, and a two-row `aisle` block never uses the
-    // spine gap — listing the fields would split the cache between blocks whose
-    // meshes are byte-identical. `rowPattern` reaches the key through this.
+    // and the group size raw. A single run consumes neither gap, a pair never
+    // opens an aisle, and one-row groups never touch the spine gap — listing the
+    // fields would split the cache between blocks whose meshes are identical.
+    // `backToBack` reaches the key through this.
     Array.from({ length: Math.max(0, rack.rowCount - 1) }, (_, index) =>
       rowGapBefore(rack, index + 2),
     ).join(','),
-    // Which way each row faces decides where its beams and pallets sit.
-    Array.from({ length: rack.rowCount }, (_, index) => rowFacing(rack, index + 1)).join(''),
+    // Facing reaches the geometry only through `depthPositionZ`, and only once
+    // there is a second position for it to order: single-deep, every row's one
+    // position sits on its centreline whichever way it faces. Listing the
+    // facings unconditionally split a two-row block from an identical one whose
+    // group size merely happened to be larger than the block.
+    rack.depthPositions > 1
+      ? Array.from({ length: rack.rowCount }, (_, index) => rowFacing(rack, index + 1)).join('')
+      : '',
     rack.depthPositions,
     rack.depthPositions > 1 ? rack.depthGap : 0,
     levels,

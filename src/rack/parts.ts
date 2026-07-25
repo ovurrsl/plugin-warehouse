@@ -12,6 +12,7 @@ import {
   levelHasShelf,
   levelSurfaceY,
   palletSupportBarCount,
+  sharesSpine,
   slotOffsetsX,
 } from './slots'
 
@@ -213,11 +214,12 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
     }
   }
 
-  // Spacers tie the two runs of a back-to-back pair together across the spine.
-  // Only *within* a pair: rows either side of a working aisle are separate
-  // structures, and a tie spanning an aisle would be a bar through the traffic.
-  if (full && rack.rowPattern === 'back-to-back') {
-    for (let row = 2; row <= rack.rowCount; row += 2) {
+  // Spacers tie a row to the one in front of it across the spine. Only within a
+  // group: rows either side of a working aisle are separate structures, and a
+  // tie spanning an aisle would be a bar through the traffic.
+  if (full) {
+    for (let row = 2; row <= rack.rowCount; row++) {
+      if (!sharesSpine(rack, row)) continue
       const innerFront = depthPositionZ(rack, row - 1, rack.depthPositions) - depth / 2
       const innerBack = depthPositionZ(rack, row, rack.depthPositions) + depth / 2
       const spanZ = innerFront - innerBack

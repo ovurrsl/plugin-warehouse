@@ -5,7 +5,7 @@ import { SegmentedControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { type RackBrush, useWarehouseStore } from '../store'
 import { PalletRackNode } from './schema'
-import { palletSlotCount, totalDepth, totalWidth } from './slots'
+import { palletSlotCount, strandedRowsPerGroup, totalDepth, totalWidth, usesAisle } from './slots'
 
 /**
  * Block layout, while the rack tool is armed.
@@ -170,10 +170,6 @@ export default function RackLayoutPopover() {
   const preview = PalletRackNode.parse({ ...brush, position: [0, 0, 0], rotation: [0, 0, 0] })
   const set = (patch: Partial<RackBrush>) => setRackBrush(patch)
 
-  // A back-to-back pair has no aisle inside it, so the control only appears once
-  // the block actually opens one.
-  const usesAisle = preview.rowCount > (preview.rowPattern === 'back-to-back' ? 2 : 1)
-
   return (
     <div style={styles.card}>
       <div style={styles.headerRow}>
@@ -205,22 +201,24 @@ export default function RackLayoutPopover() {
       />
 
       {preview.rowCount > 1 ? (
-        <div style={styles.field}>
-          <span style={styles.label}>
-            <span>Row pattern</span>
-            <span style={{ opacity: 0.7 }}>
-              {usesAisle ? metres(preview.aisleWidth) : 'no aisle'}
-            </span>
-          </span>
-          <SegmentedControl
-            onChange={(rowPattern: RackBrush['rowPattern']) => set({ rowPattern })}
-            options={[
-              { label: 'Back to back', value: 'back-to-back' },
-              { label: 'Own aisle', value: 'aisle' },
-            ]}
-            value={brush.rowPattern}
-          />
-        </div>
+        <Stepper
+          // Says what the number does, at the two values that are actually
+          // built, and warns at the ones that are not.
+          hint={
+            preview.backToBack === 1
+              ? 'every row its own aisle'
+              : strandedRowsPerGroup(preview) > 0
+                ? `${strandedRowsPerGroup(preview)} unreachable per group`
+                : usesAisle(preview)
+                  ? `aisle ${metres(preview.aisleWidth)}`
+                  : 'no aisle'
+          }
+          label="Back to back"
+          max={6}
+          min={1}
+          onChange={(backToBack) => set({ backToBack })}
+          value={brush.backToBack}
+        />
       ) : null}
 
       <div style={styles.field}>

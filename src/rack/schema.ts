@@ -50,21 +50,26 @@ export const PalletRackNode = BaseNode.extend({
   rowCount: z.number().int().min(1).max(20).default(1),
 
   /**
-   * How the rows are grouped across the depth.
+   * How many rows stand spine to spine before an aisle opens.
    *
-   * `back-to-back` pairs them — (1,2), (3,4), … — each pair standing spine to
-   * spine with an aisle between pairs, which is how a high-density block is
-   * actually laid out: one aisle serves the two rows either side of it.
-   * `aisle` gives every row its own aisle and points them all the same way,
-   * for a run of racks along a one-directional picking route.
+   * A count rather than a pattern, for the reason `bayCount` and `rowCount` are:
+   * the same idea reads the same way on all three axes, and the two-value enum
+   * this replaces could not express a block that is neither.
+   *
+   * 1 gives every row its own aisle and points them all the same way, for racks
+   * along a one-directional picking route. 2 is the standard island — (1,2),
+   * (3,4), … each pair back to back with an aisle between pairs, so one aisle
+   * serves the two rows either side of it. Above 2 the inner rows have no aisle
+   * face at all; the inspector says so rather than leaving it to be discovered
+   * from a truck that cannot reach half the block.
    */
-  rowPattern: z.enum(['back-to-back', 'aisle']).default('back-to-back'),
+  backToBack: z.number().int().min(1).max(6).default(2),
 
-  /** Spine-to-spine gap inside a back-to-back pair. */
+  /** Spine-to-spine gap between two rows in the same group. */
   backToBackGap: z.number().min(0).max(1.5).default(0.2),
 
   /**
-   * Working aisle between pairs (or between every row in `aisle` pattern).
+   * Working aisle between groups.
    *
    * 3.2 m is a reach truck's working aisle. A counterbalanced forklift needs
    * about 3.5 m and a turret truck as little as 1.6 m, so this is the field that
@@ -93,7 +98,7 @@ export const PalletRackNode = BaseNode.extend({
    * Pallets stored one behind another on the same accessible face.
    *
    * Not the same thing as `backToBack`, and the difference is the aisle:
-   * back-to-back is two runs each served from its own aisle, every position
+   * back to back is two runs each served from its own aisle, every position
    * directly reachable. Double-deep is two positions served from *one* aisle,
    * so the rear pallet cannot be reached until the front one is moved. It needs
    * telescopic double-depth forks and suits SKUs held several pallets deep.

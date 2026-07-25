@@ -13,8 +13,11 @@ import {
   rowDepth,
   rowFacing,
   rowGapBefore,
+  strandedRowsPerGroup,
   totalDepth,
   totalWidth,
+  usesAisle,
+  usesSpineGap,
 } from './slots'
 
 const rack = (overrides: Record<string, unknown> = {}) =>
@@ -54,12 +57,39 @@ describe('row layout', () => {
     expect(between).toBeCloseTo(rowDepth(block) + 3.2, 9)
   })
 
-  test('the aisle pattern gives every row its own aisle and one facing', () => {
-    const block = rack({ rowCount: 3, rowPattern: 'aisle', aisleWidth: 3.5 })
+  test('one row per group gives every row its own aisle and one facing', () => {
+    const block = rack({ rowCount: 3, backToBack: 1, aisleWidth: 3.5 })
     expect(rowGapBefore(block, 2)).toBeCloseTo(3.5, 9)
     expect(rowGapBefore(block, 3)).toBeCloseTo(3.5, 9)
     expect(totalDepth(block)).toBeCloseTo(3 * rowDepth(block) + 7, 9)
     for (const row of [1, 2, 3]) expect(rowFacing(block, row)).toBe(1)
+  })
+
+  test('a group of three strands its middle row', () => {
+    const block = rack({ rowCount: 6, backToBack: 3, backToBackGap: 0.2, aisleWidth: 3.2 })
+    // Group, group — one aisle, between rows 3 and 4.
+    expect(rowGapBefore(block, 2)).toBeCloseTo(0.2, 9)
+    expect(rowGapBefore(block, 3)).toBeCloseTo(0.2, 9)
+    expect(rowGapBefore(block, 4)).toBeCloseTo(3.2, 9)
+    // The outer rows of each group reach an aisle; the middle one reaches
+    // neither, which is what the inspector warns about.
+    expect(strandedRowsPerGroup(block)).toBe(1)
+    expect([1, 2, 3].map((row) => rowFacing(block, row))).toEqual([1, 1, -1])
+  })
+
+  test('a group cannot strand a row the block does not have', () => {
+    expect(strandedRowsPerGroup(rack({ rowCount: 1, backToBack: 4 }))).toBe(0)
+    expect(strandedRowsPerGroup(rack({ rowCount: 2, backToBack: 4 }))).toBe(0)
+    expect(strandedRowsPerGroup(rack({ rowCount: 3, backToBack: 4 }))).toBe(1)
+  })
+
+  test('the gaps a block consumes are the gaps it shows', () => {
+    expect(usesSpineGap(rack({ rowCount: 1, backToBack: 2 }))).toBe(false)
+    expect(usesSpineGap(rack({ rowCount: 2, backToBack: 1 }))).toBe(false)
+    expect(usesSpineGap(rack({ rowCount: 2, backToBack: 2 }))).toBe(true)
+    expect(usesAisle(rack({ rowCount: 2, backToBack: 2 }))).toBe(false)
+    expect(usesAisle(rack({ rowCount: 3, backToBack: 2 }))).toBe(true)
+    expect(usesAisle(rack({ rowCount: 2, backToBack: 1 }))).toBe(true)
   })
 
   test('rows are laid out from +Z toward −Z and never overlap', () => {
@@ -184,7 +214,17 @@ describe('row fields in the geometry key', () => {
     expect(keysOf({ rowCount: 3, aisleWidth: 5 })).not.toBe(keysOf({ rowCount: 3 }))
   })
 
-  test('the pattern reaches the key through the gaps and the facings', () => {
-    expect(keysOf({ rowCount: 2, rowPattern: 'aisle' })).not.toBe(keysOf({ rowCount: 2 }))
+  test('the group size reaches the key through the gaps and the facings', () => {
+    // Two rows one-per-group face the same way across an aisle; two rows paired
+    // face away from each other across the spine. Different mesh, different key.
+    expect(keysOf({ rowCount: 2, backToBack: 1 })).not.toBe(keysOf({ rowCount: 2 }))
+    // A group larger than the block is the same block, so it must not split the
+    // cache: single-deep, a row's one position sits on its centreline whichever
+    // way it faces, so the two racks are the same mesh.
+    expect(keysOf({ rowCount: 2, backToBack: 6 })).toBe(keysOf({ rowCount: 2, backToBack: 2 }))
+    // Double-deep, facing orders the two positions, so it must reach the key.
+    expect(keysOf({ rowCount: 2, backToBack: 6, depthPositions: 2 })).not.toBe(
+      keysOf({ rowCount: 2, backToBack: 2, depthPositions: 2 }),
+    )
   })
 })

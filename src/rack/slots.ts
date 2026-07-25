@@ -95,18 +95,62 @@ export function rowDepth(rack: PalletRackNode): number {
 }
 
 /**
+ * Where a row sits inside its back-to-back group, 1-based.
+ *
+ * `backToBack` rows stand together, then an aisle, then the next group. So with
+ * `backToBack: 2` the groups are (1,2), (3,4), … and this returns 1, 2, 1, 2, …
+ * — which is the one derivation every other row function is built on.
+ */
+export function rowInGroup(rack: PalletRackNode, row: number): number {
+  return ((row - 1) % Math.max(1, rack.backToBack)) + 1
+}
+
+/**
  * Clear space in front of a row, between it and the row before it.
  *
- * Zero for row 1, which has nothing in front of it inside the block. A
- * back-to-back pattern pairs the rows — (1,2), (3,4), … — so an even row closes
- * a pair and stands against its partner across the spine gap, while an odd row
- * opens the next pair across a working aisle. That alternation is the whole
- * layout: pair, aisle, pair, aisle.
+ * Zero for row 1, which has nothing in front of it inside the block. A row that
+ * opens a group faces a working aisle; a row inside one stands against its
+ * neighbour across the spine gap. That alternation is the whole layout: group,
+ * aisle, group, aisle.
  */
 export function rowGapBefore(rack: PalletRackNode, row: number): number {
   if (row <= 1) return 0
-  if (rack.rowPattern === 'back-to-back' && row % 2 === 0) return rack.backToBackGap
-  return rack.aisleWidth
+  return rowInGroup(rack, row) === 1 ? rack.aisleWidth : rack.backToBackGap
+}
+
+/** Whether a row stands spine to spine with the row in front of it. */
+export function sharesSpine(rack: PalletRackNode, row: number): boolean {
+  return row > 1 && rowInGroup(rack, row) > 1
+}
+
+/**
+ * Whether either gap is actually consumed by this block.
+ *
+ * A lone run uses neither. A pair uses only the spine. A block only opens an
+ * aisle once it has more rows than one group holds. Both the inspector and the
+ * layout card hide the gap they do not use, and the geometry key excludes it —
+ * all three read these two, so a field can never be shown, cached against, and
+ * yet move nothing.
+ */
+export function usesSpineGap(rack: PalletRackNode): boolean {
+  return rack.rowCount > 1 && rack.backToBack > 1
+}
+
+export function usesAisle(rack: PalletRackNode): boolean {
+  return rack.rowCount > rack.backToBack
+}
+
+/**
+ * Rows in a group with no aisle face at all.
+ *
+ * Zero for the layouts that are actually built — a lone row reaches its own
+ * aisle, a pair reaches one each. A group of three or more strands everything
+ * between the first and the last, and the failure is quiet: the block looks
+ * denser and the capacity figure goes up, while the pallets it counts cannot be
+ * put there or taken out.
+ */
+export function strandedRowsPerGroup(rack: PalletRackNode): number {
+  return Math.max(0, Math.min(rack.backToBack, rack.rowCount) - 2)
 }
 
 /** Outer depth of the block, over every row and the gaps between them. */
@@ -131,14 +175,14 @@ export function rowCenterZ(rack: PalletRackNode, row: number): number {
 /**
  * Which way a row's aisle face looks: +1 toward +Z, −1 toward −Z.
  *
- * In a back-to-back pair the two rows turn their backs on each other and open
- * onto the aisles either side, so odd rows face +Z and even rows face −Z. Under
- * the `aisle` pattern every row has its own aisle in front of it and they all
- * face the same way.
+ * A group turns its back on itself and opens onto the aisles either side, so
+ * each row faces whichever of the two is nearer. The front half of a group looks
+ * forward and the back half looks back — which for a lone row means it faces its
+ * own aisle, and for a pair means the two turn away from each other.
  */
 export function rowFacing(rack: PalletRackNode, row: number): 1 | -1 {
-  if (rack.rowPattern !== 'back-to-back') return 1
-  return row % 2 === 1 ? 1 : -1
+  const group = Math.max(1, rack.backToBack)
+  return rowInGroup(rack, row) * 2 <= group + 1 ? 1 : -1
 }
 
 /**

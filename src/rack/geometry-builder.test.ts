@@ -219,6 +219,7 @@ describe('cache key coverage', () => {
     ['depth', 1.2],
     ['uprightHeight', 8],
     ['rowCount', 2],
+    ['backToBack', 1],
     ['backToBackGap', 0.4],
     ['depthPositions', 2],
     ['depthGap', 0.12],

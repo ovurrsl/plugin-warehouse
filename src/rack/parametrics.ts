@@ -7,6 +7,9 @@ import {
   fittedLevelCount,
   hasUnsupportedPallets,
   levelSurfaceY,
+  strandedRowsPerGroup,
+  usesAisle,
+  usesSpineGap,
 } from './slots'
 import { en15620Clearance } from './standards'
 
@@ -54,12 +57,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
       label: 'Rows',
       fields: [
         { key: 'rowCount', kind: 'number', min: 1, max: 20, step: 1 },
-        {
-          key: 'rowPattern',
-          kind: 'enum',
-          options: ['back-to-back', 'aisle'],
-          display: 'select',
-        },
+        { key: 'backToBack', kind: 'number', min: 1, max: 6, step: 1 },
         {
           key: 'backToBackGap',
           kind: 'number',
@@ -67,9 +65,9 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0,
           max: 1.5,
           step: 0.05,
-          // Nothing stands spine to spine in an `aisle` block, so the field
-          // would sit there reading as a dimension that does nothing.
-          visibleIf: (node) => node.rowPattern === 'back-to-back' && node.rowCount > 1,
+          // Nothing stands spine to spine until a group holds two rows, so the
+          // field would otherwise read as a dimension that does nothing.
+          visibleIf: (node) => usesSpineGap(node),
         },
         {
           key: 'aisleWidth',
@@ -78,7 +76,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.8,
           max: 8,
           step: 0.1,
-          visibleIf: (node) => node.rowCount > (node.rowPattern === 'back-to-back' ? 2 : 1),
+          visibleIf: (node) => usesAisle(node),
         },
       ],
     },
@@ -213,10 +211,22 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         })
       }
 
+      // Selective racking reaches one row deep from each aisle, so a group of
+      // three or more strands everything between its first and last row. The
+      // capacity figure keeps counting those pallets, which is the whole problem
+      // — the block reads as denser storage rather than as unreachable stock.
+      const stranded = strandedRowsPerGroup(node)
+      if (stranded > 0) {
+        issues.push({
+          field: 'backToBack',
+          severity: 'warning',
+          msg: `${node.backToBack} rows back to back leaves ${stranded} of them with no aisle face — a truck can only reach the first and the last. Real blocks deeper than two rows are drive-in or push-back systems, which this rack does not model.`,
+        })
+      }
+
       // An aisle narrower than the truck cannot be worked, and the figure that
       // decides which truck is the aisle rather than anything about the rack.
-      const usesAisle = node.rowCount > (node.rowPattern === 'back-to-back' ? 2 : 1)
-      if (usesAisle && node.aisleWidth < NARROWEST_WORKING_AISLE) {
+      if (usesAisle(node) && node.aisleWidth < NARROWEST_WORKING_AISLE) {
         issues.push({
           field: 'aisleWidth',
           severity: 'warning',

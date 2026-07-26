@@ -42,6 +42,17 @@ type WarehouseStore = {
   toggleSlab: (id: string, allIds: readonly string[]) => void
 
   /**
+   * Level the readout is pinned to, or `null` to follow the viewer's own.
+   *
+   * Held as an id rather than an index into the level list: levels are sorted by
+   * an ordinal the host types as a plain number — fractional and negative are
+   * both legal — so an index would quietly shift the selection onto a different
+   * storey the moment a level was added, renamed or renumbered.
+   */
+  statsLevelId: string | null
+  setStatsLevel: (id: string | null) => void
+
+  /**
    * Whether the conveyor flow simulation is running.
    *
    * Off by default: a layout tool that animates the moment it opens is a layout
@@ -105,6 +116,11 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   scope: 'building',
   setScope: (scope) => set({ scope, slabFilter: null }),
+
+  // Slab ids belong to a level, so changing the level clears the filter for the
+  // same reason changing the scope does.
+  statsLevelId: null,
+  setStatsLevel: (statsLevelId) => set({ statsLevelId, slabFilter: null }),
 
   slabFilter: null,
   setSlabFilter: (slabFilter) => set({ slabFilter }),

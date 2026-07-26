@@ -25,6 +25,19 @@ export type SlabLike = {
   polygon: Vec2[]
   holes: Vec2[][]
   name: string | undefined
+  /**
+   * Walking surface above the level plane, metres, or `undefined` when the host
+   * does not offer one.
+   *
+   * Read for one purpose: telling a mezzanine deck from the floor underneath it.
+   * Areas on a level are summed, and a deck stacked over a floor is two real
+   * slabs whose areas are both real and whose sum is not the floor a forklift
+   * drives on. Nothing here computes a union — that needs a polygon clipper this
+   * package does not have — but knowing the sum spans two datums is the
+   * difference between a gross figure the user can interpret and one they
+   * cannot.
+   */
+  elevation: number | undefined
 }
 
 /** The subset of a host `level` this plugin reads. */
@@ -113,6 +126,13 @@ export function asSlab(node: unknown): SlabLike | null {
     polygon,
     holes: toRings(record.holes),
     name: stringOrUndefined(record.name),
+    // Deliberately not part of the guard: a host that renames this field should
+    // cost the mezzanine note, not the area. The outline is what makes a slab
+    // readable; the datum is a refinement of what its area means.
+    elevation:
+      typeof record.elevation === 'number' && Number.isFinite(record.elevation)
+        ? record.elevation
+        : undefined,
   }
 }
 
@@ -243,6 +263,58 @@ export function slabArea(slab: SlabLike): number {
  * Ray-casting point-in-polygon. Points exactly on an edge are unspecified —
  * acceptable here because callers test object centroids, never boundary points.
  */
+/**
+ * Whether a ring crosses itself.
+ *
+ * **The shoelace formula is meaningless on one.** A symmetric bow-tie reports
+ * exactly zero area, and an asymmetric one reports the difference of its lobes —
+ * a number that looks like an area, sums like an area, and is not one. The
+ * host's own auto-generated slabs are simple by construction, but a hand-drawn
+ * outline is not, and nothing upstream refuses it.
+ *
+ * O(v^2) with a bounding-box reject per pair, which is nothing at the tens of
+ * vertices a slab has and is why this runs per slab rather than being skipped.
+ */
+export function ringSelfIntersects(ring: readonly Vec2[]): boolean {
+  const count = ring.length
+  if (count < 4) return false
+
+  for (let i = 0; i < count; i++) {
+    const a1 = ring[i]
+    const a2 = ring[(i + 1) % count]
+    if (!a1 || !a2) continue
+    for (let j = i + 1; j < count; j++) {
+      // Adjacent segments share an endpoint by construction, and the first and
+      // last share one too — neither is a crossing.
+      if (j === i || (j + 1) % count === i || (i + 1) % count === j) continue
+      const b1 = ring[j]
+      const b2 = ring[(j + 1) % count]
+      if (!b1 || !b2) continue
+      if (Math.min(a1[0], a2[0]) > Math.max(b1[0], b2[0])) continue
+      if (Math.max(a1[0], a2[0]) < Math.min(b1[0], b2[0])) continue
+      if (Math.min(a1[1], a2[1]) > Math.max(b1[1], b2[1])) continue
+      if (Math.max(a1[1], a2[1]) < Math.min(b1[1], b2[1])) continue
+      if (segmentsCross(a1, a2, b1, b2)) return true
+    }
+  }
+  return false
+}
+
+function side(a: Vec2, b: Vec2, p: Vec2): number {
+  const value = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+  return Math.abs(value) < 1e-12 ? 0 : Math.sign(value)
+}
+
+/** Proper crossing only: touching at an endpoint is how a legal polygon is
+ *  built, and treating it as a crossing would reject every slab. */
+function segmentsCross(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): boolean {
+  const d1 = side(a1, a2, b1)
+  const d2 = side(a1, a2, b2)
+  const d3 = side(b1, b2, a1)
+  const d4 = side(b1, b2, a2)
+  return d1 !== 0 && d2 !== 0 && d3 !== 0 && d4 !== 0 && d1 !== d2 && d3 !== d4
+}
+
 export function pointInRing(ring: readonly Vec2[], x: number, z: number): boolean {
   let inside = false
   const n = ring.length

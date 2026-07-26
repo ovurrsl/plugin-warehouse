@@ -123,7 +123,120 @@ export const tokens = {
     fontWeight: 500,
     color: FG,
   },
+
+  // ── The statistics readout ───────────────────────────────────────────────
+  // Two columns, never three: the rail is 256 px, and a third column would
+  // either wrap or truncate the one number the user came to read.
+  figures: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+  },
+  figureRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: '0.5rem',
+  },
+  figureLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    fontSize: '0.6875rem',
+    color: fade(60),
+  },
+  figureValue: {
+    fontSize: '0.875rem',
+    fontWeight: 600,
+    fontVariantNumeric: 'tabular-nums',
+    color: FG,
+  },
+  figureUnit: {
+    marginLeft: '0.25rem',
+    fontSize: '0.625rem',
+    fontWeight: 400,
+    color: fade(45),
+  },
+  figureNote: {
+    margin: '0 0 0 1.375rem',
+    fontSize: '0.625rem',
+    lineHeight: 1.45,
+    color: fade(40),
+  },
+  disclosure: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.375rem',
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    padding: '0.25rem 0',
+    fontSize: '0.6875rem',
+    color: fade(60),
+    cursor: 'pointer',
+  },
+  list: {
+    display: 'flex',
+    flexDirection: 'column',
+    borderRadius: '0.375rem',
+    border: `1px solid ${BORDER}`,
+    overflow: 'hidden',
+  },
+  rowArea: {
+    marginLeft: 'auto',
+    flexShrink: 0,
+    fontVariantNumeric: 'tabular-nums',
+    color: fade(45),
+  },
+  advisory: {
+    display: 'flex',
+    gap: '0.375rem',
+    borderRadius: '0.375rem',
+    border: '1px solid color-mix(in oklab, #e8a13a 45%, transparent)',
+    background: 'color-mix(in oklab, #e8a13a 10%, transparent)',
+    padding: '0.375rem 0.5rem',
+    fontSize: '0.625rem',
+    lineHeight: 1.45,
+    color: FG,
+  },
 } satisfies Record<string, CSSProperties>
+
+/** A row in one of the two inline pickers. No host `Popover`: it is not on the
+ *  editor package's public surface, and a floating layer over a 256 px rail
+ *  overflows it. */
+export function listRow(selected: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    width: '100%',
+    border: 'none',
+    borderBottom: `1px solid ${BORDER}`,
+    background: selected ? ACCENT : 'transparent',
+    padding: '0.375rem 0.5rem',
+    fontSize: '0.6875rem',
+    textAlign: 'left',
+    color: selected ? FG : fade(65),
+    cursor: 'pointer',
+  }
+}
+
+export function checkbox(checked: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '0.75rem',
+    height: '0.75rem',
+    borderRadius: '0.1875rem',
+    border: `1px solid ${checked ? RING : BORDER}`,
+    background: checked ? RING : 'transparent',
+    fontSize: '0.5rem',
+    lineHeight: 1,
+    color: 'var(--sidebar-accent)',
+  }
+}
 
 export function tile(selected: boolean): CSSProperties {
   return {

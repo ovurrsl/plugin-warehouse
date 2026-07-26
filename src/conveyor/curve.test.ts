@@ -8,6 +8,7 @@ import {
   CURVE_FRAME_OVERHANG_M,
   carriesShortestBox,
   centrelineLengthM,
+  centrelineRadiusM,
   channelRadiiM,
   footprintM,
   frameWidthM,
@@ -27,6 +28,9 @@ import {
   conveyorGeometryCacheSize,
   getConveyorGeometry,
 } from './geometry-builder'
+import { hasDownstreamNeighbour, lineOf, resetLineIndex } from './line-index'
+import { jointProblems, resetPortMagnet, snapToLineEnd } from './port-magnet'
+import { conveyorPorts } from './ports'
 import { ConveyorRollerNode } from './schema'
 
 const curve = (overrides: Record<string, unknown> = {}) =>
@@ -419,5 +423,121 @@ describe('the mesh', () => {
     expect(simple.some((part) => part.role === 'frame')).toBe(true)
     expect(simple.some((part) => part.role === 'leg')).toBe(true)
     expect(curveParts(node, 'simple').length).toBeLessThan(curveParts(node, 'full').length)
+  })
+})
+
+describe('a bend joins a line, because a line is not made only of straights', () => {
+  beforeEach(() => {
+    resetLineIndex()
+    resetPortMagnet()
+  })
+
+  const straight = (overrides: Record<string, unknown> = {}) =>
+    ConveyorRollerNode.parse({ id: 'conveyor_roller_s', ...overrides })
+
+  const portOf = (node: Parameters<typeof conveyorPorts>[0], id: 'a' | 'b') => {
+    const port = conveyorPorts(node).find((candidate) => candidate.id === id)
+    if (!port) throw new Error(`no port ${id}`)
+    return port
+  }
+
+  test('a bend’s ends are on its arc, not on an assumed ±X', () => {
+    // The assumption a straight-only port list makes, and the one that would
+    // put a quarter bend's inlet a metre out into the aisle.
+    const node = curve({ angle: '90' })
+    const radius = centrelineRadiusM(node)
+    for (const [id, theta] of [
+      ['a', 0],
+      ['b', angleRad(node)],
+    ] as const) {
+      const [x, z] = arcPointLocal(node, radius, theta)
+      const port = portOf(node, id)
+      expect({ id, x: port.position[0], z: port.position[2] }).toEqual({
+        id,
+        x: expect.closeTo(x, 9),
+        z: expect.closeTo(z, 9),
+      })
+      expect(port.position[1]).toBeCloseTo(node.transportHeight, 9)
+    }
+  })
+
+  test('the two ends face apart by exactly the angle the bend turns', () => {
+    for (const angle of ['45', '90', '180'] as const) {
+      for (const handed of ['left', 'right'] as const) {
+        const node = curve({ angle, handed })
+        const a = portOf(node, 'a').direction
+        const b = portOf(node, 'b').direction
+        // Outward at both ends, so an unturned module would read −1: the turn
+        // is what opens them up, and 180° brings them back to parallel.
+        const dot = (a[0] ?? 0) * (b[0] ?? 0) + (a[2] ?? 0) * (b[2] ?? 0)
+        expect({ angle, handed, dot }).toEqual({
+          angle,
+          handed,
+          dot: expect.closeTo(-Math.cos(angleRad(node)), 9),
+        })
+      }
+    }
+  })
+
+  test('a straight and a bend magnet together and read back as one line', () => {
+    const bed = straight()
+    const outlet = portOf(bed, 'b')
+
+    // Turned so its inlet faces back down the straight. Derived rather than
+    // asserted: ask the ports where they are, then move the node by the
+    // difference — the same arithmetic the magnet does.
+    const rotation: [number, number, number] = [0, -Math.PI / 2, 0]
+    const rough = curve({ id: 'conveyor_curve_c', position: [4, 0, 0], rotation })
+    const inlet = portOf(rough, 'a')
+    const exact: [number, number, number] = [
+      rough.position[0] + (outlet.position[0] - inlet.position[0]),
+      0,
+      rough.position[2] + (outlet.position[2] - inlet.position[2]),
+    ]
+
+    // Dropped roughly there, the magnet finds the exact joint.
+    const snapped = snapToLineEnd(rough, [exact[0] + 0.18, 0, exact[2] - 0.2], rotation[1], [], {
+      [bed.id]: bed,
+    })
+    expect(snapped).not.toBeNull()
+    expect(snapped?.[0]).toBeCloseTo(exact[0], 9)
+    expect(snapped?.[2]).toBeCloseTo(exact[2], 9)
+
+    // And placed there, the line index reads the two as one line.
+    const joined = curve({ id: 'conveyor_curve_c', position: exact, rotation })
+    const scene = { [bed.id]: bed, [joined.id]: joined }
+    resetLineIndex()
+    expect(lineOf(scene, bed.id).sort()).toEqual([joined.id, bed.id].sort())
+    expect(hasDownstreamNeighbour(scene, bed)).toBe(true)
+    expect(jointProblems(joined, scene)).toEqual([])
+  })
+
+  test('a bend on a different lane is refused, exactly as a straight would be', () => {
+    // R1 is a rule about the kind, not about one shape of it — a 400 mm bend on
+    // a 600 mm line is a place boxes stop, whichever end is curved.
+    const bed = straight({ usefulWidth: '600' })
+    const rotation: [number, number, number] = [0, -Math.PI / 2, 0]
+    const narrow = curve({
+      id: 'conveyor_curve_n',
+      usefulWidth: '400',
+      position: [4, 0, 0],
+      rotation,
+    })
+    const outlet = portOf(bed, 'b')
+    const inlet = portOf(narrow, 'a')
+    const exact: [number, number, number] = [
+      narrow.position[0] + (outlet.position[0] - inlet.position[0]),
+      0,
+      narrow.position[2] + (outlet.position[2] - inlet.position[2]),
+    ]
+    expect(snapToLineEnd(narrow, exact, rotation[1], [], { [bed.id]: bed })).toBeNull()
+
+    // Built by hand anyway — by paste or by MCP — and the panel says why.
+    const joined = curve({ id: 'conveyor_curve_n', usefulWidth: '400', position: exact, rotation })
+    resetLineIndex()
+    const problems = jointProblems(joined, { [bed.id]: bed, [joined.id]: joined })
+    // Named from the neighbour's side, because that is the lane this bend is
+    // being asked to accept boxes from.
+    expect(problems).toContain('Joined to a 600 mm lane; a box wider than 400 mm cannot cross.')
   })
 })

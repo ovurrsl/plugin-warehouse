@@ -1,6 +1,5 @@
-import type { ConveyorPortId } from './ports'
-import { conveyorPorts, inletPort, outletPort } from './ports'
-import type { ConveyorRollerNode } from './schema'
+import type { ConveyorModule, ConveyorPortId } from './ports'
+import { asConveyorModule, conveyorPorts, inletPort, outletPort } from './ports'
 
 /**
  * Which modules make up a line, computed rather than stored.
@@ -52,13 +51,6 @@ type LineIndex = {
 const cellKey = (x: number, z: number) => `${Math.floor(x / CELL)}:${Math.floor(z / CELL)}`
 const portKey = (nodeId: string, port: ConveyorPortId) => `${nodeId}:${port}`
 
-function asConveyor(node: unknown): ConveyorRollerNode | null {
-  const record = node as { type?: unknown; id?: unknown } | null
-  if (record?.type !== 'warehouse:conveyor-roller') return null
-  if (typeof record.id !== 'string') return null
-  return node as ConveyorRollerNode
-}
-
 let indexedFrom: unknown = null
 let index: LineIndex = { cells: new Map(), lines: new Map(), mated: new Set() }
 
@@ -67,11 +59,11 @@ function build(nodes: Readonly<Record<string, unknown>>): LineIndex {
   const all: PortRef[] = []
 
   for (const value of Object.values(nodes)) {
-    const conveyor = asConveyor(value)
-    if (!conveyor) continue
-    for (const port of conveyorPorts(conveyor)) {
+    const module = asConveyorModule(value)
+    if (!module) continue
+    for (const port of conveyorPorts(module)) {
       const ref: PortRef = {
-        nodeId: conveyor.id,
+        nodeId: module.id,
         port: port.id as ConveyorPortId,
         x: port.position[0],
         y: port.position[1],
@@ -176,16 +168,16 @@ export function isPortMated(
  */
 export function hasDownstreamNeighbour(
   nodes: Readonly<Record<string, unknown>>,
-  conveyor: ConveyorRollerNode,
+  module: ConveyorModule,
 ): boolean {
-  return isPortMated(nodes, conveyor.id, outletPort(conveyor))
+  return isPortMated(nodes, module.id, outletPort(module))
 }
 
 /** Whether the module upstream abuts. Used by the panel to describe a joint,
  *  not by the geometry — the upstream support is always built. */
 export function hasUpstreamNeighbour(
   nodes: Readonly<Record<string, unknown>>,
-  conveyor: ConveyorRollerNode,
+  module: ConveyorModule,
 ): boolean {
-  return isPortMated(nodes, conveyor.id, inletPort(conveyor))
+  return isPortMated(nodes, module.id, inletPort(module))
 }

@@ -163,6 +163,11 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
     },
   ],
 
+  // Per-bay editing, under the run's own fields rather than instead of them.
+  // A `customPanel` would take the auto-derived groups, the actions and the
+  // Move/Delete buttons with it.
+  trailingSection: () => import('./bay-panel'),
+
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []

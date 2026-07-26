@@ -58,7 +58,21 @@ type WarehouseStore = {
    */
   rackBrush: RackBrush
   setRackBrush: (patch: Partial<RackBrush>) => void
+
+  /**
+   * The bay the user last clicked, and the rack it belongs to.
+   *
+   * The host has no sub-node selection and the click that selects a rack is the
+   * same click that lands on a bay, so there is no gesture to learn: whichever
+   * bay you clicked is the one the panel edits. Cleared when the rack it names
+   * stops being the selected one, so the panel never edits a bay of a rack you
+   * are no longer looking at.
+   */
+  focusedBay: FocusedBay | null
+  setFocusedBay: (bay: FocusedBay | null) => void
 }
+
+export type FocusedBay = { rackId: string; row: number; bay: number }
 
 export type RackBrush = Pick<
   PalletRackNode,
@@ -123,4 +137,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     ghostFill: 0,
   },
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
+
+  focusedBay: null,
+  setFocusedBay: (focusedBay) => set({ focusedBay }),
 }))

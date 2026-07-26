@@ -14,11 +14,25 @@ import * as THREE from 'three'
 import { getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
+import { useWarehouseStore } from '../store'
+import { ensureBayFocusSubscription } from './bay-focus'
 import { getRackGeometry, type RackDetail } from './geometry-builder'
 import { getRackMaterial } from './materials'
 import { occupiedSlots, slotDraw } from './occupancy'
 import type { PalletRackNode } from './schema'
-import { palletSlotsOf, totalDepth, totalWidth } from './slots'
+import {
+  bayCenterX,
+  bayPitch,
+  palletSlotsOf,
+  rowCenterZ,
+  rowDepth,
+  totalDepth,
+  totalWidth,
+} from './slots'
+
+// One listener for every rack in the scene, established the first time any rack
+// renders. See `./bay-focus`.
+ensureBayFocusSubscription()
 
 const NO_RAYCAST = () => {}
 
@@ -168,6 +182,7 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
           receiveShadow
         />
         {node.ghostFill > 0 && <GhostStock node={node} />}
+        <FocusedBayOutline node={node} />
       </group>
     </group>
   )
@@ -261,6 +276,43 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         ref={loadRef}
       />
     </>
+  )
+}
+
+/** Edges of a unit cube, scaled to whichever bay is focused. One buffer for the
+ *  whole scene, and at most one rack draws it. */
+const UNIT_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
+const FOCUS_MATERIAL = new THREE.LineBasicMaterial({ color: '#38bdf8', depthTest: false })
+
+/**
+ * The bay the last click landed on.
+ *
+ * Drawn from the rack's own store rather than the host's selection, because the
+ * host has no notion of a sub-selection — and it is what makes "click a bay,
+ * edit that bay" work with no gesture to learn. `depthTest: false` so the
+ * outline reads through the steel in front of it; a bay is mostly air and an
+ * occluded outline is invisible from the aisle.
+ */
+function FocusedBayOutline({ node }: { node: PalletRackNode }) {
+  const focused = useWarehouseStore((s) => s.focusedBay)
+  if (!focused || focused.rackId !== node.id) return null
+  if (focused.bay < 1 || focused.bay > node.bayCount) return null
+  if (focused.row < 1 || focused.row > node.rowCount) return null
+
+  return (
+    <lineSegments
+      dispose={null}
+      geometry={UNIT_EDGES}
+      material={FOCUS_MATERIAL}
+      position={[
+        bayCenterX(node, focused.bay),
+        node.uprightHeight / 2,
+        rowCenterZ(node, focused.row),
+      ]}
+      raycast={NO_RAYCAST}
+      renderOrder={999}
+      scale={[bayPitch(node), node.uprightHeight, rowDepth(node)]}
+    />
   )
 }
 

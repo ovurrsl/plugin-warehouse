@@ -11,11 +11,13 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { type CargoDetail, cargoInputOf } from './cargo-parts'
 import { loadHeightOf } from './cargo-types'
+import { getFilmGeometry, releaseFilmGeometry, retainFilmGeometry } from './film'
 import { getPalletGeometry } from './geometry-builder'
-import { getCargoMaterial, getPalletMaterial } from './materials'
+import { getCargoMaterial, getFilmMaterial, getPalletMaterial } from './materials'
 import { specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -32,6 +34,15 @@ const NO_RAYCAST = () => {}
  */
 const LOD_FAR_SQ = 25 * 25
 const LOD_NEAR_SQ = 18 * 18
+
+/**
+ * Where the film stops being drawn at all.
+ *
+ * Fill rate rather than triangles: a blended veil costs its whole silhouette in
+ * shaded fragments every frame however few triangles it has, so the only
+ * effective control is how many are on screen at once.
+ */
+const FILM_CUT_SQ = FILM_DRAW_DISTANCE_M * FILM_DRAW_DISTANCE_M
 
 /** Frames between tier checks. Distance to a camera does not change fast enough
  *  to be worth a square root every frame on every pallet in a warehouse. */
@@ -188,6 +199,7 @@ function CargoLoad({
   isExporting: boolean
 }) {
   const meshRef = useRef<Mesh>(null)
+  const filmRef = useRef<Mesh>(null)
   /**
    * The tier this load is drawing. Owned by the frame loop, and the mounted
    * geometry is read *from* it rather than hardcoded — the rack shipped the
@@ -200,6 +212,14 @@ function CargoLoad({
     [node, isExporting],
   )
   const geometry = useMemo(() => (input ? getCargoGeometry(input) : null), [input])
+  // One sleeve fits both tiers: `loadExtent` reads type, preset and variant and
+  // never the tier, so the far tier's single box has exactly the near tier's
+  // extent.
+  const wrapped = node.wrapped && node.cargo !== 'none'
+  const filmGeometry = useMemo(
+    () => (input && wrapped ? getFilmGeometry(input) : null),
+    [input, wrapped],
+  )
 
   // Tell the cache both tiers are on screen. Eviction must never free a buffer
   // something is drawing, and a tier switch must not have to build one.
@@ -209,11 +229,13 @@ function CargoLoad({
     if (!near || !far) return
     const nearKey = retainCargoGeometry(near)
     const farKey = retainCargoGeometry(far)
+    const filmKey = wrapped ? retainFilmGeometry(near) : null
     return () => {
       releaseCargoGeometry(nearKey)
       releaseCargoGeometry(farKey)
+      if (filmKey) releaseFilmGeometry(filmKey)
     }
-  }, [node])
+  }, [node, wrapped])
 
   const frameRef = useRef(0)
   const phase = useMemo(() => hashPhase(node.id), [node.id])
@@ -228,6 +250,12 @@ function CargoLoad({
     const distanceSq = camera.position.distanceToSquared(
       worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
     )
+
+    // Same distance, both decisions. A second frame loop would compute the same
+    // number again on every pallet in the building.
+    const film = filmRef.current
+    if (film) film.visible = distanceSq <= FILM_CUT_SQ
+
     const current = detailRef.current
     const next =
       current === 'full'
@@ -248,16 +276,46 @@ function CargoLoad({
   if (!geometry) return null
 
   return (
-    <mesh
-      castShadow
-      // Never dispose: shared by every pallet that resolved to the same load.
-      dispose={null}
-      geometry={geometry}
-      material={getCargoMaterial()}
-      position={[0, y, 0]}
-      raycast={NO_RAYCAST}
-      receiveShadow
-      ref={meshRef}
-    />
+    <>
+      <mesh
+        castShadow
+        // Never dispose: shared by every pallet that resolved to the same load.
+        dispose={null}
+        geometry={geometry}
+        material={getCargoMaterial()}
+        position={[0, y, 0]}
+        raycast={NO_RAYCAST}
+        receiveShadow
+        ref={meshRef}
+      />
+      {filmGeometry && (
+        <mesh
+          /**
+           * Casts no shadow, and could not cast a correct one if it wanted to:
+           * this host's shadow pass sets `scene.overrideMaterial` to one shared
+           * material that reads nothing off the object's own, so a transparent
+           * caster would lay down a fully solid shadow. Adding `alphaTest` or an
+           * `alphaMap` would not save it either — worth writing down, because
+           * that is the obvious thing to reach for next.
+           */
+          castShadow={false}
+          dispose={null}
+          geometry={filmGeometry}
+          material={getFilmMaterial()}
+          position={[0, y, 0]}
+          raycast={NO_RAYCAST}
+          receiveShadow={false}
+          ref={filmRef}
+          // After every default-0 opaque, so a blended veil is sorted and drawn
+          // against a depth buffer that has already been laid down.
+          renderOrder={1}
+          // Off until the frame loop has judged the distance. Mounted visible,
+          // a pallet placed at forty metres would draw a full sleeve for up to
+          // eight frames — and an export, which never runs the loop, would draw
+          // one at any distance.
+          visible={isExporting}
+        />
+      )}
+    </>
   )
 }

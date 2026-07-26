@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getOrCreateCargoAtlas } from './cargo-atlas'
+import { FILM_OPACITY } from './cargo-constants'
 import { getOrCreateEPALTextureAtlas } from './epal-textures'
 
 /**
@@ -85,6 +86,52 @@ export function getCargoMaterial(): THREE.MeshStandardMaterial {
     vertexColors: true,
   })
   return cachedCargoMaterial
+}
+
+let cachedFilmMaterial: THREE.MeshStandardMaterial | null = null
+
+/**
+ * Stretch film: **blended, and writing no depth.**
+ *
+ * The plan asks for `alphaHash`, on the strength of order-independence and of
+ * MSAA dissolving its grain. Neither survives contact with this host. The viewer
+ * builds a `WebGPURenderer` and a TSL pipeline whose `pass()` writes a
+ * depth+normal MRT consumed by `ssgi()`, an edge-aware `denoise()` and a
+ * depth-Laplacian `inkedEdges()`, and nothing in that chain sets `samples` — so
+ * there is no MSAA for a dither to resolve against, and a dither that kept
+ * `depthWrite` would fill that shared buffer with a per-pixel mixture of two
+ * surfaces 15 mm apart. The ink pass reads the Laplacian of that as an edge and
+ * stipples every wrapped pallet below its own line threshold, which reads as
+ * dirt rather than as anything anyone would trace back to the film.
+ *
+ * `depthWrite: false` writes nothing into that buffer, so all three passes see
+ * exactly what they see today. The cost is a per-object sort, and the errors it
+ * admits are between two near-white veils on different pallets — a wrong grey,
+ * not a wrong picture.
+ *
+ * `FrontSide`, because three sorts objects and never triangles within a mesh:
+ * a double-sided sleeve would have to order its own far wall against its near
+ * one, which nothing can do.
+ */
+export function getFilmMaterial(): THREE.MeshStandardMaterial {
+  if (cachedFilmMaterial) return cachedFilmMaterial
+  const atlas = getOrCreateCargoAtlas()
+
+  cachedFilmMaterial = new THREE.MeshStandardMaterial({
+    map: atlas.map,
+    roughnessMap: atlas.orm,
+    metalnessMap: atlas.orm,
+    roughness: 1,
+    metalness: 1,
+    // Four-component vertex colour: the sleeve grades its own alpha down the
+    // skirt, and three components are silently padded to opaque.
+    vertexColors: true,
+    transparent: true,
+    opacity: FILM_OPACITY,
+    depthWrite: false,
+    side: THREE.FrontSide,
+  })
+  return cachedFilmMaterial
 }
 
 export function getCargoPreviewMaterial(): THREE.MeshStandardMaterial {

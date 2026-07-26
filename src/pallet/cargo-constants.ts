@@ -83,7 +83,63 @@ export const LABEL_OFFSET_M = mm(1)
  * are read off photography.
  */
 export const FILM_CLEARANCE_M = mm(15)
-export const FILM_SKIRT_M = mm(120)
+
+/**
+ * **How far the film laps down the pallet, as a fraction of the deck's height.**
+ *
+ * A fraction rather than the plan's flat 120 mm, because 120 mm down a 144 mm
+ * EPAL 1 reaches the blocks and covers the EPAL, EUR and IPPC stamps branded on
+ * their outward faces — and the acceptance list this whole kind is measured
+ * against opens with those stamps staying readable under the wrap.
+ *
+ * The figure is where the boards stop: a top deck board and a stringer, 22 mm
+ * each, is 44 mm of 144. Every preset is the same construction scaled, so the
+ * ratio travels where the millimetre figure would not.
+ */
+export const FILM_SKIRT_RATIO = (0.022 * 2) / 0.144
+
+/**
+ * **Blended, not dithered — and that is a decision about this host.**
+ *
+ * The plan calls for `alphaHash` as the default, on the strength of it being
+ * order-independent and of MSAA dissolving its grain. Neither holds here. The
+ * viewer builds a `WebGPURenderer` and a TSL pipeline whose `pass()` writes a
+ * depth+normal MRT that `ssgi()`, an edge-aware `denoise()` and a
+ * depth-Laplacian `inkedEdges()` all consume, and nothing in that chain sets
+ * `samples`, so there is no MSAA for a dither to resolve against.
+ *
+ * Worse than the grain: `alphaHash` keeps `depthWrite`, so it would write depth
+ * and normal for whichever fragments survived the hash. Across the silhouette of
+ * every wrapped pallet that buffer becomes a per-pixel mixture of two surfaces
+ * 15 mm apart — the ink pass reads the Laplacian of that as an edge and stipples
+ * the load with faint random ink, below the line threshold, so it reads as dirt
+ * rather than as a bug anyone would trace back to the film.
+ *
+ * A blended veil writes no depth at all, so all three passes see exactly what
+ * they see today. It costs a per-object sort, and the errors it admits are
+ * between two near-white veils on different pallets: a slightly wrong grey
+ * rather than a wrong picture.
+ */
+export const FILM_OPACITY = 0.3
+
+/**
+ * The corner cut. Twice the clearance, so the wrap turns the corner instead of
+ * coming to a point 15 mm off a pallet whose own corners are chamfered.
+ *
+ * Eight flat facets rather than a rounded corner is also what the host's ink
+ * pass wants: piecewise-constant normals give it eight clean vertical lines
+ * where a smooth sweep gives it a field of near-threshold gradients.
+ */
+export const FILM_CHAMFER_M = mm(30)
+
+/**
+ * Beyond this the film is not drawn at all.
+ *
+ * The plan's figure, and the reason is fill rate rather than triangles: a veil
+ * costs its whole silhouette in blended fragments every frame, so the only
+ * effective control is how many of them are on screen at once.
+ */
+export const FILM_DRAW_DISTANCE_M = 30
 /** How far the film pulls in at mid-height, as a fraction of the load's width. */
 export const FILM_WAIST = 0.015
 

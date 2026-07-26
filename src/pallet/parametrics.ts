@@ -55,9 +55,7 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
         },
         { key: 'strapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
         { key: 'labelled', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
-        // `wrapped` is deliberately absent until the stretch film is built. A
-        // switch that changes no pixels is worse than a missing one: the user
-        // toggles it, sees nothing, and stops trusting the panel.
+        { key: 'wrapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
       ],
     },
     {

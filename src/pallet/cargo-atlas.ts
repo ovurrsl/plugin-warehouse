@@ -324,59 +324,6 @@ function drawLabel(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.fillText('PAL 0042', w / 2, h * 0.85)
 }
 
-function drawWarningBand(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.fillStyle = '#f2f2f2'
-  ctx.fillRect(0, 0, w, h)
-  ctx.fillStyle = '#c62828'
-  for (let x = -h; x < w; x += h * 0.9) {
-    ctx.beginPath()
-    ctx.moveTo(x, h)
-    ctx.lineTo(x + h * 0.45, h)
-    ctx.lineTo(x + h * 0.45 + h, 0)
-    ctx.lineTo(x + h, 0)
-    ctx.closePath()
-    ctx.fill()
-  }
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(w * 0.3, h * 0.18, w * 0.4, h * 0.64)
-  ctx.fillStyle = '#c62828'
-  ctx.font = `bold ${Math.round(h * 0.46)}px sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('FRAGILE', w * 0.5, h * 0.52)
-}
-
-function drawLod2Facade(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  // A whole loaded pallet in one rectangle: wrapped load above, feet below. The
-  // split is where a 144 mm pallet sits under a load of roughly a metre.
-  const deck = h * 0.86
-  ctx.fillStyle = '#e4e4e4'
-  ctx.fillRect(0, 0, w, deck)
-  for (let i = 0; i < 40; i++) {
-    const y = hash(i + 500) * deck
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + hash(i + 530) * 0.22})`
-    ctx.lineWidth = 1 + hash(i + 560) * 2
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(w, y + (hash(i + 590) - 0.5) * h * 0.05)
-    ctx.stroke()
-  }
-  // The seams that survive the wrap — the reason a far pallet still reads as
-  // boxes rather than as a monolith.
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.10)'
-  for (let i = 1; i < 4; i++) ctx.fillRect((w * i) / 4 - 1.5, 0, 3, deck)
-  shadeEdges(ctx, w, deck, w * 0.045)
-
-  ctx.fillStyle = '#b9b9b9'
-  ctx.fillRect(0, deck, w, h - deck)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)'
-  const footW = w * 0.16
-  for (const at of [0.06, 0.42, 0.78]) {
-    ctx.clearRect(w * at + footW, deck + (h - deck) * 0.35, w * 0.2, (h - deck) * 0.65)
-    ctx.fillRect(w * at + footW, deck + (h - deck) * 0.35, w * 0.2, (h - deck) * 0.65)
-  }
-}
-
 const ALBEDO_DRAWERS: Record<
   CargoRegionId,
   (ctx: CanvasRenderingContext2D, w: number, h: number) => void
@@ -388,11 +335,9 @@ const ALBEDO_DRAWERS: Record<
   drumBody: drawDrumBody,
   drumLid: drawDrumLid,
   film: drawFilm,
-  lod2Facade: drawLod2Facade,
   cornerBoard: drawCornerBoard,
   label: drawLabel,
   strap: drawStrap,
-  warningBand: drawWarningBand,
 }
 
 // ── Roughness + metalness ───────────────────────────────────────────────────
@@ -412,11 +357,9 @@ const SURFACE: Record<CargoRegionId, readonly [number, number]> = {
   drumBody: [0.42, 1],
   drumLid: [0.45, 1],
   film: [0.22, 0],
-  lod2Facade: [0.55, 0],
   cornerBoard: [0.94, 0],
   label: [0.6, 0],
   strap: [0.3, 0],
-  warningBand: [0.55, 0],
 }
 
 const channel = (value: number) => Math.round(THREE.MathUtils.clamp(value, 0, 1) * 255)
@@ -449,6 +392,17 @@ function drawOrmRegion(ctx: CanvasRenderingContext2D, w: number, h: number, id: 
   if (id === 'label') {
     ctx.fillStyle = `rgb(255, ${channel(0.45)}, 0)`
     ctx.fillRect(w * 0.04, h * 0.04, w * 0.92, h * 0.92)
+  }
+  if (id === 'film') {
+    // Wrinkle bands, from the same deterministic hash and along the same axis
+    // the albedo's strokes run, so the two agree. A uniform roughness gives a
+    // uniform specular wash with nothing for a highlight to break on, which is
+    // most of what stops a flat veil reading as plastic.
+    for (let i = 0; i < 40; i++) {
+      const y = hash(i + 700) * h
+      ctx.fillStyle = `rgb(255, ${channel(0.1 + hash(i + 730) * 0.06)}, 0)`
+      ctx.fillRect(0, y, w, 1 + hash(i + 760) * 4)
+    }
   }
 }
 

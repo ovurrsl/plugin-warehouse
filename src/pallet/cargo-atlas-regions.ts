@@ -109,12 +109,6 @@ const DECLARED = [
    */
   { id: 'film', w: 480, h: 480 },
 
-  /**
-   * The farthest tier: a whole loaded pallet as one facade, feet included, so
-   * a bird's-eye warehouse draws twelve triangles per pallet.
-   */
-  { id: 'lod2Facade', w: 480, h: 480 },
-
   /** Kraft L-profile stock for the corner boards. Tall, because it is cut to
    *  the load's height. */
   { id: 'cornerBoard', w: 240, h: 480 },
@@ -130,9 +124,6 @@ const DECLARED = [
 
   /** PET strapping: a long thin strip, sampled along its length. */
   { id: 'strap', w: 480, h: 48 },
-
-  /** The optional FRAGILE band, run horizontally around the film. */
-  { id: 'warningBand', w: 480, h: 64 },
 ] as const
 
 export type CargoRegionId = (typeof DECLARED)[number]['id']

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f24e169`](https://github.com/ovurrsl/plugin-warehouse/commit/f24e169f14be6c9e34f203b0be6d442ba9a4f7c9))
 - Refresh generated README blocks [skip ci] ([`ef86834`](https://github.com/ovurrsl/plugin-warehouse/commit/ef86834c2b137398888483621f1324c23bd354d7))
 - Refresh generated README blocks [skip ci] ([`cc09423`](https://github.com/ovurrsl/plugin-warehouse/commit/cc09423cca19e85baefa76a9e17f93a221219940))
 - Refresh generated README blocks [skip ci] ([`ed6ada4`](https://github.com/ovurrsl/plugin-warehouse/commit/ed6ada4e2633863dfa24b90b3b103d86f7e05268))
@@ -75,6 +76,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- All fifteen findings from the adversarial review ([`5b7a62d`](https://github.com/ovurrsl/plugin-warehouse/commit/5b7a62dec51404b6e7c8a4443c43ef20e4947fe3))
 - The ceded support follows the flow, and the key says which end ([`07d792a`](https://github.com/ovurrsl/plugin-warehouse/commit/07d792af7767c93868a2f1b20f049b90c749443c))
 - Store catalogue enums as strings so Duplicate works ([`f9c9548`](https://github.com/ovurrsl/plugin-warehouse/commit/f9c9548bd932afb9f266e4e9bb6ac49df08ced12))
 - Bracing is steel, and the far tier drops it ([`65a734a`](https://github.com/ovurrsl/plugin-warehouse/commit/65a734a1baa8506fd35530cca8c3f6672eb3db8b))

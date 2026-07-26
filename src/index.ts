@@ -2,6 +2,7 @@ import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
 import { conveyorCurveDefinition } from './conveyor/curve-definition'
 import { conveyorRollerDefinition } from './conveyor/definition'
+import { conveyorLauncherDefinition } from './conveyor/launcher-definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
@@ -33,6 +34,7 @@ export const warehousePlugin: Plugin = {
     palletRackDefinition as unknown as AnyNodeDefinition,
     conveyorRollerDefinition as unknown as AnyNodeDefinition,
     conveyorCurveDefinition as unknown as AnyNodeDefinition,
+    conveyorLauncherDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -57,6 +59,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:pallet-rack',
     'warehouse:conveyor-roller',
     'warehouse:conveyor-curve',
+    'warehouse:conveyor-launcher',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

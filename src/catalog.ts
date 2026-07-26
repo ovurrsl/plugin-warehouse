@@ -104,6 +104,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Turns a line through 45, 90 or 180°, keeping every box facing the way it entered. [ and ] set the angle, H flips the hand.',
     icon: 'lucide:corner-up-left',
   },
+  {
+    kind: 'warehouse:conveyor-launcher',
+    label: 'Launcher Conveyor',
+    sectionId: 'conveyance',
+    description:
+      'Branches a line at ninety degrees without a curve: the main bed runs through and a short arm throws the box off it. H flips the launch side.',
+    icon: 'lucide:git-fork',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

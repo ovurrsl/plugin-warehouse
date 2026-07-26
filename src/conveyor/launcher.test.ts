@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { isClearAt } from '../clash'
+import { PalletNode } from '../pallet/schema'
 import { LNC } from './catalog'
 import {
   clearConveyorGeometryCache,
   conveyorGeometryCacheSize,
   getConveyorGeometry,
 } from './geometry-builder'
+import { buildLauncherFloorplan } from './launcher-floorplan'
 import { getLauncherGeometry, launcherGeometryKey } from './launcher-geometry'
 import {
   footprintCentreZM,
@@ -17,6 +20,7 @@ import {
   rollerCount,
   supportOffsetsX,
 } from './launcher-metrics'
+import { conveyorLauncherParametrics } from './launcher-parametrics'
 import { launcherParts } from './launcher-parts'
 import { ConveyorLauncherNode } from './launcher-schema'
 import { hasDownstreamNeighbour, lineOf, resetLineIndex } from './line-index'
@@ -336,5 +340,146 @@ describe('the mesh', () => {
     expect(decks[1]?.rotationY).toBeCloseTo(Math.PI / 2, 9)
     expect(decks[0]?.size[0]).not.toBeCloseTo(decks[1]?.size[0] ?? 0, 3)
     expect(rollerCount(node)).toBe(12)
+  })
+})
+
+describe('the inspector can reach every field, and every option it writes parses back', () => {
+  const enumFields = conveyorLauncherParametrics.groups.flatMap((group) =>
+    group.fields.flatMap((field) => (field.kind === 'enum' ? [field] : [])),
+  )
+
+  test('the descriptor offers enums at all, so the sweep below is not vacuous', () => {
+    expect(enumFields.map((field) => field.key).sort()).toEqual([
+      'flow',
+      'launchSide',
+      'rollerPitch',
+      'usefulWidth',
+    ])
+  })
+
+  for (const field of enumFields) {
+    test(`${field.key}: every option the control can write parses back unchanged`, () => {
+      // The path Duplicate takes: the host's enum control writes `e.target.value`,
+      // a string, and `def.schema.parse(duplicateInfo)` re-reads it.
+      for (const option of field.options) {
+        const edited = { ...launcher(), [field.key]: option }
+        const reparsed = ConveyorLauncherNode.parse(edited) as Record<string, unknown>
+        expect({ key: field.key, option, stored: reparsed[field.key] }).toEqual({
+          key: field.key,
+          option,
+          stored: option,
+        })
+      }
+    })
+  }
+
+  test('no editable field is unreachable from the panel', () => {
+    const DELIBERATELY_HIDDEN = new Set([
+      'id',
+      'type',
+      'name',
+      'parentId',
+      'children',
+      'visible',
+      'locked',
+      'object',
+      'metadata',
+      // Elected at placement time from whatever slab is underneath.
+      'supportSlabId',
+    ])
+    const shown = new Set(
+      conveyorLauncherParametrics.groups.flatMap((group) => group.fields.map((field) => field.key)),
+    )
+    const missing = Object.keys(launcher()).filter(
+      (key) => !shown.has(key as never) && !DELIBERATELY_HIDDEN.has(key),
+    )
+    expect(missing).toEqual([])
+  })
+
+  test('a default launcher is clean, so a new one is not born yellow', () => {
+    const issues =
+      conveyorLauncherParametrics.invariants?.flatMap((check) => check(launcher())) ?? []
+    expect(issues).toEqual([])
+  })
+
+  test('the two things a person can actually get wrong are named', () => {
+    const fieldsOf = (overrides: Record<string, unknown>) =>
+      (conveyorLauncherParametrics.invariants ?? [])
+        .flatMap((check) => check(launcher(overrides)))
+        .map((issue) => issue.field)
+    // No far rail: nothing stops the launched box leaving the way it came.
+    expect(fieldsOf({ sideGuide: false })).toContain('sideGuide')
+    // A 400 mm lane leaves no room around the 400 mm box the type launches.
+    expect(fieldsOf({ usefulWidth: '400' })).toContain('usefulWidth')
+  })
+})
+
+describe('the arm is checked, and the empty corner is not', () => {
+  const pallet = (position: [number, number, number]) =>
+    PalletNode.parse({ id: 'pallet_l', position, rotation: [0, 0, 0] })
+
+  test('the corner opposite the arm stays free', () => {
+    // Where the branch's own line goes, in every real layout. A single box round
+    // the L would refuse the placement the machine exists to make.
+    const node = launcher({ launchSide: 'left' })
+    const scene = { [node.id]: node }
+    const clear = pallet([0, 0, -(frameWidthM(node) / 2 + 0.75)])
+    expect(isClearAt({ node: clear, position: clear.position, rotationY: 0, nodes: scene })).toBe(
+      true,
+    )
+  })
+
+  test('the arm itself is not free', () => {
+    const node = launcher({ launchSide: 'left' })
+    const scene = { [node.id]: node }
+    const onTheArm = pallet([0, 0, lateralOuterZM(node) - 0.15])
+    expect(
+      isClearAt({ node: onTheArm, position: onTheArm.position, rotationY: 0, nodes: scene }),
+    ).toBe(false)
+  })
+
+  test('so is the main bed', () => {
+    const node = launcher()
+    const scene = { [node.id]: node }
+    const onTheBed = pallet([0, 0, 0])
+    expect(
+      isClearAt({ node: onTheBed, position: onTheBed.position, rotationY: 0, nodes: scene }),
+    ).toBe(false)
+  })
+})
+
+describe('the plan symbol carries the branch, which is the whole reason to draw one', () => {
+  const plan = (node: ReturnType<typeof launcher>) =>
+    buildLauncherFloorplan(node, { viewState: undefined } as never)
+
+  test('two arrows, and the lateral one points out of the launch side', () => {
+    // A launcher drawn with one arrow is a straight, and the thing a person is
+    // reading a layout for at this spot is exactly where the line branches.
+    for (const launchSide of ['left', 'right'] as const) {
+      const node = launcher({ launchSide })
+      const group = plan(node)
+      const children = group?.kind === 'group' ? group.children : []
+      const arrows = children.filter((child) => child.kind === 'polygon')
+      expect(arrows).toHaveLength(2)
+
+      const lateral = arrows.find((arrow) =>
+        arrow.kind === 'polygon' ? Math.abs(arrow.points[0]?.[0] ?? 1) < 1e-9 : false,
+      )
+      if (lateral?.kind !== 'polygon') throw new Error('no lateral arrow')
+      expect(Math.sign(lateral.points[0]?.[1] ?? 0)).toBe(launchSign(node))
+    }
+  })
+
+  test('the body and the arm are both drawn, and the arm on the right side', () => {
+    const node = launcher({ launchSide: 'right' })
+    const group = plan(node)
+    const children = group?.kind === 'group' ? group.children : []
+    const rects = children.filter((child) => child.kind === 'rect')
+    // The arm, the body, and the lane inside it.
+    expect(rects).toHaveLength(3)
+    const arm = rects[0]
+    if (arm?.kind !== 'rect') throw new Error('no arm')
+    expect(arm.y).toBeCloseTo(-lateralOuterZM(node), 9)
+    expect(arm.height).toBeCloseTo(lateralOuterZM(node) - frameWidthM(node) / 2, 9)
   })
 })

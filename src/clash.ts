@@ -1,6 +1,15 @@
 import { nodeRegistry } from '@pascal-app/core'
+import { LNC } from './conveyor/catalog'
 import { colliderSegments, localBoundsM as curveBoundsM } from './conveyor/curve-metrics'
 import type { ConveyorCurveNode } from './conveyor/curve-schema'
+import {
+  lateralOuterZM,
+  localBoundsM as launcherBoundsM,
+  frameWidthM as launcherFrameWidthM,
+  moduleLengthM as launcherLengthM,
+  launchSign,
+} from './conveyor/launcher-metrics'
+import type { ConveyorLauncherNode } from './conveyor/launcher-schema'
 import { localBoundsM } from './conveyor/metrics'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { specOf, unitLoadHeight } from './pallet/presets'
@@ -190,6 +199,33 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // surface, and nothing passes through a surface.
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
+    )
+  }
+
+  if (placement.type === 'warehouse:conveyor-launcher') {
+    // Two boxes: the main body and the arm. The rectangle round an L is a third
+    // empty, and on a launcher that empty corner is where the branch's own line
+    // runs — so a single box would refuse the very placement the machine exists
+    // to make. Floor to guide top on both, legs included.
+    const launcher = node as ConveyorLauncherNode
+    const bounds = launcherBoundsM(launcher)
+    const height = bounds.max[1] - bounds.min[1]
+    const frame = launcherFrameWidthM(launcher)
+    const side = launchSign(launcher)
+    const armDepth = lateralOuterZM(launcher) - frame / 2
+
+    return (
+      [
+        { cz: 0, sx: launcherLengthM(launcher), sz: frame },
+        { cz: side * (frame / 2 + armDepth / 2), sx: LNC.boxLengthM, sz: armDepth },
+      ] as const
+    ).map((part) =>
+      toWorldBox(
+        [0, bounds.min[1] + height / 2, part.cz],
+        [part.sx, height, part.sz],
+        placement.position,
+        placement.rotationY,
+      ),
     )
   }
 

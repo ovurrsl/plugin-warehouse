@@ -3,7 +3,6 @@
 import {
   type AlignmentAnchor,
   type AnyNode,
-  type AnyNodeId,
   collectAlignmentAnchors,
   spatialGridManager,
   useScene,
@@ -29,12 +28,17 @@ import {
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
+import { multiplyPlacements, runExtent } from './multiply'
+import { placeRun } from './multiply-command'
 import PalletRackPreview from './preview'
 import { PalletRackNode } from './schema'
-import { anchorOffset, totalDepth, totalWidth } from './slots'
+import { totalDepth } from './slots'
 
 /** 45° steps, matching the R / T rotation every built-in placement tool uses. */
 const ROTATION_STEP = Math.PI / 4
+
+/** Ghost bays drawn at the cursor before the box stands in for the rest. */
+const GHOST_LIMIT = 200
 
 /**
  * Placement for a racking run.
@@ -43,11 +47,11 @@ const ROTATION_STEP = Math.PI / 4
  * rack snaps, aligns, measures and refuses overlaps exactly like a built-in
  * kind rather than approximately like one.
  *
- * `[` and `]` change the bay count while placing, which is the dimension you
- * actually adjust against a wall you can see. Length comes from bays rather
- * than from placing several runs: bays share their frames, so one node of
- * twenty bays is one merged mesh and one draw call, where twenty single-bay
- * nodes would be twenty of each.
+ * `[` and `]` change how many bays a click lays down, which is the dimension you
+ * actually adjust against a wall you can see. A bay is a node, so what the click
+ * commits is a whole run through `placeRun` — the same arithmetic and the same
+ * single undo step as the panel's Multiply button, so a run laid down with `]`
+ * and a run grown from the panel are indistinguishable afterwards.
  *
  * There is deliberately no Shift gesture here. The host binds Shift to cycling
  * the snapping mode whenever a snap context is active, and this kind declares
@@ -71,18 +75,39 @@ export default function PalletRackTool() {
   const lastPositionRef = useRef<[number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
 
+  const spec = useWarehouseStore((s) => s.multiply)
+
   const previewNode = useMemo(
     () => PalletRackNode.parse({ ...brush, position: [0, 0, 0], rotation: [0, 0, 0] }),
     [brush],
   )
 
+  /**
+   * The whole run's footprint, not one bay's.
+   *
+   * What the click commits is a run, so what the box collides and draws has to
+   * be the run — a box the size of the first bay would happily report a fit for
+   * twenty bays laid through a wall. `centerLocal` carries the offset, because
+   * the bay under the cursor is an *end* of the run rather than its middle.
+   */
+  const extent = useMemo(() => runExtent(previewNode, spec), [previewNode, spec])
   const boxDimensions = useMemo(
-    (): [number, number, number] => [
-      totalWidth(previewNode),
-      previewNode.uprightHeight,
-      totalDepth(previewNode),
-    ],
-    [previewNode],
+    (): [number, number, number] => [extent.width, previewNode.uprightHeight, extent.depth],
+    [extent, previewNode.uprightHeight],
+  )
+
+  /**
+   * The rest of the run as a ghost, already in the cursor group's local frame —
+   * `previewNode` sits at the origin unrotated, so the placements come out local
+   * and the group's own transform carries them.
+   *
+   * Capped, and said out loud rather than left to be noticed: the placement box
+   * always shows the run's true extent, but past a couple of hundred ghost bays
+   * the cursor costs more per frame than the scene being placed into.
+   */
+  const ghosts = useMemo(
+    () => multiplyPlacements(previewNode, spec).slice(0, GHOST_LIMIT),
+    [previewNode, spec],
   )
 
   useEffect(() => {
@@ -101,6 +126,22 @@ export default function PalletRackTool() {
       activeLevelId,
     )
 
+    /** The run's middle, from the first bay's position. The bay is what the
+     *  cursor carries; the box has to cover everything behind it. */
+    const runCenter = (
+      origin: [number, number, number],
+      rotationY: number,
+    ): [number, number, number] => {
+      const [localX, localZ] = extent.centerLocal
+      const cos = Math.cos(rotationY)
+      const sin = Math.sin(rotationY)
+      return [
+        origin[0] + localX * cos + localZ * sin,
+        origin[1],
+        origin[2] - localX * sin + localZ * cos,
+      ]
+    }
+
     const recomputeValidity = (visual: [number, number, number]) => {
       if (altRef.current) {
         validRef.current = true
@@ -109,7 +150,7 @@ export default function PalletRackTool() {
       }
       const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
         activeLevelId,
-        visual,
+        runCenter(visual, rotationRef.current),
         boxDimensions,
         [0, rotationRef.current, 0],
         [],
@@ -127,28 +168,25 @@ export default function PalletRackTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      setCursorPosition(visual)
+      setCursorPosition(runCenter(visual, rotationRef.current))
       lastPositionRef.current = position
       recomputeValidity(visual)
 
       useFacingPose.getState().set({
         position: visual,
         rotationY: rotationRef.current,
-        depth: boxDimensions[2],
+        depth: totalDepth(previewNode),
       })
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
-      // The block is centred on its position, because that is the rectangle the
-      // host collides and aligns against — so growing "from the left end" means
-      // offsetting the centre from the cursor, not offsetting the geometry.
-      const [dx, dz] = anchorOffset(previewNode)
-      const cos = Math.cos(rotationRef.current)
-      const sin = Math.sin(rotationRef.current)
+      // No centre offset: the cursor carries the *first bay*, and a bay is
+      // centred on its own node. Aligning that one footprint rather than the
+      // run's is what makes a bay snap flush against an existing one — which is
+      // the gesture that puts two bays on a shared post.
       const { position, guides } = resolveAlignedPlacement({
         candidates: alignmentCandidates,
-        centerOffset: [dx * cos + dz * sin, -dx * sin + dz * cos],
         node: previewNode as unknown as AnyNode,
         rawX,
         rawZ,
@@ -168,18 +206,19 @@ export default function PalletRackTool() {
       }
     })
 
-    const commitAt = (position: [number, number, number]): string | null => {
+    const commitAt = (position: [number, number, number]): void => {
       const current = useWarehouseStore.getState().rackBrush
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const committed = PalletRackNode.parse({
+      const first = PalletRackNode.parse({
         ...current,
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
       })
-      useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
-      return committed.id
+      // The bay under the cursor and everything behind it in one write, so the
+      // click is one undo step however long the run is.
+      placeRun(first, useWarehouseStore.getState().multiply, activeLevelId)
     }
 
     const unsubscribeClicks = subscribePlacementClicks((event) => {
@@ -192,11 +231,7 @@ export default function PalletRackTool() {
         return
       }
 
-      const placed: string[] = []
-      const committed = commitAt(position)
-      if (committed) placed.push(committed)
-
-      useViewer.getState().setSelection({ selectedIds: placed as AnyNodeId[] })
+      commitAt(position)
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
@@ -218,11 +253,11 @@ export default function PalletRackTool() {
       }
       if (event.metaKey || event.ctrlKey || event.altKey) return
 
-      const store = useWarehouseStore.getState()
       if (event.key === '[' || event.key === ']') {
         event.preventDefault()
         const delta = event.key === ']' ? 1 : -1
-        store.setRackBrush({ bayCount: Math.max(1, Math.min(40, brush.bayCount + delta)) })
+        const store = useWarehouseStore.getState()
+        store.setMultiply({ bays: Math.max(1, Math.min(200, store.multiply.bays + delta)) })
         return
       }
 
@@ -260,14 +295,27 @@ export default function PalletRackTool() {
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
     }
-  }, [activeLevelId, previewNode, boxDimensions, brush.bayCount])
+  }, [activeLevelId, previewNode, boxDimensions, extent])
 
   if (!activeLevelId) return null
 
   return (
     <>
+      {/* The whole run as a ghost, laid out in the cursor group's local frame so
+          the group's own rotation carries it. The bays share one cached
+          geometry, so a twenty-bay ghost is twenty draws of a buffer that is
+          already built rather than twenty builds. */}
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
         <PalletRackPreview node={previewNode} />
+        {ghosts.map((ghost) => (
+          <group
+            key={`${ghost.position[0]}:${ghost.position[2]}`}
+            position={ghost.position}
+            rotation={ghost.rotation}
+          >
+            <PalletRackPreview node={previewNode} />
+          </group>
+        ))}
       </group>
       {cursorVisible && (
         <PlacementBox

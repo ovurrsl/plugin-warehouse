@@ -85,7 +85,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Pallet Rack',
     sectionId: 'storage',
     description:
-      'Adjustable racking. Bays share their frames; the pallet standard and orientation set how many positions a level holds.',
+      'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
     icon: 'lucide:rows-3',
   },
 ] as const

@@ -1,17 +1,15 @@
 import * as THREE from 'three'
 import type { RackDetail, RackPart, RackPartRole } from './parts'
-import { PART_BUDGET, rackParts } from './parts'
+import { rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
-  bayShapeDepartures,
   beamedLevels,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
   palletSupportBarsDrawn,
-  rowFacing,
-  rowGapBefore,
   slotOffsetsX,
+  storageLevelsPresent,
 } from './slots'
 
 /**
@@ -188,7 +186,6 @@ const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam'>, string> = {
   connector: '#475569',
   shelf: '#9aa5b1',
   'support-bar': '#cbd5e1',
-  'row-spacer': '#94a3b8',
 }
 
 export type { RackDetail } from './parts'
@@ -229,33 +226,46 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
  * Built from the values the builder actually consumes rather than from the raw
  * schema fields, which buys two things a hand-listed key cannot.
  *
- * It cannot over-report: the row gaps move no vertex while the block is a
- * single run, and `depthGap` moves none while it is single-deep, so listing
- * them raw split the cache between racks whose meshes were byte-identical.
- * Passing them through the same helpers the builder uses collapses those back
- * together.
+ * It cannot over-report: `depthGap` moves no vertex while the bay is
+ * single-deep, so listing it raw split the cache between racks whose meshes
+ * were byte-identical. Passing it through the same condition the builder uses
+ * collapses those back together.
  *
  * And it cannot under-report as easily: the level structure is encoded as the
- * type and elevation of each level, so a new field that changes level layout —
- * `hasGroundBeam` was one, and it shipped missing from the hand-listed version —
- * reaches the key through `levelSurfaceY` without anyone remembering to add it.
+ * type and elevation of each level *that is actually drawn*, so a new field that
+ * changes level layout — `hasGroundBeam` was one, and it shipped missing from
+ * the hand-listed version — reaches the key through `levelSurfaceY` without
+ * anyone remembering to add it. `tunnelLevels` arrives the same way, through the
+ * intersection below.
  *
  * Id, name, position, rotation, `supportSlabId` and `ghostFill` are all absent
  * on purpose: two racks that look the same must share one geometry.
  */
-export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): string {
+export function rackGeometryKey(
+  rack: PalletRackNode,
+  detail: RackDetail,
+  hasRightNeighbour = false,
+): string {
   // Zero unless a bar is actually built: a decked level carries the pallet, so
   // the bar count on a decked rack moves nothing.
   const bars = palletSupportBarsDrawn(rack) ? palletSupportBarCount(rack) : 0
-  const beamed = beamedLevels(rack)
-  const hasPicking = beamed.some((level) => levelTypeOf(rack, level) === 'picking')
-  const levels = beamed
+  // Exactly the levels `rackParts` emits: beamed, minus anything the tunnel
+  // opens up. Deriving it rather than listing `tunnelLevels` keeps a tunnel that
+  // reaches no level — one set under a rack whose ground level carries no beam —
+  // from splitting the cache off an identical rack without one.
+  const present = new Set(storageLevelsPresent(rack))
+  const drawn = beamedLevels(rack).filter((level) => present.has(level))
+  const hasPicking = drawn.some((level) => levelTypeOf(rack, level) === 'picking')
+  const levels = drawn
     .map((level) => `${levelTypeOf(rack, level)}@${levelSurfaceY(rack, level).toFixed(5)}`)
     .join(',')
 
   return [
     detail,
-    rack.bayCount,
+    // One frame or two. A bay with something standing against its right leaves
+    // that frame to its neighbour, which is a different mesh — two variants per
+    // shape, and the cheapest possible price for sharing posts at a seam.
+    hasRightNeighbour ? 'L' : 'LR',
     rack.bayClearWidth,
     rack.depth,
     rack.uprightHeight,
@@ -266,28 +276,6 @@ export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): strin
     rack.bracing,
     rack.decking,
     rack.hasGroundBeam ? 1 : 0,
-    // Skips, tunnels and per-bay levels each cut real steel out of the mesh, so
-    // a rack carrying one cannot share a geometry with a uniform one. Serialised
-    // in key order so two racks with the same overrides written in a different
-    // order still collapse onto one mesh.
-    bayShapeDepartures(rack).join(';'),
-    rack.rowCount,
-    // The gap sequence the block actually uses, rather than the two gap fields
-    // and the group size raw. A single run consumes neither gap, a pair never
-    // opens an aisle, and one-row groups never touch the spine gap — listing the
-    // fields would split the cache between blocks whose meshes are identical.
-    // `backToBack` reaches the key through this.
-    Array.from({ length: Math.max(0, rack.rowCount - 1) }, (_, index) =>
-      rowGapBefore(rack, index + 2),
-    ).join(','),
-    // Facing reaches the geometry only through `depthPositionZ`, and only once
-    // there is a second position for it to order: single-deep, every row's one
-    // position sits on its centreline whichever way it faces. Listing the
-    // facings unconditionally split a two-row block from an identical one whose
-    // group size merely happened to be larger than the block.
-    rack.depthPositions > 1
-      ? Array.from({ length: rack.rowCount }, (_, index) => rowFacing(rack, index + 1)).join('')
-      : '',
     rack.depthPositions,
     rack.depthPositions > 1 ? rack.depthGap : 0,
     levels,
@@ -317,23 +305,23 @@ const cache = new Map<string, THREE.BufferGeometry>()
  * rack is deleted would blank every other rack that shares it — the same trap
  * the pallet renderer documents around `<GeometrySystem>`. A warehouse's worth
  * of distinct shapes is a few dozen meshes.
+ *
+ * This is what makes one node per bay affordable at all. Two thousand bays in a
+ * 15 000 m² building are two thousand *nodes*, but a run is one shape repeated,
+ * so they resolve to a handful of buffers — 4 per shape counting the two detail
+ * tiers against the two frame variants. The draw calls are the price; the memory
+ * is not.
  */
-export function getRackGeometry(rack: PalletRackNode, detail: RackDetail): THREE.BufferGeometry {
-  const key = rackGeometryKey(rack, detail)
+export function getRackGeometry(
+  rack: PalletRackNode,
+  detail: RackDetail,
+  hasRightNeighbour = false,
+): THREE.BufferGeometry {
+  const key = rackGeometryKey(rack, detail, hasRightNeighbour)
   const cached = cache.get(key)
   if (cached) return cached
 
-  // The budget test is exact rather than estimated, which means building the
-  // part list — so it runs only here, past the cache, where the list is about to
-  // be built anyway. An estimate would be cheaper and would drift from what the
-  // builder actually emits the first time either side gained a part.
-  const parts = rackParts(rack, detail)
-  const geometry =
-    detail === 'full' && parts.length > PART_BUDGET
-      ? // Both tiers resolve to the same silhouette; the two keys share one
-        // geometry object rather than building it twice.
-        getRackGeometry(rack, 'simple')
-      : buildFrom(rack, parts)
+  const geometry = buildFrom(rack, rackParts(rack, detail, hasRightNeighbour))
   cache.set(key, geometry)
   return geometry
 }

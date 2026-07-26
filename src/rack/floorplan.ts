@@ -3,10 +3,10 @@ import { type RackPart, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
-  bayStorageLevels,
   depthPositionZ,
   orientedPalletFootprint,
   slotOffsetsX,
+  storageLevelsPresent,
   totalDepth,
   totalWidth,
 } from './slots'
@@ -37,7 +37,6 @@ import {
 export const PLAN_ROLES: ReadonlySet<RackPart['role']> = new Set<RackPart['role']>([
   'upright',
   'beam',
-  'row-spacer',
 ])
 
 export function buildPalletRackFloorplan(
@@ -73,6 +72,12 @@ export function buildPalletRackFloorplan(
 
   // Steel, straight off the 3D part list. Always full detail: the plan shows
   // the frames whatever tier the 3D viewport happens to be drawing.
+  //
+  // Deliberately without the neighbour flag. In 3D a shared frame must be built
+  // once or the two posts z-fight; in plan the two rects are the same rectangle
+  // in the same fill, so a run reads as N+1 posts either way — and asking each
+  // bay to consult its neighbours to draw a plan would cost a scene scan per
+  // symbol per redraw.
   for (const part of rackParts(node, 'full')) {
     if (!PLAN_ROLES.has(part.role)) continue
     const partFill = part.role === 'beam' ? beamFill : steelFill
@@ -91,29 +96,26 @@ export function buildPalletRackFloorplan(
   // Pallet positions. Outline-only: a plan is read for how the positions divide
   // the bay, and filling them buries the frames at the zoom a layout is
   // actually worked at.
-  const offsets = slotOffsetsX(node)
-  const [alongRun, intoDepth] = orientedPalletFootprint(node)
-  for (let row = 1; row <= node.rowCount; row++) {
+  // A bay tunnelled all the way up holds nothing, and drawing its positions
+  // anyway is exactly the plan-against-model disagreement this file exists to
+  // stop.
+  if (storageLevelsPresent(node).length > 0) {
+    const offsets = slotOffsetsX(node)
+    const [alongRun, intoDepth] = orientedPalletFootprint(node)
+    const centerX = bayCenterX()
     for (let position = 1; position <= node.depthPositions; position++) {
-      const centerZ = depthPositionZ(node, row, position)
-      for (let bay = 1; bay <= node.bayCount; bay++) {
-        // A bay with nothing left to store — skipped outright, or tunnelled all
-        // the way up — holds no pallets, and drawing its positions anyway is
-        // exactly the plan-against-model disagreement this file exists to stop.
-        if (bayStorageLevels(node, row, bay).length === 0) continue
-        const centerX = bayCenterX(node, bay)
-        for (const offset of offsets) {
-          children.push({
-            kind: 'rect',
-            x: centerX + offset - alongRun / 2,
-            y: centerZ - intoDepth / 2,
-            width: alongRun,
-            height: intoDepth,
-            fill: 'transparent',
-            stroke: palletStroke,
-            strokeWidth: 0.015,
-          })
-        }
+      const centerZ = depthPositionZ(node, position)
+      for (const offset of offsets) {
+        children.push({
+          kind: 'rect',
+          x: centerX + offset - alongRun / 2,
+          y: centerZ - intoDepth / 2,
+          width: alongRun,
+          height: intoDepth,
+          fill: 'transparent',
+          stroke: palletStroke,
+          strokeWidth: 0.015,
+        })
       }
     }
   }

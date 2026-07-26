@@ -73,23 +73,44 @@ describe('geometry content', () => {
   })
 
   test('a warehouse-sized scene stays inside a sane triangle budget', () => {
-    // The number that matters is the far tier, because in a 15,000 m2 warehouse
-    // almost every rack is always far away. A thousand racks with fifty of them
-    // near works out at well under half a million triangles, which any GPU that
-    // can open the editor will draw without noticing.
+    // Re-derived for one node per bay, rather than nudged until it passed.
+    //
+    // 15,000 m2 — call it 100 x 150 m. Runs down the long side at a 2.822 m bay
+    // pitch is 53 bays; back-to-back pairs at 2.4 m plus a 3.2 m reach-truck
+    // aisle is 5.6 m per pair, so 100 m holds about 17 pairs, 34 rows. That is
+    // roughly 1,800 bays, and 2,000 is the round number to budget against.
+    //
+    // The LOD band is 35/45 m, so at any moment a few dozen bays are full and
+    // the rest are silhouettes. Fifty full and 1,950 silhouettes is well inside
+    // what any GPU that can open the editor draws without noticing.
+    //
+    // What this test does NOT measure is the cost that actually moved. Two
+    // thousand bays are two thousand draw calls, where the block this replaced
+    // was about ninety-five. That is the price of a bay being an ordinary
+    // object, it was paid deliberately, and LOD is the only thing holding it.
     const full = triangleCount(rack(), 'full')
     const simple = triangleCount(rack(), 'simple')
-    expect(simple).toBeLessThan(400)
-    expect(full).toBeLessThan(2000)
-    expect(50 * full + 950 * simple).toBeLessThan(500_000)
+    expect(full).toBeLessThan(1000)
+    expect(simple).toBeLessThan(200)
+    expect(50 * full + 1_950 * simple).toBeLessThan(400_000)
   })
 
-  test('geometry grows with bays but the mesh count does not', () => {
-    const small = triangleCount(rack({ bayCount: 1 }))
-    const large = triangleCount(rack({ bayCount: 10 }))
-    expect(large).toBeGreaterThan(small)
-    // Still one geometry per shape, however many bays it has.
-    expect(getRackGeometry(rack({ bayCount: 10 }), 'full').groups).toHaveLength(0)
+  test('a bay with something against its right builds one frame, not two', () => {
+    // The whole shared-frame rule, measured. Two bays at a pitch would otherwise
+    // put two posts in the same place: doubled steel, doubled perforation, and
+    // z-fighting on every coincident face.
+    const r = rack()
+    const alone = triangleCount(r, 'full')
+    const abutted = (getRackGeometry(r, 'full', true).getIndex()?.count ?? 0) / 3
+    expect(abutted).toBeLessThan(alone)
+
+    // Two variants of one shape, and no more: the flag is worth exactly one bit
+    // in the key.
+    clearRackGeometryCache()
+    getRackGeometry(r, 'full', false)
+    getRackGeometry(r, 'full', true)
+    getRackGeometry(rack({ id: 'pallet_rack_b', position: [2.822, 0, 0] }), 'full', true)
+    expect(rackGeometryCacheSize()).toBe(2)
   })
 
   test('the steel matches the declared footprint, bar the footplate overhang', () => {
@@ -97,10 +118,10 @@ describe('geometry content', () => {
     // footplates are wider than their post (175 mm under a 122 mm upright), so
     // the built mesh legitimately exceeds it at floor level by about 26 mm a
     // side. Asserted rather than ignored: any larger discrepancy means a part
-    // is escaping the footprint and racks could overlap while the editor
+    // is escaping the footprint and bays could overlap while the editor
     // reported a clear placement.
-    const r = rack({ bayCount: 3 })
-    const footprint = 3 * (r.bayClearWidth + r.uprightWidth) + r.uprightWidth
+    const r = rack()
+    const footprint = r.bayClearWidth + 2 * r.uprightWidth
 
     const structure = getRackGeometry(r, 'simple').boundingBox
     const structureWidth = (structure?.max.x ?? 0) - (structure?.min.x ?? 0)
@@ -114,17 +135,22 @@ describe('geometry content', () => {
     expect(full?.max.y ?? 0).toBeCloseTo(r.uprightHeight, 5)
   })
 
-  test('a back-to-back rack is twice as deep and still centred', () => {
-    const twin = getRackGeometry(rack({ rowCount: 2 }), 'full').boundingBox
+  test('a double-deep bay is twice as deep and still centred', () => {
+    // Depth positions survived the move to one node per bay where rows did not,
+    // because a second position is genuinely inside the same bay — served from
+    // the same aisle, behind the first pallet.
+    const twin = getRackGeometry(rack({ depthPositions: 2 }), 'full').boundingBox
     const single = getRackGeometry(rack(), 'full').boundingBox
     const twinDepth = (twin?.max.z ?? 0) - (twin?.min.z ?? 0)
     const singleDepth = (single?.max.z ?? 0) - (single?.min.z ?? 0)
     expect(twinDepth).toBeGreaterThan(singleDepth * 1.9)
+    // Centred on the node, which is what the footprint and the alignment bridge
+    // both assume.
     expect((twin?.max.z ?? 0) + (twin?.min.z ?? 0)).toBeCloseTo(0, 6)
   })
 
   test('every triangle index addresses a real vertex', () => {
-    const geometry = getRackGeometry(rack({ bayCount: 2, rowCount: 2 }), 'full')
+    const geometry = getRackGeometry(rack({ depthPositions: 2, pickingLevels: 1 }), 'full')
     const index = geometry.getIndex()
     const vertices = geometry.getAttribute('position').count
     expect(index).not.toBeNull()
@@ -214,13 +240,9 @@ describe('cache key coverage', () => {
   // One altered value per field. Kept explicit rather than generated so each
   // stays inside its schema range.
   const VARIANTS: Array<[string, unknown]> = [
-    ['bayCount', 5],
     ['bayClearWidth', 3.3],
     ['depth', 1.2],
     ['uprightHeight', 8],
-    ['rowCount', 2],
-    ['backToBack', 1],
-    ['backToBackGap', 0.4],
     ['depthPositions', 2],
     ['depthGap', 0.12],
     ['levels', 2],
@@ -228,7 +250,7 @@ describe('cache key coverage', () => {
     ['levelClear', 1.7],
     ['groundLevelStorage', false],
     ['hasGroundBeam', true],
-    ['bayOverrides', { 'R1-B1': { tunnelLevels: 1 } }],
+    ['tunnelLevels', 1],
     ['pickingLevels', 2],
     ['levelTypes', ['picking', 'pallet', 'pallet', 'pallet']],
     ['pickingLevelClear', 0.8],
@@ -249,14 +271,18 @@ describe('cache key coverage', () => {
     ['uprightColor', '#00ff00'],
     ['beamColor', '#ff00ff'],
     // Fields that must NOT move a vertex — included so the test also catches a
-    // key that over-reports and needlessly splits the cache.
-    // An override left behind on a bay the run no longer has. Shrinking a run
-    // does not clear them, so this is the ordinary case, not a contrived one.
-    ['bayOverrides', { 'R1-B9': { skipped: true } }],
+    // key that over-reports and needlessly splits the cache. The negative side
+    // has to stay populated: with it empty the test only proves the key is
+    // *large enough*, and the cheapest way to pass that is to list every field.
     ['ghostFill', 0.8],
     ['levelCapacity', 5000],
     ['name', 'Aisle 7'],
     ['position', [12, 0, 4]],
+    // Two bays standing in a line are the same shape whichever slab they landed
+    // on and whichever way the run faces — this is exactly the sharing that
+    // makes two thousand nodes affordable.
+    ['rotation', [0, Math.PI / 2, 0]],
+    ['supportSlabId', 'slab_abcdefgh'],
   ]
 
   test('every field that changes the mesh also changes the key, and none that do not', () => {
@@ -274,5 +300,20 @@ describe('cache key coverage', () => {
       const changesKey = rackGeometryKey(variant, 'full') !== baseKey
       expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
     }
+  })
+
+  test('the shared-frame flag reaches the key, in both directions', () => {
+    // Not a schema field, so it cannot ride in on the VARIANTS table — and it is
+    // the one input to the builder that comes from *another node*. Missing from
+    // the key, a bay that gained a neighbour would keep drawing its old mesh and
+    // the seam would carry two posts with nothing to say why.
+    const r = rack()
+    const alone = buildFresh(r)
+    clearRackGeometryCache()
+    const abutted = getRackGeometry(r, 'full', true).getAttribute('position')
+      .array as ArrayLike<number>
+
+    expect(Float32Array.from(abutted).length).not.toBe(alone.length)
+    expect(rackGeometryKey(r, 'full', true)).not.toBe(rackGeometryKey(r, 'full', false))
   })
 })

@@ -1,22 +1,16 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
-import { exceedsPartBudget, fullPartCount, PART_BUDGET } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   autoPalletsPerLevel,
   fittedLevelCount,
   hasUnsupportedPallets,
   levelSurfaceY,
-  usesAisle,
-  usesSpineGap,
+  storageLevelsPresent,
 } from './slots'
 import { en15620Clearance } from './standards'
 
 const PRESET_KEYS = Object.keys(PALLET_PRESETS) as (keyof typeof PALLET_PRESETS)[]
-
-/** A turret truck works the narrowest aisle of anything that serves a pallet
- *  rack — roughly 1.6 m. Below that nothing can turn a pallet into the bay. */
-const NARROWEST_WORKING_AISLE = 1.6
 
 /**
  * Auto-derived inspector fields rather than a `customPanel`, for the reason the
@@ -32,26 +26,40 @@ const NARROWEST_WORKING_AISLE = 1.6
  */
 export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
   /**
-   * Seven groups in the order a rack is actually specified: how big, how many
-   * levels, how the rows sit, what goes on it, then the steel and where it
+   * Six groups in the order a bay is actually specified: how big, how many
+   * levels, what goes on it, how it is picked, then the steel and where it
    * stands. The version this replaces had ten groups and showed every field
    * always — including five picking-container dimensions on a rack with no
    * picking levels, and a spine gap on a single run. Half the panel described
    * settings that moved nothing.
    *
    * `visibleIf` does that work, and it reads the *same predicates the geometry
-   * cache key reads* (`usesSpineGap`, `usesAisle`). So a field is shown exactly
-   * when it changes the mesh — a control can never be visible, adjustable, and
-   * inert.
+   * cache key reads*. So a field is shown exactly when it changes the mesh — a
+   * control can never be visible, adjustable, and inert.
+   *
+   * There is no bay or row count here, and that is the shape of the kind rather
+   * than an omission: a bay is a node, so "twenty bays" is twenty nodes and the
+   * command that lays them down lives in the trailing section, not in a field
+   * that would silently reshape one node into a block.
    */
   groups: [
     {
       label: 'Size',
       fields: [
-        { key: 'bayCount', kind: 'number', min: 1, max: 40, step: 1 },
         { key: 'bayClearWidth', kind: 'number', unit: 'm', min: 0.6, max: 6, step: 0.05 },
         { key: 'depth', kind: 'number', unit: 'm', min: 0.4, max: 2.5, step: 0.05 },
         { key: 'uprightHeight', kind: 'number', unit: 'm', min: 1, max: 20, step: 0.1 },
+        { key: 'depthPositions', kind: 'number', min: 1, max: 2, step: 1 },
+        {
+          key: 'depthGap',
+          kind: 'number',
+          unit: 'm',
+          min: 0,
+          max: 0.5,
+          step: 0.01,
+          // Single-deep, there is no second position to separate.
+          visibleIf: (node) => node.depthPositions > 1,
+        },
       ],
     },
     {
@@ -77,45 +85,17 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         },
         { key: 'groundLevelStorage', kind: 'boolean' },
         { key: 'hasGroundBeam', kind: 'boolean' },
+        {
+          key: 'tunnelLevels',
+          kind: 'number',
+          min: 0,
+          max: 15,
+          step: 1,
+          // A tunnel through a bay with nothing under it is a setting with no
+          // effect; the field appears once there is a level for it to clear.
+          visibleIf: (node) => fittedLevelCount(node) > 0,
+        },
         { key: 'levelCapacity', kind: 'number', unit: 'kg', min: 0, max: 20_000, step: 100 },
-      ],
-    },
-    {
-      label: 'Rows and aisles',
-      fields: [
-        { key: 'rowCount', kind: 'number', min: 1, max: 20, step: 1 },
-        { key: 'backToBack', kind: 'boolean', visibleIf: (node) => node.rowCount > 1 },
-        {
-          key: 'backToBackGap',
-          kind: 'number',
-          unit: 'm',
-          min: 0,
-          max: 1.5,
-          step: 0.05,
-          // Nothing stands spine to spine until two rows pair up, so the field
-          // would otherwise read as a dimension that does nothing.
-          visibleIf: (node) => usesSpineGap(node),
-        },
-        {
-          key: 'aisleWidth',
-          kind: 'number',
-          unit: 'm',
-          min: 0.8,
-          max: 8,
-          step: 0.1,
-          visibleIf: (node) => usesAisle(node),
-        },
-        { key: 'depthPositions', kind: 'number', min: 1, max: 2, step: 1 },
-        {
-          key: 'depthGap',
-          kind: 'number',
-          unit: 'm',
-          min: 0,
-          max: 0.5,
-          step: 0.01,
-          // Single-deep, there is no second position to separate.
-          visibleIf: (node) => node.depthPositions > 1,
-        },
       ],
     },
     {
@@ -231,18 +211,16 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
     {
       label: 'Placement',
       fields: [
-        { key: 'bayAnchor', kind: 'enum', options: ['left', 'center', 'right'], display: 'select' },
-        { key: 'rowAnchor', kind: 'enum', options: ['front', 'center', 'back'], display: 'select' },
         { key: 'position', kind: 'vec3' },
         { key: 'rotation', kind: 'vec3' },
       ],
     },
   ],
 
-  // Per-bay editing, under the run's own fields rather than instead of them.
-  // A `customPanel` would take the auto-derived groups, the actions and the
-  // Move/Delete buttons with it.
-  trailingSection: () => import('./bay-panel'),
+  // Multiply, capacity and the derived "auto" fields, under the bay's own
+  // fields rather than instead of them. A `customPanel` would take the
+  // auto-derived groups, the actions and the Move/Delete buttons with it.
+  trailingSection: () => import('./rack-panel'),
 
   invariants: [
     (node): Issue[] => {
@@ -281,24 +259,14 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         })
       }
 
-      // A block big enough to blow the merge budget still draws, but only as
-      // its silhouette — so say so here rather than leaving the user to notice
-      // that the bracing and the decking stopped appearing.
-      if (exceedsPartBudget(node)) {
+      // A tunnel taken far enough leaves a pair of frames carrying nothing —
+      // legitimate at the ends of a fire route, but silent, because the bay is
+      // still there and still selectable with every load field intact.
+      if (node.tunnelLevels > 0 && storageLevelsPresent(node).length === 0) {
         issues.push({
-          field: 'rowCount',
+          field: 'tunnelLevels',
           severity: 'warning',
-          msg: `This block is ${fullPartCount(node).toLocaleString()} parts, past the ${PART_BUDGET.toLocaleString()} one mesh holds, so it draws as posts and beams only. Split it into separate blocks to keep the detail.`,
-        })
-      }
-
-      // An aisle narrower than the truck cannot be worked, and the figure that
-      // decides which truck is the aisle rather than anything about the rack.
-      if (usesAisle(node) && node.aisleWidth < NARROWEST_WORKING_AISLE) {
-        issues.push({
-          field: 'aisleWidth',
-          severity: 'warning',
-          msg: `A ${node.aisleWidth.toFixed(2)} m aisle is below the ${NARROWEST_WORKING_AISLE.toFixed(2)} m a turret truck needs — the narrowest truck that works a pallet rack. Anything less is a walkway, not an aisle.`,
+          msg: `A ${node.tunnelLevels}-level tunnel clears every level this bay has, so it stores nothing and draws as bare frames.`,
         })
       }
 

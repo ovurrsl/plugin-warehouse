@@ -23,10 +23,10 @@ describe('the plan is projected from the model, not recomputed', () => {
     // now read one part list; this asserts the projection is faithful.
     for (const config of [
       {},
-      { bayCount: 6 },
-      { rowCount: 2 },
       { depthPositions: 2 },
       { hasGroundBeam: true },
+      { tunnelLevels: 1 },
+      { pickingLevels: 1 },
     ]) {
       const node = rack(config)
       const drawn = rects(node)
@@ -55,13 +55,16 @@ describe('the plan is projected from the model, not recomputed', () => {
     // A plan that ignored a structural field would still look plausible; this
     // catches the projection silently falling behind the model.
     const plain = rects(rack()).length
-    expect(rects(rack({ bayCount: 6 })).length).toBeGreaterThan(plain)
-    expect(rects(rack({ rowCount: 2 })).length).toBeGreaterThan(plain)
+    expect(rects(rack({ depthPositions: 2 })).length).toBeGreaterThan(plain)
     expect(rects(rack({ hasGroundBeam: true })).length).toBeGreaterThan(plain)
+    expect(rects(rack({ levels: 6, uprightHeight: 9 })).length).toBeGreaterThan(plain)
+    // And loses them when the model does. A tunnel through every level leaves
+    // the frames and takes the beams and the pallet positions with it.
+    expect(rects(rack({ tunnelLevels: 15 })).length).toBeLessThan(plain)
   })
 
   test('the outline is the collision footprint', () => {
-    const node = rack({ bayCount: 4, rowCount: 2 })
+    const node = rack({ depthPositions: 2 })
     const outline = rects(node)[0]
     expect(outline?.width).toBeCloseTo(totalWidth(node), 9)
     expect(outline?.height).toBeCloseTo(totalDepth(node), 9)
@@ -69,7 +72,7 @@ describe('the plan is projected from the model, not recomputed', () => {
   })
 
   test('steel stays inside the outline; pallets overhang it, as they really do', () => {
-    const node = rack({ bayCount: 3, rowCount: 2 })
+    const node = rack({ depthPositions: 2 })
     const halfWidth = totalWidth(node) / 2
     const halfDepth = totalDepth(node) / 2
     const [, palletDepth] = orientedPalletFootprint(node)
@@ -91,12 +94,12 @@ describe('the plan is projected from the model, not recomputed', () => {
   })
 
   test('the pallet positions in plan match the slot count', () => {
-    const node = rack({ bayCount: 3 })
+    const node = rack()
     const drawn = rects(node)
     const outlined = drawn.filter(
       (rect) => (rect as unknown as { fill?: string }).fill === 'transparent',
     )
-    // 3 bays x 3 across, one row, single depth.
-    expect(outlined).toHaveLength(9)
+    // One bay, 3 across, single depth.
+    expect(outlined).toHaveLength(3)
   })
 })

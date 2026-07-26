@@ -21,7 +21,17 @@ const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
  */
 export const palletRackDefinition = {
   kind: 'warehouse:pallet-rack',
-  schemaVersion: 1,
+  /**
+   * 2 — a node is one bay, where version 1 was a whole block.
+   *
+   * Old scenes still load: `BaseNode` is a plain `z.object()`, so the removed
+   * block fields are dropped on parse and every surviving field keeps its value.
+   * What is honestly lost is the *count*: a saved twenty-bay block reopens as
+   * one bay. There is no migration that would not be a lie in the other
+   * direction — turning one node into twenty on load would invent nineteen
+   * objects the user never placed and could not undo.
+   */
+  schemaVersion: 2,
   schema: PalletRackNode,
   category: 'furnish',
   surfaceRole: 'furnishing',
@@ -88,9 +98,9 @@ export const palletRackDefinition = {
   tool: () => import('./tool'),
 
   toolHints: [
-    { key: 'Left click', label: 'Place rack' },
+    { key: 'Left click', label: 'Place run' },
     { key: 'R / T', label: 'Rotate 45°' },
-    { key: '[ / ]', label: 'Bays' },
+    { key: '[ / ]', label: 'Bays in the run' },
     { key: 'Shift', label: 'Cycle snapping mode' },
     { key: 'Alt', label: 'Force place' },
     { key: 'Esc', label: 'Cancel' },
@@ -99,7 +109,7 @@ export const palletRackDefinition = {
   presentation: {
     label: 'Pallet Rack',
     description:
-      'Adjustable pallet racking. Bays share their frames; set the pallet standard and orientation and the capacity follows.',
+      'One bay of adjustable pallet racking. Multiply it into a run — each bay is its own object, and bays standing together share a post.',
     icon: { kind: 'iconify', name: 'lucide:rows-3' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog. Also sidesteps a live gap:
@@ -111,6 +121,6 @@ export const palletRackDefinition = {
 
   mcp: {
     description:
-      'Adjustable pallet racking. One node is a whole block: `bayCount` bays along the run sharing their upright frames, and `rowCount` runs stacked into the depth. `backToBack: true` pairs the rows spine to spine — (1,2), (3,4), … with `aisleWidth` between pairs, the standard island; `false` gives every row its own aisle, all facing the same way. `levels`, `bayClearWidth` and `uprightHeight` set the frame; `palletPreset` and `palletOrientation` set how many pallets a level holds (a 2.7 m bay takes three EPAL 1 short-side-out, two long-side-out). `depthPositions: 2` stores a second pallet behind the first on the same aisle. `pickingLevels` converts the lowest levels to hand-picked container shelves. `bayOverrides` skips a bay or opens a tunnel through it, keyed `R1-B3`. Prefer one block over many nodes: a block is one merged mesh whatever its size. Dimensions are metres.',
+      'One **bay** of adjustable pallet racking. A run is a line of these nodes, not one node with a bay count — to build twenty bays, create twenty nodes one bay pitch apart along the local +X of their shared rotation, where the pitch is `bayClearWidth + uprightWidth`. Placed at exactly that spacing they share their upright frames automatically, so twenty bays stand on twenty-one frames; anywhere else each bay closes itself off. A second run goes behind the first at `rowDepth + aisle` along local −Z, turned 180° if the two are meant to stand back to back on separate aisles. `levels`, `bayClearWidth` and `uprightHeight` set the frame; `palletPreset` and `palletOrientation` set how many pallets a level holds (a 2.7 m bay takes three EPAL 1 short-side-out, two long-side-out). `depthPositions: 2` stores a second pallet behind the first on the same aisle. `pickingLevels` converts the lowest levels to hand-picked container shelves. `tunnelLevels` opens a walkway through this bay, which is how a fire route crosses a run — set it on the bays it passes through. Dimensions are metres.',
   },
 } satisfies NodeDefinition<typeof PalletRackNode>

@@ -32,7 +32,6 @@ import {
   pickingSlotCount,
   pickingSlotsOf,
   requiresPalletSupportBars,
-  rowCenterZ,
   rowDepth,
   slotOffsetsX,
   storageLevels,
@@ -43,54 +42,37 @@ import {
 const rack = (overrides: Record<string, unknown> = {}) =>
   PalletRackNode.parse({ id: 'pallet_rack_test', ...overrides })
 
-describe('run geometry', () => {
-  test('bays share their upright frames', () => {
-    const r = rack({ bayCount: 3, bayClearWidth: 2.7, uprightWidth: 0.12 })
-    // Three bays stand on four frames, not six.
-    expect(frameCentersX(r)).toHaveLength(4)
-    // 3 × (2.7 + 0.12) + 0.12 — the multiply-and-forget-the-post version of
-    // this returned 8.1 and left the last beam hanging off the end.
-    expect(totalWidth(r)).toBeCloseTo(8.58, 6)
+describe('bay geometry', () => {
+  test('a bay is one beam between two frames', () => {
+    const r = rack({ bayClearWidth: 2.7, uprightWidth: 0.12 })
+    expect(frameCentersX(r)).toHaveLength(2)
+    expect(totalWidth(r)).toBeCloseTo(2.94, 6)
   })
 
-  test('frames are evenly pitched and symmetric about the origin', () => {
-    const r = rack({ bayCount: 2 })
-    const frames = frameCentersX(r)
-    const first = frames[0] ?? 0
-    const last = frames[frames.length - 1] ?? 0
-    expect(first).toBeCloseTo(-last, 9)
-    // Derived, not hardcoded: the pitch is clear width plus one post, so
-    // pinning a literal here just re-asserts whatever the default happens to be
-    // and breaks whenever a profile default is corrected.
-    const expectedPitch = r.bayClearWidth + r.uprightWidth
-    const pitches = frames.slice(1).map((x, i) => x - (frames[i] ?? 0))
-    for (const pitch of pitches) expect(pitch).toBeCloseTo(expectedPitch, 9)
+  test('the frames are symmetric about the origin, one pitch apart', () => {
+    // Both halves of the shared-frame contract in one assertion. Symmetry is
+    // what lets the host treat the footprint as a rectangle centred on the node;
+    // the pitch is what makes a sibling's left frame land on this one's right.
+    const r = rack()
+    const [left, right] = frameCentersX(r)
+    expect(left).toBeCloseTo(-(right ?? 0), 9)
+    expect((right ?? 0) - (left ?? 0)).toBeCloseTo(r.bayClearWidth + r.uprightWidth, 9)
   })
 
-  test('each bay centre sits midway between its two frames', () => {
-    const r = rack({ bayCount: 3 })
-    const frames = frameCentersX(r)
-    for (let bay = 1; bay <= r.bayCount; bay++) {
-      const left = frames[bay - 1] ?? 0
-      const right = frames[bay] ?? 0
-      expect(bayCenterX(r, bay)).toBeCloseTo((left + right) / 2, 9)
-    }
+  test('the bay centre is the node origin', () => {
+    // Not a tautology worth deleting: the block this replaced offset bay centres
+    // by index, and everything that reads a slot position — ghost stock,
+    // occupancy, the plan — assumes the bay is centred on its own node.
+    const r = rack()
+    const [left, right] = frameCentersX(r)
+    expect(bayCenterX()).toBeCloseTo(((left ?? 0) + (right ?? 0)) / 2, 9)
+    expect(bayCenterX()).toBe(0)
   })
 
-  test('back to back doubles depth and splits the rows about the origin', () => {
+  test('depth is the bay depth, single-deep', () => {
     const single = rack({ depth: 1.1 })
     expect(totalDepth(single)).toBeCloseTo(1.1, 9)
-    expect(rowCenterZ(single, 1)).toBe(0)
-
-    const twin = rack({ rowCount: 2, depth: 1.1, backToBackGap: 0.2 })
-    expect(totalDepth(twin)).toBeCloseTo(2.4, 9)
-    expect(rowCenterZ(twin, 1)).toBeCloseTo(0.65, 9)
-    expect(rowCenterZ(twin, 2)).toBeCloseTo(-0.65, 9)
-    // The two runs must not overlap: the gap between their near faces is the
-    // declared one.
-    const nearFaceGap =
-      rowCenterZ(twin, 1) - twin.depth / 2 - (rowCenterZ(twin, 2) + twin.depth / 2)
-    expect(nearFaceGap).toBeCloseTo(0.2, 9)
+    expect(rowDepth(single)).toBeCloseTo(1.1, 9)
   })
 })
 
@@ -199,28 +181,29 @@ describe('pallet fit', () => {
 })
 
 describe('slot enumeration', () => {
-  test('count is rows × bays × levels × positions', () => {
-    const r = rack({ bayCount: 4, levels: 3, uprightHeight: 12, bayClearWidth: 2.7 })
-    // 1 row × 4 bays × (3 beam levels + floor) × 3 across
-    expect(palletSlotCount(r)).toBe(48)
-    expect(palletSlotsOf(r)).toHaveLength(48)
+  test('count is levels × positions across × depth positions', () => {
+    const r = rack({ levels: 3, uprightHeight: 12, bayClearWidth: 2.7 })
+    // (3 beam levels + floor) × 3 across
+    expect(palletSlotCount(r)).toBe(12)
+    expect(palletSlotsOf(r)).toHaveLength(12)
   })
 
-  test('back to back doubles the enumerated slots', () => {
-    const single = rack({ bayCount: 2, levels: 2, uprightHeight: 12 })
-    const twin = rack({ bayCount: 2, levels: 2, uprightHeight: 12, rowCount: 2 })
-    expect(palletSlotCount(twin)).toBe(palletSlotCount(single) * 2)
+  test('a tunnel takes its levels out of the capacity count', () => {
+    const open = rack({ levels: 3, uprightHeight: 12 })
+    const tunnelled = rack({ levels: 3, uprightHeight: 12, tunnelLevels: 2 })
+    // Floor and level 1 gone: four storage levels become two.
+    expect(palletSlotCount(tunnelled)).toBe(palletSlotCount(open) / 2)
   })
 
   test('dropped levels are excluded from the capacity count', () => {
-    const tall = rack({ bayCount: 1, levels: 10, uprightHeight: 12 })
-    const short = rack({ bayCount: 1, levels: 10, uprightHeight: 5 })
+    const tall = rack({ levels: 10, uprightHeight: 12 })
+    const short = rack({ levels: 10, uprightHeight: 5 })
     expect(palletSlotCount(short)).toBeLessThan(palletSlotCount(tall))
     expect(palletSlotCount(short)).toBe((fittedLevelCount(short) + 1) * 3)
   })
 
   test('every slot id is unique and round-trips through the address parser', () => {
-    const r = rack({ bayCount: 3, levels: 2, uprightHeight: 12, rowCount: 2 })
+    const r = rack({ levels: 2, uprightHeight: 12, depthPositions: 2 })
     const slots = palletSlotsOf(r)
     expect(new Set(slots.map((slot) => slot.id)).size).toBe(slots.length)
 
@@ -236,20 +219,23 @@ describe('slot enumeration', () => {
     }
   })
 
-  test('an address keeps its meaning when the run gains a second row', () => {
-    // The row is written even for a single run precisely so this holds — a
-    // pallet stored at R1-B2-L1-P1 must still mean the same shelf afterwards.
-    const single = rack({ bayCount: 3, levels: 2, uprightHeight: 12 })
-    const twin = rack({ bayCount: 3, levels: 2, uprightHeight: 12, rowCount: 2 })
-    const address = formatSlotAddress({ row: 1, bay: 2, level: 1, position: 1, depth: 1 })
+  test('an address keeps its meaning when the bay gains a second depth', () => {
+    // Row and bay are written even though they are always 1, and depth even
+    // though it is usually 1, precisely so this holds: a pallet stored at
+    // R1-B1-L1-P1-D1 must still name the same shelf after the bay is made
+    // double-deep. Shortening the form is what would break it, silently.
+    const single = rack({ levels: 2, uprightHeight: 12 })
+    const deep = rack({ levels: 2, uprightHeight: 12, depthPositions: 2 })
+    const address = formatSlotAddress({ row: 1, bay: 1, level: 1, position: 1, depth: 1 })
 
     const before = palletSlotsOf(single).find((slot) => slot.id === address)
-    const after = palletSlotsOf(twin).find((slot) => slot.id === address)
+    const after = palletSlotsOf(deep).find((slot) => slot.id === address)
     expect(before).toBeDefined()
     expect(after).toBeDefined()
-    // X and Y are unchanged; only Z moves, because the run itself moved.
+    // X and Y are unchanged; only Z moves, because the bay itself grew.
     expect(after?.localPosition[0]).toBeCloseTo(before?.localPosition[0] ?? 0, 9)
     expect(after?.localPosition[1]).toBeCloseTo(before?.localPosition[1] ?? 0, 9)
+    expect(after?.directAccess).toBe(true)
   })
 
   test('a malformed address is rejected rather than half-parsed', () => {
@@ -261,7 +247,7 @@ describe('slot enumeration', () => {
   })
 
   test('slots sit on their level surface and inside the run footprint', () => {
-    const r = rack({ bayCount: 3, levels: 3, uprightHeight: 12 })
+    const r = rack({ levels: 3, uprightHeight: 12 })
     const halfWidth = totalWidth(r) / 2
     for (const slot of palletSlotsOf(r)) {
       expect(slot.localPosition[1]).toBeCloseTo(levelSurfaceY(r, slot.level), 9)
@@ -273,8 +259,8 @@ describe('slot enumeration', () => {
 
 describe('double-deep', () => {
   test('a second depth position doubles capacity but halves direct access', () => {
-    const single = rack({ bayCount: 3, levels: 2, uprightHeight: 12 })
-    const deep = rack({ bayCount: 3, levels: 2, uprightHeight: 12, depthPositions: 2 })
+    const single = rack({ levels: 2, uprightHeight: 12 })
+    const deep = rack({ levels: 2, uprightHeight: 12, depthPositions: 2 })
     expect(palletSlotCount(deep)).toBe(palletSlotCount(single) * 2)
     // The trade the headline "locations" figure hides: the extra capacity is
     // bought entirely with positions nothing can reach directly.
@@ -283,7 +269,7 @@ describe('double-deep', () => {
   })
 
   test('only the front position of a bay has direct access', () => {
-    const deep = rack({ bayCount: 1, levels: 1, uprightHeight: 12, depthPositions: 2 })
+    const deep = rack({ levels: 1, uprightHeight: 12, depthPositions: 2 })
     for (const slot of palletSlotsOf(deep)) {
       expect(slot.directAccess).toBe(slot.depth === 1)
     }
@@ -291,38 +277,32 @@ describe('double-deep', () => {
 
   test('depth positions sit one behind the other with the declared gap', () => {
     const deep = rack({ depthPositions: 2, depth: 1.1, depthGap: 0.05 })
-    const front = depthPositionZ(deep, 1, 1)
-    const rear = depthPositionZ(deep, 1, 2)
-    // Front is nearer the aisle (+Z for row 1), and the faces are depthGap apart.
+    const front = depthPositionZ(deep, 1)
+    const rear = depthPositionZ(deep, 2)
+    // Front is nearer the aisle (+Z), and the faces are depthGap apart.
     expect(front).toBeGreaterThan(rear)
     expect(front - deep.depth / 2 - (rear + deep.depth / 2)).toBeCloseTo(0.05, 9)
   })
 
-  test('each row of a back-to-back island numbers depth from its own aisle', () => {
-    // Row 1 opens onto +Z and row 2 onto −Z, so "D1 is the reachable one" has
-    // to hold on both sides — a global axis would make D1 the buried pallet on
-    // one of them.
-    const twin = rack({ rowCount: 2, depthPositions: 2, depth: 1.1 })
-    expect(depthPositionZ(twin, 1, 1)).toBeGreaterThan(depthPositionZ(twin, 1, 2))
-    expect(depthPositionZ(twin, 2, 1)).toBeLessThan(depthPositionZ(twin, 2, 2))
+  test('depth numbers from the aisle, and the aisle is local +Z', () => {
+    // "D1 is the reachable one" is what `directAccess` and every picking figure
+    // rest on, and it is a statement about the bay's own frame. A bay turned
+    // 180° to stand back to back against another carries the rule round with
+    // it, because the rotation is on the node.
+    const deep = rack({ depthPositions: 2, depth: 1.1 })
+    expect(depthPositionZ(deep, 1)).toBeGreaterThan(depthPositionZ(deep, 2))
+    expect(depthPositionZ(deep, 1)).toBeGreaterThan(0)
   })
 
-  test('back-to-back double-deep is four pallets deep and stays inside the footprint', () => {
-    const twin = rack({ rowCount: 2, depthPositions: 2, depth: 1.1, depthGap: 0.05 })
-    expect(rowDepth(twin)).toBeCloseTo(2.25, 9)
-    expect(totalDepth(twin)).toBeCloseTo(4.7, 9)
-    const half = totalDepth(twin) / 2
-    for (const slot of palletSlotsOf(twin)) {
+  test('a double-deep bay is two pallets deep and stays inside the footprint', () => {
+    const deep = rack({ depthPositions: 2, depth: 1.1, depthGap: 0.05 })
+    expect(rowDepth(deep)).toBeCloseTo(2.25, 9)
+    expect(totalDepth(deep)).toBeCloseTo(2.25, 9)
+    const half = totalDepth(deep) / 2
+    for (const slot of palletSlotsOf(deep)) {
       const z = slot.localPosition[2]
-      expect(Math.abs(z) + twin.depth / 2).toBeLessThanOrEqual(half + 1e-9)
+      expect(Math.abs(z) + deep.depth / 2).toBeLessThanOrEqual(half + 1e-9)
     }
-  })
-
-  test('the two rows never overlap', () => {
-    const twin = rack({ rowCount: 2, depthPositions: 2, depth: 1.1, backToBackGap: 0.2 })
-    const innerRow1 = depthPositionZ(twin, 1, 2) - twin.depth / 2
-    const innerRow2 = depthPositionZ(twin, 2, 2) + twin.depth / 2
-    expect(innerRow1 - innerRow2).toBeCloseTo(0.2, 9)
   })
 })
 
@@ -481,13 +461,13 @@ describe('picking containers', () => {
   })
 
   test('pallets and containers are counted separately, never both on one level', () => {
-    const r = rack({ bayCount: 3, levels: 3, uprightHeight: 12, pickingLevels: 2 })
-    // 3 bays x 2 pallet levels x 3 across
-    expect(palletSlotCount(r)).toBe(18)
-    // 3 bays x 2 picking levels x 4 across x 2 deep
-    expect(pickingSlotCount(r)).toBe(48)
-    expect(palletSlotsOf(r)).toHaveLength(18)
-    expect(pickingSlotsOf(r)).toHaveLength(48)
+    const r = rack({ levels: 3, uprightHeight: 12, pickingLevels: 2 })
+    // 2 pallet levels x 3 across
+    expect(palletSlotCount(r)).toBe(6)
+    // 2 picking levels x 4 across x 2 deep
+    expect(pickingSlotCount(r)).toBe(16)
+    expect(palletSlotsOf(r)).toHaveLength(6)
+    expect(pickingSlotsOf(r)).toHaveLength(16)
 
     const palletLevelSet = new Set(palletSlotsOf(r).map((slot) => slot.level))
     const pickingLevelSet = new Set(pickingSlotsOf(r).map((slot) => slot.level))
@@ -495,7 +475,7 @@ describe('picking containers', () => {
   })
 
   test('container addresses parse with the same reader as pallet addresses', () => {
-    const r = rack({ bayCount: 2, levels: 2, uprightHeight: 12, pickingLevels: 1 })
+    const r = rack({ levels: 2, uprightHeight: 12, pickingLevels: 1 })
     const slots = pickingSlotsOf(r)
     expect(slots.length).toBeGreaterThan(0)
     expect(new Set(slots.map((slot) => slot.id)).size).toBe(slots.length)
@@ -522,15 +502,17 @@ describe('picking containers', () => {
     expect(r.pickingShelfThickness).toBeGreaterThan(0)
   })
 
-  test('container depth index 1 is the aisle side of whichever row it is on', () => {
-    const twin = rack({ rowCount: 2, levels: 1, uprightHeight: 12, pickingLevels: 1 })
-    const slots = pickingSlotsOf(twin).filter((slot) => slot.bay === 1 && slot.position === 1)
-    const row1 = slots.filter((slot) => slot.row === 1).sort((a, b) => a.depth - b.depth)
-    const row2 = slots.filter((slot) => slot.row === 2).sort((a, b) => a.depth - b.depth)
-    // Row 1 opens onto +Z, row 2 onto -Z, so D1 is the outermost on each side.
-    expect(row1[0]?.localPosition[2] ?? 0).toBeGreaterThan(row1[1]?.localPosition[2] ?? 0)
-    expect(row2[0]?.localPosition[2] ?? 0).toBeLessThan(row2[1]?.localPosition[2] ?? 0)
-    expect(row1[0]?.directAccess).toBe(true)
-    expect(row1[1]?.directAccess).toBe(false)
+  test('container depth index 1 is the aisle side, and the only reachable one', () => {
+    // Containers number from the aisle exactly as pallets do — the shelf they
+    // stand on is deeper than an arm, and a picker at the front cannot reach
+    // what is behind without moving it.
+    const deep = rack({ depthPositions: 1, levels: 1, uprightHeight: 12, pickingLevels: 1 })
+    const front = pickingSlotsOf(deep)
+      .filter((slot) => slot.position === 1)
+      .sort((a, b) => a.depth - b.depth)
+    expect(front.length).toBeGreaterThan(1)
+    expect(front[0]?.localPosition[2] ?? 0).toBeGreaterThan(front[1]?.localPosition[2] ?? 0)
+    expect(front[0]?.directAccess).toBe(true)
+    expect(front[1]?.directAccess).toBe(false)
   })
 })

@@ -14,25 +14,12 @@ import * as THREE from 'three'
 import { getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
-import { useWarehouseStore } from '../store'
-import { ensureBayFocusSubscription } from './bay-focus'
 import { getRackGeometry, type RackDetail } from './geometry-builder'
 import { getRackMaterial } from './materials'
+import { hasRightNeighbour } from './neighbours'
 import { occupiedSlots, slotDraw } from './occupancy'
 import type { PalletRackNode } from './schema'
-import {
-  bayCenterX,
-  bayPitch,
-  palletSlotsOf,
-  rowCenterZ,
-  rowDepth,
-  totalDepth,
-  totalWidth,
-} from './slots'
-
-// One listener for every rack in the scene, established the first time any rack
-// renders. See `./bay-focus`.
-ensureBayFocusSubscription()
+import { palletSlotsOf, totalDepth, totalWidth } from './slots'
 
 const NO_RAYCAST = () => {}
 
@@ -106,10 +93,20 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     ? [baseRotation[0], live.rotation, baseRotation[2]]
     : baseRotation
 
+  /**
+   * Whether the bay standing on this one's right builds the shared frame.
+   *
+   * The index behind this is built once per store write and shared by every
+   * rack; the selector narrows it to one boolean, so a rack re-renders only when
+   * its *own* answer changes rather than on every scene edit. See
+   * `./neighbours`.
+   */
+  const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
+
   // Exporting must not bake a distance-dependent tier into the file, so the
   // full mesh is the one that mounts and the swap below is skipped.
   const detailRef = useRef<RackDetail>('full')
-  const geometry = useMemo(() => getRackGeometry(node, 'full'), [node])
+  const geometry = useMemo(() => getRackGeometry(node, 'full', abutted), [node, abutted])
   const material = getRackMaterial()
 
   const frameRef = useRef(0)
@@ -142,7 +139,7 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
           : 'simple'
     if (next === current) return
     detailRef.current = next
-    mesh.geometry = getRackGeometry(node, next)
+    mesh.geometry = getRackGeometry(node, next, abutted)
     // A rack far enough away to lose its bracing is far enough that its shadow
     // is a smudge, and every caster is a second draw call in the shadow pass.
     mesh.castShadow = next === 'full'
@@ -182,7 +179,6 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
           receiveShadow
         />
         {node.ghostFill > 0 && <GhostStock node={node} />}
-        <FocusedBayOutline node={node} />
       </group>
     </group>
   )
@@ -275,50 +271,6 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         raycast={NO_RAYCAST}
         ref={loadRef}
       />
-    </>
-  )
-}
-
-/** Edges of a unit cube, scaled to whichever bay is focused. One buffer for the
- *  whole scene, and at most one rack draws it. */
-const UNIT_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
-const FOCUS_MATERIAL = new THREE.LineBasicMaterial({ color: '#38bdf8', depthTest: false })
-
-/**
- * The bays the user has picked out — one click focuses, Shift+click grows.
- *
- * Drawn from the rack's own store rather than the host's selection, because the
- * host has no notion of a sub-selection. `depthTest: false` so the outlines
- * read through the steel in front of them; a bay is mostly air and an occluded
- * outline is invisible from the aisle. One shared edge geometry, scaled per
- * bay — even a whole run selected costs no allocation.
- */
-function FocusedBayOutline({ node }: { node: PalletRackNode }) {
-  const focused = useWarehouseStore((s) => s.focusedBays)
-  const mine = focused.filter(
-    (bay) =>
-      bay.rackId === node.id &&
-      bay.bay >= 1 &&
-      bay.bay <= node.bayCount &&
-      bay.row >= 1 &&
-      bay.row <= node.rowCount,
-  )
-  if (mine.length === 0) return null
-
-  return (
-    <>
-      {mine.map((bay) => (
-        <lineSegments
-          dispose={null}
-          geometry={UNIT_EDGES}
-          key={`${bay.row}-${bay.bay}`}
-          material={FOCUS_MATERIAL}
-          position={[bayCenterX(node, bay.bay), node.uprightHeight / 2, rowCenterZ(node, bay.row)]}
-          raycast={NO_RAYCAST}
-          renderOrder={999}
-          scale={[bayPitch(node), node.uprightHeight, rowDepth(node)]}
-        />
-      ))}
     </>
   )
 }

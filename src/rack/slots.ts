@@ -14,10 +14,10 @@ import type { PalletRackNode } from './schema'
  */
 
 export type SlotAddress = {
-  /** 1-based run within the block, counting from the +Z side. A lone run is
-   *  row 1. */
+  /** Always 1. A bay is a node, so a node has one row — kept in the address for
+   *  the reason `formatSlotAddress` gives. */
   row: number
-  /** 1-based along the run. */
+  /** Always 1, for the same reason. */
   bay: number
   /** 0 is the floor inside the bay; 1..n are the beam levels. */
   level: number
@@ -50,12 +50,14 @@ export type Slot = SlotAddress & {
 /**
  * `R1-B2-L3-P1-D1`.
  *
- * Every component is always written, including the ones that are constant in a
- * simple rack. That is deliberate: a single run is row 1, a single-deep bay is
- * depth 1, so raising `rowCount` or `depthPositions` cannot change what an
- * already-stored address means. Omitting the constant parts would save a few
- * characters and silently re-point every pallet in the scene the first time
- * somebody widened a rack.
+ * Row and bay are now always 1 — a bay is a node — and the form is kept anyway.
+ * Shortening it to `L3-P1-D1` would break silently rather than loudly: every
+ * pallet already standing in a rack carries a `slotAddress` in the long form,
+ * `occupiedSlots` would stop matching them, and `GhostStock` would start drawing
+ * phantom pallets straight through the real ones. The saving is five characters.
+ *
+ * A single-deep bay is depth 1 for the same reason: raising `depthPositions`
+ * must not change what an already-stored address means.
  */
 export function formatSlotAddress({ row, bay, level, position, depth }: SlotAddress): string {
   return `R${row}-B${bay}-L${level}-P${position}-D${depth}`
@@ -77,330 +79,77 @@ export function parseSlotAddress(address: string): SlotAddress | null {
   }
 }
 
-// ── Run geometry ────────────────────────────────────────────────────────────
+// ── Bay geometry ────────────────────────────────────────────────────────────
 
-/** Centre-to-centre distance between adjacent upright frames. */
+/**
+ * Centre-to-centre distance between the bay's two upright frames — and, because
+ * bays share their frames, the spacing at which two bays abut.
+ *
+ * One number doing both jobs is the point: a sibling laid down at exactly this
+ * pitch lands its left frame where its neighbour's right frame would have been,
+ * which is what lets the neighbour omit that frame and the two show one post.
+ */
 export function bayPitch(rack: PalletRackNode): number {
   return rack.bayClearWidth + rack.uprightWidth
 }
 
-/** Outer width of the run, over the outermost upright faces. */
+/**
+ * Outer width over the two upright faces — the bay with both its frames.
+ *
+ * Wider than `bayPitch` by one upright, which is the half-post each side that a
+ * neighbour would have shared. The collision footprint is the *pitch*, not
+ * this, so abutting bays touch exactly instead of overlapping by a post; the
+ * geometry simply overhangs its footprint by half an upright each side, the way
+ * the footplates already do.
+ */
 export function totalWidth(rack: PalletRackNode): number {
-  return rack.bayCount * bayPitch(rack) + rack.uprightWidth
+  return bayPitch(rack) + rack.uprightWidth
 }
 
-/** Depth of one run, including its rear position when double-deep. */
+/** Depth of the bay, including its rear position when double-deep. */
 export function rowDepth(rack: PalletRackNode): number {
   return rack.depthPositions * rack.depth + (rack.depthPositions - 1) * rack.depthGap
 }
 
-/**
- * Where a row sits inside its group, 1-based.
- *
- * Back to back, rows pair up — (1,2), (3,4), … — so this alternates 1, 2, 1, 2;
- * otherwise every row is its own group and this is always 1. The one derivation
- * every other row function is built on.
- */
-export function rowInGroup(rack: PalletRackNode, row: number): number {
-  return rack.backToBack ? ((row - 1) % 2) + 1 : 1
-}
-
-/**
- * Clear space in front of a row, between it and the row before it.
- *
- * Zero for row 1, which has nothing in front of it inside the block. A row that
- * opens a group faces a working aisle; a row inside one stands against its
- * neighbour across the spine gap. That alternation is the whole layout: group,
- * aisle, group, aisle.
- */
-export function rowGapBefore(rack: PalletRackNode, row: number): number {
-  if (row <= 1) return 0
-  return rowInGroup(rack, row) === 1 ? rack.aisleWidth : rack.backToBackGap
-}
-
-/** Whether a row stands spine to spine with the row in front of it. */
-export function sharesSpine(rack: PalletRackNode, row: number): boolean {
-  return row > 1 && rowInGroup(rack, row) > 1
-}
-
-/**
- * Whether either gap is actually consumed by this block.
- *
- * A lone run uses neither. A back-to-back pair uses only the spine. An aisle
- * only opens once there are more rows than one group holds. The inspector hides
- * the gap a block does not use and the geometry key excludes it — both read
- * these two, so a field can never be shown, cached against, and yet move
- * nothing.
- */
-export function usesSpineGap(rack: PalletRackNode): boolean {
-  return rack.rowCount > 1 && rack.backToBack
-}
-
-export function usesAisle(rack: PalletRackNode): boolean {
-  return rack.rowCount > (rack.backToBack ? 2 : 1)
-}
-
-/** Outer depth of the block, over every row and the gaps between them. */
+/** Outer depth. Kept as its own name because the floorplan, the collider and
+ *  the footprint all read "how deep is this thing" rather than "how deep is a
+ *  row", and a bay is one row. */
 export function totalDepth(rack: PalletRackNode): number {
-  let total = rack.rowCount * rowDepth(rack)
-  for (let row = 2; row <= rack.rowCount; row++) total += rowGapBefore(rack, row)
-  return total
+  return rowDepth(rack)
 }
 
-/** Local Z of a row's centreline. Row 1 is the +Z-most; rows count toward −Z. */
-export function rowCenterZ(rack: PalletRackNode, row: number): number {
-  const single = rowDepth(rack)
-  let z = totalDepth(rack) / 2
-  for (let index = 1; index <= row; index++) {
-    z -= rowGapBefore(rack, index)
-    if (index === row) return z - single / 2
-    z -= single
-  }
+/** Local X of the two upright frame centrelines, left then right. */
+export function frameCentersX(rack: PalletRackNode): [number, number] {
+  const half = bayPitch(rack) / 2
+  return [-half, half]
+}
+
+/** Local X of the bay's centre. Always zero — kept as a name so the geometry
+ *  reads as "at the bay centre" rather than as a bare literal. */
+export function bayCenterX(): number {
   return 0
-}
-
-/**
- * Which way a row's aisle face looks: +1 toward +Z, −1 toward −Z.
- *
- * A back-to-back pair turns away from itself and opens onto the aisles either
- * side; a lone-aisle row simply faces its own aisle. So the second row of a
- * pair is the only one that looks backward.
- */
-export function rowFacing(rack: PalletRackNode, row: number): 1 | -1 {
-  return rowInGroup(rack, row) === 2 ? -1 : 1
 }
 
 /**
  * Local Z of a depth position's centre.
  *
- * Depth 1 is the aisle side of whichever row it belongs to. Numbering every row
- * from its own aisle rather than from a global axis is what makes "D1 is the one
- * you can reach" true on both sides of every pair in the block.
+ * Depth 1 is the aisle side. Two bays standing back to back are two nodes
+ * rotated half a turn from each other, so a bay only ever numbers its positions
+ * from its own front — which is why this no longer needs to know about rows.
  */
-export function depthPositionZ(rack: PalletRackNode, row: number, depth: number): number {
-  const centre = rowCenterZ(rack, row)
+export function depthPositionZ(rack: PalletRackNode, depth: number): number {
   const fromAisle = (depth - 0.5) * rack.depth + (depth - 1) * rack.depthGap
-  const outward = rowDepth(rack) / 2 - fromAisle
-  return centre + rowFacing(rack, row) * outward
+  return rowDepth(rack) / 2 - fromAisle
 }
 
 /**
- * Offset from the block's anchor point to its centre, in the rack's local frame.
+ * Storage levels the bay actually builds.
  *
- * The block is always centred on the node position, because that is what the
- * host's footprint contract means: `spatial-grid-manager` and the alignment
- * anchor bridge both read `floorPlaced.footprint` as a rectangle centred on the
- * node, and the bridge ignores the optional `position` field entirely — an
- * off-centre block would collide and align against a rectangle it does not
- * occupy. So anchoring moves the node rather than the geometry, and this is the
- * vector between the two.
+ * A tunnel opens the lowest N levels as a walkway: the frames stay because they
+ * carry what is above, and everything that would have sat below is omitted.
  */
-export function anchorOffset(rack: PalletRackNode): [number, number] {
-  const halfWidth = totalWidth(rack) / 2
-  const halfDepth = totalDepth(rack) / 2
-  const dx = rack.bayAnchor === 'left' ? halfWidth : rack.bayAnchor === 'right' ? -halfWidth : 0
-  const dz = rack.rowAnchor === 'front' ? -halfDepth : rack.rowAnchor === 'back' ? halfDepth : 0
-  return [dx, dz]
-}
-
-/** Where the block's centre lands when its anchor point sits at `(x, z)`. */
-export function centerFromAnchor(
-  rack: PalletRackNode,
-  x: number,
-  z: number,
-  rotationY: number,
-): [number, number] {
-  const [dx, dz] = anchorOffset(rack)
-  const cos = Math.cos(rotationY)
-  const sin = Math.sin(rotationY)
-  return [x + dx * cos + dz * sin, z - dx * sin + dz * cos]
-}
-
-/** Local X of every upright frame centreline, left to right. */
-export function frameCentersX(rack: PalletRackNode): number[] {
-  const pitch = bayPitch(rack)
-  const start = -totalWidth(rack) / 2 + rack.uprightWidth / 2
-  return Array.from({ length: rack.bayCount + 1 }, (_, index) => start + index * pitch)
-}
-
-/** Local X of a bay's centre. `bay` is 1-based. */
-export function bayCenterX(rack: PalletRackNode, bay: number): number {
-  const pitch = bayPitch(rack)
-  return -totalWidth(rack) / 2 + rack.uprightWidth / 2 + (bay - 1) * pitch + pitch / 2
-}
-
-// ── Bays ────────────────────────────────────────────────────────────────────
-
-export type BayOverride = NonNullable<PalletRackNode['bayOverrides'][string]>
-
-/** `R1-B3`. Same form the slot addresses use, so a bay key and a slot address
- *  name the same bay and both survive a change to the row count. */
-export function formatBayAddress(row: number, bay: number): string {
-  return `R${row}-B${bay}`
-}
-
-const BAY_ADDRESS = /^R(\d+)-B(\d+)$/
-
-export function parseBayAddress(address: string): { row: number; bay: number } | null {
-  const match = BAY_ADDRESS.exec(address)
-  if (!match) return null
-  const [, row, bay] = match
-  if (!row || !bay) return null
-  return { row: Number(row), bay: Number(bay) }
-}
-
-export function bayOverrideOf(rack: PalletRackNode, row: number, bay: number): BayOverride {
-  return rack.bayOverrides[formatBayAddress(row, bay)] ?? {}
-}
-
-/**
- * Override keys addressing a bay the block actually has, sorted.
- *
- * Overrides outlive the bays they were set on: shrink a ten-bay run to three and
- * the entries for bays four to ten stay in the record, harmless and invisible.
- * Harmless to the geometry, at least — left in the cache key they made a rack
- * carrying them unable to share a mesh with an identical rack that never had
- * them. Sorted so two racks whose overrides were written in a different order
- * still collapse onto one geometry.
- */
-export function activeBayOverrideKeys(rack: PalletRackNode): string[] {
-  return Object.keys(rack.bayOverrides)
-    .filter((key) => {
-      const address = parseBayAddress(key)
-      if (!address) return false
-      if (address.row < 1 || address.row > rack.rowCount) return false
-      return address.bay >= 1 && address.bay <= rack.bayCount
-    })
-    .sort()
-}
-
-/** What the builder emits for a bay, as a short string. */
-function bayShape(rack: PalletRackNode, row: number, bay: number): string {
-  if (isBaySkipped(rack, row, bay)) return 'skip'
-  const present = new Set(bayStorageLevels(rack, row, bay))
-  const levels = beamedLevels(rack).filter((level) => present.has(level))
-  return `${levels.join('/')}:${bayDecking(rack, row, bay)}`
-}
-
-/**
- * Bays whose built shape departs from a plain one, for the geometry key.
- *
- * The departure rather than the override, because the two are not the same
- * thing. A one-level tunnel through a rack with no ground beam removes the floor
- * position — which carries no steel — so the override is set, and the mesh is
- * unchanged. Keying on the record split the cache on a setting that moved
- * nothing; keying on the shape collapses it back.
- *
- * Walks the override record rather than every bay, so a forty-by-twenty block
- * with no overrides costs nothing here. The key is computed on every lookup, not
- * only on a miss.
- */
-export function bayShapeDepartures(rack: PalletRackNode): string[] {
-  const plain = `${beamedLevels(rack).join('/')}:${rack.decking}`
-  const departures: string[] = []
-  for (const key of activeBayOverrideKeys(rack)) {
-    const address = parseBayAddress(key)
-    if (!address) continue
-    const shape = bayShape(rack, address.row, address.bay)
-    if (shape !== plain) departures.push(`${key}=${shape}`)
-  }
-  return departures
-}
-
-/** A skipped bay is a deliberate gap — for a column, a doorway — so the run
- *  keeps its length and only this bay's contents are omitted. */
-export function isBaySkipped(rack: PalletRackNode, row: number, bay: number): boolean {
-  return bayOverrideOf(rack, row, bay).skipped === true
-}
-
-/** Lowest levels of a bay left open as a walkway. The frames stay: they carry
- *  the levels above. */
-export function bayTunnelLevels(rack: PalletRackNode, row: number, bay: number): number {
-  return Math.max(0, bayOverrideOf(rack, row, bay).tunnelLevels ?? 0)
-}
-
-/** Beam levels present in a bay, never more than the run's own fitted count. */
-export function bayLevelCount(rack: PalletRackNode, row: number, bay: number): number {
-  const override = bayOverrideOf(rack, row, bay).levels
-  const fitted = fittedLevelCount(rack)
-  return override === undefined ? fitted : Math.max(0, Math.min(fitted, override))
-}
-
-/** Storage levels actually present in a bay, floor first when enabled. */
-export function bayStorageLevels(rack: PalletRackNode, row: number, bay: number): number[] {
-  if (isBaySkipped(rack, row, bay)) return []
-  const tunnel = bayTunnelLevels(rack, row, bay)
-  return storageLevels(rack).filter(
-    (level) => level >= tunnel && level <= bayLevelCount(rack, row, bay),
-  )
-}
-
-/** Decking for a bay, falling back to the run's. */
-export function bayDecking(
-  rack: PalletRackNode,
-  row: number,
-  bay: number,
-): PalletRackNode['decking'] {
-  return bayOverrideOf(rack, row, bay).decking ?? rack.decking
-}
-
-/**
- * Whether an upright frame is worth erecting.
- *
- * Frames are shared, so frame `index` stands between bay `index` and bay
- * `index + 1`. It is needed when either neighbour is present — which means a
- * skipped bay in the middle of a run keeps both its frames (they carry the bays
- * either side), while a skipped bay at the end takes the outermost frame with
- * it. Erecting all of them regardless would leave a post standing in the gap
- * the skip was cut for.
- */
-export function isFramePresent(rack: PalletRackNode, row: number, index: number): boolean {
-  const left = index >= 1 && !isBaySkipped(rack, row, index)
-  const right = index + 1 <= rack.bayCount && !isBaySkipped(rack, row, index + 1)
-  return left || right
-}
-
-/** Bays that are actually built, 1-based. */
-export function presentBays(rack: PalletRackNode, row: number): number[] {
-  const bays: number[] = []
-  for (let bay = 1; bay <= rack.bayCount; bay++) {
-    if (!isBaySkipped(rack, row, bay)) bays.push(bay)
-  }
-  return bays
-}
-
-/** The row a local Z falls in, or null for an aisle between rows. */
-export function rowAt(rack: PalletRackNode, localZ: number): number | null {
-  const half = rowDepth(rack) / 2
-  for (let row = 1; row <= rack.rowCount; row++) {
-    if (Math.abs(localZ - rowCenterZ(rack, row)) <= half) return row
-  }
-  return null
-}
-
-/**
- * The bay a point in the rack's local frame falls in, or null for the aisles
- * between rows and beyond the ends.
- *
- * This is what makes per-bay selection cost nothing. The host has no sub-node
- * selection, and the alternative — one child node per bay, the way cabinet
- * modules work — is one more draw call per bay, so a twenty-bay run in a
- * thousand-rack warehouse would add twenty thousand. A click already carries
- * its hit point in the node's local frame, so the bay is arithmetic.
- */
-export function bayAt(
-  rack: PalletRackNode,
-  localX: number,
-  localZ: number,
-): { row: number; bay: number } | null {
-  const row = rowAt(rack, localZ)
-  if (row === null) return null
-
-  const pitch = bayPitch(rack)
-  const fromLeft = localX + totalWidth(rack) / 2 - rack.uprightWidth / 2
-  const bay = Math.floor(fromLeft / pitch) + 1
-  if (bay < 1 || bay > rack.bayCount) return null
-  return { row, bay }
+export function storageLevelsPresent(rack: PalletRackNode): number[] {
+  return storageLevels(rack).filter((level) => level >= rack.tunnelLevels)
 }
 
 // ── Levels ──────────────────────────────────────────────────────────────────
@@ -696,40 +445,42 @@ export function pickingOffsetsZ(rack: PalletRackNode): number[] {
 
 // ── Slot enumeration ────────────────────────────────────────────────────────
 
-/** Every pallet position in the run, in a stable order. Picking levels hold
- *  containers instead and are enumerated by `pickingSlotsOf`. */
+/**
+ * Every pallet position in the bay, in a stable order. Picking levels hold
+ * containers instead and are enumerated by `pickingSlotsOf`.
+ *
+ * `row` and `bay` are always 1 now that a node is one bay, but they stay in the
+ * address. Shortening the form to `L3-P1-D1` would break silently and
+ * invisibly: a pallet saved at `R1-B1-L3-P1-D1` keeps its `slotRackId`, the
+ * parser returns null for the new short form, the occupancy index goes on
+ * holding the old string, and `GhostStock` draws a ghost straight through the
+ * real pallet because it cannot match them.
+ */
 export function palletSlotsOf(rack: PalletRackNode): Slot[] {
   const offsets = slotOffsetsX(rack)
-  const levels = palletLevels(rack)
+  const present = new Set(storageLevelsPresent(rack))
   const footprint = orientedPalletFootprint(rack)
   const slots: Slot[] = []
 
-  for (let row = 1; row <= rack.rowCount; row++) {
-    for (let bay = 1; bay <= rack.bayCount; bay++) {
-      // A skipped bay holds nothing, and a tunnel's open levels hold nothing —
-      // counting them would report capacity the rack does not have.
-      const present = new Set(bayStorageLevels(rack, row, bay))
-      if (present.size === 0) continue
-      const centreX = bayCenterX(rack, bay)
-      for (const level of levels) {
-        if (!present.has(level)) continue
-        const y = levelSurfaceY(rack, level)
-        const clearHeight = levelClearHeight(rack, level)
-        for (let depth = 1; depth <= rack.depthPositions; depth++) {
-          const z = depthPositionZ(rack, row, depth)
-          offsets.forEach((offset, index) => {
-            const address = { row, bay, level, position: index + 1, depth }
-            slots.push({
-              ...address,
-              id: formatSlotAddress(address),
-              localPosition: [centreX + offset, y, z],
-              footprint,
-              clearHeight,
-              directAccess: depth === 1,
-            })
-          })
-        }
-      }
+  for (const level of palletLevels(rack)) {
+    // A tunnel's open levels hold nothing — counting them would report capacity
+    // the bay does not have.
+    if (!present.has(level)) continue
+    const y = levelSurfaceY(rack, level)
+    const clearHeight = levelClearHeight(rack, level)
+    for (let depth = 1; depth <= rack.depthPositions; depth++) {
+      const z = depthPositionZ(rack, depth)
+      offsets.forEach((offset, index) => {
+        const address = { row: 1, bay: 1, level, position: index + 1, depth }
+        slots.push({
+          ...address,
+          id: formatSlotAddress(address),
+          localPosition: [bayCenterX() + offset, y, z],
+          footprint,
+          clearHeight,
+          directAccess: depth === 1,
+        })
+      })
     }
   }
   return slots
@@ -755,7 +506,7 @@ export function directAccessSlotCount(rack: PalletRackNode): number {
 }
 
 /**
- * Every container position on the run's picking levels.
+ * Every container position on the bay's picking levels.
  *
  * Addresses share the pallet format, and the components keep their meaning: P
  * still counts across the bay, D still counts into the depth. Only the unit
@@ -765,36 +516,30 @@ export function directAccessSlotCount(rack: PalletRackNode): number {
 export function pickingSlotsOf(rack: PalletRackNode): Slot[] {
   const offsetsX = pickingOffsetsX(rack)
   const offsetsZ = pickingOffsetsZ(rack)
-  const levels = pickingLevelsOf(rack)
+  const present = new Set(storageLevelsPresent(rack))
   const footprint: [number, number] = [rack.pickingBoxWidth, rack.pickingBoxDepth]
   const slots: Slot[] = []
 
-  for (let row = 1; row <= rack.rowCount; row++) {
-    for (let bay = 1; bay <= rack.bayCount; bay++) {
-      const centreX = bayCenterX(rack, bay)
-      for (const level of levels) {
-        // Containers stand on the shelf panel, not on the beam top.
-        const y = levelSurfaceY(rack, level) + (level > 0 ? rack.pickingShelfThickness : 0)
-        const clearHeight = levelClearHeight(rack, level)
-        for (let depth = 1; depth <= offsetsZ.length; depth++) {
-          // Row 1 faces +Z, row 2 faces −Z, and index 1 is the aisle side of
-          // whichever row it belongs to — the same convention pallet depth
-          // positions use, so "D1 is the one you reach first" holds throughout.
-          const offsetZ = offsetsZ[offsetsZ.length - depth] ?? 0
-          const z = rowCenterZ(rack, row) + (row === 1 ? offsetZ : -offsetZ)
-          offsetsX.forEach((offset, index) => {
-            const address = { row, bay, level, position: index + 1, depth }
-            slots.push({
-              ...address,
-              id: formatSlotAddress(address),
-              localPosition: [centreX + offset, y, z],
-              footprint,
-              clearHeight,
-              directAccess: depth === 1,
-            })
-          })
-        }
-      }
+  for (const level of pickingLevelsOf(rack)) {
+    if (!present.has(level)) continue
+    // Containers stand on the shelf panel, not on the beam top.
+    const y = levelSurfaceY(rack, level) + (level > 0 ? rack.pickingShelfThickness : 0)
+    const clearHeight = levelClearHeight(rack, level)
+    for (let depth = 1; depth <= offsetsZ.length; depth++) {
+      // Index 1 is the aisle side — the same convention pallet depth positions
+      // use, so "D1 is the one you reach first" holds throughout.
+      const offsetZ = offsetsZ[offsetsZ.length - depth] ?? 0
+      offsetsX.forEach((offset, index) => {
+        const address = { row: 1, bay: 1, level, position: index + 1, depth }
+        slots.push({
+          ...address,
+          id: formatSlotAddress(address),
+          localPosition: [bayCenterX() + offset, y, offsetZ],
+          footprint,
+          clearHeight,
+          directAccess: depth === 1,
+        })
+      })
     }
   }
   return slots
@@ -840,12 +585,7 @@ export function palletSupportBarCount(rack: PalletRackNode): number {
  * the cache on a number nothing reads.
  */
 export function palletSupportBarsDrawn(rack: PalletRackNode): boolean {
-  if (palletSupportBarCount(rack) === 0) return false
-  if (rack.decking === 'open') return true
-  return activeBayOverrideKeys(rack).some((key) => {
-    const address = parseBayAddress(key)
-    return address !== null && bayDecking(rack, address.row, address.bay) === 'open'
-  })
+  return palletSupportBarCount(rack) > 0 && rack.decking === 'open'
 }
 
 /**

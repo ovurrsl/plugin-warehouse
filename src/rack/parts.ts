@@ -1,19 +1,15 @@
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
-  bayDecking,
-  bayStorageLevels,
   beamedLevels,
   depthPositionZ,
   frameCentersX,
-  isBaySkipped,
-  isFramePresent,
   levelBeamHeight,
   levelHasShelf,
   levelSurfaceY,
   palletSupportBarCount,
-  sharesSpine,
   slotOffsetsX,
+  storageLevelsPresent,
 } from './slots'
 
 /**
@@ -42,7 +38,6 @@ export type RackPartRole =
   | 'connector'
   | 'shelf'
   | 'support-bar'
-  | 'row-spacer'
 
 export type RackPart = {
   role: RackPartRole
@@ -85,153 +80,152 @@ export type RackDetail = 'full' | 'simple'
  * that stop reading past a few tens of metres, and in a warehouse almost every
  * rack is always at that distance.
  */
-export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] {
+export function rackParts(
+  rack: PalletRackNode,
+  detail: RackDetail,
+  /**
+   * Leave the right frame to the bay standing against it.
+   *
+   * Bays share their frames, so a run of them must not each build both: at one
+   * bay pitch the right frame of one lands exactly on the left frame of the
+   * next, and building both puts two posts in the same place — doubled steel,
+   * doubled perforation texture, z-fighting on every coincident face. Building
+   * the left always and the right only when nothing abuts gives a run of N bays
+   * N+1 frames, which is how racking is really built. See `./neighbours`.
+   */
+  hasRightNeighbour = false,
+): RackPart[] {
   const parts: RackPart[] = []
   const full = detail === 'full'
-  const frames = frameCentersX(rack)
+  const frames = hasRightNeighbour ? [frameCentersX(rack)[0]] : frameCentersX(rack)
   const levels = beamedLevels(rack)
+  const present = new Set(storageLevelsPresent(rack))
   const { uprightWidth, uprightDepth, depth, uprightHeight, beamThickness } = rack
   const postOffset = depth / 2 - uprightDepth / 2
 
-  for (let row = 1; row <= rack.rowCount; row++) {
-    for (let position = 1; position <= rack.depthPositions; position++) {
-      const centerZ = depthPositionZ(rack, row, position)
-      const postZ = [centerZ + postOffset, centerZ - postOffset]
+  for (let position = 1; position <= rack.depthPositions; position++) {
+    const centerZ = depthPositionZ(rack, position)
+    const postZ = [centerZ + postOffset, centerZ - postOffset]
 
-      frames.forEach((x, frameIndex) => {
-        // A frame only stands where a bay needs it. Erecting all of them
-        // regardless leaves a post in the gap a skip was cut for.
-        if (!isFramePresent(rack, row, frameIndex)) return
-        postZ.forEach((z, side) => {
-          if (full) {
-            pushUprightSection(parts, x, z, rack, side === 0 ? 1 : -1)
-          } else {
-            parts.push({
-              role: 'upright',
-              center: [x, uprightHeight / 2, z],
-              size: [uprightWidth, uprightHeight, uprightDepth],
-            })
-          }
+    frames.forEach((x) => {
+      postZ.forEach((z, side) => {
+        if (full) {
+          pushUprightSection(parts, x, z, rack, side === 0 ? 1 : -1)
+        } else {
+          parts.push({
+            role: 'upright',
+            center: [x, uprightHeight / 2, z],
+            size: [uprightWidth, uprightHeight, uprightDepth],
+          })
+        }
 
-          if (full) {
-            // Catalogue footplates are wider than the post they carry — 175 x
-            // 119 mm under a 122 x 80 upright — so they overhang it by about
-            // 26 mm a side. Real, and the reason the built mesh is slightly
-            // wider at the floor than the declared footprint.
-            parts.push({
-              role: 'footplate',
-              center: [x, FOOTPLATE_HEIGHT / 2, z],
-              size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
-            })
-          }
-        })
-
-        if (full && rack.bracing !== 'open') {
-          pushFrameBracing(parts, x, centerZ, rack)
+        if (full) {
+          // Catalogue footplates are wider than the post they carry — 175 x
+          // 119 mm under a 122 x 80 upright — so they overhang it by about
+          // 26 mm a side. Real, and the reason the built mesh is slightly
+          // wider at the floor than the declared footprint.
+          parts.push({
+            role: 'footplate',
+            center: [x, FOOTPLATE_HEIGHT / 2, z],
+            size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
+          })
         }
       })
 
-      for (let bay = 1; bay <= rack.bayCount; bay++) {
-        if (isBaySkipped(rack, row, bay)) continue
-        const centerX = bayCenterX(rack, bay)
-        // Per-bay levels: a tunnel omits the lowest ones, an override can stop
-        // the bay short. Intersected with the run's beamed levels so a bay can
-        // never gain a level the frame does not carry.
-        const bayLevels = new Set(bayStorageLevels(rack, row, bay))
-        for (const level of levels) {
-          if (!bayLevels.has(level)) continue
-          const beamHeight = levelBeamHeight(rack, level)
-          const surface = levelSurfaceY(rack, level)
-          // Every other level hangs its beam under the load surface; a ground
-          // beam has no surface above it to hang from. It stands on its own
-          // connectors, clear of the baseplate — the hooks reach below the
-          // section, and the plate is wider than the post, so a ground beam set
-          // from the floor buried its connectors in both.
-          const beamY =
-            level === 0
-              ? FOOTPLATE_HEIGHT + CONNECTOR_REACH + beamHeight / 2
-              : surface - beamHeight / 2
-          const beamTop = beamY + beamHeight / 2
+      if (full && rack.bracing !== 'open') {
+        pushFrameBracing(parts, x, centerZ, rack)
+      }
+    })
 
-          for (const sign of [1, -1]) {
-            // Outer face flush with the frame's outer face, which is where a
-            // beam actually sits — its connector bolts to the post's front.
-            const beamZ = centerZ + sign * (depth / 2 - beamThickness / 2)
+    const centerX = bayCenterX()
+    for (const level of levels) {
+      // A tunnel omits the lowest levels. Intersected with the beamed levels
+      // so the bay can never gain one the frame does not carry.
+      if (!present.has(level)) continue
+      const beamHeight = levelBeamHeight(rack, level)
+      const surface = levelSurfaceY(rack, level)
+      // Every other level hangs its beam under the load surface; a ground
+      // beam has no surface above it to hang from. It stands on its own
+      // connectors, clear of the baseplate — the hooks reach below the
+      // section, and the plate is wider than the post, so a ground beam set
+      // from the floor buried its connectors in both.
+      const beamY =
+        level === 0 ? FOOTPLATE_HEIGHT + CONNECTOR_REACH + beamHeight / 2 : surface - beamHeight / 2
+      const beamTop = beamY + beamHeight / 2
+
+      for (const sign of [1, -1]) {
+        // Outer face flush with the frame's outer face, which is where a
+        // beam actually sits — its connector bolts to the post's front.
+        const beamZ = centerZ + sign * (depth / 2 - beamThickness / 2)
+        parts.push({
+          role: 'beam',
+          // Spans the clear width exactly, so its ends meet the upright
+          // faces instead of running through them.
+          center: [centerX, beamY, beamZ],
+          size: [rack.bayClearWidth, beamHeight, beamThickness],
+        })
+
+        if (full) {
+          // The endplate welded to the beam's end, whose hooks engage the
+          // upright's punched face.
+          //
+          // It occupies the beam's own last stretch rather than reaching
+          // past it. Lapping outward — which is what "the plate sits against
+          // the post" suggests — drove it three millimetres into the post's
+          // near flange, the full thickness of the folded section. Nothing
+          // in the model said so, and because the plate carries a beam-ish
+          // colour and sits exactly where a beam ends, what it looked like
+          // on screen was the beam itself running into the upright.
+          for (const end of [-1, 1]) {
             parts.push({
-              role: 'beam',
-              // Spans the clear width exactly, so its ends meet the upright
-              // faces instead of running through them.
-              center: [centerX, beamY, beamZ],
-              size: [rack.bayClearWidth, beamHeight, beamThickness],
-            })
-
-            if (full) {
-              // The endplate welded to the beam's end, whose hooks engage the
-              // upright's punched face.
-              //
-              // It occupies the beam's own last stretch rather than reaching
-              // past it. Lapping outward — which is what "the plate sits against
-              // the post" suggests — drove it three millimetres into the post's
-              // near flange, the full thickness of the folded section. Nothing
-              // in the model said so, and because the plate carries a beam-ish
-              // colour and sits exactly where a beam ends, what it looked like
-              // on screen was the beam itself running into the upright.
-              for (const end of [-1, 1]) {
-                parts.push({
-                  role: 'connector',
-                  center: [
-                    centerX + (end * (rack.bayClearWidth - CONNECTOR_LAP)) / 2,
-                    beamY,
-                    // Exactly the beam's thickness and exactly its Z. What makes
-                    // the plate legible is its height — the hooks reach above
-                    // and below the section, which is what you actually see on a
-                    // real beam end. Standing it proud instead put it 4 mm into
-                    // the decking, which begins at the beams' inner faces.
-                    beamZ,
-                  ],
-                  size: [CONNECTOR_LAP, beamHeight + 2 * CONNECTOR_REACH, beamThickness],
-                })
-              }
-            }
-          }
-
-          const decked = levelHasShelf(rack, level) && bayDecking(rack, row, bay) !== 'open'
-
-          if (full && decked) {
-            const thickness = shelfThickness(rack, level, bayDecking(rack, row, bay))
-            // Flush-mounted: the panel drops between the beams and its top
-            // finishes level with them, so the load surface stays exactly where
-            // `levelSurfaceY` says it is and pallets do not float on a lip.
-            parts.push({
-              role: 'shelf',
-              center: [centerX, beamTop - thickness / 2, centerZ],
-              size: [rack.bayClearWidth, thickness, depth - 2 * beamThickness],
+              role: 'connector',
+              center: [
+                centerX + (end * (rack.bayClearWidth - CONNECTOR_LAP)) / 2,
+                beamY,
+                // Exactly the beam's thickness and exactly its Z. What makes
+                // the plate legible is its height — the hooks reach above
+                // and below the section, which is what you actually see on a
+                // real beam end. Standing it proud instead put it 4 mm into
+                // the decking, which begins at the beams' inner faces.
+                beamZ,
+              ],
+              size: [CONNECTOR_LAP, beamHeight + 2 * CONNECTOR_REACH, beamThickness],
             })
           }
+        }
+      }
 
-          // Bars and decking are alternatives, not layers. Both mount on top of
-          // the beams, so a decked level fitted with bars had the two occupying
-          // the same six millimetres — and the reason it is a real rule rather
-          // than a drawing tidy-up is that a deck already carries the pallet
-          // whichever way round it sits, which is the entire job of the bars.
-          if (full && !decked) {
-            const bars = palletSupportBarCount(rack)
-            if (bars > 0) {
-              const barHeight = 0.03
-              for (const offset of slotOffsetsX(rack)) {
-                const spread = ((bars - 1) / 2) * 0.25
-                for (let bar = 0; bar < bars; bar++) {
-                  parts.push({
-                    role: 'support-bar',
-                    center: [
-                      centerX + offset - spread + bar * 0.25,
-                      beamTop - barHeight / 2,
-                      centerZ,
-                    ],
-                    size: [0.04, barHeight, depth - 2 * beamThickness],
-                  })
-                }
-              }
+      const decked = levelHasShelf(rack, level) && rack.decking !== 'open'
+
+      if (full && decked) {
+        const thickness = shelfThickness(rack, level, rack.decking)
+        // Flush-mounted: the panel drops between the beams and its top
+        // finishes level with them, so the load surface stays exactly where
+        // `levelSurfaceY` says it is and pallets do not float on a lip.
+        parts.push({
+          role: 'shelf',
+          center: [centerX, beamTop - thickness / 2, centerZ],
+          size: [rack.bayClearWidth, thickness, depth - 2 * beamThickness],
+        })
+      }
+
+      // Bars and decking are alternatives, not layers. Both mount on top of
+      // the beams, so a decked level fitted with bars had the two occupying
+      // the same six millimetres — and the reason it is a real rule rather
+      // than a drawing tidy-up is that a deck already carries the pallet
+      // whichever way round it sits, which is the entire job of the bars.
+      if (full && !decked) {
+        const bars = palletSupportBarCount(rack)
+        if (bars > 0) {
+          const barHeight = 0.03
+          for (const offset of slotOffsetsX(rack)) {
+            const spread = ((bars - 1) / 2) * 0.25
+            for (let bar = 0; bar < bars; bar++) {
+              parts.push({
+                role: 'support-bar',
+                center: [centerX + offset - spread + bar * 0.25, beamTop - barHeight / 2, centerZ],
+                size: [0.04, barHeight, depth - 2 * beamThickness],
+              })
             }
           }
         }
@@ -239,73 +233,27 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
     }
   }
 
-  // Spacers tie a row to the one in front of it across the spine. Only within a
-  // group: rows either side of a working aisle are separate structures, and a
-  // tie spanning an aisle would be a bar through the traffic.
-  if (full) {
-    for (let row = 2; row <= rack.rowCount; row++) {
-      if (!sharesSpine(rack, row)) continue
-      const innerFront = depthPositionZ(rack, row - 1, rack.depthPositions) - depth / 2
-      const innerBack = depthPositionZ(rack, row, rack.depthPositions) + depth / 2
-      const spanZ = innerFront - innerBack
-      const midZ = (innerFront + innerBack) / 2
-      frames.forEach((x, frameIndex) => {
-        // Needs a post at both ends. A skip that removed one row's end frame
-        // would otherwise leave a spacer reaching out to nothing.
-        if (!isFramePresent(rack, row - 1, frameIndex)) return
-        if (!isFramePresent(rack, row, frameIndex)) return
-        for (const y of [uprightHeight * 0.15, uprightHeight * 0.85]) {
-          parts.push({
-            role: 'row-spacer',
-            center: [x, y, midZ],
-            size: [uprightWidth * 0.6, 0.05, spanZ],
-          })
-        }
-      })
-    }
-  }
+  // Row spacers are gone with rows. They were real hardware — a tie between two
+  // bays standing spine to spine — but they cannot be expressed by either bay
+  // alone, and a bay is a node now. Modelling them would need a kind of their
+  // own rather than a part one node guesses at.
 
   return parts
 }
 
 /**
- * Boxes a single merged geometry is allowed to hold.
+ * There is no part budget any more, and that is worth saying out loud.
  *
- * Each box costs 24 vertices × 11 floats, so 12 000 of them is about 12 MB of
- * buffer and 144 000 triangles — already a large single mesh, and the point at
- * which one block starts to cost more than the draw calls merging it saved.
+ * A block used to be able to ask for 40 bays × 20 rows × 4 levels — about 39 000
+ * boxes and 41 MB in one buffer — so the full tier fell back to the silhouette
+ * past 12 000 parts and the inspector warned about it. A bay is a node now, and
+ * the worst a single one can emit is a few hundred boxes: fifteen levels,
+ * double-deep, fully braced and decked. The ceiling cannot be reached, so the
+ * fallback and its warning are gone rather than kept as reassurance.
  *
- * A block can ask for far more than that: 40 bays × 20 rows × 4 levels comes to
- * roughly 39 000 boxes and 41 MB. Rather than build that, the full tier falls
- * back to the silhouette — one box per post instead of five, and no footplates,
- * bracing, connectors or decking. The block still draws, still in one call; it
- * just stops carrying detail nobody can resolve from where a block that size is
- * looked at. `exceedsPartBudget` reports it so the inspector can say so instead
- * of leaving the user to notice the bracing went missing.
+ * The cost moved, it did not vanish. It is draw calls now, and `renderer.tsx`
+ * pays it with LOD.
  */
-export const PART_BUDGET = 12_000
-
-/**
- * Boxes the full tier would emit.
- *
- * Memoised on the node object, because building the list in order to count it is
- * exactly the work the budget exists to avoid and the inspector asks on every
- * render. The store replaces nodes rather than mutating them, so the key is
- * exact: a stale count is not reachable.
- */
-const partCounts = new WeakMap<PalletRackNode, number>()
-
-export function fullPartCount(rack: PalletRackNode): number {
-  const cached = partCounts.get(rack)
-  if (cached !== undefined) return cached
-  const count = rackParts(rack, 'full').length
-  partCounts.set(rack, count)
-  return count
-}
-
-export function exceedsPartBudget(rack: PalletRackNode): boolean {
-  return fullPartCount(rack) > PART_BUDGET
-}
 
 /** Chipboard is three times a steel or mesh panel and it shows at the edge. */
 function shelfThickness(

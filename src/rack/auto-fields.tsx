@@ -3,6 +3,7 @@
 import { Icon } from '@iconify/react'
 import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { SegmentedControl } from '@pascal-app/editor'
+import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import type { PalletRackNode } from './schema'
 import {
@@ -108,7 +109,19 @@ function AutoField({
   )
 }
 
-export default function RackAutoFields({ node }: { node: PalletRackNode }) {
+/**
+ * Reads the selection rather than taking a node.
+ *
+ * It is mounted from the trailing section, and the host renders that with no
+ * props at all — so a required `node` prop would arrive `undefined` and throw on
+ * the first property read, however carefully the parent passed one.
+ */
+export default function RackAutoFields() {
+  const selectedId = useViewer((s) => s.selection.selectedIds[0])
+  const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
+  if (!selected || (selected as { type?: string }).type !== 'warehouse:pallet-rack') return null
+  const node = selected as unknown as PalletRackNode
+
   const write = (patch: Partial<PalletRackNode>) =>
     useScene.getState().updateNode(node.id as AnyNodeId, patch as unknown as Partial<AnyNode>)
 

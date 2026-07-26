@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { PalletPreset } from './pallet/presets'
+import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 
 /**
@@ -60,36 +61,27 @@ type WarehouseStore = {
   setRackBrush: (patch: Partial<RackBrush>) => void
 
   /**
-   * The bays the user has picked out, all belonging to one rack.
+   * What the **Multiply** button in the rack panel will lay down.
    *
-   * The host has no sub-node selection, so this is the plugin's own. The click
-   * that selects a rack focuses the bay it landed on; **Shift+click** grows the
-   * set — which is not an arbitrary choice of modifier: the host reserves a
-   * plain second click on a selected node for picking it up to move, so Shift
-   * is the click that can reach a bay without starting a drag.
+   * Not schema fields, and deliberately: a bay is a node, so a bay count that
+   * lived on the node would be a number that silently reshapes one object into
+   * twenty — which is exactly the model this kind was rebuilt to get away from.
+   * It is a command's arguments, so it lives with the other panel state.
    *
-   * One rack at a time, by construction: every entry carries the same `rackId`,
-   * and focusing a bay of a different rack replaces the set. The panel edits
-   * every focused bay at once.
+   * Outside the panel component because the panel unmounts whenever the user
+   * switches rail tabs or reselects, and a count that reset every time you
+   * glanced away would be worse than useless.
    */
-  focusedBays: FocusedBay[]
-  setFocusedBays: (bays: FocusedBay[]) => void
+  multiply: MultiplySpec
+  setMultiply: (patch: Partial<MultiplySpec>) => void
 }
-
-export type FocusedBay = { rackId: string; row: number; bay: number }
 
 export type RackBrush = Pick<
   PalletRackNode,
-  | 'bayCount'
   | 'bayClearWidth'
   | 'depth'
   | 'uprightHeight'
   | 'levels'
-  | 'rowCount'
-  | 'backToBack'
-  | 'aisleWidth'
-  | 'bayAnchor'
-  | 'rowAnchor'
   | 'palletPreset'
   | 'palletOrientation'
   | 'pickingLevels'
@@ -125,16 +117,10 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     set({ palletLoadHeight: Math.max(0, palletLoadHeight) }),
 
   rackBrush: {
-    bayCount: 1,
     bayClearWidth: 2.7,
     depth: 1.1,
     uprightHeight: 5,
     levels: 3,
-    rowCount: 1,
-    backToBack: true,
-    aisleWidth: 3.2,
-    bayAnchor: 'center',
-    rowAnchor: 'front',
     palletPreset: 'epal-1',
     palletOrientation: 'short-side-out',
     pickingLevels: 0,
@@ -142,6 +128,6 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
 
-  focusedBays: [],
-  setFocusedBays: (focusedBays) => set({ focusedBays }),
+  multiply: DEFAULT_MULTIPLY,
+  setMultiply: (patch) => set((state) => ({ multiply: { ...state.multiply, ...patch } })),
 }))

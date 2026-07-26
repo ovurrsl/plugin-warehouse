@@ -3,14 +3,21 @@ import { z } from 'zod'
 import { PALLET_PRESET_IDS } from '../pallet/presets'
 
 /**
- * Adjustable pallet racking — a single continuous run of bays.
+ * Adjustable pallet racking — **one bay**.
  *
- * Bays in a run **share their upright frames**: `bayCount` bays stand on
- * `bayCount + 1` frames. That is how racking is actually built, and it is the
- * difference between a rack whose beams land on the posts and one whose beams
- * float — the version this replaces multiplied `bayCount × bayWidth` and
- * ignored the upright entirely, so the frames and the footprint disagreed by
- * one post width per bay.
+ * A run is not one node with a bay count; it is a line of these, each its own
+ * node. That is the whole shape of this kind, and everything else follows from
+ * it: a bay can be selected, moved, copied, deleted and multi-selected with the
+ * host's own machinery, and none of it needs a sub-selection system.
+ *
+ * The trade is draw calls — a twenty-bay run is twenty meshes rather than one.
+ * It is a deliberate choice in favour of every bay being an ordinary object.
+ *
+ * **Bays still share their upright frames.** A bay always builds its left
+ * frame and builds its right frame only when nothing abuts it (see
+ * `./neighbours`), so two bays standing at one bay pitch show one post between
+ * them, exactly as racking is really built — and a bay dragged clear grows its
+ * own closing frame.
  *
  * Every dimension is metres.
  */
@@ -21,17 +28,9 @@ export const PalletRackNode = BaseNode.extend({
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
 
-  // ── Run layout ────────────────────────────────────────────────────────────
+  // ── The bay ───────────────────────────────────────────────────────────────
 
-  /**
-   * Bays along the run. Frames are shared, so this is one fewer than frames.
-   *
-   * One by default: a rack you drop in is a single bay you then multiply, not a
-   * three-bay run you have to cut back.
-   */
-  bayCount: z.number().int().min(1).max(40).default(1),
-
-  /** Clear entry width of one bay, measured between the two uprights. */
+  /** Clear entry width of the bay, measured between the two uprights. */
   bayClearWidth: z.number().min(0.6).max(6).default(2.7),
 
   /** Frame depth, front upright face to rear upright face. */
@@ -41,84 +40,18 @@ export const PalletRackNode = BaseNode.extend({
   uprightHeight: z.number().min(1).max(20).default(5),
 
   /**
-   * Runs stacked into the depth, sharing one node.
-   *
-   * The same reasoning as `bayCount`, one axis over: a block of twenty runs
-   * built as twenty nodes is twenty meshes and twenty draw calls, and at
-   * warehouse scale the draw calls are what costs the frame. As one node it is
-   * one merged mesh, and the whole block still shares that mesh with every other
-   * block of the same shape.
-   *
-   * Row 1 is the +Z-most run and they count back toward −Z, so a row index means
-   * the same thing however many rows there are.
-   */
-  rowCount: z.number().int().min(1).max(20).default(1),
-
-  /**
-   * Whether rows pair up spine to spine.
-   *
-   * A rack either stands back to back or it does not — there is no third
-   * arrangement selective racking is actually built in, which is why this is a
-   * switch and not a count. (It briefly *was* a count, 1–6; everything above 2
-   * described blocks whose inner rows no truck could reach, and the only thing
-   * the extra values ever did was trigger the warning saying so.)
-   *
-   * On: rows pair (1,2), (3,4), … each pair spine to spine with a working
-   * aisle between pairs, so one aisle serves the two rows either side of it —
-   * the standard island. Off: every row gets its own aisle and they all face
-   * the same way, for racks along a one-directional picking route.
-   */
-  backToBack: z
-    .preprocess(
-      // Two legacy shapes still live in saved scenes: the original boolean and
-      // the short-lived 1–6 count. Rejecting either would fail the whole node
-      // parse — the rack would not come back at all, a far worse outcome than
-      // the field being guarded. Count 1 was "own aisle"; 2 and above pair up.
-      (value) => (typeof value === 'number' ? value >= 2 : value),
-      z.boolean(),
-    )
-    .default(true),
-
-  /** Spine-to-spine gap between two rows in the same group. */
-  backToBackGap: z.number().min(0).max(1.5).default(0.2),
-
-  /**
-   * Working aisle between groups.
-   *
-   * 3.2 m is a reach truck's working aisle. A counterbalanced forklift needs
-   * about 3.5 m and a turret truck as little as 1.6 m, so this is the field that
-   * decides which truck the block can actually be served by.
-   */
-  aisleWidth: z.number().min(0.8).max(8).default(3.2),
-
-  /**
-   * Which end of the block stays put when it grows.
-   *
-   * The block itself is always centred on the node's position — the host reads
-   * a footprint as a rectangle centred there, and an offset one would put the
-   * collision box and the alignment guides in the wrong place. So the anchor
-   * moves the *node* instead: place with `left` and the click marks the run's
-   * left end, add bays from the layout popover and the left end does not budge.
-   *
-   * The inspector's raw `bayCount` / `rowCount` fields do not consult this; they
-   * grow the block about its centre, which is what editing a number in a list of
-   * numbers reads as.
-   */
-  bayAnchor: z.enum(['left', 'center', 'right']).default('center'),
-  /** `front` is the +Z face — the aisle side of row 1. */
-  rowAnchor: z.enum(['front', 'center', 'back']).default('front'),
-
-  /**
    * Pallets stored one behind another on the same accessible face.
    *
-   * Not the same thing as `backToBack`, and the difference is the aisle:
-   * back to back is two runs each served from its own aisle, every position
-   * directly reachable. Double-deep is two positions served from *one* aisle,
-   * so the rear pallet cannot be reached until the front one is moved. It needs
-   * telescopic double-depth forks and suits SKUs held several pallets deep.
+   * Not the same thing as standing two bays back to back, and the difference is
+   * the aisle: back to back is two bays each served from its own aisle, every
+   * position directly reachable. Double-deep is two positions served from *one*
+   * aisle, so the rear pallet cannot be reached until the front one is moved. It
+   * needs telescopic double-depth forks and suits SKUs held several pallets
+   * deep.
    *
-   * Both can be on at once — a back-to-back double-deep island is four pallets
-   * deep across two aisles.
+   * This is a property of the bay, which is why it survived the move to one node
+   * per bay while rows did not: a second row is a second node, a second depth
+   * position is not.
    */
   depthPositions: z.number().int().min(1).max(2).default(1),
 
@@ -145,48 +78,18 @@ export const PalletRackNode = BaseNode.extend({
   /** Rated load per beam level, kg. Reported by the capacity panel. */
   levelCapacity: z.number().min(0).max(20_000).default(3000),
 
-  // ── Per-bay overrides ─────────────────────────────────────────────────────
-
   /**
-   * Departures from the run's uniform shape, keyed `R1-B3`.
+   * Lowest N levels left open as a walkway through the bay.
    *
-   * Real runs are not uniform: a column lands mid-aisle, a door needs a gap, a
-   * fire route crosses the block. Rather than forcing the user to break one run
-   * into three, a bay can opt out or shorten.
+   * A safety passageway, which regulations require through long blocks. The
+   * frames stay — they carry the levels above — but the beams and everything on
+   * them are omitted below this height.
    *
-   * Uses the same `R{row}-B{bay}` form the slot addresses do, so a bay key and
-   * a slot address name the same bay, and both stay meaningful when
-   * `backToBack` is switched on.
-   *
-   * Keeping this empty is the fast path: an override makes a rack's geometry
-   * unique, so a run of fifty identical racks that would share one mesh becomes
-   * fifty meshes. Uniform racks are unaffected.
+   * A node field rather than a per-bay override, because a bay *is* a node now:
+   * a fire route through a twenty-bay run is `tunnelLevels` set on the two bays
+   * it crosses.
    */
-  bayOverrides: z
-    .record(
-      z.string(),
-      z.object({
-        /**
-         * The bay is left out entirely — no beams, no decking, no goods. The
-         * run keeps its overall length: a skipped bay is a deliberate gap for
-         * a column or a doorway, not a shortening.
-         */
-        skipped: z.boolean().optional(),
-        /**
-         * Lowest N levels left open as a walkway through the run.
-         *
-         * A safety passageway, which regulations require through long blocks.
-         * The frames stay — they carry the levels above — but the beams and
-         * everything on them are omitted below this height.
-         */
-        tunnelLevels: z.number().int().min(0).max(15).optional(),
-        /** Fewer beam levels than the run, e.g. under a sloping roof. */
-        levels: z.number().int().min(0).max(15).optional(),
-        /** Decking that differs from the run's. */
-        decking: z.enum(['wire-mesh', 'steel', 'timber', 'open']).optional(),
-      }),
-    )
-    .default({}),
+  tunnelLevels: z.number().int().min(0).max(15).default(0),
 
   // ── Picking levels ────────────────────────────────────────────────────────
 

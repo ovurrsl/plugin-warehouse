@@ -5,6 +5,7 @@ import {
   useLiveNodeOverrides,
   useLiveTransforms,
   useRegistry,
+  useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
@@ -16,6 +17,7 @@ import {
   releaseConveyorGeometry,
   retainConveyorGeometry,
 } from './geometry-builder'
+import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
 import { frameWidthM, moduleLengthM } from './metrics'
 import type { ConveyorRollerNode } from './schema'
@@ -86,12 +88,15 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
   /**
    * Whether the module standing downstream builds the shared support.
    *
-   * Always false until the port index lands — a module with no neighbours
-   * builds both its supports, which is correct for a lone module and merely
-   * generous for an abutting one. Wiring it is increment 2; the geometry key
-   * and the parts list already take it, so nothing here has to change.
+   * The catalogue puts one support at every joint, not two, so a run of modules
+   * must not each build one — every seam would carry doubled steel, a doubled
+   * shadow and z-fighting on every coincident face.
+   *
+   * The index behind this is built once per store write and shared by every
+   * module; the selector narrows it to one boolean, so a module re-renders only
+   * when its *own* answer changes rather than on every scene edit.
    */
-  const abutted = false
+  const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
   /**
    * The tier this module is drawing. Owned by the frame loop below, and the

@@ -2,6 +2,8 @@ import type { NodeDefinition } from '@pascal-app/core'
 import { buildConveyorFloorplan } from './floorplan'
 import { frameWidthM, moduleLengthM } from './metrics'
 import { conveyorRollerParametrics } from './parametrics'
+import { snapToLineEnd } from './port-magnet'
+import { conveyorPorts } from './ports'
 import { ConveyorRollerNode } from './schema'
 
 /** Every 45°, the full turn. Written out rather than derived: a mirrored-and-
@@ -16,6 +18,20 @@ export const conveyorRollerDefinition = {
   category: 'furnish',
   surfaceRole: 'furnishing',
   snapProfile: 'item',
+
+  /**
+   * A module is a **fitting**, not a run, and the distinction is the whole
+   * payoff of declaring ports at all.
+   *
+   * The host's run arm rewrites a node's `path` to reach a moved neighbour —
+   * which would stretch a catalogue 6 m bed to whatever the gap happened to be,
+   * and mint a geometry per stretched length. The fitting arm translates the
+   * node rigidly instead, which is the only correct semantics for a bed that
+   * cannot be lengthened. In exchange: drag any module of a line and the whole
+   * connected line follows, previewed without touching history and folded into
+   * one write at the end — **one undo step for a sixty-metre line.**
+   */
+  distributionRole: 'fitting',
   // A conveyor has a direction, and it is the whole point of one.
   facingIndicator: true,
 
@@ -34,7 +50,27 @@ export const conveyorRollerDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: {
+      axes: ['x', 'z'],
+      gridSnap: true,
+      /**
+       * The magnet. Modules join end to end at an exact coincidence, and
+       * nothing the host offers reaches it: alignment guides pull only inside
+       * 8 cm, grid snap fights a 6 m bed that is no multiple of any step, and
+       * Duplicate drops its copy a hardcoded metre along world X and Z. See
+       * `./port-magnet`.
+       */
+      groupMoveSnap: ({ node, candidatePosition, movingIds, nodes }) => {
+        const conveyor = node as unknown as ConveyorRollerNode
+        return snapToLineEnd(
+          conveyor,
+          candidatePosition,
+          conveyor.rotation?.[1] ?? 0,
+          movingIds as readonly string[],
+          nodes as Readonly<Record<string, unknown>>,
+        )
+      },
+    },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},
 
@@ -85,6 +121,10 @@ export const conveyorRollerDefinition = {
       }
     },
   },
+
+  /** Where a module can be joined, and to what. Reading it is what gives the
+   *  host the connectivity that drags a whole line as one. */
+  ports: conveyorPorts,
 
   parametrics: conveyorRollerParametrics,
 

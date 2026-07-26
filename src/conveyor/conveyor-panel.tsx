@@ -5,6 +5,7 @@ import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { type CSSProperties, useState } from 'react'
 import { CAR } from './catalog'
+import { hasDownstreamNeighbour, hasUpstreamNeighbour, lineOf } from './line-index'
 import {
   frameWidthM,
   maxThroughputPerHour,
@@ -15,6 +16,7 @@ import {
   supportOffsetsX,
 } from './metrics'
 import { conveyorRollerParametrics } from './parametrics'
+import { jointProblems } from './port-magnet'
 import type { ConveyorRollerNode } from './schema'
 
 /**
@@ -135,11 +137,18 @@ function useInspectedConveyor(provided?: ConveyorRollerNode): ConveyorRollerNode
 
 export default function ConveyorPanel({ node: provided }: { node?: ConveyorRollerNode }) {
   const node = useInspectedConveyor(provided)
+  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
   const [draft, setDraft] = useState<string | null>(null)
 
   if (!node) return null
 
-  const issues = conveyorRollerParametrics.invariants?.flatMap((check) => check(node)) ?? []
+  // The descriptor's own warnings, plus the ones that only exist once a module
+  // has a neighbour — a joint is between two nodes, so no single node's
+  // invariants can see it.
+  const issues = [
+    ...(conveyorRollerParametrics.invariants?.flatMap((check) => check(node)) ?? []),
+    ...jointProblems(node, nodes).map((msg) => ({ field: undefined, severity: 'warning', msg })),
+  ]
   const length = moduleLengthM(node)
   const pitch = rollerPitchM(node)
 
@@ -203,6 +212,10 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
               'Rated load',
               `${CAR.loadKgPerMetre} kg/m · ${ratedLoadKg(node).toFixed(0)} kg on this bed`,
             ],
+            // What a joint bought. A line is not stored anywhere — it is the
+            // set of modules whose ends meet, read back from their ports — so
+            // this figure cannot disagree with what is drawn.
+            ['Line', describeLine(node, nodes)],
           ] as Array<[string, string]>
         ).map(([label, value]) => (
           <div key={label} style={styles.label}>
@@ -245,8 +258,33 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
 
       <p style={styles.hint}>
         Each module is its own object, so you can select, move, copy or delete any of them on their
-        own. Place a run with <strong>[</strong> and <strong>]</strong> while the tool is armed.
+        own. Place a run with <strong>[</strong> and <strong>]</strong> while the tool is armed, or
+        drag one within half a metre of another's free end and it clicks on — head to tail, matching
+        lane, matching height. Drag a joined module and the whole line comes with it.
       </p>
     </div>
   )
+}
+
+/**
+ * The line this module belongs to, in a phrase.
+ *
+ * Computed from the ports rather than stored, so it is never stale: a module
+ * deleted out of the middle splits the line the instant the store writes, with
+ * nothing to heal.
+ */
+function describeLine(node: ConveyorRollerNode, nodes: Record<string, unknown>): string {
+  const line = lineOf(nodes, node.id)
+  if (line.length <= 1) return 'on its own'
+
+  let length = 0
+  for (const id of line) {
+    const member = nodes[id] as ConveyorRollerNode | undefined
+    if (member) length += moduleLengthM(member)
+  }
+  const ends: string[] = []
+  if (!hasUpstreamNeighbour(nodes, node)) ends.push('head')
+  if (!hasDownstreamNeighbour(nodes, node)) ends.push('tail')
+  const place = ends.length === 2 ? 'alone' : ends.length ? `at the ${ends[0]}` : 'mid-line'
+  return `${line.length} modules · ${length.toFixed(2)} m · this one ${place}`
 }

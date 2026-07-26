@@ -61,19 +61,30 @@ export function resetOccupancyIndex(): void {
 }
 
 /**
- * Stable 0..1 draw for a slot id.
+ * Stable 0..1 draw for a slot, in a particular rack.
  *
  * `ghostFill` needs to pick a subset of slots, and the pick has to be identical
  * on every render — `Math.random()` would reshuffle the whole rack each frame.
- * Hashing the address also makes the fill *progressive*: raising the fraction
- * adds ghosts to slots that were already empty instead of redealing, so the
- * rack visibly fills rather than flickering into a new arrangement.
+ * Hashing also makes the fill *progressive*: raising the fraction adds ghosts to
+ * slots that were already empty instead of redealing, so the rack visibly fills
+ * rather than flickering into a new arrangement.
+ *
+ * **The rack id is part of the draw, and has to be.** Every bay is its own node
+ * now, and every bay therefore emits the same slot addresses — `R1-B1-L0-P1-D1`
+ * and so on. Hashing the address alone gave every bay in a run the identical
+ * draw, so a twenty-bay run at 30% fill showed the same three slots stocked
+ * twenty times over: a perfectly repeating pattern no warehouse has ever had.
+ * Under the block model the addresses ran `B1`..`B20` and the bug could not
+ * arise.
  */
-export function slotDraw(address: string): number {
+export function slotDraw(rackId: string, address: string): number {
   let hash = 0x811c9dc5
-  for (let index = 0; index < address.length; index++) {
-    hash ^= address.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
+  // Fed as one stream with a separator, so `ab|c` and `a|bc` cannot collide.
+  for (const text of [rackId, '|', address]) {
+    for (let index = 0; index < text.length; index++) {
+      hash ^= text.charCodeAt(index)
+      hash = Math.imul(hash, 0x01000193)
+    }
   }
   return ((hash >>> 0) % 10_000) / 10_000
 }

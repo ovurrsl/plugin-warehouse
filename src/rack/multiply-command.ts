@@ -2,7 +2,8 @@
 
 import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
-import { electSupportSlab } from '../placement'
+import { slabAt } from '../host-adapter'
+import { collectSlabs } from '../placement'
 import { type MultiplySpec, multiplyPlacements } from './multiply'
 import { PalletRackNode } from './schema'
 
@@ -34,6 +35,12 @@ function siblingsOf(
 ): PalletRackNode[] {
   const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
   const { id: _drop, ...rest } = rack
+  // Collected once. Electing per sibling walks the level's whole child list each
+  // time, and in a finished warehouse those children are the racks — so a
+  // 2,000-bay run into a level already holding 2,000 racks was four million
+  // lookups and about 70 ms inside one click, growing with everything already
+  // placed.
+  const slabs = levelId ? collectSlabs(nodes, levelId) : []
 
   return multiplyPlacements(rack, spec).map((placement) =>
     PalletRackNode.parse({
@@ -43,9 +50,7 @@ function siblingsOf(
       // Re-elected per sibling rather than inherited: a twenty-bay run is 57 m
       // long and can easily start on one slab and finish on another, and the
       // slab is what the host lifts the bay onto.
-      supportSlabId: levelId
-        ? electSupportSlab(nodes, levelId, placement.position[0], placement.position[2])
-        : null,
+      supportSlabId: slabAt(slabs, placement.position[0], placement.position[2])?.id ?? null,
     }),
   )
 }

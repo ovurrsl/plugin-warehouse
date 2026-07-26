@@ -2,7 +2,7 @@ import type { NodeDefinition } from '@pascal-app/core'
 import { buildPalletRackFloorplan } from './floorplan'
 import { palletRackParametrics } from './parametrics'
 import { PalletRackNode } from './schema'
-import { totalDepth, totalWidth } from './slots'
+import { bayPitch, totalDepth, totalWidth } from './slots'
 
 /** Every 45°, the full turn. Written out rather than derived: a mirrored-and-
  *  filtered list drops 0 as well as -0, which silently removes the one angle a
@@ -61,10 +61,25 @@ export const palletRackDefinition = {
     snappable: {},
 
     floorPlaced: {
+      /**
+       * **The pitch, not the outer width.**
+       *
+       * A bay is `bayPitch` wide as far as the world is concerned, and its steel
+       * overhangs that by half an upright each side — the half-post a neighbour
+       * shares. Declaring the outer width instead made two bays at the sharing
+       * pitch overlap by one upright (122 mm on the defaults), which
+       * `spatialGridManager` reads as a hard conflict: the placement box went
+       * red and the click was swallowed every time a bay was brought flush
+       * against another. The one gesture the whole kind is built around was the
+       * one thing it refused to do.
+       *
+       * The overhang is not a fudge. Footplates already reach further out than
+       * this (`uprightWidth + 0.053`), and no footprint has ever contained them.
+       */
       footprint: (node) => {
         const rack = node as unknown as PalletRackNode
         return {
-          dimensions: [totalWidth(rack), rack.uprightHeight, totalDepth(rack)],
+          dimensions: [bayPitch(rack), rack.uprightHeight, totalDepth(rack)],
           rotation: rack.rotation ?? [0, 0, 0],
         }
       },

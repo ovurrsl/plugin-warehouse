@@ -95,6 +95,20 @@ describe('a bay leaves its right frame to whatever stands against it', () => {
     expect(hasRightNeighbour(nodes, lone.id)).toBe(false)
   })
 
+  test('a full turn is the same orientation as none', () => {
+    // The host's rotate affordance accumulates rather than wrapping, so a bay
+    // turned eight times by 45° really does sit at 2π. Quantising the raw angle
+    // made it a different shape from its neighbour at 0 and opened a gap in the
+    // steel that nothing explained.
+    const first = rack('a', { position: [0, 0, 0], rotation: [0, 0, 0] })
+    const wrapped = rack('b', { position: [PITCH, 0, 0], rotation: [0, Math.PI * 2, 0] })
+    expect(hasRightNeighbour(scene(first, wrapped), first.id)).toBe(true)
+
+    resetNeighbourIndex()
+    const negative = rack('c', { position: [0, 0, 0], rotation: [0, -Math.PI * 2, 0] })
+    expect(hasRightNeighbour(scene(negative, wrapped), negative.id)).toBe(true)
+  })
+
   test('a bay never reports itself as its own neighbour', () => {
     // Unreachable while `bayClearWidth` has a minimum, and guarded anyway: a bay
     // that did would delete its right frame with nothing to say why.

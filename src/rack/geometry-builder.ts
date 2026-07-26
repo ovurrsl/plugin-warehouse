@@ -4,6 +4,8 @@ import { rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   beamedLevels,
+  type DeckFinish,
+  deckFinishOf,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
@@ -44,17 +46,28 @@ type Sink = {
 }
 
 /**
- * The material's map is a two-column atlas: the left column is blank and the
- * right carries the punched slot pattern. Steering UVs into one column or the
- * other is what lets an upright show its perforations while every other part
+ * The material's map is a three-column atlas: blank, the punched slot pattern,
+ * and a wire-deck grid. Steering UVs into one column is what lets an upright
+ * show its perforations and a wire deck show its mesh while every other part
  * stays plain — without a second material, and so without a second draw call
  * per rack.
+ *
+ * The patterned columns are inset by 4% of a column so a part can never sample
+ * across a boundary under filtering; the blank column takes its centre, which
+ * is as far from either edge as it gets.
  */
-const ATLAS_BLANK_U = 0.25
-const ATLAS_SLOT_U0 = 0.52
-const ATLAS_SLOT_U1 = 0.98
+const ATLAS_COLUMN = 1 / 3
+const ATLAS_INSET = ATLAS_COLUMN * 0.04
+const ATLAS_BLANK_U = ATLAS_COLUMN / 2
+const ATLAS_SLOT_U0 = ATLAS_COLUMN + ATLAS_INSET
+const ATLAS_SLOT_U1 = 2 * ATLAS_COLUMN - ATLAS_INSET
+const ATLAS_MESH_U0 = 2 * ATLAS_COLUMN + ATLAS_INSET
+const ATLAS_MESH_U1 = 1 - ATLAS_INSET
 /** Upright slots are punched every 50 mm, so the pattern repeats at that rate. */
 const SLOT_PITCH = 0.05
+/** Wire decks are welded on a 100 mm grid, and the mesh tile is one grid square,
+ *  so V repeats once per 100 mm of deck. */
+const MESH_PITCH = 0.1
 
 /** Unit-cube faces as outward normal plus four CCW corners in half-extents. */
 const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, number]> }> = [
@@ -128,29 +141,44 @@ function emitPart(sink: Sink, part: RackPart, color: readonly [number, number, n
   const tilt = part.tiltX ?? 0
   const cos = Math.cos(tilt)
   const sin = Math.sin(tilt)
-  // Repeat the pattern along the part's own height, so the slot pitch is the
-  // real 50 mm whatever the post length — a 0..1 map would stretch the holes
-  // further apart on a taller frame.
-  const vSpan = part.size[1] / SLOT_PITCH
+  // Repeat each pattern along the axis that carries it, so the pitch stays the
+  // real 50 mm / 100 mm whatever the part's size — a 0..1 map would stretch the
+  // holes further apart on a taller frame and the mesh coarser on a wider bay.
+  const slotSpan = part.size[1] / SLOT_PITCH
+  const meshSpan = part.size[0] / MESH_PITCH
 
   for (const face of FACES) {
     const base = sink.positions.length / 3
     const ny = face.n[1] * cos - face.n[2] * sin
     const nz = face.n[1] * sin + face.n[2] * cos
+    // An upright is read from the side and a deck from above, so "the face that
+    // carries the pattern" is the opposite one in each case.
+    const upright = Math.abs(face.n[1]) < 0.5
     for (const corner of face.c) {
       const y = corner[1] * hy
       const z = corner[2] * hz
       sink.positions.push(cx + corner[0] * hx, cy + y * cos - z * sin, cz + y * sin + z * cos)
       sink.normals.push(face.n[0], ny, nz)
       sink.colors.push(color[0], color[1], color[2])
-      if (part.perforated) {
+
+      if (part.pattern === 'slots' && upright) {
         // Only the broad faces carry holes; the paper-thin edges of a folded
         // section would smear one pixel of the pattern across them.
-        const broad = Math.abs(face.n[1]) < 0.5
-        const u = broad
-          ? ATLAS_SLOT_U0 + (corner[0] > 0 ? 1 : 0) * (ATLAS_SLOT_U1 - ATLAS_SLOT_U0)
-          : ATLAS_BLANK_U
-        sink.uvs.push(u, broad ? (corner[1] > 0 ? 1 : 0) * vSpan : 0)
+        sink.uvs.push(
+          ATLAS_SLOT_U0 + (corner[0] > 0 ? 1 : 0) * (ATLAS_SLOT_U1 - ATLAS_SLOT_U0),
+          (corner[1] > 0 ? 1 : 0) * slotSpan,
+        )
+      } else if (part.pattern === 'mesh' && !upright) {
+        // U maps the depth once and V repeats along the run, not the other way
+        // round, and the choice is forced: `wrapS` has to stay clamped or one
+        // atlas column bleeds into the next, so only V can tile. So the run gets
+        // the exact 100 mm pitch and the into-depth cell count is whatever the
+        // tile's own grid gives — 100 mm on a 1.1 m frame, which is the frame
+        // almost every rack uses.
+        sink.uvs.push(
+          ATLAS_MESH_U0 + (corner[2] > 0 ? 1 : 0) * (ATLAS_MESH_U1 - ATLAS_MESH_U0),
+          (corner[0] > 0 ? 1 : 0) * meshSpan,
+        )
       } else {
         sink.uvs.push(ATLAS_BLANK_U, 0)
       }
@@ -180,12 +208,44 @@ function toLinear(hex: string): [number, number, number] {
   return linear
 }
 
-const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam'>, string> = {
+const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam' | 'shelf'>, string> = {
   footplate: '#334155',
   brace: '#94a3b8',
   connector: '#475569',
-  shelf: '#9aa5b1',
   'support-bar': '#cbd5e1',
+}
+
+/**
+ * A shelf's colour comes from its finish, not from its role.
+ *
+ * This is the fix for the defect that started the whole audit: colour was keyed
+ * on role alone, so all four decking values painted the same `#9aa5b1` slab —
+ * and since thickness is the only other thing decking reached, `wire-mesh` and
+ * `steel` built byte-identical meshes. Three of the four options were inert.
+ *
+ * Colour is per-vertex and already in the buffer, so this costs nothing: no
+ * second material, no second draw call, not one extra triangle.
+ *
+ * The wire deck is bright because the atlas darkens it: the mesh column leaves
+ * the wires white and paints the openings dark, and the map multiplies into this
+ * colour. So this is the colour of the **wire**, and what you see between the
+ * wires is this colour times the opening — which is also physically what a mesh
+ * deck is, the mat plus the shadow under it.
+ */
+const DECK_COLORS: Record<DeckFinish, string> = {
+  /** Galvanised wire, bright. The grid pattern does the rest. */
+  'wire-mesh': '#ced7e2',
+  /** A flat roll-formed panel — no pattern, so a mid grey that cannot be
+   *  mistaken for the mesh beside it. */
+  steel: '#8a94a0',
+  /** Chipboard. Unmistakable, which is the point. */
+  timber: '#b08a55',
+  /** Never emitted; `deckFinishOf` returns null for an open level. */
+  open: '#9aa5b1',
+  /** The picking shelf keeps the old shelf grey. It is a specified part, not a
+   *  deck finish, and it must not change colour when the pallet levels above it
+   *  are re-decked. */
+  picking: '#9aa5b1',
 }
 
 export type { RackDetail } from './parts'
@@ -203,7 +263,9 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
         ? uprightColor
         : part.role === 'beam'
           ? beamColor
-          : toLinear(ROLE_COLORS[part.role])
+          : part.role === 'shelf'
+            ? toLinear(DECK_COLORS[part.finish ?? 'picking'])
+            : toLinear(ROLE_COLORS[part.role])
     emitPart(sink, part, color)
   }
 
@@ -246,9 +308,6 @@ export function rackGeometryKey(
   detail: RackDetail,
   hasRightNeighbour = false,
 ): string {
-  // Zero unless a bar is actually built: a decked level carries the pallet, so
-  // the bar count on a decked rack moves nothing.
-  const bars = palletSupportBarsDrawn(rack) ? palletSupportBarCount(rack) : 0
   // Exactly the levels `rackParts` emits: beamed, minus anything the tunnel
   // opens up. Deriving it rather than listing `tunnelLevels` keeps a tunnel that
   // reaches no level — one set under a rack whose ground level carries no beam —
@@ -259,6 +318,19 @@ export function rackGeometryKey(
   const levels = drawn
     .map((level) => `${levelTypeOf(rack, level)}@${levelSurfaceY(rack, level).toFixed(5)}`)
     .join(',')
+  // The panels actually built, per level, through the same helper the builder
+  // uses. `rack.decking` was listed raw here, which is how the cache ended up
+  // holding two copies of one mesh: back when every finish painted the same grey
+  // slab, `wire-mesh` and `steel` produced byte-identical geometry under two
+  // different keys. Deriving it means the key follows the panels wherever the
+  // rules move next — a bay with no beamed level has no deck and does not
+  // mention one.
+  const finishes = drawn.map((level) => deckFinishOf(rack, level) ?? '-').join(',')
+  // Zero unless a bar is actually built. Not `decking === 'open'`, which was the
+  // old test and was wrong per level: a ground beam carries no deck at any
+  // setting, so a wire-decked rack with `hasGroundBeam` really does grow bars,
+  // and two such racks differing only in bar count shared one mesh.
+  const bars = palletSupportBarsDrawn(rack) ? palletSupportBarCount(rack) : 0
 
   return [
     detail,
@@ -274,7 +346,7 @@ export function rackGeometryKey(
     rack.beamHeight,
     rack.beamThickness,
     rack.bracing,
-    rack.decking,
+    finishes,
     rack.hasGroundBeam ? 1 : 0,
     rack.depthPositions,
     rack.depthPositions > 1 ? rack.depthGap : 0,

@@ -113,23 +113,34 @@ describe('geometry content', () => {
     expect(rackGeometryCacheSize()).toBe(2)
   })
 
-  test('the steel matches the declared footprint, bar the footplate overhang', () => {
-    // The collision footprint measures over the outer upright faces. Catalogue
-    // footplates are wider than their post (175 mm under a 122 mm upright), so
-    // the built mesh legitimately exceeds it at floor level by about 26 mm a
-    // side. Asserted rather than ignored: any larger discrepancy means a part
-    // is escaping the footprint and bays could overlap while the editor
-    // reported a clear placement.
+  test('the steel overhangs the declared footprint by exactly the shared post', () => {
+    // The collision footprint is the **pitch**, not the outer width, and the
+    // difference is the whole shared-frame story: a bay occupies one pitch in
+    // the world and its two half-posts stick out either side, so bays at the
+    // sharing pitch tile exactly instead of overlapping by a post.
+    //
+    // Declaring the outer width instead is what made the editor refuse to place
+    // a bay flush against another — a 122 mm overlap, read as a hard conflict —
+    // so the one gesture the kind is built around was the one it would not do.
+    // This pins the relationship rather than the number.
     const r = rack()
-    const footprint = r.bayClearWidth + 2 * r.uprightWidth
+    const footprint = r.bayClearWidth + r.uprightWidth
+    const steel = r.bayClearWidth + 2 * r.uprightWidth
 
     const structure = getRackGeometry(r, 'simple').boundingBox
     const structureWidth = (structure?.max.x ?? 0) - (structure?.min.x ?? 0)
-    expect(structureWidth).toBeCloseTo(footprint, 5)
+    expect(structureWidth).toBeCloseTo(steel, 5)
+    // Precision 5, not 9: this is measured off the built Float32 buffer, so the
+    // last few digits are the attribute's, not the arithmetic's.
+    expect(structureWidth - footprint).toBeCloseTo(r.uprightWidth, 5)
 
+    // Catalogue footplates are wider than the post they carry — 175 mm under a
+    // 122 mm upright — so the full tier reaches a further 26 mm a side at floor
+    // level. Real, and asserted rather than ignored: anything larger means a
+    // part is escaping further than the design says it may.
     const full = getRackGeometry(r, 'full').boundingBox
     const fullWidth = (full?.max.x ?? 0) - (full?.min.x ?? 0)
-    expect(fullWidth - footprint).toBeCloseTo(0.053, 5)
+    expect(fullWidth - steel).toBeCloseTo(0.053, 5)
 
     expect(full?.min.y ?? -1).toBeGreaterThanOrEqual(-1e-9)
     expect(full?.max.y ?? 0).toBeCloseTo(r.uprightHeight, 5)
@@ -239,6 +250,13 @@ describe('cache key coverage', () => {
 
   // One altered value per field. Kept explicit rather than generated so each
   // stays inside its schema range.
+  //
+  // **Every value of every enum is listed, not one representative.** A single
+  // representative only proves the key notices the value that happens to differ,
+  // and the bug this table exists to catch is precisely the opposite: `decking`
+  // shipped with `wire-mesh` and `steel` building byte-identical meshes under
+  // two different keys, and the table said nothing because it only ever tried
+  // `timber`. `ENUMS` below sweeps every value against every other.
   const VARIANTS: Array<[string, unknown]> = [
     ['bayClearWidth', 3.3],
     ['depth', 1.2],
@@ -300,6 +318,69 @@ describe('cache key coverage', () => {
       const changesKey = rackGeometryKey(variant, 'full') !== baseKey
       expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
     }
+  })
+
+  /**
+   * Every value of every geometry enum, so the sweep below compares each against
+   * each rather than each against the default.
+   *
+   * `decking` is the reason this exists. With one representative per field, the
+   * table could only ever ask "does `timber` differ from `wire-mesh`?" — which it
+   * does — and never "does `steel` differ from `wire-mesh`?", which it did not.
+   * A whole class of over-reporting was invisible to the strongest test in the
+   * repo. Enums are small; sweep them exhaustively.
+   */
+  const ENUMS: Array<[string, readonly unknown[], Record<string, unknown>]> = [
+    // Decking only reaches the mesh where a level actually carries a panel, so
+    // the sweep needs a rack that has one.
+    ['decking', ['wire-mesh', 'steel', 'timber', 'open'], { levels: 2, uprightHeight: 8 }],
+    ['bracing', ['z-bracing', 'x-bracing', 'open'], {}],
+    ['palletOrientation', ['short-side-out', 'long-side-out'], { decking: 'open' }],
+    ['palletPreset', ['epal-1', 'epal-2', 'epal-3'], { decking: 'open' }],
+  ]
+
+  test('every pair of enum values agrees about whether it changes the mesh', () => {
+    for (const [field, values, context] of ENUMS) {
+      const meshes = values.map((value) => buildFresh(rack({ ...context, [field]: value })))
+      const keys = values.map((value) =>
+        rackGeometryKey(rack({ ...context, [field]: value }), 'full'),
+      )
+
+      for (let a = 0; a < values.length; a++) {
+        for (let b = a + 1; b < values.length; b++) {
+          const pair = `${field}: ${String(values[a])} vs ${String(values[b])}`
+          const differentMesh = !sameMesh(meshes[a] as Float32Array, meshes[b] as Float32Array)
+          const differentKey = keys[a] !== keys[b]
+          expect({ pair, differentKey }).toEqual({ pair, differentKey: differentMesh })
+        }
+      }
+    }
+  })
+
+  test('every decking value is visibly its own thing, not just its own key', () => {
+    // A key that distinguishes them is necessary and nowhere near sufficient —
+    // that was exactly the shipped state. What the user needs is for the four
+    // options to look like four different products, so this asserts against the
+    // *colour* buffer, which is where the difference now lives.
+    const shelfColors = (decking: string) => {
+      clearRackGeometryCache()
+      const node = rack({ decking, levels: 2, uprightHeight: 8 })
+      const geometry = getRackGeometry(node, 'full')
+      const colors = geometry.getAttribute('color').array as ArrayLike<number>
+      return new Set(
+        Array.from({ length: colors.length / 3 }, (_, index) =>
+          [colors[index * 3], colors[index * 3 + 1], colors[index * 3 + 2]].join(','),
+        ),
+      )
+    }
+
+    const mesh = shelfColors('wire-mesh')
+    const steel = shelfColors('steel')
+    const timber = shelfColors('timber')
+    // Each carries a colour neither of the others has: the deck's own.
+    expect([...mesh].some((color) => !steel.has(color) && !timber.has(color))).toBe(true)
+    expect([...steel].some((color) => !mesh.has(color) && !timber.has(color))).toBe(true)
+    expect([...timber].some((color) => !mesh.has(color) && !steel.has(color))).toBe(true)
   })
 
   test('the shared-frame flag reaches the key, in both directions', () => {

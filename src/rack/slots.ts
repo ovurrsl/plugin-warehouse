@@ -283,6 +283,24 @@ export function levelHasShelf(rack: PalletRackNode, level: number): boolean {
   return levelTypeOf(rack, level) === 'picking' || rack.decking !== 'open'
 }
 
+/**
+ * What the panel over a level actually is.
+ *
+ * A picking level's shelf is a shelf — a solid panel sized to hold containers —
+ * and it is *not* the pallet deck the `decking` field describes. Keeping the two
+ * apart is what stops a picking shelf from turning brown when the pallet levels
+ * above it are given chipboard decks.
+ *
+ * Shared by the builder and the geometry cache key, so the key can never
+ * disagree with the mesh about which finishes a rack actually emits.
+ */
+export type DeckFinish = PalletRackNode['decking'] | 'picking'
+
+export function deckFinishOf(rack: PalletRackNode, level: number): DeckFinish | null {
+  if (!levelHasShelf(rack, level)) return null
+  return levelTypeOf(rack, level) === 'picking' ? 'picking' : rack.decking
+}
+
 // ── Pallet fit ──────────────────────────────────────────────────────────────
 
 /**
@@ -577,15 +595,26 @@ export function palletSupportBarCount(rack: PalletRackNode): number {
 }
 
 /**
- * Whether any bar is actually built.
+ * Levels that actually carry support bars: a beamed level the bay still has,
+ * with no panel over it.
  *
- * A decked level never gets one — the two mount in the same place and the deck
- * already does the job. So on a decked rack the bar count moves no vertex, and
- * anything that keys on it (the geometry cache) has to know that or it splits
- * the cache on a number nothing reads.
+ * A decked level never gets bars — the two mount in the same six millimetres and
+ * the deck already carries the pallet whichever way round it sits. But "decked"
+ * is per level, not per rack: a **ground beam** carries no shelf at any decking
+ * setting (`levelHasShelf` is false below level 1), so a wire-decked rack with
+ * `hasGroundBeam` really does grow bars down there. Testing `decking === 'open'`
+ * at rack level missed exactly that case, and the geometry cache key inherited
+ * the miss — two racks differing only in bar count shared one mesh.
  */
+export function barLevels(rack: PalletRackNode): number[] {
+  if (palletSupportBarCount(rack) === 0) return []
+  const present = new Set(storageLevelsPresent(rack))
+  return beamedLevels(rack).filter((level) => present.has(level) && !levelHasShelf(rack, level))
+}
+
+/** Whether any bar is actually built. */
 export function palletSupportBarsDrawn(rack: PalletRackNode): boolean {
-  return palletSupportBarCount(rack) > 0 && rack.decking === 'open'
+  return barLevels(rack).length > 0
 }
 
 /**

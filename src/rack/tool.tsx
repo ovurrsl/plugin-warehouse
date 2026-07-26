@@ -91,8 +91,15 @@ export default function PalletRackTool() {
    * the bay under the cursor is an *end* of the run rather than its middle.
    */
   const extent = useMemo(() => runExtent(previewNode, spec), [previewNode, spec])
+  // `collisionWidth`, not `width`: the box is a validity indicator, so it has to
+  // draw exactly what is being tested. The steel overhangs it by half an upright
+  // at each end, which is what lets the next run sit against this one.
   const boxDimensions = useMemo(
-    (): [number, number, number] => [extent.width, previewNode.uprightHeight, extent.depth],
+    (): [number, number, number] => [
+      extent.collisionWidth,
+      previewNode.uprightHeight,
+      extent.depth,
+    ],
     [extent, previewNode.uprightHeight],
   )
 

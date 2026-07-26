@@ -103,10 +103,28 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
    */
   const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
 
-  // Exporting must not bake a distance-dependent tier into the file, so the
-  // full mesh is the one that mounts and the swap below is skipped.
+  /**
+   * The tier this rack is drawing. Owned by the frame loop below — and the
+   * mounted geometry has to be read *from* it, not hardcoded.
+   *
+   * It was hardcoded to `'full'`, and the two paths fought. R3F diffs props by
+   * reference, so the memo only clobbered the imperative swap when it produced a
+   * different buffer — which is exactly what happens when `abutted` flips. So a
+   * distant rack that had dropped to its silhouette was handed the full mesh
+   * back the moment a bay was placed against it, while `detailRef` still said
+   * `'simple'` and the `next === current` guard blocked re-demotion until the
+   * camera made a full round trip through the hysteresis band. Multiplying a run
+   * walked bay after bay into the full tier, and LOD is the only thing paying
+   * for two thousand nodes.
+   *
+   * Exporting must not bake a distance-dependent tier into the file, so it pins
+   * the full mesh and the swap below is skipped.
+   */
   const detailRef = useRef<RackDetail>('full')
-  const geometry = useMemo(() => getRackGeometry(node, 'full', abutted), [node, abutted])
+  const geometry = useMemo(
+    () => getRackGeometry(node, isExporting ? 'full' : detailRef.current, abutted),
+    [node, abutted, isExporting],
+  )
   const material = getRackMaterial()
 
   const frameRef = useRef(0)
@@ -169,7 +187,10 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
 
       <group position={position} ref={registeredRef} rotation={rotation}>
         <mesh
-          castShadow
+          // Derived from the same tier as the geometry, for the same reason: a
+          // hardcoded `castShadow` re-promoted a demoted rack to a caster on the
+          // next re-render, and every caster is a second draw in the shadow pass.
+          castShadow={isExporting || detailRef.current === 'full'}
           // Never dispose: shared by every rack of this shape.
           dispose={null}
           geometry={geometry}
@@ -222,7 +243,7 @@ function GhostStock({ node }: { node: PalletRackNode }) {
     const result: Array<{ position: [number, number, number]; load: number }> = []
     for (const slot of palletSlotsOf(node)) {
       if (occupied.has(slot.id)) continue
-      if (slotDraw(slot.id) >= node.ghostFill) continue
+      if (slotDraw(node.id, slot.id) >= node.ghostFill) continue
       // Leave the top of the opening clear rather than filling it exactly: a
       // unit load that touches the beam above reads as a modelling error.
       const load = Math.max(0, Math.min(1.2, slot.clearHeight - spec.height - 0.15))

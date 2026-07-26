@@ -195,6 +195,26 @@ export function electSupportSlab(
   x: number,
   z: number,
 ): string | null {
+  return slabAt(collectSlabs(nodes, levelId), x, z)?.id ?? null
+}
+
+/**
+ * The level's slabs, once.
+ *
+ * Split out of `electSupportSlab` because that function walks **every child of
+ * the level** to find them, and a level's children are mostly not slabs — in a
+ * finished warehouse they are the two thousand racks. Electing per node
+ * therefore costs placed × children, which is quadratic in exactly the thing
+ * this kind is built to have a lot of: laying a 2,000-bay run into a level that
+ * already holds 2,000 racks is four million lookups inside one click.
+ *
+ * Anything placing more than one node collects once and calls `slabAt` per
+ * position, which is placed + children.
+ */
+export function collectSlabs(
+  nodes: Readonly<Record<string, unknown>>,
+  levelId: string,
+): SlabLike[] {
   const level = nodes[levelId] as { children?: unknown } | undefined
   const childIds = Array.isArray(level?.children) ? level.children : []
   const slabs: SlabLike[] = []
@@ -203,7 +223,7 @@ export function electSupportSlab(
     const slab = asSlab(nodes[id])
     if (slab) slabs.push(slab)
   }
-  return slabAt(slabs, x, z)?.id ?? null
+  return slabs
 }
 
 export type GridMoveHandler = (rawLevelLocal: [number, number, number], event: GridEvent) => void

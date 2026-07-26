@@ -2,10 +2,11 @@ import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
   beamedLevels,
+  type DeckFinish,
+  deckFinishOf,
   depthPositionZ,
   frameCentersX,
   levelBeamHeight,
-  levelHasShelf,
   levelSurfaceY,
   palletSupportBarCount,
   slotOffsetsX,
@@ -46,16 +47,29 @@ export type RackPart = {
   /** Rotation about X in radians. Only frame bracing uses it. */
   tiltX?: number
   /**
-   * Carries the punched slot pattern.
+   * Which column of the material's atlas this part reads.
    *
-   * Set on the web and flanges of an upright, which is where the perforations
-   * actually are. The pattern is a texture rather than geometry: the old
-   * renderer drew each slot as an instanced box, which on a 5 m post is 65
-   * slots x 2 columns x 8 posts — about a thousand extra boxes per rack, and at
-   * warehouse scale that alone costs more than everything else in the model
-   * combined.
+   * The whole rack draws from **one** material, so a part that needs a surface
+   * pattern cannot have its own map — it steers its UVs into a column of a
+   * shared atlas instead. `slots` is the upright's punched face; `mesh` is a
+   * wire deck's grid. Absent means the blank column, which multiplies out to
+   * exactly the part's own colour.
+   *
+   * The pattern is a texture rather than geometry, and that is the whole point:
+   * the renderer this replaces drew each punched slot as an instanced box, which
+   * on a 5 m post is 65 slots x 2 columns x 8 posts — about a thousand extra
+   * boxes per rack, more than everything else in the model combined.
    */
-  perforated?: boolean
+  pattern?: 'slots' | 'mesh'
+  /**
+   * Which panel a shelf is. Absent on everything that is not a shelf.
+   *
+   * Carried on the part rather than read back off the node, because a rack mixes
+   * them: the pallet levels take `decking` and a picking level takes its own
+   * shelf whatever `decking` says. One field decides both the colour and the
+   * thickness, so the two can never drift apart.
+   */
+  finish?: DeckFinish
 }
 
 /** Wall thickness of the upright's cold-formed section. */
@@ -195,15 +209,23 @@ export function rackParts(
         }
       }
 
-      const decked = levelHasShelf(rack, level) && rack.decking !== 'open'
+      // `levelHasShelf` already encodes the open-deck rule, and it encodes it
+      // per level: a picking level carries a shelf whatever `decking` says,
+      // because containers cannot sit on beams. Re-testing `decking !== 'open'`
+      // here on top of it deleted exactly that shelf and left the containers
+      // standing on a panel that was never built.
+      const finish = deckFinishOf(rack, level)
 
-      if (full && decked) {
-        const thickness = shelfThickness(rack, level, rack.decking)
+      if (full && finish) {
+        const thickness = panelThickness(rack, finish)
         // Flush-mounted: the panel drops between the beams and its top
         // finishes level with them, so the load surface stays exactly where
         // `levelSurfaceY` says it is and pallets do not float on a lip.
         parts.push({
           role: 'shelf',
+          finish,
+          // Only a wire deck carries a pattern; the others are flat panels.
+          pattern: finish === 'wire-mesh' ? 'mesh' : undefined,
           center: [centerX, beamTop - thickness / 2, centerZ],
           size: [rack.bayClearWidth, thickness, depth - 2 * beamThickness],
         })
@@ -214,7 +236,7 @@ export function rackParts(
       // the same six millimetres — and the reason it is a real rule rather
       // than a drawing tidy-up is that a deck already carries the pallet
       // whichever way round it sits, which is the entire job of the bars.
-      if (full && !decked) {
+      if (full && !finish) {
         const bars = palletSupportBarCount(rack)
         if (bars > 0) {
           const barHeight = 0.03
@@ -255,14 +277,43 @@ export function rackParts(
  * pays it with LOD.
  */
 
-/** Chipboard is three times a steel or mesh panel and it shows at the edge. */
-function shelfThickness(
-  rack: PalletRackNode,
-  level: number,
-  decking: PalletRackNode['decking'],
-): number {
-  if (levelBeamHeight(rack, level) === rack.pickingBeamHeight) return rack.pickingShelfThickness
-  return decking === 'timber' ? 0.018 : 0.006
+/**
+ * Panel thickness by finish, from the catalogues.
+ *
+ * A total record rather than a `decking === 'timber' ? … : …` ternary, which was
+ * the shape of the old bug: two of the four values fell into the same branch and
+ * built the same slab. A record cannot gain a fifth finish without failing to
+ * compile.
+ *
+ * `picking` is here because it *is* one of the panels — it used to be detected
+ * by comparing `levelBeamHeight` against `pickingBeamHeight`, so a rack that
+ * legitimately set `beamHeight: 0.06` made every pallet deck take the picking
+ * thickness and `decking` go completely inert.
+ *
+ * Thickness alone is not what makes the finishes readable, and the audit that
+ * found this proved it: every face of the panel that differs is either coplanar
+ * with an upright flange or hidden behind a 120 mm beam, and the one that is
+ * visible — the underside — moves 12 mm. The colours and the wire pattern do the
+ * work. These numbers are here to be right, not to be seen.
+ */
+const DECK_THICKNESS: Record<PalletRackNode['decking'], number> = {
+  /** A welded wire mat, about 5 mm of wire. The formed channels it sits in are
+   *  part of the beam, not the deck. */
+  'wire-mesh': 0.005,
+  /** Roll-formed galvanised sheet — under a millimetre of steel, held out by its
+   *  own folded profile. */
+  steel: 0.009,
+  /** 18 mm P5 chipboard, the catalogue standard. (38 mm is the heavy option.) */
+  timber: 0.018,
+  /** Never emitted: `deckFinishOf` returns null for an open level. Present so
+   *  the record is total. */
+  open: 0.006,
+}
+
+/** A picking shelf is a specified part, so its thickness is a schema field
+ *  rather than a catalogue constant. */
+function panelThickness(rack: PalletRackNode, finish: DeckFinish): number {
+  return finish === 'picking' ? rack.pickingShelfThickness : DECK_THICKNESS[finish]
 }
 
 /**
@@ -289,7 +340,7 @@ function pushUprightSection(
     role: 'upright',
     center: [x, midY, z + facing * (depth / 2 - SECTION_WALL / 2)],
     size: [width, height, SECTION_WALL],
-    perforated: true,
+    pattern: 'slots',
   })
 
   for (const side of [-1, 1]) {
@@ -297,7 +348,7 @@ function pushUprightSection(
       role: 'upright',
       center: [x + (side * (width - SECTION_WALL)) / 2, midY, z],
       size: [SECTION_WALL, height, depth - SECTION_WALL],
-      perforated: true,
+      pattern: 'slots',
     })
     parts.push({
       role: 'upright',

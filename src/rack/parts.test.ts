@@ -240,19 +240,94 @@ describe('bay width follows the beam and upright dimensions', () => {
   })
 })
 
-describe('perforations', () => {
+describe('atlas patterns', () => {
   test('only the upright faces carry the slot pattern', () => {
     const r = rack()
     for (const part of rackParts(r, 'full')) {
-      if (part.perforated) expect(part.role).toBe('upright')
+      if (part.pattern === 'slots') expect(part.role).toBe('upright')
     }
-    expect(partsOf(r, 'upright').some((part) => part.perforated)).toBe(true)
+    expect(partsOf(r, 'upright').some((part) => part.pattern === 'slots')).toBe(true)
   })
 
-  test('the far tier drops the pattern along with the section', () => {
-    // `simple` uses a solid box for the post, so there is no web face to punch
-    // and the texture lookup would land on a face that is not really there.
-    const r = rack()
-    expect(rackParts(r, 'simple').some((part) => part.perforated)).toBe(false)
+  test('only a wire deck carries the mesh pattern', () => {
+    // The third atlas column is what lets a wire deck look like a wire deck
+    // without a second material. A flat panel asking for it would paint a grid
+    // onto chipboard.
+    for (const decking of ['wire-mesh', 'steel', 'timber', 'open'] as const) {
+      const meshed = rackParts(rack({ decking }), 'full').filter((part) => part.pattern === 'mesh')
+      expect({ decking, meshed: meshed.length > 0 }).toEqual({
+        decking,
+        meshed: decking === 'wire-mesh',
+      })
+      for (const part of meshed) expect(part.role).toBe('shelf')
+    }
+  })
+
+  test('a picking shelf never takes the mesh pattern, whatever the decking is', () => {
+    // A picking shelf is a specified part, not a deck finish — it must not turn
+    // into a wire mat because the pallet levels above it were re-decked.
+    // Two, not one: `pickingLevels` counts from the floor, and the floor carries
+    // no shelf at all — so a single picking level produces no shelf to check.
+    const r = rack({ decking: 'wire-mesh', pickingLevels: 2, levels: 2, uprightHeight: 8 })
+    const picking = rackParts(r, 'full').filter((part) => part.finish === 'picking')
+    expect(picking.length).toBeGreaterThan(0)
+    for (const part of picking) expect(part.pattern).toBeUndefined()
+  })
+
+  test('the far tier drops every pattern along with the section', () => {
+    // `simple` uses a solid box for the post and emits no deck at all, so a
+    // texture lookup would land on a face that is not really there.
+    const r = rack({ decking: 'wire-mesh' })
+    expect(rackParts(r, 'simple').some((part) => part.pattern !== undefined)).toBe(false)
+  })
+})
+
+describe('deck finishes', () => {
+  test('each decking value builds a distinct panel', () => {
+    // The defect the audit was launched for: colour was keyed on role, thickness
+    // was a `timber ? … : …` ternary, and the atlas had no mesh column — so
+    // `wire-mesh` and `steel` produced byte-identical geometry and three of the
+    // four options were inert on screen.
+    const seen = new Map<string, string>()
+    for (const decking of ['wire-mesh', 'steel', 'timber'] as const) {
+      const shelf = rackParts(rack({ decking }), 'full').find((part) => part.role === 'shelf')
+      expect(shelf).toBeDefined()
+      expect(shelf?.finish).toBe(decking)
+      const signature = `${shelf?.size[1]}/${shelf?.pattern ?? '-'}`
+      expect(seen.has(signature)).toBe(false)
+      seen.set(signature, decking)
+    }
+  })
+
+  test('an open deck builds no panel, and grows support bars instead', () => {
+    const open = rack({ decking: 'open', palletOrientation: 'long-side-out' })
+    const parts = rackParts(open, 'full')
+    expect(parts.some((part) => part.role === 'shelf')).toBe(false)
+    expect(parts.some((part) => part.role === 'support-bar')).toBe(true)
+  })
+
+  test('a picking level keeps its shelf even under an open deck', () => {
+    // Containers cannot sit on beams, which is what `levelHasShelf` says. The
+    // builder used to re-test `decking !== 'open'` on top of it and delete
+    // exactly that shelf, leaving the containers standing on nothing.
+    const r = rack({ decking: 'open', pickingLevels: 2, levels: 2, uprightHeight: 8 })
+    const shelves = rackParts(r, 'full').filter((part) => part.role === 'shelf')
+    expect(shelves.length).toBeGreaterThan(0)
+    for (const shelf of shelves) expect(shelf.finish).toBe('picking')
+  })
+
+  test('a ground beam grows support bars under any decking', () => {
+    // A ground beam carries no deck at any setting, so bars belong there whether
+    // or not the levels above are decked. Testing `decking === 'open'` at rack
+    // level missed it, and the cache key inherited the miss.
+    const r = rack({
+      decking: 'wire-mesh',
+      hasGroundBeam: true,
+      palletOrientation: 'long-side-out',
+    })
+    const bars = rackParts(r, 'full').filter((part) => part.role === 'support-bar')
+    expect(bars.length).toBeGreaterThan(0)
+    // All of them at the ground level, none up among the decked ones.
+    for (const bar of bars) expect(bar.center[1]).toBeLessThan(0.3)
   })
 })

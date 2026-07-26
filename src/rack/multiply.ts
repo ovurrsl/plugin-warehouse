@@ -104,7 +104,7 @@ export function rowOffsets(
  * the source bay.
  *
  * One derivation, three consumers: the placement box the tool collides and
- * draws, the depth and length the panel reports, and the tests. Computing it
+ * draws, the length and depth the panel reports, and the tests. Computing it
  * twice is how a run that reads 57.0 m in the panel ends up refusing to fit a
  * 57.5 m building.
  *
@@ -112,10 +112,28 @@ export function rowOffsets(
  * middle: bays grow along +X and rows along −Z, so the centre is half a run
  * along each.
  */
-export function runExtent(
-  rack: PalletRackNode,
-  spec: MultiplySpec,
-): { width: number; depth: number; centerLocal: [number, number] } {
+export type RunExtent = {
+  /**
+   * Overall steel length — N pitches plus the closing post. The figure you would
+   * measure against a wall, and the one the panel reports.
+   */
+  width: number
+  /**
+   * What the run occupies in the spatial grid, which is **not** the same number.
+   *
+   * A bay's declared footprint is one pitch wide (see `definition.ts`), so N
+   * bays tile exactly N pitches and the half-post at each end overhangs — the
+   * same overhang a single bay already has, and the same one the footplates
+   * have. Using the steel length here instead would make a run refuse to sit
+   * against the run beside it, which is the bug this pair of numbers exists to
+   * keep fixed.
+   */
+  collisionWidth: number
+  depth: number
+  centerLocal: [number, number]
+}
+
+export function runExtent(rack: PalletRackNode, spec: MultiplySpec): RunExtent {
   const pitch = bayPitch(rack)
   const bays = Math.max(1, Math.floor(spec.bays))
   const rows = rowOffsets(rack, spec)
@@ -123,8 +141,8 @@ export function runExtent(
   const bay = rowDepth(rack)
 
   return {
-    // N bays stand on N+1 frames: N pitches, plus the closing post.
     width: pitch * bays + rack.uprightWidth,
+    collisionWidth: pitch * bays,
     depth: bay - lastRowZ,
     centerLocal: [((bays - 1) * pitch) / 2, lastRowZ / 2],
   }

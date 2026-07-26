@@ -105,6 +105,13 @@ export const conveyorLauncherDefinition = {
       const height = bounds.max[1] - bounds.min[1]
       return {
         size: [bounds.max[0] - bounds.min[0], height, bounds.max[2] - bounds.min[2]],
+        // **Off the node's origin**, because the arm sticks out one side and the
+        // steel does not straddle the node. Without it the host draws the box
+        // centred anyway: two hundred millimetres over empty floor on one side
+        // and two hundred short of the arm on the other, with the facing marker
+        // carried along with it — and clearance judged against a racking run
+        // from that box is wrong by the same amount.
+        center: [0, height / 2, (bounds.min[2] + bounds.max[2]) / 2],
         centerY: height / 2,
       }
     },

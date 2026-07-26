@@ -1,6 +1,6 @@
 import { speedMPerSec as boosterSpeed } from './booster-metrics'
 import { speedMPerSec as curveSpeed } from './curve-metrics'
-import { type Route, routeLengthM, routesOf, sampleRoute, worldPoint } from './flow-routes'
+import { type Route, routeLengthM, routesOf, sampleRoute } from './flow-routes'
 import { speedMPerSec as launcherSpeed } from './launcher-metrics'
 import { isPortMated } from './line-index'
 import { speedMPerSec as straightSpeed } from './metrics'
@@ -43,6 +43,19 @@ export const FLOW_BOX_M: readonly [number, number, number] = [0.4, 0.3, 0.3]
  *  follow — and paying for it every frame. */
 const MAX_BOXES = 600
 
+/** The host's own coincidence tolerance, which is what decides a joint
+ *  everywhere else in this package. */
+const JOINT_EPSILON = 0.05
+
+/** An empty network, so a scene with the flow switched off allocates nothing. */
+export const EMPTY_NETWORK: FlowNetwork = {
+  modules: new Map(),
+  routes: new Map(),
+  lengths: new Map(),
+  mates: new Map(),
+  heads: [],
+}
+
 export type FlowBox = {
   /** Which module it is on, and which of that module's routes it is following. */
   nodeId: string
@@ -55,8 +68,10 @@ export type FlowBox = {
   seed: number
 }
 
-export type FlowPose = {
-  position: [number, number, number]
+export type FlowLocalPose = {
+  nodeId: string
+  /** In the module's own frame. The host owns the transform out of it. */
+  local: [number, number, number]
   heading: number
 }
 
@@ -106,28 +121,53 @@ export function buildNetwork(nodes: Readonly<Record<string, unknown>>): FlowNetw
     )
   }
 
-  // Which port a box arrives at, for every joint. Two ports coincide when the
-  // line index says they are mated; this resolves *which* one, which the index
-  // deliberately does not store.
-  const worldPorts: Array<{ nodeId: string; port: ConveyorPortId; p: [number, number, number] }> =
-    []
+  /**
+   * Which port a box arrives at, for every joint.
+   *
+   * **Bucketed, for the reason `./line-index` states against itself**: the same
+   * coincidence question over the same ports, and the pairwise loop it rejected
+   * there would be just as quadratic here — three thousand modules is seven
+   * thousand ports and forty-nine million distance tests, run on the render path
+   * every time the store is written. A cell wider than the tolerance means a
+   * lookup reads nine of them.
+   *
+   * The line index answers *whether* an end is mated and deliberately keeps no
+   * mate identity; this resolves *which* end it is, which is what a box needs to
+   * continue.
+   */
+  const CELL = 1
+  const cells = new Map<
+    string,
+    Array<{ nodeId: string; port: ConveyorPortId; p: readonly number[] }>
+  >()
+  const cellKey = (x: number, z: number) => `${Math.floor(x / CELL)}:${Math.floor(z / CELL)}`
+
   for (const module of modules.values()) {
     for (const port of conveyorPorts(module)) {
-      worldPorts.push({
-        nodeId: module.id,
-        port: port.id as ConveyorPortId,
-        p: [port.position[0], port.position[1], port.position[2]],
-      })
+      const entry = { nodeId: module.id, port: port.id as ConveyorPortId, p: port.position }
+      const key = cellKey(port.position[0], port.position[2])
+      const bucket = cells.get(key)
+      if (bucket) bucket.push(entry)
+      else cells.set(key, [entry])
     }
   }
-  for (const a of worldPorts) {
-    for (const b of worldPorts) {
-      if (a.nodeId === b.nodeId) continue
-      const dx = a.p[0] - b.p[0]
-      const dy = a.p[1] - b.p[1]
-      const dz = a.p[2] - b.p[2]
-      if (dx * dx + dy * dy + dz * dz > 0.05 * 0.05) continue
-      mates.set(`${a.nodeId}:${a.port}`, { nodeId: b.nodeId, port: b.port })
+
+  for (const bucket of cells.values()) {
+    for (const a of bucket) {
+      const cx = Math.floor((a.p[0] ?? 0) / CELL)
+      const cz = Math.floor((a.p[2] ?? 0) / CELL)
+      for (let ix = cx - 1; ix <= cx + 1; ix++) {
+        for (let iz = cz - 1; iz <= cz + 1; iz++) {
+          for (const b of cells.get(`${ix}:${iz}`) ?? []) {
+            if (a.nodeId === b.nodeId) continue
+            const dx = (a.p[0] ?? 0) - (b.p[0] ?? 0)
+            const dy = (a.p[1] ?? 0) - (b.p[1] ?? 0)
+            const dz = (a.p[2] ?? 0) - (b.p[2] ?? 0)
+            if (dx * dx + dy * dy + dz * dz > JOINT_EPSILON * JOINT_EPSILON) continue
+            mates.set(`${a.nodeId}:${a.port}`, { nodeId: b.nodeId, port: b.port })
+          }
+        }
+      }
     }
   }
 
@@ -163,6 +203,16 @@ function chooseRoute(routes: Route[], seed: number): number {
  * result straight into an instance buffer, and a box that left the network this
  * frame simply is not in it.
  */
+/** Distance the last release at each head has run. Module-scope for the same
+ *  reason the boxes are: it is a fact about the current frame. */
+const released = new Map<string, number>()
+
+/** Drops the release clocks. Needed when the flow is switched off, and so tests
+ *  do not leak a head's timing between cases. */
+export function resetReleases(): void {
+  released.clear()
+}
+
 export function step(
   network: FlowNetwork,
   boxes: FlowBox[],
@@ -218,13 +268,29 @@ export function step(
     const routes = network.routes.get(head)
     if (!module || !routes || routes.length === 0) continue
 
+    /**
+     * How far the last release has travelled — **along the line**, not along
+     * this module.
+     *
+     * Measured on the head alone, the test could never fail once the head's own
+     * route was shorter than the gap: the box handed off, no box remained with
+     * this node id, and the next one was released immediately. A line started by
+     * a booster (675 mm) or a transfer (708 mm) ran half again as dense as an
+     * identical line started by a straight, and visibly denser than everything
+     * else in the scene.
+     *
+     * A per-head clock rather than a search, because the answer is about time
+     * since the last release and the boxes stop being able to report it.
+     */
     const spacing = FLOW_BOX_M[0] * RELEASE_GAP
-    const closest = alive
-      .filter((box) => box.nodeId === head)
-      .reduce((min, box) => Math.min(min, box.distance), Number.POSITIVE_INFINITY)
-    if (closest < spacing) continue
+    const since = (released.get(head) ?? Number.POSITIVE_INFINITY) + moduleSpeedMPerSec(module) * dt
+    if (since < spacing) {
+      released.set(head, since)
+      continue
+    }
 
     const seed = nextSeed()
+    released.set(head, 0)
     alive.push({ nodeId: head, routeIndex: chooseRoute(routes, seed), distance: 0, seed })
   }
 
@@ -265,18 +331,27 @@ export function resetLifting(): void {
   lifting = new Set()
 }
 
-/** Where a box is, in world space, and which way it faces. */
-export function poseOf(network: FlowNetwork, box: FlowBox): FlowPose | null {
+/**
+ * Where a box is, and which way it faces — **in the module's own frame**.
+ *
+ * Local, deliberately. Computing a world position here would mean re-deriving
+ * the module's place in the building, and the building is not a flat plane: a
+ * level carries a base height, an exploded view shifts every level again, and a
+ * slab under a module lifts it further. The host writes all three onto the
+ * node's registered group; the flow system reads that group's world matrix and
+ * puts the box through it, so a box on a mezzanine rides the rollers it is
+ * actually on.
+ */
+export function poseOf(network: FlowNetwork, box: FlowBox): FlowLocalPose | null {
   const module = network.modules.get(box.nodeId)
   const route = network.routes.get(box.nodeId)?.[box.routeIndex]
   if (!module || !route) return null
 
   const local = sampleRoute(route, box.distance)
-  const [x, z] = worldPoint(module, local)
-  const rotationY = module.rotation?.[1] ?? 0
   return {
+    nodeId: box.nodeId,
     // Sitting on the rollers, not through them.
-    position: [x, module.position[1] + module.transportHeight + FLOW_BOX_M[1] / 2, z],
-    heading: rotationY + local.heading,
+    local: [local.x, module.transportHeight + FLOW_BOX_M[1] / 2, local.z],
+    heading: local.heading,
   }
 }

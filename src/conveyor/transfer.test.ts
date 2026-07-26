@@ -13,7 +13,12 @@ import { resetLineIndex } from './line-index'
 import { jointProblems, resetPortMagnet, snapToLineEnd } from './port-magnet'
 import { conveyorPorts, localPorts } from './ports'
 import { ConveyorRollerNode } from './schema'
-import { getTransferGeometry, transferGeometryKey, transferStripsKey } from './transfer-geometry'
+import {
+  getTransferGeometry,
+  getTransferStripsGeometry,
+  transferGeometryKey,
+  transferStripsKey,
+} from './transfer-geometry'
 import {
   dischargeSign,
   frameWidthM,
@@ -310,6 +315,57 @@ describe('the mesh', () => {
 
     publishLifting(network, [])
     expect(isLifting(node.id)).toBe(false)
+  })
+
+  /**
+   * The strips are the kind's only second buffer, and the sweep above cannot see
+   * them: `buildFresh` builds the body. Without this, deleting `transportHeight`
+   * from `transferStripsKey` leaves the whole suite green while two machines at
+   * different heights share one strip mesh — and `stripParts` places them at
+   * `top - ROLLER_DIAMETER_M / 2`, so one renders its strips 180 mm off its bed.
+   */
+  const stripsFresh = (node: ReturnType<typeof transfer>): Float32Array => {
+    clearConveyorGeometryCache()
+    // Position **and** colour: the strip colour is a vertex attribute, so a
+    // position-only fingerprint would report a recoloured strip set as the same
+    // mesh and let the key carry a field it did not need.
+    const geometry = getTransferStripsGeometry(node)
+    const parts = (['position', 'color'] as const).map(
+      (name) => geometry.getAttribute(name).array as ArrayLike<number>,
+    )
+    const combined = new Float32Array(parts.reduce((total, part) => total + part.length, 0))
+    let offset = 0
+    for (const part of parts) {
+      combined.set(Float32Array.from(part), offset)
+      offset += part.length
+    }
+    return combined
+  }
+
+  const STRIP_VARIANTS: Array<[string, unknown]> = [
+    ['travel', 'asymmetric'],
+    ['dischargeSide', 'right'],
+    ['transportHeight', 0.57],
+    ['stripColor', '#00ff00'],
+    // Must NOT move a strip vertex.
+    ['speed', '25'],
+    ['flow', 'reverse'],
+    ['shortestBox', 0.5],
+    ['frameColor', '#123456'],
+    ['position', [12, 0, 4]],
+  ]
+
+  test('the strip buffer obeys the key law too, not just the body', () => {
+    const base = transfer()
+    const baseMesh = stripsFresh(base)
+    const baseKey = transferStripsKey(base)
+
+    for (const [field, value] of STRIP_VARIANTS) {
+      const variant = transfer({ [field]: value })
+      const changesMesh = !sameMesh(stripsFresh(variant), baseMesh)
+      const changesKey = transferStripsKey(variant) !== baseKey
+      expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
+    }
   })
 
   test('it shares the straight’s pool, because it is one kind', () => {

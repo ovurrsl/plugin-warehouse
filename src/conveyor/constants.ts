@@ -95,6 +95,21 @@ export const PALETTE = {
 } as const
 
 /**
+ * **The overhang behind an oblique's useful widths.**
+ *
+ * The catalogue publishes only this type's *exterior* widths — 667 main, 467
+ * branch — and no useful width at all, so the 600 and 400 classes its ports
+ * carry are inferred. Sixty-seven millimetres is the booster's published
+ * overhang and the tightest in the family, taken as the nearest published
+ * analogue because an oblique's side members are formed the same way.
+ *
+ * Its own constant rather than a reach into `catalog.ts`: the two are equal
+ * today by coincidence of derivation, not by the catalogue saying so, and a
+ * republished booster must not silently move this machine's ports.
+ */
+export const OBLIQUE_FRAME_OVERHANG_M = mm(67)
+
+/**
  * **A6 — the angle an oblique branch leaves at.**
  *
  * Measured off the catalogue's render. Thirty and forty-five are both built, so

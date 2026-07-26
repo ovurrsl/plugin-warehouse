@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { ConveyorCurveNode } from './curve-schema'
 import { routeLengthM, routesOf, sampleRoute } from './flow-routes'
-import { buildNetwork, type FlowBox, moduleSpeedMPerSec, poseOf, step } from './flow-simulation'
+import {
+  buildNetwork,
+  type FlowBox,
+  moduleSpeedMPerSec,
+  poseOf,
+  resetReleases,
+  step,
+} from './flow-simulation'
 import { resetLineIndex } from './line-index'
+import { branchEndLocal, divergeXM } from './oblique-metrics'
 import { ConveyorObliqueNode } from './oblique-schema'
 import { conveyorPorts } from './ports'
 import { ConveyorRollerNode } from './schema'
@@ -27,6 +35,9 @@ function pair() {
 
 beforeEach(() => {
   resetLineIndex()
+  // The release clocks live at module scope, like the boxes: a case that let a
+  // head release leaves that head mid-gap for the next one.
+  resetReleases()
 })
 
 describe('a route is derived from the same figures as the steel', () => {
@@ -81,13 +92,43 @@ describe('a route is derived from the same figures as the steel', () => {
     }
   })
 
-  test('a junction offers two routes and a two-ended shape offers one', () => {
-    expect(routesOf(straight())).toHaveLength(1)
-    expect(routesOf(ConveyorObliqueNode.parse({ id: 'conveyor_oblique_f' }))).toHaveLength(2)
-    // A merge-only branch takes nothing out — goods arrive by it instead.
-    expect(
-      routesOf(ConveyorObliqueNode.parse({ id: 'conveyor_oblique_m', branchMode: 'merge' })),
-    ).toHaveLength(1)
+  test('a branch is a way in as well as a way out, and the mode says which', () => {
+    // The bug this pins: routes were built from the *first* inlet found, so an
+    // oblique ordered as a merge had no route starting at its branch — and every
+    // box a feeder delivered there was dropped on arrival, silently, because a
+    // box with nowhere to go simply stops being in the list.
+    const modes = (mode: string) =>
+      routesOf(ConveyorObliqueNode.parse({ id: 'conveyor_oblique_r', branchMode: mode })).map(
+        (route) => `${route.from}->${route.to}`,
+      )
+
+    expect(routesOf(straight()).map((route) => `${route.from}->${route.to}`)).toEqual(['a->b'])
+    expect(modes('divert')).toEqual(['a->b', 'a->c'])
+    expect(modes('merge')).toEqual(['a->b', 'c->b'])
+    // Bidirectional, which is how the catalogue ships it and the default here.
+    expect(modes('both')).toEqual(['a->b', 'a->c', 'c->b'])
+  })
+
+  test('a box merging in travels the branch towards the main line, not away', () => {
+    const node = ConveyorObliqueNode.parse({ id: 'conveyor_oblique_i', branchMode: 'merge' })
+    const merging = routesOf(node).find((route) => route.from === 'c')
+    if (!merging) throw new Error('no merge route')
+    const first = merging.points[0]
+    const last = merging.points[merging.points.length - 1]
+    // It starts at the branch's far end and finishes on the main line's outlet.
+    expect(first?.[0]).toBeCloseTo(branchEndLocal(node)[0], 9)
+    expect(first?.[1]).toBeCloseTo(branchEndLocal(node)[1], 9)
+    expect(last?.[1]).toBeCloseTo(0, 9)
+  })
+
+  test('the branch leaves at the discharge end, whichever end the flow makes it', () => {
+    // Built fixed toward +X, a reverse-flow machine declared an outlet at its
+    // own infeed — and the magnet would mate a line onto it that cannot run.
+    const forward = ConveyorObliqueNode.parse({ id: 'conveyor_oblique_fw' })
+    const reverse = ConveyorObliqueNode.parse({ id: 'conveyor_oblique_rv', flow: 'reverse' })
+    expect(branchEndLocal(forward)[0]).toBeGreaterThan(0)
+    expect(branchEndLocal(reverse)[0]).toBeLessThan(0)
+    expect(divergeXM(reverse)).toBeCloseTo(-divergeXM(forward), 9)
   })
 })
 
@@ -150,26 +191,37 @@ describe('boxes travel the network and hand off at joints', () => {
   })
 })
 
-describe('a box sits on the rollers, in world space', () => {
-  test('its height is the transport height, not the floor', () => {
+describe('a box sits on the rollers, in the module’s own frame', () => {
+  test('the pose is local, and names the module the host must transform it by', () => {
+    // Deliberately local. A world position computed here would have to
+    // re-derive the module's place in the building — a level's base height, the
+    // exploded-view offset, the lift a slab gives it — none of which is visible
+    // from `node.position`. The system multiplies by the registered group's
+    // world matrix instead, so a box on a mezzanine rides the rollers it is on.
     const node = straight({ position: [4, 0, -2], transportHeight: 0.57 })
     const network = buildNetwork({ [node.id]: node })
     const pose = poseOf(network, { nodeId: node.id, routeIndex: 0, distance: 3, seed: 1 })
     if (!pose) throw new Error('no pose')
-    expect(pose.position[1]).toBeGreaterThan(0.57)
-    // Halfway along a 6 m bed placed at x = 4 is x = 4.
-    expect(pose.position[0]).toBeCloseTo(4, 9)
-    expect(pose.position[2]).toBeCloseTo(-2, 9)
+
+    expect(pose.nodeId).toBe(node.id)
+    // Halfway along a 6 m bed is the middle of it, and the module's own origin
+    // is where the host will put it.
+    expect(pose.local[0]).toBeCloseTo(0, 9)
+    expect(pose.local[2]).toBeCloseTo(0, 9)
+    // On the rollers, not through them.
+    expect(pose.local[1]).toBeGreaterThan(0.57)
   })
 
-  test('the node’s own rotation carries the box with it', () => {
+  test('the box runs along the bed, and the module’s rotation is not applied twice', () => {
+    // The heading is the route's own, in the module's frame — the group's world
+    // matrix carries the module's rotation, so adding it here would turn every
+    // box twice.
     const turned = straight({ position: [0, 0, 0], rotation: [0, Math.PI / 2, 0] })
     const network = buildNetwork({ [turned.id]: turned })
-    // A quarter along the bed, on a module turned a quarter: the box has moved
-    // along world −Z rather than +X.
     const pose = poseOf(network, { nodeId: turned.id, routeIndex: 0, distance: 4.5, seed: 1 })
     if (!pose) throw new Error('no pose')
-    expect(pose.position[0]).toBeCloseTo(0, 6)
-    expect(pose.position[2]).toBeCloseTo(-1.5, 6)
+    expect(pose.local[0]).toBeCloseTo(1.5, 6)
+    expect(pose.local[2]).toBeCloseTo(0, 6)
+    expect(pose.heading).toBeCloseTo(0, 6)
   })
 })

@@ -186,8 +186,12 @@ export function curveGeometryKey(
     supportAngles(curve)
       .map((theta) => theta.toFixed(5))
       .join(','),
-    curve.sideGuide === 'none' ? '-' : `${curve.sideGuide}/${curve.sideGuideHeight.toFixed(4)}`,
-    zoneCount(curve),
+    // Full-tier parts only — see `./geometry-builder` on why a `simple` key must
+    // not carry them.
+    detail === 'full' && curve.sideGuide !== 'none'
+      ? `${curve.sideGuide}/${curve.sideGuideHeight.toFixed(4)}`
+      : '-',
+    detail === 'full' ? zoneCount(curve) : 0,
     curve.frameColor,
     curve.rollerColor,
     curve.profileColor,

@@ -53,10 +53,13 @@ export function buildObliqueFloorplan(
       // A nested transform, because `rect` has no rotation of its own — and the
       // registry layer maps `group` recursively in both the static and the
       // interactive renderer.
-      transform: {
-        translate: [branchX, branchZ],
-        rotate: (-branchHeadingRad(node) * 180) / Math.PI,
-      },
+      //
+      // **Radians**, like the group above it and like every other `rotate` in
+      // this package: the host multiplies by 180/PI itself when it emits the SVG
+      // (`floorplan-pdfkit-renderer.ts:169`). Handing it degrees turned the
+      // branch through fifty-seven times its own angle and drew it on the wrong
+      // side of the main line.
+      transform: { translate: [branchX, branchZ], rotate: -branchHeadingRad(node) },
       children: [
         {
           kind: 'rect',

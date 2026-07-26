@@ -1,7 +1,7 @@
 import { OBQ } from './catalog'
 import {
-  CROSSBAR_CLEARANCE_M,
   MIN_ROLLERS_UNDER_A_BOX,
+  OBLIQUE_FRAME_OVERHANG_M,
   ROLLER_DIAMETER_M,
   SIDE_PROFILE_DEPTH_M,
 } from './constants'
@@ -47,6 +47,18 @@ export function branchSign(oblique: ConveyorObliqueNode): number {
   return oblique.branchSide === 'left' ? 1 : -1
 }
 
+/**
+ * Which end of the main line the branch leaves at, as a sign on local X.
+ *
+ * **The discharge end, whichever end that is.** A branch is where goods leave,
+ * so on a module installed the other way round it is at the other end — built
+ * fixed toward +X, a reverse-flow machine would declare an outlet at its own
+ * infeed and the magnet would happily mate a line onto it that cannot run.
+ */
+export function flowSign(oblique: ConveyorObliqueNode): number {
+  return oblique.flow === 'forward' ? 1 : -1
+}
+
 /** The main body, fixed by the catalogue in both directions. */
 export function moduleLengthM(_oblique: ConveyorObliqueNode): number {
   return OBQ.lengthM
@@ -60,14 +72,23 @@ export function branchWidthM(_oblique: ConveyorObliqueNode): number {
   return OBQ.branchExteriorWidthM
 }
 
-/** The lane class each end carries. The main pair and the branch differ, which
- *  is the whole reason a port in this package names its own. */
+/**
+ * The lane class each end carries. The main pair and the branch differ, which is
+ * the whole reason a port in this package names its own.
+ *
+ * **Both are inferred, and the inference is named.** The catalogue publishes
+ * only exterior widths for this type, so the useful widths behind them come from
+ * an overhang it does not state — see `OBLIQUE_FRAME_OVERHANG_M`. Subtracting a
+ * bare literal here would hide that from anyone auditing the catalogue split,
+ * and would silently follow a *different* machine's figure the day that one is
+ * republished.
+ */
 export function mainLaneMm(oblique: ConveyorObliqueNode): number {
-  return Math.round((mainWidthM(oblique) - 0.067) * 1000)
+  return Math.round((mainWidthM(oblique) - OBLIQUE_FRAME_OVERHANG_M) * 1000)
 }
 
 export function branchLaneMm(oblique: ConveyorObliqueNode): number {
-  return Math.round((branchWidthM(oblique) - 0.067) * 1000)
+  return Math.round((branchWidthM(oblique) - OBLIQUE_FRAME_OVERHANG_M) * 1000)
 }
 
 // ── Where the branch leaves ─────────────────────────────────────────────────
@@ -92,7 +113,8 @@ export function branchOffsetM(oblique: ConveyorObliqueNode): number {
  * point is computed rather than placed.
  */
 export function divergeXM(oblique: ConveyorObliqueNode): number {
-  return moduleLengthM(oblique) / 2 - branchOffsetM(oblique) / Math.tan(angleRad(oblique))
+  const along = moduleLengthM(oblique) / 2 - branchOffsetM(oblique) / Math.tan(angleRad(oblique))
+  return flowSign(oblique) * along
 }
 
 /** How far the branch bed runs, along its own axis. */
@@ -100,9 +122,13 @@ export function branchLengthM(oblique: ConveyorObliqueNode): number {
   return branchOffsetM(oblique) / Math.sin(angleRad(oblique))
 }
 
-/** The branch's far end, in the node's local plan frame. */
+/** The branch's far end, in the node's local plan frame — at the discharge end
+ *  of the main line, which is what `flowSign` names. */
 export function branchEndLocal(oblique: ConveyorObliqueNode): [number, number] {
-  return [moduleLengthM(oblique) / 2, branchSign(oblique) * branchOffsetM(oblique)]
+  return [
+    (flowSign(oblique) * moduleLengthM(oblique)) / 2,
+    branchSign(oblique) * branchOffsetM(oblique),
+  ]
 }
 
 /** The middle of the branch bed, in the node's local plan frame. */
@@ -111,9 +137,16 @@ export function branchCentreLocal(oblique: ConveyorObliqueNode): [number, number
   return [(divergeXM(oblique) + endX) / 2, endZ / 2]
 }
 
-/** The branch's heading in plan, as a rotation about Y. */
+/**
+ * The branch's heading in plan, as a rotation about Y.
+ *
+ * Mirrored on both axes: the hand decides which side it leaves by, and the flow
+ * decides which end — a reverse-flow branch runs back along −X, so its heading
+ * is the forward one turned through half a circle.
+ */
 export function branchHeadingRad(oblique: ConveyorObliqueNode): number {
-  return -branchSign(oblique) * angleRad(oblique)
+  const forward = -branchSign(oblique) * angleRad(oblique)
+  return flowSign(oblique) > 0 ? forward : Math.PI - forward
 }
 
 // ── Heights ─────────────────────────────────────────────────────────────────
@@ -128,10 +161,6 @@ export function frameBottomY(oblique: ConveyorObliqueNode): number {
 
 export function legHeightM(oblique: ConveyorObliqueNode): number {
   return Math.max(0, frameBottomY(oblique))
-}
-
-export function hasCrossbar(oblique: ConveyorObliqueNode): boolean {
-  return legHeightM(oblique) > CROSSBAR_CLEARANCE_M + 0.1
 }
 
 /** Local X of each main-line support station: one at each end, which is what

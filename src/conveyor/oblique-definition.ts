@@ -105,6 +105,14 @@ export const conveyorObliqueDefinition = {
       const height = bounds.max[1] - bounds.min[1]
       return {
         size: [bounds.max[0] - bounds.min[0], height, bounds.max[2] - bounds.min[2]],
+        // Off the origin: the branch leaves one side, so the steel does not
+        // straddle the node — see the launcher's, which has the same shape of
+        // problem for the same reason.
+        center: [
+          (bounds.min[0] + bounds.max[0]) / 2,
+          height / 2,
+          (bounds.min[2] + bounds.max[2]) / 2,
+        ],
         centerY: height / 2,
       }
     },

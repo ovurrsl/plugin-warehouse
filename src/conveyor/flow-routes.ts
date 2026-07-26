@@ -9,7 +9,6 @@ import {
   isTransferModule,
   localPorts,
   moduleRunLengthM,
-  toWorldPlan,
 } from './ports'
 import { dischargeSign, frameWidthM as transferWidthM } from './transfer-metrics'
 
@@ -22,9 +21,12 @@ import { dischargeSign, frameWidthM as transferWidthM } from './transfer-metrics
  * is its centreline arc, a launcher's cross route ends where its arm ends, an
  * oblique's branch route leaves where `divergeXM` says it does.
  *
- * Points are in the node's own plan frame; `worldRoute` carries them out. The
- * y is the transport height throughout — every shape in this kind runs level,
- * and the day an incline lands it will be the one thing that changes here.
+ * Points stay in the node's own plan frame. Carrying them into world space
+ * here would mean re-deriving the module's place in the building — a level's
+ * base height, the exploded-view offset, the lift a slab gives it — so the flow
+ * system multiplies by the node's own registered world matrix instead. The y is
+ * the transport height throughout: every shape in this kind runs level, and the
+ * day an incline lands it will be the one thing that changes here.
  */
 
 export type Route = {
@@ -49,12 +51,23 @@ const ARC_STEPS = 16
  */
 export function routesOf(module: ConveyorModule): Route[] {
   const ports = localPorts(module)
-  const inlet = ports.find((port) => port.role === 'in')
+  /**
+   * **Every** end goods can arrive by, not the first one found.
+   *
+   * An oblique ordered as a merge has two: its main infeed and its branch. Built
+   * from one inlet only, no route in the network started at the branch, so every
+   * box a feeder line delivered there was dropped on arrival — silently, because
+   * a box with nowhere to go simply stops being in the list. `'both'` counts as
+   * an entry too: a bidirectional branch is one goods can come in by.
+   */
+  const inlets = ports.filter((port) => port.role === 'in' || port.role === 'both')
   const outlets = ports.filter((port) => port.role === 'out' || port.role === 'both')
   // A module whose ends are all outlets, or all inlets, carries nothing. That
   // is a real configuration — two discharges facing each other — and the joint
   // checker already reports it; here it simply has no route.
-  if (!inlet || outlets.length === 0) return []
+  if (inlets.length === 0 || outlets.length === 0) return []
+  const inlet = ports.find((port) => port.role === 'in') ?? inlets[0]
+  if (!inlet) return []
 
   if (isCurveModule(module)) {
     const sweep = angleRad(module)
@@ -118,11 +131,16 @@ export function routesOf(module: ConveyorModule): Route[] {
       [divergeXM(module), 0],
       branchEndLocal(module),
     ]
-    const routes: Route[] = [
-      { from: inlet.id, to: inlet.id === 'a' ? 'b' : 'a', points: order(main, inlet.id) },
-    ]
-    // A merge-only branch takes nothing *out* — goods arrive by it instead.
+    const outlet: ConveyorPortId = inlet.id === 'a' ? 'b' : 'a'
+    const routes: Route[] = [{ from: inlet.id, to: outlet, points: order(main, inlet.id) }]
+    // Out by the branch, when the branch is one goods can leave by.
     if (module.branchMode !== 'merge') routes.push({ from: inlet.id, to: 'c', points: branch })
+    // **And in by it**, when it is one goods can arrive by. Without this the
+    // branch is an end boxes reach and vanish at, which is the whole of what a
+    // merge is for.
+    if (module.branchMode !== 'divert') {
+      routes.push({ from: 'c', to: outlet, points: [...branch].reverse() })
+    }
     return routes
   }
 
@@ -188,13 +206,4 @@ export function sampleRoute(
 
   const [x, z] = points[points.length - 1] ?? [0, 0]
   return { x, z, heading: 0 }
-}
-
-/** A local route point carried into world space by the node's transform. */
-export function worldPoint(
-  module: ConveyorModule,
-  local: { x: number; z: number },
-): [number, number] {
-  const rotationY = module.rotation?.[1] ?? 0
-  return toWorldPlan([local.x, local.z], module.position, Math.cos(rotationY), Math.sin(rotationY))
 }

@@ -53,7 +53,6 @@ type FreeEnd = {
   /** What this end does, which is what decides whether another may join it. */
   role: PortRole
   x: number
-  y: number
   z: number
   /** Outward direction in plan, for the head-to-tail test. */
   dx: number
@@ -110,7 +109,6 @@ function build(nodes: Readonly<Record<string, unknown>>): Map<string, FreeEnd[]>
         port: id,
         role: local.role,
         x: port.position[0],
-        y: port.position[1],
         z: port.position[2],
         dx: port.direction[0],
         dz: port.direction[2],
@@ -169,16 +167,7 @@ export function snapToLineEnd(
   const mine = localPorts(module).map((local) => {
     const [x, z] = toWorldPlan([local.x, local.z], candidate, cos, sin)
     const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
-    return {
-      id: local.id,
-      role: local.role,
-      lane: local.laneMm,
-      x,
-      y: cy + local.y,
-      z,
-      dx,
-      dz,
-    }
+    return { id: local.id, role: local.role, lane: local.laneMm, x, z, dx, dz }
   })
 
   let bestDistance = MAGNET_RADIUS_SQ

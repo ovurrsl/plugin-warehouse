@@ -318,12 +318,16 @@ export function conveyorGeometryKey(
     supportOffsetsX(conveyor)
       .map((offset) => offset.toFixed(5))
       .join(','),
-    conveyor.sideGuide === 'none'
-      ? '-'
-      : `${conveyor.sideGuide}/${conveyor.sideGuideHeight.toFixed(4)}`,
+    // Guides and the motor are emitted at `full` only, so at `simple` neither
+    // can move a vertex — and an entry that cannot move a vertex splits the
+    // cache between byte-identical buffers. Dragging a guide height across its
+    // range would otherwise mint a spurious far-tier buffer at every stop.
+    detail === 'full' && conveyor.sideGuide !== 'none'
+      ? `${conveyor.sideGuide}/${conveyor.sideGuideHeight.toFixed(4)}`
+      : '-',
     // The motor is real steel hanging off the frame, and which end it hangs
     // from follows the flow — so flow reaches the mesh here and nowhere else.
-    conveyor.hasDrive ? `m${conveyor.flow === 'forward' ? '-' : '+'}` : '-',
+    detail === 'full' && conveyor.hasDrive ? `m${conveyor.flow === 'forward' ? '-' : '+'}` : '-',
     conveyor.frameColor,
     conveyor.rollerColor,
     conveyor.profileColor,

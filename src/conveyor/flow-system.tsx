@@ -1,6 +1,6 @@
 'use client'
 
-import { useScene } from '@pascal-app/core'
+import { sceneRegistry, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
@@ -8,10 +8,12 @@ import * as THREE from 'three'
 import { useWarehouseStore } from '../store'
 import {
   buildNetwork,
+  EMPTY_NETWORK,
   FLOW_BOX_M,
   type FlowBox,
   poseOf,
   publishLifting,
+  resetReleases,
   step,
 } from './flow-simulation'
 
@@ -52,7 +54,11 @@ export default function ConveyorFlowSystem() {
   // The store replaces `nodes` on every write, so this re-runs exactly when the
   // modules change — and never during a drag, which does not touch the store.
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
-  const network = useMemo(() => buildNetwork(nodes), [nodes])
+  // Gated on `running`, because the host mounts this system whenever the plugin
+  // is installed: a user who never presses Run would otherwise pay for a full
+  // network rebuild on every store write — every drag commit, every undo, every
+  // edit to a wall that has nothing to do with a conveyor.
+  const network = useMemo(() => (running ? buildNetwork(nodes) : EMPTY_NETWORK), [nodes, running])
 
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const boxesRef = useRef<FlowBox[]>([])
@@ -81,7 +87,11 @@ export default function ConveyorFlowSystem() {
   // A network with nothing to release into is a network with no boxes; drop
   // them rather than leaving the last frame's stranded on deleted modules.
   useEffect(() => {
-    if (!running) boxesRef.current = []
+    if (running) return
+    boxesRef.current = []
+    // The release clocks go with them: a head that was mid-gap when the flow
+    // stopped would otherwise hold that gap when it starts again.
+    resetReleases()
   }, [running])
 
   useFrame((_, delta) => {
@@ -106,11 +116,20 @@ export default function ConveyorFlowSystem() {
       if (index >= CAPACITY) break
       const pose = poseOf(network, box)
       if (!pose) continue
-      matrix.compose(
-        position.set(pose.position[0], pose.position[1], pose.position[2]),
+      // **Through the module's own world matrix**, rather than through
+      // arithmetic of my own. The host has already put that group where it
+      // belongs — the level's base height, the exploded-view offset, the lift a
+      // slab gives it — and none of those are visible from a node's `position`.
+      // A box computed from the node alone rides at ground-floor height under a
+      // mezzanine line.
+      const host = sceneRegistry.nodes.get(box.nodeId)
+      if (!host) continue
+      local.compose(
+        position.set(pose.local[0], pose.local[1], pose.local[2]),
         quaternion.setFromAxisAngle(UP, pose.heading),
         SCALE,
       )
+      matrix.multiplyMatrices(host.matrixWorld, local)
       mesh.setMatrixAt(index, matrix)
       index += 1
     }
@@ -126,6 +145,21 @@ export default function ConveyorFlowSystem() {
       // Boxes are a simulation, not scene content: they must never be pickable,
       // or a click meant for the conveyor under them lands on a box that will
       // not be there next frame.
+      /**
+       * **Never culled.** three computes an `InstancedMesh`'s bounding sphere
+       * once, on the first frustum test, and `setMatrixAt` does not invalidate
+       * it — so a mesh whose instances move every frame is culled against a
+       * stale sphere for the rest of its life. Worse here: the flow starts
+       * switched off, so that first test happens at `count = 0`, which leaves an
+       * *empty* sphere centred on the world origin. Every box in the building
+       * would then draw only while the origin sat inside the frustum.
+       *
+       * Recomputing the sphere each frame would be the other fix and a worse
+       * one: it is a pass over every instance, to cull a single draw call whose
+       * instances are scattered across the whole building and therefore almost
+       * never all off screen.
+       */
+      frustumCulled={false}
       raycast={NO_RAYCAST}
       ref={meshRef}
     />
@@ -136,5 +170,6 @@ const NO_RAYCAST = () => {}
 const UP = new THREE.Vector3(0, 1, 0)
 const SCALE = new THREE.Vector3(1, 1, 1)
 const matrix = new THREE.Matrix4()
+const local = new THREE.Matrix4()
 const position = new THREE.Vector3()
 const quaternion = new THREE.Quaternion()

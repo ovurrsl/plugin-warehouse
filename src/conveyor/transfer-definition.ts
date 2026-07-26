@@ -20,10 +20,14 @@ export const conveyorTransferDefinition = {
   snapProfile: 'item',
 
   /**
-   * A **fitting**, like every other shape of this kind. A transfer's bed is
-   * whatever its roller count makes it, so there is nothing for the host's run
+   * A **fitting**, like every other shape of this kind. A transfer's body is
+   * fixed at 708 by 723 in the catalogue, so there is nothing for the host's run
    * arm to stretch even in principle; the fitting arm translates it rigidly and
    * the whole connected line follows in one undo step.
+   *
+   * Not "whatever its roller count makes it", which is the booster's reason and
+   * was carried here by a scripted copy: this type has no roller count and no
+   * pitch at all, and derives its roller positions from the strips.
    */
   distributionRole: 'fitting',
   facingIndicator: true,

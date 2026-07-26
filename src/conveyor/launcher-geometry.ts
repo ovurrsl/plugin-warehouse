@@ -102,7 +102,8 @@ export function launcherGeometryKey(
     supportOffsetsX(launcher)
       .map((offset) => offset.toFixed(5))
       .join(','),
-    launcher.sideGuide ? launcher.sideGuideHeight.toFixed(4) : '-',
+    // Full-tier parts only — see `./geometry-builder`.
+    detail === 'full' && launcher.sideGuide ? launcher.sideGuideHeight.toFixed(4) : '-',
     launcher.frameColor,
     launcher.rollerColor,
     launcher.profileColor,

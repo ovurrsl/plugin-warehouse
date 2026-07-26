@@ -91,9 +91,10 @@ export function boosterGeometryKey(
     supportOffsetsX(booster)
       .map((offset) => offset.toFixed(5))
       .join(','),
-    booster.sideGuide === 'none'
-      ? '-'
-      : `${booster.sideGuide}/${booster.sideGuideHeight.toFixed(4)}`,
+    // Full-tier parts only — see `./geometry-builder`.
+    detail === 'full' && booster.sideGuide !== 'none'
+      ? `${booster.sideGuide}/${booster.sideGuideHeight.toFixed(4)}`
+      : '-',
     booster.frameColor,
     booster.rollerColor,
     booster.profileColor,

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b12eade`](https://github.com/ovurrsl/plugin-warehouse/commit/b12eade7db83832e5bc6e092a4cbbed720de296b))
 - Refresh generated README blocks [skip ci] ([`f24e169`](https://github.com/ovurrsl/plugin-warehouse/commit/f24e169f14be6c9e34f203b0be6d442ba9a4f7c9))
 - Refresh generated README blocks [skip ci] ([`ef86834`](https://github.com/ovurrsl/plugin-warehouse/commit/ef86834c2b137398888483621f1324c23bd354d7))
 - Refresh generated README blocks [skip ci] ([`cc09423`](https://github.com/ovurrsl/plugin-warehouse/commit/cc09423cca19e85baefa76a9e17f93a221219940))
@@ -39,6 +40,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Cargo type registry with seeded, quantised fill ([`2505872`](https://github.com/ovurrsl/plugin-warehouse/commit/2505872765bd51206501f343c560552f96534fd2))
 - The mixed transfer's strips lift — increment 5b ([`2e500de`](https://github.com/ovurrsl/plugin-warehouse/commit/2e500de96d29bf4b474b69508d34cd669d206df6))
 - Boxes run the lines — increment 5a ([`d51960a`](https://github.com/ovurrsl/plugin-warehouse/commit/d51960a4877909c9962f82cc95607356bc4b5708))
 - CNV-OBQ oblique branch — increment 4 complete ([`112df12`](https://github.com/ovurrsl/plugin-warehouse/commit/112df120fde9e7418372655de2866a8c0b34b9fd))

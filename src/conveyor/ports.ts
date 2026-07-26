@@ -42,30 +42,58 @@ export type ConveyorModule = ConveyorRollerNode | ConveyorCurveNode
 /**
  * Ids are **geometric, never flow-named**.
  *
- * `'a'` is the end the shape starts at and `'b'` the end it finishes at,
- * whichever way goods happen to travel. The host snapshots port ids when a drag
- * begins, so a `flow` flipped mid-drag would rename the ports underneath a live
- * snapshot and the connectivity solver would mate the wrong pair. Flow is read
- * off the node by anything that needs it, not off the port.
+ * `'a'` is the end the shape starts at, `'b'` the end it finishes at, and `'c'`
+ * the lateral one where a shape has three — whichever way goods happen to
+ * travel through any of them.
+ *
+ * The reason is not that flow-named ids would race a drag: the host captures
+ * every *other* node's port list by value when a move begins
+ * (`port-connectivity.ts:176`) and re-reads only the moved node's, so renaming
+ * a port through the inspector cannot desync a live snapshot. The reason is
+ * that a junction has two discharges, and `out1` / `out2` would need a
+ * tie-break that means nothing — while `'b'` and `'c'` are already the two
+ * different places they physically are. Flow decides what a port *does*; it
+ * never decides what it is called.
  */
-export type ConveyorPortId = 'a' | 'b'
+export type ConveyorPortId = 'a' | 'b' | 'c'
+
+/**
+ * What a port does, which is what decides whether two of them may mate.
+ *
+ * `'both'` is not a convenience: an oblique branch is ordered as a divert or a
+ * merge and installed either way round, so the port genuinely accepts goods in
+ * both directions and a design that forced it to pick would describe half the
+ * catalogue's own configurations as errors.
+ */
+export type PortRole = 'in' | 'out' | 'both'
+
+/** Every kind this package registers as one conveyor family. Narrowing reads
+ *  this rather than a list per file — a kind missing from it is a kind whose
+ *  ends the line index cannot see, which shows up as doubled steel at a seam
+ *  rather than as an error. */
+const CONVEYOR_KINDS = new Set(['warehouse:conveyor-roller', 'warehouse:conveyor-curve'])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
   return module.type === 'warehouse:conveyor-curve'
 }
 
-/** Narrow an unknown scene node to a module of this kind, either shape. */
+/** Narrow an unknown scene node to a module of this kind, any shape. */
 export function asConveyorModule(node: unknown): ConveyorModule | null {
   const record = node as { type?: unknown; id?: unknown } | null
-  if (record?.type !== 'warehouse:conveyor-roller' && record?.type !== 'warehouse:conveyor-curve') {
-    return null
-  }
+  if (typeof record?.type !== 'string' || !CONVEYOR_KINDS.has(record.type)) return null
   if (typeof record.id !== 'string') return null
   return node as ConveyorModule
 }
 
-/** Which end goods enter and leave by, given the flow. Read by the magnet, so
- *  that two discharges are never mated nose to nose. */
+/**
+ * Which end goods enter and leave by on a **two-ended** shape.
+ *
+ * Deliberately not generalised to three ports. Their only readers are the
+ * shared-support rule — which asks a module whether the end it would cede is
+ * mated — and the panel; and every three-port shape in the catalogue has a
+ * fixed leg layout that cedes nothing. A junction answers `portRole` per port
+ * instead, which is the question that actually has an answer there.
+ */
 export function inletPort(module: ConveyorModule): ConveyorPortId {
   return module.flow === 'forward' ? 'a' : 'b'
 }
@@ -118,6 +146,24 @@ export type LocalPort = {
   /** Outward heading in plan, so two mated ports face each other. */
   dx: number
   dz: number
+  /**
+   * What this end does. Derived from `flow` on a two-ended shape, because flow
+   * is a per-instance field there and the same hardware runs either way round;
+   * declared by the shape on a junction, where the lateral port's function is
+   * what the machine is.
+   */
+  role: PortRole
+  /**
+   * The lane and the frame **at this port**, not at the node.
+   *
+   * Forced by the oblique transfer, whose branch is a 400 mm lane leaving a
+   * 600 mm main line — the catalogue's own geometry. A per-node lane would
+   * report that branch as a 600 mm opening to the host's collar sizing and to
+   * rule R1, and would then read every oblique ever placed as a width mismatch
+   * against itself.
+   */
+  laneMm: number
+  frameWidthM: number
 }
 
 /**
@@ -138,6 +184,9 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
     // tangent's Z with it.
     const hand = module.handed === 'left' ? 1 : -1
 
+    const lane = curveUsefulWidthMm(module)
+    const frame = curveFrameWidthM(module)
+
     return (['a', 'b'] as const).map((id) => {
       const theta = id === 'a' ? 0 : sweep
       const [x, z] = arcPointLocal(module, radius, theta)
@@ -151,14 +200,29 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         z,
         dx: outward * -Math.sin(theta),
         dz: outward * -hand * Math.cos(theta),
+        role: (id === outletPort(module) ? 'out' : 'in') as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
       }
     })
   }
 
   const half = moduleLengthM(module) / 2
+  const lane = usefulWidthMm(module)
+  const frame = frameWidthM(module)
   return (['a', 'b'] as const).map((id) => {
     const sign = id === 'b' ? 1 : -1
-    return { id, x: sign * half, y: module.transportHeight, z: 0, dx: sign, dz: 0 }
+    return {
+      id,
+      x: sign * half,
+      y: module.transportHeight,
+      z: 0,
+      dx: sign,
+      dz: 0,
+      role: (id === outletPort(module) ? 'out' : 'in') as PortRole,
+      laneMm: lane,
+      frameWidthM: frame,
+    }
   })
 }
 
@@ -202,16 +266,16 @@ export function conveyorPorts(module: ConveyorModule): NodePort[] {
   const sin = Math.sin(rotationY)
   const origin = module.position
 
-  const frame = moduleFrameWidthM(module)
-  // Area-equivalent round size, which is what the field asks a rectangular port
-  // to report. The lane, not the frame: what mates is what a box travels
-  // through.
-  const lane = moduleLaneMm(module) / 1000
-  const equivalent = 2 * Math.sqrt((lane * lane) / Math.PI)
-
   const ports: NodePort[] = localPorts(module).map((local) => {
     const [x, z] = toWorldPlan([local.x, local.z], origin, cos, sin)
     const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
+    // Per port, not per node: an oblique branch is a narrower opening than the
+    // main line it leaves, and the host sizes a joining run's collar from these.
+    const lane = local.laneMm / 1000
+    // Area-equivalent round size, which is what the field asks a rectangular
+    // port to report. The lane, not the frame: what mates is what a box travels
+    // through.
+    const equivalent = 2 * Math.sqrt((lane * lane) / Math.PI)
     return {
       id: local.id,
       position: [x, origin[1] + local.y, z],
@@ -223,7 +287,7 @@ export function conveyorPorts(module: ConveyorModule): NodePort[] {
       system: 'conveyor',
       shape: 'rect',
       width: lane * INCHES_PER_METRE,
-      height: frame * INCHES_PER_METRE,
+      height: local.frameWidthM * INCHES_PER_METRE,
     }
   })
 

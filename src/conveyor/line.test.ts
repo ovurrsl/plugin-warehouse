@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { ConveyorCurveNode } from './curve-schema'
 import {
   hasDownstreamNeighbour,
   hasUpstreamNeighbour,
@@ -8,7 +9,7 @@ import {
 } from './line-index'
 import { moduleLengthM } from './metrics'
 import { jointProblems, resetPortMagnet, snapToLineEnd } from './port-magnet'
-import { conveyorPorts, inletPort, outletPort } from './ports'
+import { conveyorPorts, inletPort, localPorts, outletPort } from './ports'
 import { ConveyorRollerNode } from './schema'
 
 const conveyor = (id: string, overrides: Record<string, unknown> = {}) =>
@@ -273,5 +274,66 @@ describe('a joint built by hand is checked, because the magnet is not the only w
   test('a lone module reports nothing', () => {
     const lone = conveyor('lone')
     expect(jointProblems(lone, scene(lone))).toEqual([])
+  })
+})
+
+describe('a port carries what a joint is judged on, and carries it per port', () => {
+  const straight = (overrides: Record<string, unknown> = {}) =>
+    ConveyorRollerNode.parse({ id: 'conveyor_roller_p', ...overrides })
+  const bend = (overrides: Record<string, unknown> = {}) =>
+    ConveyorCurveNode.parse({ id: 'conveyor_curve_p', ...overrides })
+
+  test('the role follows the flow on a two-ended shape, because the hardware runs either way', () => {
+    // Not declared, and that is the point: `flow` is a per-instance field on a
+    // straight and a bend — the same machine installed the other way round — so
+    // a table of roles per kind would be wrong for half the instances.
+    for (const make of [straight, bend]) {
+      const forward = localPorts(make({ flow: 'forward' }))
+      const reverse = localPorts(make({ flow: 'reverse' }))
+      expect(forward.map((p) => `${p.id}:${p.role}`)).toEqual(['a:in', 'b:out'])
+      expect(reverse.map((p) => `${p.id}:${p.role}`)).toEqual(['a:out', 'b:in'])
+    }
+  })
+
+  test('every port names its own lane and its own frame', () => {
+    // Forced by the oblique branch, which is a 400 mm lane leaving a 600 mm main
+    // line. A two-ended shape's ports agree with each other — but they agree
+    // because they are computed, not because anything assumes they must.
+    for (const [module, lane, frame] of [
+      [straight({ usefulWidth: '400' }), 400, 0.547],
+      [straight({ usefulWidth: '600' }), 600, 0.747],
+      [bend({ usefulWidth: '400' }), 400, 0.511],
+      [bend({ usefulWidth: '600' }), 600, 0.711],
+    ] as const) {
+      for (const port of localPorts(module)) {
+        expect({ id: port.id, lane: port.laneMm, frame: port.frameWidthM }).toEqual({
+          id: port.id,
+          lane,
+          frame: expect.closeTo(frame, 9),
+        })
+      }
+    }
+  })
+
+  test('the host-facing cross-section is the port’s, not the node’s', () => {
+    // `NodePort.height` is the collar's vertical face and the host sizes a
+    // joining run from it. Read off the node it would report an oblique branch
+    // as its main line's frame — 200 mm of opening that is not there.
+    const module = straight({ usefulWidth: '600' })
+    const locals = new Map(localPorts(module).map((local) => [local.id, local]))
+    for (const port of conveyorPorts(module)) {
+      const local = locals.get(port.id as 'a' | 'b' | 'c')
+      if (!local) throw new Error(`no local port ${port.id}`)
+      expect(port.width).toBeCloseTo((local.laneMm / 1000) * 39.3701, 6)
+      expect(port.height).toBeCloseTo(local.frameWidthM * 39.3701, 6)
+    }
+  })
+
+  test('a third port is a shape’s to declare, and neither shipped shape declares one', () => {
+    // The widening is real — `ConveyorPortId` admits 'c' — but nothing that
+    // exists today grows an end because of it. This is the line that fails the
+    // day a junction accidentally reaches the straight's local port list.
+    expect(localPorts(straight()).map((p) => p.id)).toEqual(['a', 'b'])
+    expect(localPorts(bend()).map((p) => p.id)).toEqual(['a', 'b'])
   })
 })

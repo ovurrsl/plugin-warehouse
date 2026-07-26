@@ -1,11 +1,9 @@
 import { isPortMated } from './line-index'
-import type { ConveyorModule, ConveyorPortId } from './ports'
+import type { ConveyorModule, ConveyorPortId, PortRole } from './ports'
 import {
   asConveyorModule,
   conveyorPorts,
   localPorts,
-  moduleLaneMm,
-  outletPort,
   toWorldPlan,
   transportHeightAt,
 } from './ports'
@@ -52,8 +50,8 @@ const CELL = 1
 type FreeEnd = {
   nodeId: string
   port: ConveyorPortId
-  /** True when goods leave here, so it wants an infeed against it. */
-  isOutlet: boolean
+  /** What this end does, which is what decides whether another may join it. */
+  role: PortRole
   x: number
   y: number
   z: number
@@ -61,9 +59,24 @@ type FreeEnd = {
   dx: number
   dz: number
   /** What has to match: the lane a box travels through, and the height it
-   *  travels at. Both are the catalogue's own joint rules — R1 and R2. */
+   *  travels at. Both are the catalogue's own joint rules — R1 and R2, and both
+   *  are properties of the **port** rather than of the node: an oblique branch
+   *  is a narrower lane than the main line it leaves. */
   lane: number
   height: number
+}
+
+/**
+ * Whether two ends may join.
+ *
+ * Head to tail: one has to deliver into the other. `'both'` accepts either
+ * side, which is not a loophole — an oblique branch is ordered as a divert or a
+ * merge and installed either way round, so refusing it would call half the
+ * catalogue's own configurations errors.
+ */
+function rolesComplement(a: PortRole, b: PortRole): boolean {
+  if (a === 'both' || b === 'both') return true
+  return a !== b
 }
 
 let indexedFrom: unknown = null
@@ -84,22 +97,24 @@ function build(nodes: Readonly<Record<string, unknown>>): Map<string, FreeEnd[]>
   for (const value of Object.values(nodes)) {
     const module = asConveyorModule(value)
     if (!module) continue
-    const outlet = outletPort(module)
+    const locals = new Map(localPorts(module).map((local) => [local.id, local]))
 
     for (const port of conveyorPorts(module)) {
       const id = port.id as ConveyorPortId
       if (isPortMated(nodes, module.id, id)) continue
+      const local = locals.get(id)
+      if (!local) continue
 
       const end: FreeEnd = {
         nodeId: module.id,
         port: id,
-        isOutlet: id === outlet,
+        role: local.role,
         x: port.position[0],
         y: port.position[1],
         z: port.position[2],
         dx: port.direction[0],
         dz: port.direction[2],
-        lane: moduleLaneMm(module),
+        lane: local.laneMm,
         height: transportHeightAt(module, id),
       }
       const key = cellKey(end.x, end.z)
@@ -146,15 +161,24 @@ export function snapToLineEnd(
   const cos = Math.cos(rotationY)
   const sin = Math.sin(rotationY)
   const [cx, cy, cz] = candidate
-  const outlet = outletPort(module)
 
-  // This module's own two ends, at the candidate transform. Built from the same
-  // local list `def.ports` uses, so a bend's ends are on its arc rather than on
-  // an assumed ±X — the assumption a straight-only magnet was making.
+  // This module's own ends, at the candidate transform. Built from the same
+  // local list `def.ports` uses, so a bend's ends are on its arc and a
+  // junction's third end is where it actually is — rather than on an assumed
+  // ±X, the assumption a straight-only magnet was making.
   const mine = localPorts(module).map((local) => {
     const [x, z] = toWorldPlan([local.x, local.z], candidate, cos, sin)
     const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
-    return { id: local.id, isOutlet: local.id === outlet, x, y: cy + local.y, z, dx, dz }
+    return {
+      id: local.id,
+      role: local.role,
+      lane: local.laneMm,
+      x,
+      y: cy + local.y,
+      z,
+      dx,
+      dz,
+    }
   })
 
   let bestDistance = MAGNET_RADIUS_SQ
@@ -167,10 +191,11 @@ export function snapToLineEnd(
       for (let iz = bz - 1; iz <= bz + 1; iz++) {
         for (const other of cells.get(`${ix}:${iz}`) ?? []) {
           if (moving.has(other.nodeId)) continue
-          // Head to tail: one end has to be a discharge and the other an infeed.
-          if (end.isOutlet === other.isOutlet) continue
-          // R1 — the lane a box travels through has to be the same lane.
-          if (other.lane !== moduleLaneMm(module)) continue
+          // Head to tail: one end has to deliver into the other.
+          if (!rolesComplement(end.role, other.role)) continue
+          // R1 — the lane a box travels through has to be the same lane. Read
+          // off both ports, because a junction's ends are not all one class.
+          if (other.lane !== end.lane) continue
           // R2 — and it has to be at the same height, with no tolerance. A step
           // between two beds is a step a box falls down.
           if (Math.abs(other.height - transportHeightAt(module, end.id)) > 1e-6) continue
@@ -212,15 +237,19 @@ export function jointProblems(
   nodes: Readonly<Record<string, unknown>>,
 ): string[] {
   const problems: string[] = []
-  const outlet = outletPort(module)
+  const mineLocal = new Map(localPorts(module).map((local) => [local.id, local]))
 
   for (const port of conveyorPorts(module)) {
     const id = port.id as ConveyorPortId
     if (!isPortMated(nodes, module.id, id)) continue
+    const local = mineLocal.get(id)
+    if (!local) continue
 
     for (const value of Object.values(nodes)) {
       const other = asConveyorModule(value)
       if (!other || other.id === module.id) continue
+      const theirLocal = new Map(localPorts(other).map((entry) => [entry.id, entry]))
+
       for (const theirs of conveyorPorts(other)) {
         const dx = theirs.position[0] - port.position[0]
         const dy = theirs.position[1] - port.position[1]
@@ -228,18 +257,22 @@ export function jointProblems(
         if (dx * dx + dy * dy + dz * dz > 0.05 * 0.05) continue
 
         const theirId = theirs.id as ConveyorPortId
-        const theirOutlet = theirId === outletPort(other)
-        const mineOutlet = id === outlet
-        if (mineOutlet === theirOutlet) {
+        const theirPort = theirLocal.get(theirId)
+        if (!theirPort) continue
+
+        if (!rolesComplement(local.role, theirPort.role)) {
           problems.push(
-            mineOutlet
-              ? `Two discharges meet at the ${id === outlet ? 'downstream' : 'upstream'} end — nothing feeds either line.`
+            local.role === 'out'
+              ? 'Two discharges meet here — nothing feeds either line.'
               : 'Two infeeds meet — no line delivers into this joint.',
           )
         }
-        if (moduleLaneMm(other) !== moduleLaneMm(module)) {
+        // R1, read off the two **ports**. An oblique branch is a narrower lane
+        // than its own main line, so comparing the nodes would report every
+        // oblique as a mismatch against itself.
+        if (theirPort.laneMm !== local.laneMm) {
           problems.push(
-            `Joined to a ${moduleLaneMm(other)} mm lane; a box wider than ${Math.min(moduleLaneMm(other), moduleLaneMm(module))} mm cannot cross.`,
+            `Joined to a ${theirPort.laneMm} mm lane; a box wider than ${Math.min(theirPort.laneMm, local.laneMm)} mm cannot cross.`,
           )
         }
         const step = Math.abs(transportHeightAt(other, theirId) - transportHeightAt(module, id))

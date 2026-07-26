@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`c2ebb6c`](https://github.com/ovurrsl/plugin-warehouse/commit/c2ebb6c0e09010b5fc540bcd617adc5ac65514ac))
 - Refresh generated README blocks [skip ci] ([`3dab0b7`](https://github.com/ovurrsl/plugin-warehouse/commit/3dab0b7c771af595d6f8b1240508f67723633834))
 - Refresh generated README blocks [skip ci] ([`b12eade`](https://github.com/ovurrsl/plugin-warehouse/commit/b12eade7db83832e5bc6e092a4cbbed720de296b))
 - Refresh generated README blocks [skip ci] ([`f24e169`](https://github.com/ovurrsl/plugin-warehouse/commit/f24e169f14be6c9e34f203b0be6d442ba9a4f7c9))
@@ -41,6 +42,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Storage, picking and footprint — the readout, ported honestly ([`8cd7ae9`](https://github.com/ovurrsl/plugin-warehouse/commit/8cd7ae93dd861a64d1eaed69835a64f44389b58d))
 - Modelled cargo — cartons, drums and the load's hardware ([`725aafb`](https://github.com/ovurrsl/plugin-warehouse/commit/725aafbad1df4a889d8dab01cf6475cfd2eae831))
 - Cargo atlas with a single source for its regions ([`7abe253`](https://github.com/ovurrsl/plugin-warehouse/commit/7abe253ca1ab0670bc5fc316c3db0769e57288e0))
 - Cargo type registry with seeded, quantised fill ([`2505872`](https://github.com/ovurrsl/plugin-warehouse/commit/2505872765bd51206501f343c560552f96534fd2))
@@ -81,6 +83,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Six findings from the adversarial review of the cargo code ([`3745ac4`](https://github.com/ovurrsl/plugin-warehouse/commit/3745ac4f8c3b32613f7d81268f51d1ec1d2f7c66))
 - All fifteen findings from the adversarial review ([`5b7a62d`](https://github.com/ovurrsl/plugin-warehouse/commit/5b7a62dec51404b6e7c8a4443c43ef20e4947fe3))
 - The ceded support follows the flow, and the key says which end ([`07d792a`](https://github.com/ovurrsl/plugin-warehouse/commit/07d792af7767c93868a2f1b20f049b90c749443c))
 - Store catalogue enums as strings so Duplicate works ([`f9c9548`](https://github.com/ovurrsl/plugin-warehouse/commit/f9c9548bd932afb9f266e4e9bb6ac49df08ced12))

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7459a92`](https://github.com/ovurrsl/plugin-warehouse/commit/7459a9265dc44df5122f6c6c638b8f0b350cda61))
 - Refresh generated README blocks [skip ci] ([`00cb3d3`](https://github.com/ovurrsl/plugin-warehouse/commit/00cb3d33875b7709caefbf95c8a0fb36f9c1d2ce))
 - Refresh generated README blocks [skip ci] ([`24aff10`](https://github.com/ovurrsl/plugin-warehouse/commit/24aff1072a3d60f6950944c12236c9aa2caf52ca))
 - Refresh generated README blocks [skip ci] ([`8e01fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/8e01fa100f1611d7183a324ba0342b02f98c0458))
@@ -25,6 +26,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- A roller conveyor module, and a clash test the host cannot do ([`b448d7e`](https://github.com/ovurrsl/plugin-warehouse/commit/b448d7e1c8ee004e67f56b70396ab6646ab0ff29))
 - Magnet a dragged bay onto the seam of a run ([`53924b6`](https://github.com/ovurrsl/plugin-warehouse/commit/53924b61b8e54199ba467d29e15ae2b68e418008))
 - One node is one bay ([`699764c`](https://github.com/ovurrsl/plugin-warehouse/commit/699764c851faf6dc5b06162fcd4baf16e716e96a))
 - Shift-select bays, and a panel that only shows what applies ([`533cc0c`](https://github.com/ovurrsl/plugin-warehouse/commit/533cc0c8ded4dfb8636100b430433b287c7c5d54))

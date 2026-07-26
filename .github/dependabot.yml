@@ -1,24 +1,25 @@
+# Actions only. npm version updates are deliberately NOT enabled here, and the
+# reason is empirical rather than theoretical.
+#
+# Dependabot's bun support went GA in February 2025, so it does open npm PRs on
+# this repository — but it edits `package.json` and leaves `bun.lock` untouched
+# (dependabot-core#11602). CI runs `bun install --frozen-lockfile`, which then
+# correctly refuses, so every npm PR arrives already red. Both PRs it opened
+# here failed exactly that way before this file was narrowed.
+#
+# A permanently-red robot PR is worse than no robot PR: it teaches you to
+# ignore a red check. Dependency *security alerts* are a separate feature and
+# still work — they are repository settings, not this file — so nothing about
+# being told a dependency is vulnerable changes. Only the automatic bump PR
+# goes away, and `bun update` does that job honestly in one command.
+#
+# Re-enable when dependabot-core#11602 closes.
 version: 2
 updates:
-  # `@pascal-app/*` are peer dependencies and deliberately unpinned — a pinned
-  # copy creates a second `nodeRegistry` singleton and the kinds silently never
-  # resolve. Dependabot only ever touches `devDependencies` here, which is
-  # exactly the surface where a bump is safe.
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: chore
-      include: scope
-    groups:
-      types:
-        patterns: ['@types/*']
-
   # Workflows pin third-party actions to a commit SHA. Dependabot understands
-  # the `SHA # tag` form and bumps both halves together, which is what makes
-  # SHA pinning maintainable rather than a thing that quietly goes stale.
+  # the `SHA # tag` form and bumps both halves together, which is what makes SHA
+  # pinning maintainable rather than a thing that quietly goes stale. No
+  # lockfile is involved, so this half works properly.
   - package-ecosystem: github-actions
     directory: /
     schedule:

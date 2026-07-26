@@ -3,6 +3,7 @@
 import { Icon } from '@iconify/react'
 import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { SegmentedControl } from '@pascal-app/editor'
+import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { useWarehouseStore } from '../store'
 import { deleteBay } from './bay-commands'
@@ -120,8 +121,35 @@ function patchBay(rack: PalletRackNode, row: number, bay: number, patch: Partial
     .updateNode(rack.id as AnyNodeId, { bayOverrides: next } as unknown as Partial<AnyNode>)
 }
 
-export default function RackBayPanel({ node }: { node: PalletRackNode }) {
+/**
+ * The rack this panel is editing.
+ *
+ * `ParametricDescriptor.trailingSection` is typed `ComponentType<{ node: N }>`,
+ * but `parametric-inspector.tsx` renders `<TrailingSection />` with no props at
+ * all — so the declared `node` arrives `undefined` and the first property read
+ * throws. The type is the thing that is wrong, not the call site's intent, and
+ * a plugin cannot patch the host.
+ *
+ * So the node is read the way the inspector itself reads it: whatever is
+ * selected. The prop is still preferred when a host does pass one, which costs
+ * nothing and means this keeps working if the contract is repaired.
+ */
+function useInspectedRack(provided?: PalletRackNode): PalletRackNode | null {
+  const selectedId = useViewer((s) => s.selection.selectedIds[0])
+  const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
+  if (provided) return provided
+  if (!selected || (selected as { type?: string }).type !== 'warehouse:pallet-rack') return null
+  return selected as unknown as PalletRackNode
+}
+
+export default function RackBayPanel({ node: provided }: { node?: PalletRackNode }) {
   const focused = useWarehouseStore((s) => s.focusedBay)
+  const node = useInspectedRack(provided)
+
+  // The inspector is open for something that is not a rack — or for nothing.
+  // Rendering the empty-state hint here would put a "click a bay" prompt under
+  // an unrelated node's fields.
+  if (!node) return null
 
   const inRange =
     focused !== null &&

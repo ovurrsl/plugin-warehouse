@@ -1,5 +1,6 @@
 import { BaseNode, nodeType, objectId } from '@pascal-app/core'
 import { z } from 'zod'
+import { CARGO_COLOR_IDS } from './cargo-constants'
 import { PALLET_PRESET_IDS } from './presets'
 
 /**
@@ -60,10 +61,17 @@ export const PalletNode = BaseNode.extend({
   strapped: z.boolean().default(true),
   labelled: z.boolean().default(true),
 
-  /** The goods' own colour. Kraft for cartons, drum blue for drums; each pallet
-   *  takes a small seeded tint off it so a rack full of them does not read as
-   *  one object pasted a thousand times. */
-  cargoColor: z.string().default('#c8a06a'),
+  /**
+   * The goods' own colour, chosen from a prepared set rather than typed as a
+   * hex.
+   *
+   * **Named because the geometry cache is keyed on it.** Hue is carried on the
+   * vertices, not by the per-instance tint, so a free-form colour would mint a
+   * merged buffer per stop of a colour picker's drag. Each pallet still takes a
+   * small seeded tint off whichever of these it names, so a rack full of them
+   * does not read as one object pasted a thousand times.
+   */
+  cargoColor: z.enum(CARGO_COLOR_IDS).default('kraft'),
 
   /**
    * Slot this pallet occupies, as `bay-level-position`, or null when it is

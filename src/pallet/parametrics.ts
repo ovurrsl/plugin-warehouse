@@ -1,8 +1,14 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { CARGO_COLOR_IDS } from './cargo-constants'
+import { CARGO_TYPE_IDS } from './cargo-types'
 import { PALLET_PRESETS, specOf } from './presets'
 import type { PalletNode } from './schema'
 
 const PRESET_KEYS = Object.keys(PALLET_PRESETS) as (keyof typeof PALLET_PRESETS)[]
+
+/** `'none'` first, because it is the default and the state every pallet saved
+ *  before cargo existed is in. */
+const CARGO_OPTIONS = ['none', ...CARGO_TYPE_IDS] as const
 
 /**
  * Auto-derived inspector fields rather than a `customPanel`.
@@ -21,7 +27,35 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
       label: 'Pallet',
       fields: [
         { key: 'preset', kind: 'enum', options: PRESET_KEYS, display: 'select' },
-        { key: 'loadHeight', kind: 'number', unit: 'm', min: 0, max: 2.4, step: 0.05 },
+        // Only meaningful while the pallet carries the plain block. A typed
+        // cargo takes its height from the variant its seed resolves to, and
+        // leaving an editable field that silently does nothing is worse than
+        // hiding it.
+        {
+          key: 'loadHeight',
+          kind: 'number',
+          unit: 'm',
+          min: 0,
+          max: 2.4,
+          step: 0.05,
+          visibleIf: (node) => node.cargo === 'none',
+        },
+      ],
+    },
+    {
+      label: 'Load',
+      fields: [
+        { key: 'cargo', kind: 'enum', options: CARGO_OPTIONS, display: 'select' },
+        {
+          key: 'cargoColor',
+          kind: 'enum',
+          options: CARGO_COLOR_IDS,
+          display: 'select',
+          visibleIf: (node) => node.cargo !== 'none',
+        },
+        { key: 'strapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
+        { key: 'labelled', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
+        { key: 'wrapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
       ],
     },
     {

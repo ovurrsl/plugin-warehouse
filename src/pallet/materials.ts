@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { getOrCreateCargoAtlas } from './cargo-atlas'
 import { getOrCreateEPALTextureAtlas } from './epal-textures'
 
 /**
@@ -49,4 +50,48 @@ export function getPalletPreviewMaterial(): THREE.MeshStandardMaterial {
   cachedPreviewMaterial.opacity = 0.55
   cachedPreviewMaterial.depthWrite = false
   return cachedPreviewMaterial
+}
+
+let cachedCargoMaterial: THREE.MeshStandardMaterial | null = null
+let cachedCargoPreviewMaterial: THREE.MeshStandardMaterial | null = null
+
+/**
+ * One material for everything a pallet carries — cartons, drums, straps, corner
+ * boards and the label alike.
+ *
+ * **The same texture is handed to `roughnessMap` and `metalnessMap`**, which is
+ * not a mistake: three reads roughness from a texture's green channel and
+ * metalness from its blue, expressly so one packed sheet can serve both. Two
+ * separate sheets would double the VRAM to say the same thing.
+ *
+ * `vertexColors` carries two multiplied together — each part's own hue and the
+ * approximate occlusion baked over it. That is what lets a green strap and a
+ * kraft carton share one mesh, and it is why a per-instance tint is left to do
+ * only the small per-pallet variation it is good at.
+ */
+export function getCargoMaterial(): THREE.MeshStandardMaterial {
+  if (cachedCargoMaterial) return cachedCargoMaterial
+  const atlas = getOrCreateCargoAtlas()
+
+  cachedCargoMaterial = new THREE.MeshStandardMaterial({
+    map: atlas.map,
+    roughnessMap: atlas.orm,
+    metalnessMap: atlas.orm,
+    // Left at 1 so the packed sheet carries the values rather than being scaled
+    // by a second opinion — the mistake the pallet's own material shipped with,
+    // which rendered its steel control nail as grey plastic.
+    roughness: 1,
+    metalness: 1,
+    vertexColors: true,
+  })
+  return cachedCargoMaterial
+}
+
+export function getCargoPreviewMaterial(): THREE.MeshStandardMaterial {
+  if (cachedCargoPreviewMaterial) return cachedCargoPreviewMaterial
+  cachedCargoPreviewMaterial = getCargoMaterial().clone()
+  cachedCargoPreviewMaterial.transparent = true
+  cachedCargoPreviewMaterial.opacity = 0.55
+  cachedCargoPreviewMaterial.depthWrite = false
+  return cachedCargoPreviewMaterial
 }

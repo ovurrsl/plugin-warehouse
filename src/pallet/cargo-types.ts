@@ -187,6 +187,33 @@ export function unitCount(type: CargoType, preset: PalletPreset, variant: number
   return Math.max(1, Math.round(variant * most))
 }
 
+/**
+ * **How tall the goods on this pallet are — the one answer everything else asks
+ * for.**
+ *
+ * A pallet carrying cargo has two candidate heights: the `loadHeight` field a
+ * user typed, and the height the resolved variant actually builds to. They are
+ * not the same number, and letting each caller pick meant collision testing one
+ * while the renderer drew the other — a load that clashes with the beam above it
+ * and reports itself clear, which is precisely the failure the whole clash
+ * system exists to prevent.
+ *
+ * So: cargo, when set, wins. `loadHeight` stays the answer for the plain block a
+ * pallet has always been able to carry, which is why nothing about a scene saved
+ * before cargo existed changes.
+ */
+export function loadHeightOf(node: {
+  id: string
+  cargo: 'none' | CargoTypeId
+  preset: PalletPreset
+  fillRange: readonly [number, number]
+  loadHeight: number
+}): number {
+  if (node.cargo === 'none') return Math.max(0, node.loadHeight)
+  const type = CARGO_TYPES[node.cargo]
+  return cargoHeightM(type, resolveVariant(type, node.id, node.fillRange))
+}
+
 /** Height of the goods alone, metres. The pallet's own deck is not in it. */
 export function cargoHeightM(type: CargoType, variant: number): number {
   if (type.fill === 'layers') {

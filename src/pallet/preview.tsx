@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { loadHeightOf } from './cargo-types'
 import { getPalletGeometry } from './geometry-builder'
 import { getPalletPreviewMaterial } from './materials'
 import { specOf } from './presets'
@@ -26,7 +27,18 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
   const spec = specOf(node.preset)
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
   const material = getPalletPreviewMaterial()
-  const loadHeight = Math.max(0, node.loadHeight ?? 0)
+  /**
+   * The same height source the renderer and the clash test use, so a ghost can
+   * never promise one height and commit another.
+   *
+   * **The ghost deliberately does not draw modelled cargo yet.** A load's fill is
+   * a function of its node's id, and this node's id is minted for the preview and
+   * thrown away — the pallet that commits gets a different one. Drawing real
+   * variant geometry here before the placement path hands its id to the committed
+   * node would show the user one load and place another, which is worse than
+   * showing a plain block.
+   */
+  const loadHeight = loadHeightOf(node)
 
   // The overlay layer keeps the ghost out of export and snapshot passes.
   // Layers do not inherit, so every object in the subtree needs it set.

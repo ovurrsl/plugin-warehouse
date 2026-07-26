@@ -1,7 +1,8 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { loadHeightOf } from './cargo-types'
 import { buildPalletFloorplan } from './floorplan'
 import { palletParametrics } from './parametrics'
-import { specOf, unitLoadHeight } from './presets'
+import { specOf } from './presets'
 import { PalletNode } from './schema'
 
 /** Every 45°, the full turn. Written out rather than derived: a mirrored-and-
@@ -57,7 +58,7 @@ export const palletDefinition = {
         const pallet = node as unknown as PalletNode
         const spec = specOf(pallet.preset)
         return {
-          dimensions: [spec.length, unitLoadHeight(pallet.preset, pallet.loadHeight), spec.width],
+          dimensions: [spec.length, spec.height + loadHeightOf(pallet), spec.width],
           rotation: pallet.rotation ?? [0, 0, 0],
         }
       },
@@ -71,7 +72,7 @@ export const palletDefinition = {
     dragBounds: (node) => {
       const pallet = node as unknown as PalletNode
       const spec = specOf(pallet.preset)
-      const height = unitLoadHeight(pallet.preset, pallet.loadHeight)
+      const height = specOf(pallet.preset).height + loadHeightOf(pallet)
       return { size: [spec.length, height, spec.width], centerY: height / 2 }
     },
   },
@@ -112,6 +113,6 @@ export const palletDefinition = {
 
   mcp: {
     description:
-      'A warehouse pallet. `preset` selects the standard (EPAL 1/2/3/6, quarter, GMA 48x40, plastic euro); `loadHeight` in metres is 0 for an empty pallet or the height of the goods carried. Dimensions are metres.',
+      'A warehouse pallet. `preset` selects the standard (EPAL 1/2/3/6, quarter, GMA 48x40, plastic euro). `cargo` is `none` for a bare deck or a plain block sized by `loadHeight` in metres, or `carton`/`drum` for modelled goods whose height comes from `fillRange` instead. Dimensions are metres.',
   },
 } satisfies NodeDefinition<typeof PalletNode>

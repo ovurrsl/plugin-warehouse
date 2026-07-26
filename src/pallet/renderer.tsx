@@ -7,14 +7,48 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useMemo, useRef } from 'react'
-import type { Object3D } from 'three'
+import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
+import type { Mesh, Object3D } from 'three'
+import { Vector3 } from 'three'
+import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
+import { type CargoDetail, cargoInputOf } from './cargo-parts'
+import { loadHeightOf } from './cargo-types'
 import { getPalletGeometry } from './geometry-builder'
-import { getPalletMaterial } from './materials'
+import { getCargoMaterial, getPalletMaterial } from './materials'
 import { specOf } from './presets'
 import type { PalletNode } from './schema'
 
 const NO_RAYCAST = () => {}
+
+/**
+ * Where the load drops to its far tier, and where it comes back.
+ *
+ * Two thresholds rather than one, because a single one at the exact distance a
+ * pallet is hovering makes it flicker between tiers on every camera breath. The
+ * near figure is set from the acceptance requirement rather than from taste:
+ * carton seams have to stay countable at ten to fifteen metres, so the detailed
+ * tier has to survive well past that.
+ */
+const LOD_FAR_SQ = 25 * 25
+const LOD_NEAR_SQ = 18 * 18
+
+/** Frames between tier checks. Distance to a camera does not change fast enough
+ *  to be worth a square root every frame on every pallet in a warehouse. */
+const LOD_INTERVAL = 8
+
+const worldPosition = new Vector3()
+
+/** Spreads the tier checks across the interval so a thousand pallets do not all
+ *  re-evaluate on the same frame and spike it. */
+function hashPhase(id: string): number {
+  let hash = 0x811c9dc5
+  for (let index = 0; index < id.length; index++) {
+    hash ^= id.charCodeAt(index)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0) % LOD_INTERVAL
+}
 
 /**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
@@ -60,7 +94,10 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
   const material = getPalletMaterial()
 
-  const loadHeight = Math.max(0, node.loadHeight ?? 0)
+  // One height, from the one function that knows: a typed load answers with what
+  // was typed, a cargo load with what its variant resolved to. The collider and
+  // the clash test must not be able to disagree about it.
+  const loadHeight = loadHeightOf(node)
   const totalHeight = spec.height + loadHeight
 
   return (
@@ -90,8 +127,17 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
           raycast={NO_RAYCAST}
           receiveShadow
         />
-        {loadHeight > 0 && (
-          <PalletLoad height={loadHeight} length={spec.length} y={spec.height} width={spec.width} />
+        {node.cargo !== 'none' ? (
+          <CargoLoad isExporting={isExporting} node={node} y={spec.height} />
+        ) : (
+          loadHeight > 0 && (
+            <PalletLoad
+              height={loadHeight}
+              length={spec.length}
+              width={spec.width}
+              y={spec.height}
+            />
+          )
         )}
       </group>
     </group>
@@ -121,5 +167,97 @@ function PalletLoad({
       <boxGeometry args={[length - inset, height, width - inset]} />
       <meshStandardMaterial color="#c8b394" metalness={0} roughness={0.85} />
     </mesh>
+  )
+}
+
+/**
+ * The goods, when the pallet carries a type rather than a plain block.
+ *
+ * Mounted as its own mesh beside the pallet's, not merged into it: the deck is
+ * one shared buffer per preset and there are eight of those, where a load is one
+ * per distinct type, layout, fill, colour and tier. Merging the two would
+ * multiply the pallet's eight by every load in the building.
+ */
+function CargoLoad({
+  node,
+  y,
+  isExporting,
+}: {
+  node: PalletNode
+  y: number
+  isExporting: boolean
+}) {
+  const meshRef = useRef<Mesh>(null)
+  /**
+   * The tier this load is drawing. Owned by the frame loop, and the mounted
+   * geometry is read *from* it rather than hardcoded — the rack shipped the
+   * hardcoded version and the two paths fought over which tier was current.
+   */
+  const detailRef = useRef<CargoDetail>('full')
+
+  const input = useMemo(
+    () => cargoInputOf(node, isExporting ? 'full' : detailRef.current),
+    [node, isExporting],
+  )
+  const geometry = useMemo(() => (input ? getCargoGeometry(input) : null), [input])
+
+  // Tell the cache both tiers are on screen. Eviction must never free a buffer
+  // something is drawing, and a tier switch must not have to build one.
+  useEffect(() => {
+    const near = cargoInputOf(node, 'full')
+    const far = cargoInputOf(node, 'simple')
+    if (!near || !far) return
+    const nearKey = retainCargoGeometry(near)
+    const farKey = retainCargoGeometry(far)
+    return () => {
+      releaseCargoGeometry(nearKey)
+      releaseCargoGeometry(farKey)
+    }
+  }, [node])
+
+  const frameRef = useRef(0)
+  const phase = useMemo(() => hashPhase(node.id), [node.id])
+
+  useFrame(({ camera }) => {
+    const mesh = meshRef.current
+    if (!mesh || isExporting) return
+    frameRef.current += 1
+    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
+
+    const { elements } = mesh.matrixWorld
+    const distanceSq = camera.position.distanceToSquared(
+      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+    )
+    const current = detailRef.current
+    const next =
+      current === 'full'
+        ? distanceSq > LOD_FAR_SQ
+          ? 'simple'
+          : 'full'
+        : distanceSq < LOD_NEAR_SQ
+          ? 'full'
+          : 'simple'
+    if (next === current) return
+    detailRef.current = next
+    const swapped = cargoInputOf(node, next)
+    if (!swapped) return
+    mesh.geometry = getCargoGeometry(swapped)
+    mesh.castShadow = next === 'full'
+  })
+
+  if (!geometry) return null
+
+  return (
+    <mesh
+      castShadow
+      // Never dispose: shared by every pallet that resolved to the same load.
+      dispose={null}
+      geometry={geometry}
+      material={getCargoMaterial()}
+      position={[0, y, 0]}
+      raycast={NO_RAYCAST}
+      receiveShadow
+      ref={meshRef}
+    />
   )
 }

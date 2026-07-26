@@ -1,4 +1,5 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { loadHeightOf } from './cargo-types'
 import { specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -62,7 +63,7 @@ export function buildPalletFloorplan(
     })
   }
 
-  if (node.loadHeight > 0) {
+  if (loadHeightOf(node) > 0) {
     // Stretch-wrap outline, so a loaded position reads differently from an
     // empty one at a glance.
     children.push({

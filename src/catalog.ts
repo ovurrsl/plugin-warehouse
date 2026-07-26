@@ -128,6 +128,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Crosses a line through ninety degrees without turning the box: belt strips rise between the rollers and carry it off sideways. H flips the discharge side.',
     icon: 'lucide:move-diagonal',
   },
+  {
+    kind: 'warehouse:conveyor-oblique',
+    label: 'Oblique Transfer',
+    sectionId: 'conveyance',
+    description:
+      'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
+    icon: 'lucide:split',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

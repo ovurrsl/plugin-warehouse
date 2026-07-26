@@ -23,6 +23,17 @@ import {
 } from './launcher-metrics'
 import type { ConveyorLauncherNode } from './launcher-schema'
 import { frameWidthM, moduleLengthM, usefulWidthMm } from './metrics'
+import {
+  branchEndLocal,
+  branchLaneMm,
+  branchSign,
+  branchWidthM,
+  mainLaneMm,
+  mainWidthM,
+  angleRad as obliqueAngleRad,
+  moduleLengthM as obliqueLengthM,
+} from './oblique-metrics'
+import type { ConveyorObliqueNode } from './oblique-schema'
 import type { ConveyorRollerNode } from './schema'
 import {
   dischargeSign,
@@ -64,6 +75,7 @@ export type ConveyorModule =
   | ConveyorLauncherNode
   | ConveyorBoosterNode
   | ConveyorTransferNode
+  | ConveyorObliqueNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -103,6 +115,7 @@ const CONVEYOR_KINDS = new Set([
   'warehouse:conveyor-launcher',
   'warehouse:conveyor-booster',
   'warehouse:conveyor-transfer',
+  'warehouse:conveyor-oblique',
 ])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
@@ -119,6 +132,10 @@ export function isBoosterModule(module: ConveyorModule): module is ConveyorBoost
 
 export function isTransferModule(module: ConveyorModule): module is ConveyorTransferNode {
   return module.type === 'warehouse:conveyor-transfer'
+}
+
+export function isObliqueModule(module: ConveyorModule): module is ConveyorObliqueNode {
+  return module.type === 'warehouse:conveyor-oblique'
 }
 
 /** Narrow an unknown scene node to a module of this kind, any shape. */
@@ -164,6 +181,9 @@ export function moduleLaneMm(module: ConveyorModule): number {
   if (isLauncherModule(module)) return launcherUsefulWidthMm(module)
   if (isBoosterModule(module)) return boosterUsefulWidthMm(module)
   if (isTransferModule(module)) return transferLaneMm(module)
+  // The **main** line's class. A branch is narrower, and anything that needs to
+  // know reads the port rather than the node — which is what this shape forced.
+  if (isObliqueModule(module)) return mainLaneMm(module)
   return usefulWidthMm(module)
 }
 
@@ -180,6 +200,7 @@ export function moduleRunLengthM(module: ConveyorModule): number {
   if (isLauncherModule(module)) return launcherLengthM(module)
   if (isBoosterModule(module)) return boosterLengthM(module)
   if (isTransferModule(module)) return transferLengthM(module)
+  if (isObliqueModule(module)) return obliqueLengthM(module)
   return moduleLengthM(module)
 }
 
@@ -190,6 +211,7 @@ export function moduleFrameWidthM(module: ConveyorModule): number {
   if (isLauncherModule(module)) return launcherFrameWidthM(module)
   if (isBoosterModule(module)) return boosterFrameWidthM(module)
   if (isTransferModule(module)) return transferFrameWidthM(module)
+  if (isObliqueModule(module)) return mainWidthM(module)
   return frameWidthM(module)
 }
 
@@ -300,6 +322,58 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         role: 'out' as PortRole,
         laneMm: lane,
         frameWidthM: frame,
+      },
+    ]
+  }
+
+  if (isObliqueModule(module)) {
+    const half = obliqueLengthM(module) / 2
+    const outlet = outletPort(module)
+    const side = branchSign(module)
+    const theta = obliqueAngleRad(module)
+
+    const main = (['a', 'b'] as const).map((id) => {
+      const sign = id === 'b' ? 1 : -1
+      return {
+        id,
+        x: sign * half,
+        y: module.transportHeight,
+        z: 0,
+        dx: sign,
+        dz: 0,
+        role: (id === outlet ? 'out' : 'in') as PortRole,
+        laneMm: mainLaneMm(module),
+        frameWidthM: mainWidthM(module),
+      }
+    })
+
+    /**
+     * The branch, and the reason `'both'` exists at all.
+     *
+     * The catalogue ships this port bidirectional: the same machine is ordered
+     * as a divert or as a merge and installed either way round. `branchMode`
+     * narrows it when a drawing knows which, and `'both'` is what a port that
+     * genuinely accepts either looks like — refusing it would call half the
+     * catalogue's own configurations errors.
+     */
+    const branchRole: PortRole =
+      module.branchMode === 'divert' ? 'out' : module.branchMode === 'merge' ? 'in' : 'both'
+    const [endX, endZ] = branchEndLocal(module)
+
+    return [
+      ...main,
+      {
+        id: 'c' as ConveyorPortId,
+        x: endX,
+        y: module.transportHeight,
+        z: endZ,
+        dx: Math.cos(theta),
+        dz: side * Math.sin(theta),
+        role: branchRole,
+        // Narrower than the main line, which is the catalogue's own geometry
+        // and what makes R11 a fact about this module rather than a warning.
+        laneMm: branchLaneMm(module),
+        frameWidthM: branchWidthM(module),
       },
     ]
   }

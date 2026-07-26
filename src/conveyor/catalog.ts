@@ -123,6 +123,38 @@ export function boosterExteriorWidthM(usefulWidthMm: number): number {
 }
 
 /**
+ * CNV-OBQ · Oblique Box Transfer.
+ *
+ * A branch rather than a corner: the main line runs through and a narrower lane
+ * leaves it at an angle, for entry and exit branches and for inducting boxes
+ * onto a high-speed line.
+ *
+ * **The branch is a narrower class than the main**, 467 mm outside against 667.
+ * That is the catalogue's own geometry, and it is what makes circuit rule R11 —
+ * the box length a line accepts narrows at its junctions — a fact about this
+ * module rather than a general warning. It is also the reason a port carries its
+ * own lane in this package: read off the node, this machine would report its
+ * branch as a mismatch against itself.
+ *
+ * Unlike the launcher and the mixed transfer, **it does not change a box's
+ * orientation**: a box leaving on the branch keeps its heading relative to the
+ * branch it is now on.
+ */
+export const OBQ = {
+  id: 'CNV-OBQ',
+  nameEn: 'Oblique Box Transfer',
+  loadKg: TRANSFER_UNIT_LOAD_KG,
+  lengthM: mm(1500),
+  mainExteriorWidthM: mm(667),
+  branchExteriorWidthM: mm(467),
+  speedsMPerMin: [25, 45, 60] as const,
+  maxInclinationDeg: 0,
+  /** R8 does not apply here. A curve preserves orientation and so does this;
+   *  what a branch changes is which line the box is on, not how it faces. */
+  changesBoxOrientation: false,
+} as const
+
+/**
  * CNV-MTR · Mixed Transfer Roller & Belt.
  *
  * A fixed square body: a roller bed with belt strips that rise *between* the

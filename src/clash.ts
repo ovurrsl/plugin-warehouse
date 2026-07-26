@@ -13,6 +13,16 @@ import {
 } from './conveyor/launcher-metrics'
 import type { ConveyorLauncherNode } from './conveyor/launcher-schema'
 import { localBoundsM } from './conveyor/metrics'
+import {
+  branchCentreLocal,
+  branchHeadingRad,
+  branchLengthM,
+  branchWidthM,
+  mainWidthM,
+  localBoundsM as obliqueBoundsM,
+  moduleLengthM as obliqueLengthM,
+} from './conveyor/oblique-metrics'
+import type { ConveyorObliqueNode } from './conveyor/oblique-schema'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { localBoundsM as transferBoundsM } from './conveyor/transfer-metrics'
 import type { ConveyorTransferNode } from './conveyor/transfer-schema'
@@ -204,6 +214,33 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
     )
+  }
+
+  if (placement.type === 'warehouse:conveyor-oblique') {
+    // Two beds, the second turned. The rectangle round a Y is mostly the wedge
+    // between its arms, and in a real layout that wedge is where the line the
+    // branch feeds runs — so a single box would refuse the very placement the
+    // machine exists to make.
+    const oblique = node as ConveyorObliqueNode
+    const bounds = obliqueBoundsM(oblique)
+    const height = bounds.max[1] - bounds.min[1]
+    const centreY = bounds.min[1] + height / 2
+    const [branchX, branchZ] = branchCentreLocal(oblique)
+
+    return [
+      toWorldBox(
+        [0, centreY, 0],
+        [obliqueLengthM(oblique), height, mainWidthM(oblique)],
+        placement.position,
+        placement.rotationY,
+      ),
+      toWorldBox(
+        [branchX, centreY, branchZ],
+        [branchLengthM(oblique), height, branchWidthM(oblique)],
+        placement.position,
+        placement.rotationY + branchHeadingRad(oblique),
+      ),
+    ]
   }
 
   if (placement.type === 'warehouse:conveyor-transfer') {

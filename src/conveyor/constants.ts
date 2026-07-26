@@ -95,6 +95,16 @@ export const PALETTE = {
 } as const
 
 /**
+ * **A6 — the angle an oblique branch leaves at.**
+ *
+ * Measured off the catalogue's render. Thirty and forty-five are both built, so
+ * it is a field rather than a constant — and it is the field that decides how
+ * much floor the branch takes: a shallower branch runs further before it clears
+ * the main frame, which is exactly the trade a dense installation makes.
+ */
+export const OBLIQUE_BRANCH_ANGLES_DEG = ['30', '45'] as const
+
+/**
  * **A10 — how far a mixed transfer's belt strip rises above the roller line.**
  *
  * Eight millimetres, from the catalogue imagery. **Animation only.** It changes

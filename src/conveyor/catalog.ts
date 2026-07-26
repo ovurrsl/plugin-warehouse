@@ -83,6 +83,46 @@ export function exteriorWidthM(usefulWidthMm: number): number {
 export const TRANSFER_UNIT_LOAD_KG = 50
 
 /**
+ * Frame width over the useful width, for the **booster**: 67 mm, against the
+ * straights' 147 and the curves' 111.
+ *
+ * Derived from the two figures the catalogue publishes for this type — 600
+ * useful inside a 667 exterior — and it is by far the tightest in the family.
+ * That is the machine: a booster is a short, deep table whose job is to regulate
+ * the passage of a load, so it carries its drive underneath rather than in a
+ * housing off the side, and the frame has nothing to make room for.
+ */
+export const BOOSTER_FRAME_OVERHANG_M = mm(67)
+
+/**
+ * CNV-BST · Booster.
+ *
+ * Not a junction: two ends and one short driven bed. It regulates the direction
+ * and passage of a load anywhere in an installation and optimises cycle time —
+ * a *control* function, which is why what it is on a drawing is a short straight
+ * with a drive box under it.
+ *
+ * It sits in the transfer family for the reason that matters here: the 50 kg
+ * limit is per box, not per metre of bed.
+ */
+export const BST = {
+  id: 'CNV-BST',
+  nameEn: 'Booster Conveyor',
+  loadKg: TRANSFER_UNIT_LOAD_KG,
+  usefulWidthsMm: [400, 600] as const,
+  exteriorWidthMaxM: mm(667),
+  lengthRangeM: [mm(675), mm(1050)] as const,
+  boxLengthRangeM: [mm(150), mm(800)] as const,
+  speedsMPerMin: [25, 45, 60] as const,
+  maxInclinationDeg: 0,
+  accumulation: 'none',
+} as const
+
+export function boosterExteriorWidthM(usefulWidthMm: number): number {
+  return mm(usefulWidthMm) + BOOSTER_FRAME_OVERHANG_M
+}
+
+/**
  * CNV-LNC · Launcher Roller.
  *
  * A T: the main bed runs through and a short lateral bed launches the box off

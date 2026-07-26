@@ -125,3 +125,13 @@ export const DEFAULT_SIDE_GUIDE_HEIGHT_M = mm(68)
 /** Motor block at the head of a driven line — one per line, not per module,
  *  which is what distinguishes CAR from the zoned accumulator. */
 export const MOTOR_BLOCK_M: readonly [number, number, number] = [mm(300), mm(220), mm(180)]
+
+/**
+ * **A11 — the control box, 400 × 250 × 500 mm.**
+ *
+ * From the catalogue photography. A booster carries its drive *under* the bed
+ * rather than in a housing off the side, which is the whole reason its frame is
+ * 67 mm over the lane where a straight's is 147 — there is nothing beside the
+ * bed to make room for.
+ */
+export const CONTROL_BOX_M: readonly [number, number, number] = [mm(400), mm(250), mm(500)]

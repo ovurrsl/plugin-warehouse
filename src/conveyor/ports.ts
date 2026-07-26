@@ -1,5 +1,11 @@
 import type { NodePort } from '@pascal-app/core'
 import {
+  frameWidthM as boosterFrameWidthM,
+  moduleLengthM as boosterLengthM,
+  usefulWidthMm as boosterUsefulWidthMm,
+} from './booster-metrics'
+import type { ConveyorBoosterNode } from './booster-schema'
+import {
   angleRad,
   arcPointLocal,
   centrelineRadiusM,
@@ -45,7 +51,11 @@ import type { ConveyorRollerNode } from './schema'
 /** The one place metres become inches, because one host field is in inches. */
 const INCHES_PER_METRE = 39.3701
 
-export type ConveyorModule = ConveyorRollerNode | ConveyorCurveNode | ConveyorLauncherNode
+export type ConveyorModule =
+  | ConveyorRollerNode
+  | ConveyorCurveNode
+  | ConveyorLauncherNode
+  | ConveyorBoosterNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -83,6 +93,7 @@ const CONVEYOR_KINDS = new Set([
   'warehouse:conveyor-roller',
   'warehouse:conveyor-curve',
   'warehouse:conveyor-launcher',
+  'warehouse:conveyor-booster',
 ])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
@@ -91,6 +102,10 @@ export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNo
 
 export function isLauncherModule(module: ConveyorModule): module is ConveyorLauncherNode {
   return module.type === 'warehouse:conveyor-launcher'
+}
+
+export function isBoosterModule(module: ConveyorModule): module is ConveyorBoosterNode {
+  return module.type === 'warehouse:conveyor-booster'
 }
 
 /** Narrow an unknown scene node to a module of this kind, any shape. */
@@ -134,6 +149,7 @@ export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId)
 export function moduleLaneMm(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveUsefulWidthMm(module)
   if (isLauncherModule(module)) return launcherUsefulWidthMm(module)
+  if (isBoosterModule(module)) return boosterUsefulWidthMm(module)
   return usefulWidthMm(module)
 }
 
@@ -148,6 +164,7 @@ export function moduleLaneMm(module: ConveyorModule): number {
 export function moduleRunLengthM(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveCentrelineLengthM(module)
   if (isLauncherModule(module)) return launcherLengthM(module)
+  if (isBoosterModule(module)) return boosterLengthM(module)
   return moduleLengthM(module)
 }
 
@@ -156,6 +173,7 @@ export function moduleRunLengthM(module: ConveyorModule): number {
 export function moduleFrameWidthM(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveFrameWidthM(module)
   if (isLauncherModule(module)) return launcherFrameWidthM(module)
+  if (isBoosterModule(module)) return boosterFrameWidthM(module)
   return frameWidthM(module)
 }
 
@@ -270,9 +288,11 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
     ]
   }
 
-  const half = moduleLengthM(module) / 2
-  const lane = usefulWidthMm(module)
-  const frame = frameWidthM(module)
+  // A booster's ends are a straight's against its own tighter frame; nothing
+  // about the port list differs, so it shares the branch below.
+  const half = moduleRunLengthM(module) / 2
+  const lane = moduleLaneMm(module)
+  const frame = moduleFrameWidthM(module)
   return (['a', 'b'] as const).map((id) => {
     const sign = id === 'b' ? 1 : -1
     return {

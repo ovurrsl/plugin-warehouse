@@ -1,4 +1,6 @@
 import { nodeRegistry } from '@pascal-app/core'
+import { localBoundsM as boosterBoundsM } from './conveyor/booster-metrics'
+import type { ConveyorBoosterNode } from './conveyor/booster-schema'
 import { LNC } from './conveyor/catalog'
 import { colliderSegments, localBoundsM as curveBoundsM } from './conveyor/curve-metrics'
 import type { ConveyorCurveNode } from './conveyor/curve-schema'
@@ -200,6 +202,23 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
     )
+  }
+
+  if (placement.type === 'warehouse:conveyor-booster') {
+    const booster = node as ConveyorBoosterNode
+    const local = boosterBoundsM(booster)
+    return [
+      toWorldBox(
+        [
+          (local.min[0] + local.max[0]) / 2,
+          (local.min[1] + local.max[1]) / 2,
+          (local.min[2] + local.max[2]) / 2,
+        ],
+        [local.max[0] - local.min[0], local.max[1] - local.min[1], local.max[2] - local.min[2]],
+        placement.position,
+        placement.rotationY,
+      ),
+    ]
   }
 
   if (placement.type === 'warehouse:conveyor-launcher') {

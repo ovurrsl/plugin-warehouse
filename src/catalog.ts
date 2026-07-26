@@ -112,6 +112,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Branches a line at ninety degrees without a curve: the main bed runs through and a short arm throws the box off it. H flips the launch side.',
     icon: 'lucide:git-fork',
   },
+  {
+    kind: 'warehouse:conveyor-booster',
+    label: 'Booster Conveyor',
+    sectionId: 'conveyance',
+    description:
+      'A short driven section that regulates a load’s passage and tightens the cycle. Its drive sits under the bed, which makes it the tightest frame in the family.',
+    icon: 'lucide:chevrons-right',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

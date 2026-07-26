@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`3dab0b7`](https://github.com/ovurrsl/plugin-warehouse/commit/3dab0b7c771af595d6f8b1240508f67723633834))
 - Refresh generated README blocks [skip ci] ([`b12eade`](https://github.com/ovurrsl/plugin-warehouse/commit/b12eade7db83832e5bc6e092a4cbbed720de296b))
 - Refresh generated README blocks [skip ci] ([`f24e169`](https://github.com/ovurrsl/plugin-warehouse/commit/f24e169f14be6c9e34f203b0be6d442ba9a4f7c9))
 - Refresh generated README blocks [skip ci] ([`ef86834`](https://github.com/ovurrsl/plugin-warehouse/commit/ef86834c2b137398888483621f1324c23bd354d7))
@@ -40,6 +41,8 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Modelled cargo — cartons, drums and the load's hardware ([`725aafb`](https://github.com/ovurrsl/plugin-warehouse/commit/725aafbad1df4a889d8dab01cf6475cfd2eae831))
+- Cargo atlas with a single source for its regions ([`7abe253`](https://github.com/ovurrsl/plugin-warehouse/commit/7abe253ca1ab0670bc5fc316c3db0769e57288e0))
 - Cargo type registry with seeded, quantised fill ([`2505872`](https://github.com/ovurrsl/plugin-warehouse/commit/2505872765bd51206501f343c560552f96534fd2))
 - The mixed transfer's strips lift — increment 5b ([`2e500de`](https://github.com/ovurrsl/plugin-warehouse/commit/2e500de96d29bf4b474b69508d34cd669d206df6))
 - Boxes run the lines — increment 5a ([`d51960a`](https://github.com/ovurrsl/plugin-warehouse/commit/d51960a4877909c9962f82cc95607356bc4b5708))

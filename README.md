@@ -222,11 +222,13 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5644d5c`](https://github.com/ovurrsl/plugin-warehouse/commit/5644d5cf4bf11c3bcb76e04f41545f44410135fc))
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
 - Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
 
 ### Features
 
+- Delete one bay, not the whole run ([`189715c`](https://github.com/ovurrsl/plugin-warehouse/commit/189715cab00f5f84fd6422eef440e92a82e2f180))
 - Click a bay, configure that bay — and the tunnel finally has a UI ([`553491e`](https://github.com/ovurrsl/plugin-warehouse/commit/553491eda482abbd88645d0fd3eeafaa367b762b))
 - The beam's endplate was in the post, and one bay by default ([`f75ecb4`](https://github.com/ovurrsl/plugin-warehouse/commit/f75ecb455e3f30d904c03081abc24185a04b1cdd))
 - Back to back is a count too, not a two-value pattern ([`79beac0`](https://github.com/ovurrsl/plugin-warehouse/commit/79beac06393d52c71e0c8f67bcae6fe64a55e4dd))
@@ -234,8 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Per-bay skips, tunnels and level counts ([`1806fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/1806fddfeac67d27abc4ef3c325bbace80b10d32))
 - Drop the Shift row gesture — it collided with the host's snap key ([`6c4dca1`](https://github.com/ovurrsl/plugin-warehouse/commit/6c4dca1863db4bae9d74d84dfdaa237024a2adc1))
 - One part list for 3D, 2D and the tests — and fix beams cutting through posts ([`450d11b`](https://github.com/ovurrsl/plugin-warehouse/commit/450d11bc6763b53f3356de58aa3f2c8e115ce918))
-- Definition, tool, floorplan and inspector — the rack is placeable ([`d79bfba`](https://github.com/ovurrsl/plugin-warehouse/commit/d79bfbac0b968df5e1f34f4e0acbb8198216dba3))
-- Tidy the occupancy type guard ([`7e4cfda`](https://github.com/ovurrsl/plugin-warehouse/commit/7e4cfda5c5e7035fee0ad338dfb3486f463b6805))
 
 …
 

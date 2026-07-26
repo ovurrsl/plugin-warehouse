@@ -13,11 +13,13 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5644d5c`](https://github.com/ovurrsl/plugin-warehouse/commit/5644d5cf4bf11c3bcb76e04f41545f44410135fc))
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
 - Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
 
 ### Features
 
+- Delete one bay, not the whole run ([`189715c`](https://github.com/ovurrsl/plugin-warehouse/commit/189715cab00f5f84fd6422eef440e92a82e2f180))
 - Click a bay, configure that bay — and the tunnel finally has a UI ([`553491e`](https://github.com/ovurrsl/plugin-warehouse/commit/553491eda482abbd88645d0fd3eeafaa367b762b))
 - The beam's endplate was in the post, and one bay by default ([`f75ecb4`](https://github.com/ovurrsl/plugin-warehouse/commit/f75ecb455e3f30d904c03081abc24185a04b1cdd))
 - Back to back is a count too, not a two-value pattern ([`79beac0`](https://github.com/ovurrsl/plugin-warehouse/commit/79beac06393d52c71e0c8f67bcae6fe64a55e4dd))

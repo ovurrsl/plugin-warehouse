@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`747ff61`](https://github.com/ovurrsl/plugin-warehouse/commit/747ff6195f406d235d6c2fc770e3e7e44fbb3e41))
 - Refresh generated README blocks [skip ci] ([`5644d5c`](https://github.com/ovurrsl/plugin-warehouse/commit/5644d5cf4bf11c3bcb76e04f41545f44410135fc))
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
 - Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Rows multiply inside the node, and a layout card to set them ([`8d39106`](https://github.com/ovurrsl/plugin-warehouse/commit/8d39106f8229b7dbb872b8d9d761c5fd6c4369fc))
 - Per-bay skips, tunnels and level counts ([`1806fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/1806fddfeac67d27abc4ef3c325bbace80b10d32))
 - Drop the Shift row gesture — it collided with the host's snap key ([`6c4dca1`](https://github.com/ovurrsl/plugin-warehouse/commit/6c4dca1863db4bae9d74d84dfdaa237024a2adc1))
-- One part list for 3D, 2D and the tests — and fix beams cutting through posts ([`450d11b`](https://github.com/ovurrsl/plugin-warehouse/commit/450d11bc6763b53f3356de58aa3f2c8e115ce918))
 
 …
 

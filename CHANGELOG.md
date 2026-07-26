@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`747ff61`](https://github.com/ovurrsl/plugin-warehouse/commit/747ff6195f406d235d6c2fc770e3e7e44fbb3e41))
 - Refresh generated README blocks [skip ci] ([`5644d5c`](https://github.com/ovurrsl/plugin-warehouse/commit/5644d5cf4bf11c3bcb76e04f41545f44410135fc))
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
 - Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
@@ -40,6 +41,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- The bay panel crashed — trailingSection is rendered with no props ([`162907b`](https://github.com/ovurrsl/plugin-warehouse/commit/162907b821e973db98a2417f65df11243c889eaf))
 - Place pallets on the surface, and refuse overlapping drops ([`925252b`](https://github.com/ovurrsl/plugin-warehouse/commit/925252b983493bcc80809094aedfcb7f12025fa6))
 - Render the rail panel as a plain container, not inspector chrome ([`210a7ed`](https://github.com/ovurrsl/plugin-warehouse/commit/210a7edccfec36ea0e47ff5022cab52f75a65b2c))
 - Style the panel without depending on the host's Tailwind scan ([`158a158`](https://github.com/ovurrsl/plugin-warehouse/commit/158a158b5b2ef09438d6d75e12864fb1a21d80f5))

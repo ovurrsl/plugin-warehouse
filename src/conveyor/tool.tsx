@@ -20,13 +20,13 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
+import { isClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
-import { clearOfRacks } from './clash'
 import { frameWidthM, moduleLengthM } from './metrics'
 import { extendConveyorRun, moduleOffsets } from './multiply'
 import ConveyorRollerPreview from './preview'
@@ -139,8 +139,9 @@ export default function ConveyorRollerTool() {
         setValid(true)
         return
       }
-      // Every module of the run, against the rack steel. Not the host's plan
-      // test: it has no height, and height is the whole question here.
+      // Every module of the run, against everything else in the scene. Not the
+      // host's plan test: it has no height at all, and height is the whole
+      // question — under a rack's tunnel is fine, through its legs is not.
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const rotationY = rotationRef.current
       const placed = ConveyorRollerNode.parse({
@@ -150,7 +151,9 @@ export default function ConveyorRollerTool() {
         rotation: [0, rotationY, 0],
       })
       const positions = [visual, ...moduleOffsets(placed, modulesRef.current)]
-      const clear = positions.every((position) => clearOfRacks(placed, position, rotationY, nodes))
+      const clear = positions.every((position) =>
+        isClearAt({ node: placed, position, rotationY, nodes }),
+      )
       validRef.current = clear
       setValid(clear)
     }

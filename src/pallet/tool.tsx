@@ -22,6 +22,7 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
+import { isClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
@@ -135,8 +136,19 @@ export default function PalletTool() {
         // Nothing to exclude: the ghost is not in the scene graph yet.
         [],
       )
-      validRef.current = placeable
-      setValid(placeable)
+      // And the package's own three-dimensional test on top of it. The host's
+      // is plan-only, so it cannot tell a pallet set down on a rack beam from
+      // one buried in the upright beside it — and it does not see this
+      // package's conveyor at all, which declares `collides: false` precisely
+      // because a plan test would refuse the walkway it is meant to run through.
+      const clear = isClearAt({
+        node: { ...previewNode, position: visual, rotation: [0, rotationRef.current, 0] },
+        position: visual,
+        rotationY: rotationRef.current,
+        nodes: useScene.getState().nodes as Readonly<Record<string, unknown>>,
+      })
+      validRef.current = placeable && clear
+      setValid(placeable && clear)
     }
 
     /** Move the ghost, the box, the guides and the facing triangle to a

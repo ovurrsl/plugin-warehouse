@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { clashesWith } from '../clash'
 import { PalletRackNode } from '../rack/schema'
 import { CAR, exteriorWidthM, SPEEDS_M_PER_MIN } from './catalog'
-import { clashingRacks } from './clash'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
 import {
   clearConveyorGeometryCache,
@@ -237,8 +237,12 @@ describe('a conveyor may pass under a rack, but not through its legs', () => {
 
   /** Across the bay, through the middle, at a given transport height. */
   const across = (transportHeight: number, rack: ReturnType<typeof PalletRackNode.parse>) =>
-    clashingRacks(conveyor({ rollers: 40, transportHeight }), [0, 0, 0], Math.PI / 2, scene(rack))
-      .length > 0
+    clashesWith({
+      node: conveyor({ rollers: 40, transportHeight }),
+      position: [0, 0, 0],
+      rotationY: Math.PI / 2,
+      nodes: scene(rack),
+    }).length > 0
 
   test('a tunnel is clear at a height a solid bay is not', () => {
     // The whole requirement, in one assertion. No special case computes it: a
@@ -262,17 +266,24 @@ describe('a conveyor may pass under a rack, but not through its legs', () => {
 
   test('an upright is always a clash, tunnel or no tunnel', () => {
     // The frames stay whatever the tunnel does — they carry what is above.
-    const atUpright = clashingRacks(
-      conveyor({ rollers: 40 }),
-      [1.411, 0, 0],
-      Math.PI / 2,
-      scene(tunnelled),
-    )
+    const atUpright = clashesWith({
+      node: conveyor({ rollers: 40 }),
+      position: [1.411, 0, 0],
+      rotationY: Math.PI / 2,
+      nodes: scene(tunnelled),
+    })
     expect(atUpright).toHaveLength(1)
   })
 
   test('a conveyor nowhere near a rack costs one envelope test and reports nothing', () => {
-    expect(clashingRacks(conveyor(), [40, 0, 40], 0, scene(tunnelled))).toHaveLength(0)
+    expect(
+      clashesWith({
+        node: conveyor(),
+        position: [40, 0, 40],
+        rotationY: 0,
+        nodes: scene(tunnelled),
+      }),
+    ).toHaveLength(0)
   })
 })
 

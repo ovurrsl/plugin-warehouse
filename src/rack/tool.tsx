@@ -21,6 +21,7 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
+import { isClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
@@ -177,8 +178,24 @@ export default function PalletRackTool() {
         [0, rotationRef.current, 0],
         [],
       )
-      validRef.current = placeable
-      setValid(placeable)
+      // And the package's own three-dimensional test, per bay of the run. The
+      // host's is plan-only and blind to anything declaring `collides: false`,
+      // which is how a bay could be dropped straight through a conveyor.
+      const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
+      const rotationY = rotationRef.current
+      const bay = { ...previewNode, rotation: [0, rotationY, 0] }
+      const positions = [
+        visual,
+        ...multiplyPlacements(
+          { ...bay, position: visual } as typeof previewNode,
+          useWarehouseStore.getState().multiply,
+        ).map((placement) => placement.position),
+      ]
+      const clear = positions.every((position) =>
+        isClearAt({ node: bay, position, rotationY, nodes }),
+      )
+      validRef.current = placeable && clear
+      setValid(placeable && clear)
     }
 
     const applyCursor = (position: [number, number, number]) => {

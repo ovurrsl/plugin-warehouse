@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4e3dc16`](https://github.com/ovurrsl/plugin-warehouse/commit/4e3dc166803de22b752ab8d5ac98870d73912884))
 - Refresh generated README blocks [skip ci] ([`6d582fd`](https://github.com/ovurrsl/plugin-warehouse/commit/6d582fde8ddf886acbe979ae2c31928151fcb28a))
 - Refresh generated README blocks [skip ci] ([`7459a92`](https://github.com/ovurrsl/plugin-warehouse/commit/7459a9265dc44df5122f6c6c638b8f0b350cda61))
 - Refresh generated README blocks [skip ci] ([`00cb3d3`](https://github.com/ovurrsl/plugin-warehouse/commit/00cb3d33875b7709caefbf95c8a0fb36f9c1d2ce))
@@ -52,6 +53,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Bracing is steel, and the far tier drops it ([`65a734a`](https://github.com/ovurrsl/plugin-warehouse/commit/65a734a1baa8506fd35530cca8c3f6672eb3db8b))
 - One clash test, for every kind in the package and every kind in the editor ([`7429789`](https://github.com/ovurrsl/plugin-warehouse/commit/742978947d1a3fb8945ecd16f45c85ac7f35697b))
 - Turn the ghost pallets, and let Multiply hear the count you typed ([`ab3f723`](https://github.com/ovurrsl/plugin-warehouse/commit/ab3f723d41289e67bd16c259d51ff0d0226dc147))
 - Render the invariants, reach the derived fields, and stop Multiply repeating itself ([`0f89de1`](https://github.com/ovurrsl/plugin-warehouse/commit/0f89de13dc8d653ddb58de4be4542c2b267a913f))

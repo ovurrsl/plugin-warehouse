@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`24aff10`](https://github.com/ovurrsl/plugin-warehouse/commit/24aff1072a3d60f6950944c12236c9aa2caf52ca))
 - Refresh generated README blocks [skip ci] ([`8e01fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/8e01fa100f1611d7183a324ba0342b02f98c0458))
 - Refresh generated README blocks [skip ci] ([`24384d4`](https://github.com/ovurrsl/plugin-warehouse/commit/24384d4b75921919b56d1221943fec969eaa11b6))
 - Refresh generated README blocks [skip ci] ([`22275af`](https://github.com/ovurrsl/plugin-warehouse/commit/22275aff7d6d898b74e22dd2d58fa1aabb016227))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - One node is one bay ([`699764c`](https://github.com/ovurrsl/plugin-warehouse/commit/699764c851faf6dc5b06162fcd4baf16e716e96a))
 - Shift-select bays, and a panel that only shows what applies ([`533cc0c`](https://github.com/ovurrsl/plugin-warehouse/commit/533cc0c8ded4dfb8636100b430433b287c7c5d54))
 - Delete one bay, not the whole run ([`189715c`](https://github.com/ovurrsl/plugin-warehouse/commit/189715cab00f5f84fd6422eef440e92a82e2f180))
-- Click a bay, configure that bay — and the tunnel finally has a UI ([`553491e`](https://github.com/ovurrsl/plugin-warehouse/commit/553491eda482abbd88645d0fd3eeafaa367b762b))
 
 …
 

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`24aff10`](https://github.com/ovurrsl/plugin-warehouse/commit/24aff1072a3d60f6950944c12236c9aa2caf52ca))
 - Refresh generated README blocks [skip ci] ([`8e01fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/8e01fa100f1611d7183a324ba0342b02f98c0458))
 - Refresh generated README blocks [skip ci] ([`24384d4`](https://github.com/ovurrsl/plugin-warehouse/commit/24384d4b75921919b56d1221943fec969eaa11b6))
 - Refresh generated README blocks [skip ci] ([`22275af`](https://github.com/ovurrsl/plugin-warehouse/commit/22275aff7d6d898b74e22dd2d58fa1aabb016227))
@@ -46,6 +47,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Turn the ghost pallets, and let Multiply hear the count you typed ([`ab3f723`](https://github.com/ovurrsl/plugin-warehouse/commit/ab3f723d41289e67bd16c259d51ff0d0226dc147))
 - Render the invariants, reach the derived fields, and stop Multiply repeating itself ([`0f89de1`](https://github.com/ovurrsl/plugin-warehouse/commit/0f89de13dc8d653ddb58de4be4542c2b267a913f))
 - Make decking visible, and stop the footprint refusing shared posts ([`d26e3db`](https://github.com/ovurrsl/plugin-warehouse/commit/d26e3db44d0f22558ca38d942b6d145a226c9a03))
 - The bay panel crashed — trailingSection is rendered with no props ([`162907b`](https://github.com/ovurrsl/plugin-warehouse/commit/162907b821e973db98a2417f65df11243c889eaf))

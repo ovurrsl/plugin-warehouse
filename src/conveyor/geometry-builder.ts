@@ -119,15 +119,25 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
  * merged: a merge allocates one geometry per part and then discards all of
  * them. Flat normals need four vertices per face, which is why corners are not
  * shared.
+ *
+ * `rotationY` turns the box about its own centre in the plan frame, which a
+ * straight never needs and a curve needs for every piece it has: the kerbs
+ * following a bend are short segments at increasing headings, and a leg under
+ * the outer edge stands square to the arc rather than to the node. At zero the
+ * factors are exactly 1 and 0, so a straight's vertices are bit-identical to
+ * what this emitted before the parameter existed.
  */
 export function emitPart(
   sink: Sink,
   part: ConveyorPart,
   color: readonly [number, number, number],
   stripeSpan: number,
+  rotationY = 0,
 ): void {
   const [cx, cy, cz] = part.center
   const [hx, hy, hz] = [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
+  const cos = Math.cos(rotationY)
+  const sin = Math.sin(rotationY)
 
   for (const face of FACES) {
     const base = sink.positions.length / 3
@@ -136,8 +146,14 @@ export function emitPart(
     const horizontal = Math.abs(face.n[1]) > 0.5
 
     for (const corner of face.c) {
-      sink.positions.push(cx + corner[0] * hx, cy + corner[1] * hy, cz + corner[2] * hz)
-      sink.normals.push(face.n[0], face.n[1], face.n[2])
+      const ox = corner[0] * hx
+      const oz = corner[2] * hz
+      sink.positions.push(cx + ox * cos - oz * sin, cy + corner[1] * hy, cz + ox * sin + oz * cos)
+      sink.normals.push(
+        face.n[0] * cos - face.n[2] * sin,
+        face.n[1],
+        face.n[0] * sin + face.n[2] * cos,
+      )
       sink.colors.push(color[0], color[1], color[2])
 
       if (part.pattern === 'rollers' && horizontal) {
@@ -362,22 +378,26 @@ function evict(): void {
   }
 }
 
-/** Claim a shape while a module is drawing it. Returns the key so the caller
- *  releases the exact entry it claimed. */
+/** Claim a shape while something is drawing it. Returns the key so the caller
+ *  releases the exact entry it claimed. Kind-agnostic for the same reason the
+ *  cache is: a curve holds its shapes out of this pool too. */
+export function retainGeometry(key: string): string {
+  retained.set(key, (retained.get(key) ?? 0) + 1)
+  return key
+}
+
+export function releaseGeometry(key: string): void {
+  const count = (retained.get(key) ?? 0) - 1
+  if (count > 0) retained.set(key, count)
+  else retained.delete(key)
+}
+
 export function retainConveyorGeometry(
   conveyor: ConveyorRollerNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour: boolean,
 ): string {
-  const key = conveyorGeometryKey(conveyor, detail, hasDownstreamNeighbour)
-  retained.set(key, (retained.get(key) ?? 0) + 1)
-  return key
-}
-
-export function releaseConveyorGeometry(key: string): void {
-  const count = (retained.get(key) ?? 0) - 1
-  if (count > 0) retained.set(key, count)
-  else retained.delete(key)
+  return retainGeometry(conveyorGeometryKey(conveyor, detail, hasDownstreamNeighbour))
 }
 
 /** Distinct shapes built so far. Test and diagnostic hook for the sharing the

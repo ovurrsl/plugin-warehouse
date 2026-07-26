@@ -12,11 +12,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { ConveyorDetail } from './geometry-builder'
-import {
-  getConveyorGeometry,
-  releaseConveyorGeometry,
-  retainConveyorGeometry,
-} from './geometry-builder'
+import { getConveyorGeometry, releaseGeometry, retainConveyorGeometry } from './geometry-builder'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
 import { frameWidthM, moduleLengthM } from './metrics'
@@ -122,8 +118,8 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
     const near = retainConveyorGeometry(node, 'full', abutted)
     const far = retainConveyorGeometry(node, 'simple', abutted)
     return () => {
-      releaseConveyorGeometry(near)
-      releaseConveyorGeometry(far)
+      releaseGeometry(near)
+      releaseGeometry(far)
     }
   }, [node, abutted])
 

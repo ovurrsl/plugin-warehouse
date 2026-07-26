@@ -60,16 +60,20 @@ type WarehouseStore = {
   setRackBrush: (patch: Partial<RackBrush>) => void
 
   /**
-   * The bay the user last clicked, and the rack it belongs to.
+   * The bays the user has picked out, all belonging to one rack.
    *
-   * The host has no sub-node selection and the click that selects a rack is the
-   * same click that lands on a bay, so there is no gesture to learn: whichever
-   * bay you clicked is the one the panel edits. Cleared when the rack it names
-   * stops being the selected one, so the panel never edits a bay of a rack you
-   * are no longer looking at.
+   * The host has no sub-node selection, so this is the plugin's own. The click
+   * that selects a rack focuses the bay it landed on; **Shift+click** grows the
+   * set — which is not an arbitrary choice of modifier: the host reserves a
+   * plain second click on a selected node for picking it up to move, so Shift
+   * is the click that can reach a bay without starting a drag.
+   *
+   * One rack at a time, by construction: every entry carries the same `rackId`,
+   * and focusing a bay of a different rack replaces the set. The panel edits
+   * every focused bay at once.
    */
-  focusedBay: FocusedBay | null
-  setFocusedBay: (bay: FocusedBay | null) => void
+  focusedBays: FocusedBay[]
+  setFocusedBays: (bays: FocusedBay[]) => void
 }
 
 export type FocusedBay = { rackId: string; row: number; bay: number }
@@ -127,7 +131,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     uprightHeight: 5,
     levels: 3,
     rowCount: 1,
-    backToBack: 2,
+    backToBack: true,
     aisleWidth: 3.2,
     bayAnchor: 'center',
     rowAnchor: 'front',
@@ -138,6 +142,6 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
 
-  focusedBay: null,
-  setFocusedBay: (focusedBay) => set({ focusedBay }),
+  focusedBays: [],
+  setFocusedBays: (focusedBays) => set({ focusedBays }),
 }))

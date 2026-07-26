@@ -55,30 +55,29 @@ export const PalletRackNode = BaseNode.extend({
   rowCount: z.number().int().min(1).max(20).default(1),
 
   /**
-   * How many rows stand spine to spine before an aisle opens.
+   * Whether rows pair up spine to spine.
    *
-   * A count rather than a pattern, for the reason `bayCount` and `rowCount` are:
-   * the same idea reads the same way on all three axes, and the two-value enum
-   * this replaces could not express a block that is neither.
+   * A rack either stands back to back or it does not — there is no third
+   * arrangement selective racking is actually built in, which is why this is a
+   * switch and not a count. (It briefly *was* a count, 1–6; everything above 2
+   * described blocks whose inner rows no truck could reach, and the only thing
+   * the extra values ever did was trigger the warning saying so.)
    *
-   * 1 gives every row its own aisle and points them all the same way, for racks
-   * along a one-directional picking route. 2 is the standard island — (1,2),
-   * (3,4), … each pair back to back with an aisle between pairs, so one aisle
-   * serves the two rows either side of it. Above 2 the inner rows have no aisle
-   * face at all; the inspector says so rather than leaving it to be discovered
-   * from a truck that cannot reach half the block.
+   * On: rows pair (1,2), (3,4), … each pair spine to spine with a working
+   * aisle between pairs, so one aisle serves the two rows either side of it —
+   * the standard island. Off: every row gets its own aisle and they all face
+   * the same way, for racks along a one-directional picking route.
    */
   backToBack: z
     .preprocess(
-      // This field was a boolean before it was a count, and a scene saved then
-      // still holds one. Zod would reject it and the whole node would fail to
-      // parse — the rack does not come back at all, which is a much worse
-      // outcome than the field it is guarding. `true` was a back-to-back pair
-      // and `false` was a lone run, so the two values map exactly.
-      (value) => (typeof value === 'boolean' ? (value ? 2 : 1) : value),
-      z.number().int().min(1).max(6),
+      // Two legacy shapes still live in saved scenes: the original boolean and
+      // the short-lived 1–6 count. Rejecting either would fail the whole node
+      // parse — the rack would not come back at all, a far worse outcome than
+      // the field being guarded. Count 1 was "own aisle"; 2 and above pair up.
+      (value) => (typeof value === 'number' ? value >= 2 : value),
+      z.boolean(),
     )
-    .default(2),
+    .default(true),
 
   /** Spine-to-spine gap between two rows in the same group. */
   backToBackGap: z.number().min(0).max(1.5).default(0.2),

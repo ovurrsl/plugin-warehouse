@@ -13,7 +13,6 @@ import {
   rowDepth,
   rowFacing,
   rowGapBefore,
-  strandedRowsPerGroup,
   totalDepth,
   totalWidth,
   usesAisle,
@@ -57,39 +56,21 @@ describe('row layout', () => {
     expect(between).toBeCloseTo(rowDepth(block) + 3.2, 9)
   })
 
-  test('one row per group gives every row its own aisle and one facing', () => {
-    const block = rack({ rowCount: 3, backToBack: 1, aisleWidth: 3.5 })
+  test('switched off, every row gets its own aisle and one facing', () => {
+    const block = rack({ rowCount: 3, backToBack: false, aisleWidth: 3.5 })
     expect(rowGapBefore(block, 2)).toBeCloseTo(3.5, 9)
     expect(rowGapBefore(block, 3)).toBeCloseTo(3.5, 9)
     expect(totalDepth(block)).toBeCloseTo(3 * rowDepth(block) + 7, 9)
     for (const row of [1, 2, 3]) expect(rowFacing(block, row)).toBe(1)
   })
 
-  test('a group of three strands its middle row', () => {
-    const block = rack({ rowCount: 6, backToBack: 3, backToBackGap: 0.2, aisleWidth: 3.2 })
-    // Group, group — one aisle, between rows 3 and 4.
-    expect(rowGapBefore(block, 2)).toBeCloseTo(0.2, 9)
-    expect(rowGapBefore(block, 3)).toBeCloseTo(0.2, 9)
-    expect(rowGapBefore(block, 4)).toBeCloseTo(3.2, 9)
-    // The outer rows of each group reach an aisle; the middle one reaches
-    // neither, which is what the inspector warns about.
-    expect(strandedRowsPerGroup(block)).toBe(1)
-    expect([1, 2, 3].map((row) => rowFacing(block, row))).toEqual([1, 1, -1])
-  })
-
-  test('a group cannot strand a row the block does not have', () => {
-    expect(strandedRowsPerGroup(rack({ rowCount: 1, backToBack: 4 }))).toBe(0)
-    expect(strandedRowsPerGroup(rack({ rowCount: 2, backToBack: 4 }))).toBe(0)
-    expect(strandedRowsPerGroup(rack({ rowCount: 3, backToBack: 4 }))).toBe(1)
-  })
-
   test('the gaps a block consumes are the gaps it shows', () => {
-    expect(usesSpineGap(rack({ rowCount: 1, backToBack: 2 }))).toBe(false)
-    expect(usesSpineGap(rack({ rowCount: 2, backToBack: 1 }))).toBe(false)
-    expect(usesSpineGap(rack({ rowCount: 2, backToBack: 2 }))).toBe(true)
-    expect(usesAisle(rack({ rowCount: 2, backToBack: 2 }))).toBe(false)
-    expect(usesAisle(rack({ rowCount: 3, backToBack: 2 }))).toBe(true)
-    expect(usesAisle(rack({ rowCount: 2, backToBack: 1 }))).toBe(true)
+    expect(usesSpineGap(rack({ rowCount: 1, backToBack: true }))).toBe(false)
+    expect(usesSpineGap(rack({ rowCount: 2, backToBack: false }))).toBe(false)
+    expect(usesSpineGap(rack({ rowCount: 2, backToBack: true }))).toBe(true)
+    expect(usesAisle(rack({ rowCount: 2, backToBack: true }))).toBe(false)
+    expect(usesAisle(rack({ rowCount: 3, backToBack: true }))).toBe(true)
+    expect(usesAisle(rack({ rowCount: 2, backToBack: false }))).toBe(true)
   })
 
   test('rows are laid out from +Z toward −Z and never overlap', () => {
@@ -214,42 +195,43 @@ describe('row fields in the geometry key', () => {
     expect(keysOf({ rowCount: 3, aisleWidth: 5 })).not.toBe(keysOf({ rowCount: 3 }))
   })
 
-  test('the group size reaches the key through the gaps and the facings', () => {
-    // Two rows one-per-group face the same way across an aisle; two rows paired
-    // face away from each other across the spine. Different mesh, different key.
-    expect(keysOf({ rowCount: 2, backToBack: 1 })).not.toBe(keysOf({ rowCount: 2 }))
-    // A group larger than the block is the same block, so it must not split the
-    // cache: single-deep, a row's one position sits on its centreline whichever
-    // way it faces, so the two racks are the same mesh.
-    expect(keysOf({ rowCount: 2, backToBack: 6 })).toBe(keysOf({ rowCount: 2, backToBack: 2 }))
+  test('the switch reaches the key through the gaps and the facings', () => {
+    // Two rows on their own aisles face the same way; two rows paired face away
+    // from each other across the spine. Different mesh, different key.
+    expect(keysOf({ rowCount: 2, backToBack: false })).not.toBe(keysOf({ rowCount: 2 }))
+    // Single-deep, a row's one position sits on its centreline whichever way it
+    // faces — so a one-row block is the same mesh either way.
+    expect(keysOf({ rowCount: 1, backToBack: false })).toBe(keysOf({ rowCount: 1 }))
     // Double-deep, facing orders the two positions, so it must reach the key.
-    expect(keysOf({ rowCount: 2, backToBack: 6, depthPositions: 2 })).not.toBe(
-      keysOf({ rowCount: 2, backToBack: 2, depthPositions: 2 }),
+    expect(keysOf({ rowCount: 2, backToBack: false, depthPositions: 2 })).not.toBe(
+      keysOf({ rowCount: 2, depthPositions: 2 }),
     )
   })
 })
 
-describe('scenes saved before back-to-back was a count', () => {
-  test('the boolean it used to be still parses', () => {
+describe('legacy shapes of the back-to-back field', () => {
+  test('the short-lived 1-6 count still parses', () => {
     // Rejecting it would fail the whole node, so the rack would not come back
-    // at all — a much worse outcome than the field being guarded.
-    expect(rack({ backToBack: true }).backToBack).toBe(2)
-    expect(rack({ backToBack: false }).backToBack).toBe(1)
+    // at all — a much worse outcome than the field being guarded. 1 was "own
+    // aisle"; 2 and above paired up.
+    expect(rack({ backToBack: 1 }).backToBack).toBe(false)
+    expect(rack({ backToBack: 2 }).backToBack).toBe(true)
+    expect(rack({ backToBack: 4 }).backToBack).toBe(true)
   })
 
-  test('and the two values mean what they meant', () => {
-    const pair = rack({ rowCount: 2, backToBack: true })
-    const single = rack({ rowCount: 2, backToBack: false })
-    // `true` was a back-to-back pair: one spine gap, rows facing away.
+  test('and it means what it meant', () => {
+    const pair = rack({ rowCount: 2, backToBack: 2 })
+    const single = rack({ rowCount: 2, backToBack: 1 })
+    // A pair: one spine gap, rows facing away.
     expect(rowGapBefore(pair, 2)).toBeCloseTo(pair.backToBackGap, 9)
     expect(rowFacing(pair, 2)).toBe(-1)
-    // `false` was a lone run, so two rows are two independent ones.
+    // Own aisle: two rows are two independent ones.
     expect(rowGapBefore(single, 2)).toBeCloseTo(single.aisleWidth, 9)
     expect(rowFacing(single, 2)).toBe(1)
   })
 
   test('a nonsense value is still rejected', () => {
     expect(() => rack({ backToBack: 'yes' })).toThrow()
-    expect(() => rack({ backToBack: 0 })).toThrow()
+    expect(() => rack({ backToBack: {} })).toThrow()
   })
 })

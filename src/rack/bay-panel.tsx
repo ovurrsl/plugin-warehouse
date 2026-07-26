@@ -6,7 +6,8 @@ import { SegmentedControl } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { useWarehouseStore } from '../store'
-import { deleteBay } from './bay-commands'
+import RackAutoFields from './auto-fields'
+import { deleteBays } from './bay-commands'
 import type { PalletRackNode } from './schema'
 import {
   type BayOverride,
@@ -105,17 +106,24 @@ const styles = {
 /** Merge a patch into one bay's override, dropping the entry entirely when it no
  *  longer says anything — an empty record is what makes the bay uniform again,
  *  and a uniform block is the one that shares its mesh. */
-function patchBay(rack: PalletRackNode, row: number, bay: number, patch: Partial<BayOverride>) {
-  const key = formatBayAddress(row, bay)
-  const merged: BayOverride = { ...(rack.bayOverrides[key] ?? {}), ...patch }
-  for (const field of Object.keys(merged) as (keyof BayOverride)[]) {
-    if (merged[field] === undefined) delete merged[field]
+function patchBays(
+  rack: PalletRackNode,
+  bays: ReadonlyArray<{ row: number; bay: number }>,
+  patch: Partial<BayOverride>,
+) {
+  const next = { ...rack.bayOverrides }
+  for (const { row, bay } of bays) {
+    const key = formatBayAddress(row, bay)
+    const merged: BayOverride = { ...(next[key] ?? {}), ...patch }
+    for (const field of Object.keys(merged) as (keyof BayOverride)[]) {
+      if (merged[field] === undefined) delete merged[field]
+    }
+    if (Object.keys(merged).length === 0) delete next[key]
+    else next[key] = merged
   }
 
-  const next = { ...rack.bayOverrides }
-  if (Object.keys(merged).length === 0) delete next[key]
-  else next[key] = merged
-
+  // One update for the whole set — one store write, one undo step, however many
+  // bays are focused.
   useScene
     .getState()
     .updateNode(rack.id as AnyNodeId, { bayOverrides: next } as unknown as Partial<AnyNode>)
@@ -143,7 +151,7 @@ function useInspectedRack(provided?: PalletRackNode): PalletRackNode | null {
 }
 
 export default function RackBayPanel({ node: provided }: { node?: PalletRackNode }) {
-  const focused = useWarehouseStore((s) => s.focusedBay)
+  const allFocused = useWarehouseStore((s) => s.focusedBays)
   const node = useInspectedRack(provided)
 
   // The inspector is open for something that is not a rack — or for nothing.
@@ -151,44 +159,60 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
   // an unrelated node's fields.
   if (!node) return null
 
-  const inRange =
-    focused !== null &&
-    focused.rackId === node.id &&
-    focused.row >= 1 &&
-    focused.row <= node.rowCount &&
-    focused.bay >= 1 &&
-    focused.bay <= node.bayCount
+  const bays = allFocused
+    .filter(
+      (entry) =>
+        entry.rackId === node.id &&
+        entry.row >= 1 &&
+        entry.row <= node.rowCount &&
+        entry.bay >= 1 &&
+        entry.bay <= node.bayCount,
+    )
+    .map(({ row, bay }) => ({ row, bay }))
 
-  if (!inRange) {
+  if (bays.length === 0) {
     return (
       <div style={styles.root}>
+        <RackAutoFields node={node} />
         <span style={styles.title}>
           <Icon height={13} icon="lucide:square-mouse-pointer" width={13} />
           Bay
         </span>
         <p style={styles.hint}>
-          Click a bay in the 3D view to configure just that one — leave it out for a column, open a
-          walkway through it, or stop it short of the others.
+          Click a bay in the 3D view to configure just that one — Shift+click to add more. Leave a
+          bay out for a column, open a walkway through it, or stop it short of the others.
         </p>
       </div>
     )
   }
 
-  const { row, bay } = focused
+  // Values shown come from the first focused bay; edits go to all of them.
+  // Showing a merged "mixed" state per control would be more precise and much
+  // harder to read — and the first bay is always the one clicked first.
+  const { row, bay } = bays[0] as { row: number; bay: number }
   const skipped = isBaySkipped(node, row, bay)
   const tunnel = bayTunnelLevels(node, row, bay)
   const fitted = fittedLevelCount(node)
   const levels = bayLevelCount(node, row, bay)
   const override = node.bayOverrides[formatBayAddress(row, bay)]
+  const patch = (change: Partial<BayOverride>) => patchBays(node, bays, change)
 
   return (
     <div style={styles.root}>
+      <RackAutoFields node={node} />
+
       <div style={styles.header}>
         <span style={styles.title}>
           <Icon height={13} icon="lucide:square-mouse-pointer" width={13} />
-          Bay
+          {bays.length === 1 ? 'Bay' : `${bays.length} bays`}
         </span>
-        <span style={styles.address}>{formatBayAddress(row, bay)}</span>
+        <span style={styles.address}>
+          {bays
+            .slice(0, 4)
+            .map((entry) => formatBayAddress(entry.row, entry.bay))
+            .join(' ')}
+          {bays.length > 4 ? ` +${bays.length - 4}` : ''}
+        </span>
       </div>
 
       <div style={styles.field}>
@@ -197,9 +221,7 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
           <span style={{ opacity: 0.7 }}>{skipped ? 'left out' : 'in the run'}</span>
         </span>
         <SegmentedControl
-          onChange={(value: string) =>
-            patchBay(node, row, bay, { skipped: value === 'skip' ? true : undefined })
-          }
+          onChange={(value: string) => patch({ skipped: value === 'skip' ? true : undefined })}
           options={[
             { label: 'Built', value: 'built' },
             { label: 'Leave out', value: 'skip' },
@@ -224,7 +246,7 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
             </span>
             <SegmentedControl
               onChange={(value: string) =>
-                patchBay(node, row, bay, {
+                patch({
                   tunnelLevels: value === '0' ? undefined : Number(value),
                 })
               }
@@ -253,7 +275,7 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
             </span>
             <SegmentedControl
               onChange={(value: string) =>
-                patchBay(node, row, bay, {
+                patch({
                   levels: value === 'run' ? undefined : Number(value),
                 })
               }
@@ -277,7 +299,7 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
             </span>
             <SegmentedControl
               onChange={(value: string) =>
-                patchBay(node, row, bay, {
+                patch({
                   decking: value === 'run' ? undefined : (value as BayOverride['decking']),
                 })
               }
@@ -296,7 +318,7 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
       {override ? (
         <button
           onClick={() =>
-            patchBay(node, row, bay, {
+            patch({
               skipped: undefined,
               tunnelLevels: undefined,
               levels: undefined,
@@ -315,8 +337,17 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
           <span>Remove</span>
           <span style={{ opacity: 0.7 }}>Del</span>
         </span>
-        <button onClick={() => deleteBay(node, bay)} style={styles.danger} type="button">
-          {removalLabel(node, bay)}
+        <button
+          onClick={() =>
+            deleteBays(
+              node,
+              bays.map((entry) => entry.bay),
+            )
+          }
+          style={styles.danger}
+          type="button"
+        >
+          {removalLabel(node, bays)}
         </button>
       </div>
 
@@ -332,14 +363,21 @@ export default function RackBayPanel({ node: provided }: { node?: PalletRackNode
 /**
  * Say what the button will actually do before it does it.
  *
- * Removing a bay has three quite different outcomes depending on where it sits,
- * and the one that surprises people is the middle: a run cannot lose an
- * interior bay and stay one run without dragging half of itself across the
- * other half, so it becomes two. Naming that on the button is cheaper than
- * explaining it after.
+ * Removing bays has quite different outcomes depending on where they sit, and
+ * the one that surprises people is the middle: a run cannot lose an interior
+ * bay and stay one run without dragging half of itself across the other half,
+ * so it splits. Naming that on the button is cheaper than explaining it after.
  */
-function removalLabel(node: PalletRackNode, bay: number): string {
-  if (node.bayCount <= 1) return 'Delete this rack'
-  if (bay === 1 || bay === node.bayCount) return 'Remove this bay'
-  return 'Remove this bay — splits the run in two'
+function removalLabel(node: PalletRackNode, bays: ReadonlyArray<{ bay: number }>): string {
+  const removed = new Set(bays.map((entry) => entry.bay))
+  if (removed.size >= node.bayCount) return 'Delete this rack'
+  // The run splits when any surviving stretch is bounded by removals on both
+  // sides — i.e. some removed bay has kept bays both left and right of it.
+  const splits = [...removed].some(
+    (cut) =>
+      [...Array(cut - 1)].some((_, i) => !removed.has(i + 1)) &&
+      [...Array(node.bayCount - cut)].some((_, i) => !removed.has(cut + i + 1)),
+  )
+  const what = removed.size === 1 ? 'this bay' : `${removed.size} bays`
+  return splits ? `Remove ${what} — splits the run` : `Remove ${what}`
 }

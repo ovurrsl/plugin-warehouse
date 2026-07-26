@@ -55,6 +55,10 @@ const CLICK_TRIGGER_KINDS = [
   'stair',
   'stair-segment',
   'warehouse:pallet',
+  // A placed rack's picking collider swallows the click that lands on it, so
+  // without this a second rack cannot be placed against the first — the cursor
+  // is over the run you are aligning to, and nothing commits.
+  'warehouse:pallet-rack',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

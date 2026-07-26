@@ -285,34 +285,41 @@ const UNIT_EDGES = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
 const FOCUS_MATERIAL = new THREE.LineBasicMaterial({ color: '#38bdf8', depthTest: false })
 
 /**
- * The bay the last click landed on.
+ * The bays the user has picked out — one click focuses, Shift+click grows.
  *
  * Drawn from the rack's own store rather than the host's selection, because the
- * host has no notion of a sub-selection — and it is what makes "click a bay,
- * edit that bay" work with no gesture to learn. `depthTest: false` so the
- * outline reads through the steel in front of it; a bay is mostly air and an
- * occluded outline is invisible from the aisle.
+ * host has no notion of a sub-selection. `depthTest: false` so the outlines
+ * read through the steel in front of them; a bay is mostly air and an occluded
+ * outline is invisible from the aisle. One shared edge geometry, scaled per
+ * bay — even a whole run selected costs no allocation.
  */
 function FocusedBayOutline({ node }: { node: PalletRackNode }) {
-  const focused = useWarehouseStore((s) => s.focusedBay)
-  if (!focused || focused.rackId !== node.id) return null
-  if (focused.bay < 1 || focused.bay > node.bayCount) return null
-  if (focused.row < 1 || focused.row > node.rowCount) return null
+  const focused = useWarehouseStore((s) => s.focusedBays)
+  const mine = focused.filter(
+    (bay) =>
+      bay.rackId === node.id &&
+      bay.bay >= 1 &&
+      bay.bay <= node.bayCount &&
+      bay.row >= 1 &&
+      bay.row <= node.rowCount,
+  )
+  if (mine.length === 0) return null
 
   return (
-    <lineSegments
-      dispose={null}
-      geometry={UNIT_EDGES}
-      material={FOCUS_MATERIAL}
-      position={[
-        bayCenterX(node, focused.bay),
-        node.uprightHeight / 2,
-        rowCenterZ(node, focused.row),
-      ]}
-      raycast={NO_RAYCAST}
-      renderOrder={999}
-      scale={[bayPitch(node), node.uprightHeight, rowDepth(node)]}
-    />
+    <>
+      {mine.map((bay) => (
+        <lineSegments
+          dispose={null}
+          geometry={UNIT_EDGES}
+          key={`${bay.row}-${bay.bay}`}
+          material={FOCUS_MATERIAL}
+          position={[bayCenterX(node, bay.bay), node.uprightHeight / 2, rowCenterZ(node, bay.row)]}
+          raycast={NO_RAYCAST}
+          renderOrder={999}
+          scale={[bayPitch(node), node.uprightHeight, rowDepth(node)]}
+        />
+      ))}
+    </>
   )
 }
 

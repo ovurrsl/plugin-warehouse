@@ -7,7 +7,6 @@ import {
   fittedLevelCount,
   hasUnsupportedPallets,
   levelSurfaceY,
-  strandedRowsPerGroup,
   usesAisle,
   usesSpineGap,
 } from './slots'
@@ -32,9 +31,22 @@ const NARROWEST_WORKING_AISLE = 1.6
  * support bars looks completely normal.
  */
 export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
+  /**
+   * Seven groups in the order a rack is actually specified: how big, how many
+   * levels, how the rows sit, what goes on it, then the steel and where it
+   * stands. The version this replaces had ten groups and showed every field
+   * always — including five picking-container dimensions on a rack with no
+   * picking levels, and a spine gap on a single run. Half the panel described
+   * settings that moved nothing.
+   *
+   * `visibleIf` does that work, and it reads the *same predicates the geometry
+   * cache key reads* (`usesSpineGap`, `usesAisle`). So a field is shown exactly
+   * when it changes the mesh — a control can never be visible, adjustable, and
+   * inert.
+   */
   groups: [
     {
-      label: 'Run',
+      label: 'Size',
       fields: [
         { key: 'bayCount', kind: 'number', min: 1, max: 40, step: 1 },
         { key: 'bayClearWidth', kind: 'number', unit: 'm', min: 0.6, max: 6, step: 0.05 },
@@ -47,17 +59,32 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
       fields: [
         { key: 'levels', kind: 'number', min: 0, max: 15, step: 1 },
         { key: 'firstLevelClear', kind: 'number', unit: 'm', min: 0.2, max: 6, step: 0.05 },
-        { key: 'levelClear', kind: 'number', unit: 'm', min: 0.2, max: 6, step: 0.05 },
+        {
+          key: 'levelClear',
+          kind: 'number',
+          unit: 'm',
+          min: 0.2,
+          max: 6,
+          step: 0.05,
+          // With one beam level there is nothing above the first to space.
+          visibleIf: (node) => node.levels > 1,
+        },
+        {
+          key: 'decking',
+          kind: 'enum',
+          options: ['wire-mesh', 'steel', 'timber', 'open'],
+          display: 'select',
+        },
         { key: 'groundLevelStorage', kind: 'boolean' },
         { key: 'hasGroundBeam', kind: 'boolean' },
         { key: 'levelCapacity', kind: 'number', unit: 'kg', min: 0, max: 20_000, step: 100 },
       ],
     },
     {
-      label: 'Rows',
+      label: 'Rows and aisles',
       fields: [
         { key: 'rowCount', kind: 'number', min: 1, max: 20, step: 1 },
-        { key: 'backToBack', kind: 'number', min: 1, max: 6, step: 1 },
+        { key: 'backToBack', kind: 'boolean', visibleIf: (node) => node.rowCount > 1 },
         {
           key: 'backToBackGap',
           kind: 'number',
@@ -65,8 +92,8 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0,
           max: 1.5,
           step: 0.05,
-          // Nothing stands spine to spine until a group holds two rows, so the
-          // field would otherwise read as a dimension that does nothing.
+          // Nothing stands spine to spine until two rows pair up, so the field
+          // would otherwise read as a dimension that does nothing.
           visibleIf: (node) => usesSpineGap(node),
         },
         {
@@ -78,24 +105,21 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           step: 0.1,
           visibleIf: (node) => usesAisle(node),
         },
-      ],
-    },
-    {
-      label: 'Depth',
-      fields: [
         { key: 'depthPositions', kind: 'number', min: 1, max: 2, step: 1 },
-        { key: 'depthGap', kind: 'number', unit: 'm', min: 0, max: 0.5, step: 0.01 },
+        {
+          key: 'depthGap',
+          kind: 'number',
+          unit: 'm',
+          min: 0,
+          max: 0.5,
+          step: 0.01,
+          // Single-deep, there is no second position to separate.
+          visibleIf: (node) => node.depthPositions > 1,
+        },
       ],
     },
     {
-      label: 'Growth',
-      fields: [
-        { key: 'bayAnchor', kind: 'enum', options: ['left', 'center', 'right'], display: 'select' },
-        { key: 'rowAnchor', kind: 'enum', options: ['front', 'center', 'back'], display: 'select' },
-      ],
-    },
-    {
-      label: 'Pallets',
+      label: 'Load',
       fields: [
         { key: 'palletPreset', kind: 'enum', options: PRESET_KEYS, display: 'select' },
         {
@@ -104,8 +128,6 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           options: ['short-side-out', 'long-side-out'],
           display: 'select',
         },
-        { key: 'palletsPerLevel', kind: 'number', min: 1, max: 12, step: 1 },
-        { key: 'palletSupportBars', kind: 'number', min: 0, max: 3, step: 1 },
         { key: 'clearanceToUpright', kind: 'number', unit: 'm', min: 0, max: 0.4, step: 0.005 },
         {
           key: 'clearanceBetweenPallets',
@@ -115,16 +137,78 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           max: 0.4,
           step: 0.005,
         },
+        { key: 'ghostFill', kind: 'number', min: 0, max: 1, step: 0.05 },
       ],
     },
     {
       label: 'Picking',
       fields: [
         { key: 'pickingLevels', kind: 'number', min: 0, max: 15, step: 1 },
-        { key: 'pickingLevelClear', kind: 'number', unit: 'm', min: 0.15, max: 3, step: 0.05 },
-        { key: 'pickingBoxWidth', kind: 'number', unit: 'm', min: 0.1, max: 1.5, step: 0.05 },
-        { key: 'pickingBoxDepth', kind: 'number', unit: 'm', min: 0.1, max: 1.5, step: 0.05 },
-        { key: 'pickingBoxHeight', kind: 'number', unit: 'm', min: 0.05, max: 1, step: 0.02 },
+        // Everything below describes hand-picked container shelves. On an
+        // all-pallet rack it is five controls for a thing that does not exist.
+        {
+          key: 'pickingLevelClear',
+          kind: 'number',
+          unit: 'm',
+          min: 0.15,
+          max: 3,
+          step: 0.05,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingBeamHeight',
+          kind: 'number',
+          unit: 'm',
+          min: 0.04,
+          max: 0.2,
+          step: 0.005,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingShelfThickness',
+          kind: 'number',
+          unit: 'm',
+          min: 0.005,
+          max: 0.06,
+          step: 0.005,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingBoxWidth',
+          kind: 'number',
+          unit: 'm',
+          min: 0.1,
+          max: 1.5,
+          step: 0.05,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingBoxDepth',
+          kind: 'number',
+          unit: 'm',
+          min: 0.1,
+          max: 1.5,
+          step: 0.05,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingBoxHeight',
+          kind: 'number',
+          unit: 'm',
+          min: 0.05,
+          max: 1,
+          step: 0.02,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
+        {
+          key: 'pickingBoxGap',
+          kind: 'number',
+          unit: 'm',
+          min: 0,
+          max: 0.2,
+          step: 0.005,
+          visibleIf: (node) => node.pickingLevels > 0,
+        },
       ],
     },
     {
@@ -140,23 +224,15 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           options: ['z-bracing', 'x-bracing', 'open'],
           display: 'select',
         },
-        {
-          key: 'decking',
-          kind: 'enum',
-          options: ['wire-mesh', 'steel', 'timber', 'open'],
-          display: 'select',
-        },
         { key: 'uprightColor', kind: 'color' },
         { key: 'beamColor', kind: 'color' },
       ],
     },
     {
-      label: 'Stock',
-      fields: [{ key: 'ghostFill', kind: 'number', min: 0, max: 1, step: 0.05 }],
-    },
-    {
-      label: 'Transform',
+      label: 'Placement',
       fields: [
+        { key: 'bayAnchor', kind: 'enum', options: ['left', 'center', 'right'], display: 'select' },
+        { key: 'rowAnchor', kind: 'enum', options: ['front', 'center', 'back'], display: 'select' },
         { key: 'position', kind: 'vec3' },
         { key: 'rotation', kind: 'vec3' },
       ],
@@ -213,19 +289,6 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           field: 'rowCount',
           severity: 'warning',
           msg: `This block is ${fullPartCount(node).toLocaleString()} parts, past the ${PART_BUDGET.toLocaleString()} one mesh holds, so it draws as posts and beams only. Split it into separate blocks to keep the detail.`,
-        })
-      }
-
-      // Selective racking reaches one row deep from each aisle, so a group of
-      // three or more strands everything between its first and last row. The
-      // capacity figure keeps counting those pallets, which is the whole problem
-      // — the block reads as denser storage rather than as unreachable stock.
-      const stranded = strandedRowsPerGroup(node)
-      if (stranded > 0) {
-        issues.push({
-          field: 'backToBack',
-          severity: 'warning',
-          msg: `${node.backToBack} rows back to back leaves ${stranded} of them with no aisle face — a truck can only reach the first and the last. Real blocks deeper than two rows are drive-in or push-back systems, which this rack does not model.`,
         })
       }
 

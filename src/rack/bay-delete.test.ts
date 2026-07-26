@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { planBayDeletion, splitGap } from './bay-delete'
+import { planBayDeletion, planBaysDeletion, splitGap } from './bay-delete'
 import { PalletRackNode } from './schema'
 import { bayCenterX, bayPitch, totalWidth } from './slots'
 
@@ -224,5 +224,78 @@ describe('edges of the operation', () => {
     for (const bay of [1, 2]) {
       expect(planBayDeletion(rack({ bayCount: 2 }), bay)?.kind).toBe('shrink')
     }
+  })
+})
+
+describe('deleting a set of bays', () => {
+  const segs = (node: ReturnType<typeof rack>, bays: number[]) => {
+    const plan = planBaysDeletion(node, bays)
+    if (plan?.kind !== 'segments') throw new Error(`expected segments, got ${plan?.kind}`)
+    return [plan.first, ...plan.rest].map((patch) => rack({ ...node, ...patch }))
+  }
+
+  test('two separate interior bays make three runs, each where it stood', () => {
+    const before = rack({ bayCount: 7, position: [3, 0, -1] })
+    const wasAt = new Map<number, number>()
+    for (const bay of [1, 2, 4, 6, 7]) wasAt.set(bay, worldBayCentre(before, bay))
+
+    const parts = segs(before, [3, 5])
+    expect(parts.map((p) => p.bayCount)).toEqual([2, 1, 2])
+    expect(worldBayCentre(parts[0] as never, 1)).toBeCloseTo(wasAt.get(1) as number, 9)
+    expect(worldBayCentre(parts[0] as never, 2)).toBeCloseTo(wasAt.get(2) as number, 9)
+    expect(worldBayCentre(parts[1] as never, 1)).toBeCloseTo(wasAt.get(4) as number, 9)
+    expect(worldBayCentre(parts[2] as never, 1)).toBeCloseTo(wasAt.get(6) as number, 9)
+    expect(worldBayCentre(parts[2] as never, 2)).toBeCloseTo(wasAt.get(7) as number, 9)
+  })
+
+  test('adjacent bays removed together leave one double-wide opening', () => {
+    const before = rack({ bayCount: 5 })
+    const parts = segs(before, [2, 3])
+    expect(parts.map((p) => p.bayCount)).toEqual([1, 2])
+    const gap = edges(parts[1] as never)[0] - edges(parts[0] as never)[1]
+    // Two clear widths plus the frame that stood between them — both survivors
+    // keep the frames they shared with the removed bays, so the middle frame
+    // of the removed pair is the one that goes.
+    expect(gap).toBeCloseTo(2 * before.bayClearWidth + before.uprightWidth, 9)
+  })
+
+  test('removing both ends at once shrinks from both sides', () => {
+    const before = rack({ bayCount: 4, position: [0, 0, 0] })
+    const keep2 = worldBayCentre(before, 2)
+    const keep3 = worldBayCentre(before, 3)
+    const plan = planBaysDeletion(before, [1, 4])
+    if (plan?.kind !== 'segments') throw new Error('expected segments')
+    expect(plan.rest).toHaveLength(0)
+    const after = rack({ ...before, ...plan.first })
+    expect(after.bayCount).toBe(2)
+    expect(worldBayCentre(after, 1)).toBeCloseTo(keep2, 9)
+    expect(worldBayCentre(after, 2)).toBeCloseTo(keep3, 9)
+  })
+
+  test('every bay at once deletes the node, duplicates and strays ignored', () => {
+    const node = rack({ bayCount: 3 })
+    expect(planBaysDeletion(node, [1, 2, 3])).toEqual({ kind: 'delete-node' })
+    expect(planBaysDeletion(node, [1, 1, 2, 3, 3])).toEqual({ kind: 'delete-node' })
+    expect(planBaysDeletion(node, [0, 9])).toBeNull()
+  })
+
+  test('overrides land on the stretch that kept their bay', () => {
+    const before = rack({
+      bayCount: 6,
+      bayOverrides: {
+        'R1-B1': { decking: 'open' },
+        'R1-B3': { skipped: true },
+        'R1-B5': { tunnelLevels: 1 },
+        'R1-B6': { levels: 2 },
+      },
+    })
+    const plan = planBaysDeletion(before, [2, 4])
+    if (plan?.kind !== 'segments') throw new Error('expected segments')
+    expect(plan.first.bayOverrides).toEqual({ 'R1-B1': { decking: 'open' } })
+    expect(plan.rest[0]?.bayOverrides).toEqual({ 'R1-B1': { skipped: true } })
+    expect(plan.rest[1]?.bayOverrides).toEqual({
+      'R1-B1': { tunnelLevels: 1 },
+      'R1-B2': { levels: 2 },
+    })
   })
 })

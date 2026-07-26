@@ -20,10 +20,29 @@ import type { ConveyorRollerNode } from './schema'
  * Metres throughout.
  */
 
-/** Roller pitch as a length. The schema stores the catalogue's millimetres so
- *  that a pitch is an equality rather than a float comparison. */
+/**
+ * The catalogue enums as numbers.
+ *
+ * The schema stores them as strings because that is what the host's enum
+ * control reads and writes; these four functions are the only place that is
+ * undone, so nothing downstream ever has to remember which it is holding.
+ */
+export function rollerPitchMm(conveyor: ConveyorRollerNode): number {
+  return Number(conveyor.rollerPitch)
+}
+
+export function usefulWidthMm(conveyor: ConveyorRollerNode): number {
+  return Number(conveyor.usefulWidth)
+}
+
+export function speedMPerMin(conveyor: ConveyorRollerNode): number {
+  return Number(conveyor.speed)
+}
+
+/** Roller pitch as a length. Millimetres in the field so a pitch is an equality
+ *  rather than a float comparison. */
 export function rollerPitchM(conveyor: ConveyorRollerNode): number {
-  return conveyor.rollerPitch / 1000
+  return rollerPitchMm(conveyor) / 1000
 }
 
 /**
@@ -39,13 +58,13 @@ export function moduleLengthM(conveyor: ConveyorRollerNode): number {
 
 /** Useful width — the widest box the lane carries — as a length. */
 export function usefulWidthM(conveyor: ConveyorRollerNode): number {
-  return conveyor.usefulWidth / 1000
+  return usefulWidthMm(conveyor) / 1000
 }
 
 /** Outside of one side profile to the outside of the other. Derived from the
  *  useful width, never stored: see `./catalog`. */
 export function frameWidthM(conveyor: ConveyorRollerNode): number {
-  return exteriorWidthM(conveyor.usefulWidth)
+  return exteriorWidthM(usefulWidthMm(conveyor))
 }
 
 /**
@@ -110,7 +129,7 @@ export function hasCrossbar(conveyor: ConveyorRollerNode): boolean {
 
 /** Speed in metres per second, for anything that has to move. */
 export function speedMPerSec(conveyor: ConveyorRollerNode): number {
-  return conveyor.speed / 60
+  return speedMPerMin(conveyor) / 60
 }
 
 /**
@@ -150,7 +169,7 @@ export function withinCatalogueLength(conveyor: ConveyorRollerNode): boolean {
 /** Whether the speed is one of the three the catalogue offers. Guards a value
  *  arriving from MCP or a hand-edited scene rather than the panel. */
 export function isCatalogueSpeed(conveyor: ConveyorRollerNode): boolean {
-  return (SPEEDS_M_PER_MIN as readonly number[]).includes(conveyor.speed)
+  return (SPEEDS_M_PER_MIN as readonly number[]).includes(speedMPerMin(conveyor))
 }
 
 // ── Placement ───────────────────────────────────────────────────────────────

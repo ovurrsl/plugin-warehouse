@@ -6,7 +6,9 @@ import {
   isCatalogueSpeed,
   moduleLengthM,
   rollerPitchM,
+  rollerPitchMm,
   rollersUnderShortestBox,
+  speedMPerMin,
   withinCatalogueLength,
 } from './metrics'
 import type { ConveyorRollerNode } from './schema'
@@ -144,7 +146,7 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at ${node.rollerPitch} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
+          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
         })
       }
 
@@ -174,14 +176,14 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
         issues.push({
           field: 'speed',
           severity: 'warning',
-          msg: `${node.speed} m/min is not one of the catalogue speeds (${SPEEDS_M_PER_MIN.join(' / ')}).`,
+          msg: `${speedMPerMin(node)} m/min is not one of the catalogue speeds (${SPEEDS_M_PER_MIN.join(' / ')}).`,
         })
       }
 
       // A driven line has one motor. A module that is part of a run and also
       // claims the drive is a second motor on the same line — worth naming, and
       // properly checkable once the line index lands.
-      if (node.hasDrive && node.rollerPitch > 0 && length < 1) {
+      if (node.hasDrive && length < 1) {
         issues.push({
           field: 'hasDrive',
           severity: 'warning',
@@ -208,11 +210,11 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
       // Pitch is stored in millimetres so a joint is an equality; a value from
       // outside the set means the geometry cache is being split on a shape no
       // supplier ships.
-      if (!(ROLLER_PITCHES_MM as readonly number[]).includes(node.rollerPitch)) {
+      if (!(ROLLER_PITCHES_MM as readonly number[]).includes(rollerPitchMm(node))) {
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `${node.rollerPitch} mm is not one of the pitches this model builds (${ROLLER_PITCHES_MM.join(' / ')} mm).`,
+          msg: `${rollerPitchMm(node)} mm is not one of the pitches this model builds (${ROLLER_PITCHES_MM.join(' / ')} mm).`,
         })
       }
 

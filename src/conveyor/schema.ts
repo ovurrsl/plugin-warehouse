@@ -1,10 +1,17 @@
 import { BaseNode, nodeType, objectId } from '@pascal-app/core'
 import { z } from 'zod'
-import type { SPEEDS_M_PER_MIN, USEFUL_WIDTH_CLASSES_MM } from './catalog'
-import { DEFAULT_ROLLER_PITCH, type ROLLER_PITCHES_MM } from './constants'
 
 /**
  * A continuously driven roller conveyor — **one module**.
+ *
+ * **The catalogue enums are stored as strings, and that is the host's contract
+ * rather than a preference.** `ParamField`'s enum control declares
+ * `options: readonly string[]`, renders a value only when `typeof value ===
+ * 'string'`, and writes back `e.target.value`. Held as numbers, a pitch
+ * therefore displayed as the *first* option whatever it really was, and the
+ * first edit wrote `'75'` over `75` — which the schema then refused on the next
+ * re-parse, so **Duplicate threw**. The numbers live one conversion away, in
+ * `./metrics`, and nothing else reads the raw field.
  *
  * A module is the unit a supplier ships and a drawing schedules: a length of
  * bed on its own supports, with two ends that meet other modules. A line is not
@@ -40,9 +47,7 @@ export const ConveyorRollerNode = BaseNode.extend({
    * The frame is 147 mm wider; that figure is derived in `./catalog` from every
    * straight the catalogue publishes both numbers for, never stored.
    */
-  usefulWidth: z.union([z.literal(400), z.literal(600)]).default(600) as z.ZodType<
-    (typeof USEFUL_WIDTH_CLASSES_MM)[number]
-  >,
+  usefulWidth: z.enum(['400', '600']).default('600'),
 
   /**
    * Rollers along the bed. **Length is this times the pitch, and is never
@@ -61,9 +66,7 @@ export const ConveyorRollerNode = BaseNode.extend({
   rollers: z.number().int().min(27).max(200).default(80),
 
   /** Roller pitch. A fixed set, not a slider — see `./constants` A2. */
-  rollerPitch: z
-    .union([z.literal(50), z.literal(75), z.literal(100)])
-    .default(DEFAULT_ROLLER_PITCH) as z.ZodType<(typeof ROLLER_PITCHES_MM)[number]>,
+  rollerPitch: z.enum(['50', '75', '100']).default('75'),
 
   /**
    * Top of roller: the height goods travel at, and the datum every drawing and
@@ -81,9 +84,7 @@ export const ConveyorRollerNode = BaseNode.extend({
    * Line speed. Three catalogue values, so an enum: a conveyor is ordered at a
    * speed rather than tuned to one, and the middle one is the ordinary choice.
    */
-  speed: z.union([z.literal(25), z.literal(45), z.literal(60)]).default(45) as z.ZodType<
-    (typeof SPEEDS_M_PER_MIN)[number]
-  >,
+  speed: z.enum(['25', '45', '60']).default('45'),
 
   /**
    * Which way boxes travel, along the module's own local +X.

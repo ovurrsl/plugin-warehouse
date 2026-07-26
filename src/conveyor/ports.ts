@@ -1,5 +1,5 @@
 import type { NodePort } from '@pascal-app/core'
-import { frameWidthM, moduleLengthM } from './metrics'
+import { frameWidthM, moduleLengthM, usefulWidthM } from './metrics'
 import type { ConveyorRollerNode } from './schema'
 
 /**
@@ -82,7 +82,7 @@ export function conveyorPorts(conveyor: ConveyorRollerNode): NodePort[] {
   // Area-equivalent round size, which is what the field asks a rectangular port
   // to report. The lane, not the frame: what mates is what a box travels
   // through.
-  const lane = conveyor.usefulWidth / 1000
+  const lane = usefulWidthM(conveyor)
   const equivalent = 2 * Math.sqrt((lane * lane) / Math.PI)
 
   const ports: NodePort[] = (['a', 'b'] as const).map((id) => {

@@ -178,8 +178,8 @@ describe('the magnet joins head to tail and nothing else', () => {
   })
 
   test('a different lane is refused — R1', () => {
-    const standing = conveyor('standing', { position: [0, 0, 0], usefulWidth: 600 })
-    const dragged = conveyor('dragged', { position: [40, 0, 40], usefulWidth: 400 })
+    const standing = conveyor('standing', { position: [0, 0, 0], usefulWidth: '600' })
+    const dragged = conveyor('dragged', { position: [40, 0, 40], usefulWidth: '400' })
     expect(
       snapToLineEnd(dragged, [LENGTH - 0.1, 0, 0], 0, [dragged.id], scene(standing, dragged)),
     ).toBeNull()
@@ -250,8 +250,8 @@ describe('a joint built by hand is checked, because the magnet is not the only w
   test('a mismatched lane is reported once the two are joined', () => {
     // The host calls two ends within 50 mm one line whatever they are, so a
     // line built by paste or by MCP can be joined and wrong at the same time.
-    const wide = conveyor('wide', { position: [0, 0, 0], usefulWidth: 600 })
-    const narrow = conveyor('narrow', { position: [LENGTH, 0, 0], usefulWidth: 400 })
+    const wide = conveyor('wide', { position: [0, 0, 0], usefulWidth: '600' })
+    const narrow = conveyor('narrow', { position: [LENGTH, 0, 0], usefulWidth: '400' })
     const problems = jointProblems(wide, scene(wide, narrow))
     expect(problems.some((problem) => problem.includes('400 mm'))).toBe(true)
   })

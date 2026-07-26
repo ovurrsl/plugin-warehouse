@@ -12,8 +12,11 @@ import {
   moduleLengthM,
   ratedLoadKg,
   rollerPitchM,
+  rollerPitchMm,
+  speedMPerMin,
   speedMPerSec,
   supportOffsetsX,
+  usefulWidthMm,
 } from './metrics'
 import { conveyorRollerParametrics } from './parametrics'
 import { jointProblems } from './port-magnet'
@@ -197,13 +200,13 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
         </span>
         {(
           [
-            ['Bed', `${length.toFixed(3)} m · ${node.rollers} rollers @ ${node.rollerPitch} mm`],
+            ['Bed', `${length.toFixed(3)} m · ${node.rollers} rollers @ ${rollerPitchMm(node)} mm`],
             [
               'Frame',
-              `${(frameWidthM(node) * 1000).toFixed(0)} mm over a ${node.usefulWidth} mm lane`,
+              `${(frameWidthM(node) * 1000).toFixed(0)} mm over a ${usefulWidthMm(node)} mm lane`,
             ],
             ['Supports', `${supportOffsetsX(node).length} stations`],
-            ['Speed', `${node.speed} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
+            ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
             [
               'Throughput',
               `≤ ${maxThroughputPerHour(node).toLocaleString()} boxes/h at ${(node.shortestBox * 1000).toFixed(0)} mm`,
@@ -228,7 +231,7 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
       <div style={styles.field}>
         <span style={styles.label}>
           <span>Length</span>
-          <span style={{ opacity: 0.7 }}>steps of {node.rollerPitch} mm</span>
+          <span style={{ opacity: 0.7 }}>steps of {rollerPitchMm(node)} mm</span>
         </span>
         {/* Metres, because that is how a conveyor is specified — but the node
             stores a roller count, so the box is a request rather than a value.

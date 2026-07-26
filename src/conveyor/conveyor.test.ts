@@ -38,10 +38,10 @@ describe('the bed is a whole number of pitches', () => {
     // a whole number of pitches, and a metres slider would both produce lengths
     // no supplier cuts and mint a geometry at every step it passed through.
     for (const [rollers, pitch, expected] of [
-      [80, 75, 6],
-      [27, 75, 2.025],
-      [60, 100, 6],
-      [200, 75, 15],
+      [80, '75', 6],
+      [27, '75', 2.025],
+      [60, '100', 6],
+      [200, '75', 15],
     ] as const) {
       const node = conveyor({ rollers, rollerPitch: pitch })
       expect({ rollers, pitch, length: moduleLengthM(node) }).toEqual({
@@ -72,9 +72,9 @@ describe('the bed is a whole number of pitches', () => {
   })
 
   test('the catalogue length range is what the module is checked against', () => {
-    expect(withinCatalogueLength(conveyor({ rollers: 27, rollerPitch: 75 }))).toBe(true)
-    expect(withinCatalogueLength(conveyor({ rollers: 200, rollerPitch: 75 }))).toBe(true)
-    expect(withinCatalogueLength(conveyor({ rollers: 27, rollerPitch: 50 }))).toBe(false)
+    expect(withinCatalogueLength(conveyor({ rollers: 27, rollerPitch: '75' }))).toBe(true)
+    expect(withinCatalogueLength(conveyor({ rollers: 200, rollerPitch: '75' }))).toBe(true)
+    expect(withinCatalogueLength(conveyor({ rollers: 27, rollerPitch: '50' }))).toBe(false)
     expect(CAR.lengthRangeM[0]).toBeCloseTo(2.025, 9)
   })
 })
@@ -86,8 +86,8 @@ describe('the frame is derived, never stored', () => {
     // different families and bring their own constant when they land.
     expect(exteriorWidthM(800)).toBeCloseTo(0.947, 9)
     expect(exteriorWidthM(600)).toBeCloseTo(0.747, 9)
-    expect(frameWidthM(conveyor({ usefulWidth: 600 }))).toBeCloseTo(0.747, 9)
-    expect(frameWidthM(conveyor({ usefulWidth: 400 }))).toBeCloseTo(0.547, 9)
+    expect(frameWidthM(conveyor({ usefulWidth: '600' }))).toBeCloseTo(0.747, 9)
+    expect(frameWidthM(conveyor({ usefulWidth: '400' }))).toBeCloseTo(0.547, 9)
   })
 
   test('supports are never further apart than the catalogue spacing', () => {
@@ -181,9 +181,9 @@ describe('the cache key is derived, never raw', () => {
   // populated: with it empty the test only proves the key is large enough, and
   // the cheapest way to pass that is to list every field.
   const VARIANTS: Array<[string, unknown]> = [
-    ['usefulWidth', 400],
+    ['usefulWidth', '400'],
     ['rollers', 100],
-    ['rollerPitch', 100],
+    ['rollerPitch', '100'],
     ['transportHeight', 0.57],
     ['sideGuide', 'none'],
     ['sideGuideHeight', 0.09],
@@ -193,7 +193,7 @@ describe('the cache key is derived, never raw', () => {
     ['rollerColor', '#ff00ff'],
     ['profileColor', '#123456'],
     // Must NOT move a vertex.
-    ['speed', 25],
+    ['speed', '25'],
     ['shortestBox', 0.6],
     ['inclination', 3],
     ['name', 'Spine 1'],
@@ -218,11 +218,54 @@ describe('the cache key is derived, never raw', () => {
   test('two ways to reach one length are still two meshes, because the pitch differs', () => {
     // 80 at 75 mm and 60 at 100 mm are both 6 m — and the stripe repeat is not
     // the same, so they must not share a buffer.
-    const a = conveyor({ rollers: 80, rollerPitch: 75 })
-    const b = conveyor({ rollers: 60, rollerPitch: 100 })
+    const a = conveyor({ rollers: 80, rollerPitch: '75' })
+    const b = conveyor({ rollers: 60, rollerPitch: '100' })
     expect(moduleLengthM(a)).toBeCloseTo(moduleLengthM(b), 9)
     expect(conveyorGeometryKey(a, 'full')).not.toBe(conveyorGeometryKey(b, 'full'))
   })
+})
+
+describe('every enum the inspector offers survives a re-parse', () => {
+  /**
+   * The exact path Duplicate takes, and the one that broke.
+   *
+   * `ParametricInspector`'s enum control declares `options: readonly string[]`,
+   * renders a value only when `typeof value === 'string'`, and writes back
+   * `e.target.value`. A field declared as a numeric literal union therefore
+   * displayed the *first* option whatever it really was, and the first edit
+   * stored a string the schema refused — so `def.schema.parse(duplicateInfo)`
+   * threw and the module could not be duplicated.
+   *
+   * Walking the descriptor rather than naming the fields is the point: a
+   * numeric enum added later fails here without anyone having to remember.
+   */
+  const enumFields = conveyorRollerParametrics.groups.flatMap((group) =>
+    group.fields.flatMap((field) => (field.kind === 'enum' ? [field] : [])),
+  )
+
+  test('the descriptor offers enums at all, so the sweep below is not vacuous', () => {
+    expect(enumFields.map((field) => field.key).sort()).toEqual([
+      'flow',
+      'rollerPitch',
+      'sideGuide',
+      'speed',
+      'usefulWidth',
+    ])
+  })
+
+  for (const field of enumFields) {
+    test(`${field.key}: every option the control can write parses back unchanged`, () => {
+      for (const option of field.options) {
+        const edited = { ...conveyor(), [field.key]: option }
+        const reparsed = ConveyorRollerNode.parse(edited) as Record<string, unknown>
+        expect({ key: field.key, option, stored: reparsed[field.key] }).toEqual({
+          key: field.key,
+          option,
+          stored: option,
+        })
+      }
+    })
+  }
 })
 
 describe('a conveyor may pass under a rack, but not through its legs', () => {
@@ -300,13 +343,13 @@ describe('the catalogue rules are checked, not assumed', () => {
   test('a pitch too coarse for the shortest box is reported', () => {
     // The catalogue rule: a box always sits on at least three rollers. Fewer and
     // it drops between them — a failure a drawing cannot show.
-    expect(fieldsOf({ rollerPitch: 100, shortestBox: 0.15 })).toContain('rollerPitch')
-    expect(carriesShortestBox(conveyor({ rollerPitch: 100, shortestBox: 0.15 }))).toBe(false)
+    expect(fieldsOf({ rollerPitch: '100', shortestBox: 0.15 })).toContain('rollerPitch')
+    expect(carriesShortestBox(conveyor({ rollerPitch: '100', shortestBox: 0.15 }))).toBe(false)
     expect(MIN_ROLLERS_UNDER_A_BOX).toBe(3)
   })
 
   test('a length outside the catalogue range is reported', () => {
-    expect(fieldsOf({ rollers: 27, rollerPitch: 50 })).toContain('rollers')
+    expect(fieldsOf({ rollers: 27, rollerPitch: '50' })).toContain('rollers')
   })
 
   test('a fall steeper than the type allows is reported', () => {
@@ -322,8 +365,8 @@ describe('the catalogue rules are checked, not assumed', () => {
   test('every issue names a field the schema has', () => {
     const shape = ConveyorRollerNode.shape as Record<string, unknown>
     for (const overrides of [
-      { rollerPitch: 100, shortestBox: 0.15 },
-      { rollers: 27, rollerPitch: 50 },
+      { rollerPitch: '100', shortestBox: 0.15 },
+      { rollers: 27, rollerPitch: '50' },
       { transportHeight: 0.82 },
     ]) {
       for (const issue of issuesFor(overrides)) {

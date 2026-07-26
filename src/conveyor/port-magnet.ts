@@ -1,5 +1,5 @@
 import { isPortMated } from './line-index'
-import { frameWidthM, moduleLengthM } from './metrics'
+import { frameWidthM, moduleLengthM, usefulWidthMm } from './metrics'
 import type { ConveyorPortId } from './ports'
 import { conveyorPorts, inletPort, outletPort, transportHeightAt } from './ports'
 import type { ConveyorRollerNode } from './schema'
@@ -100,7 +100,7 @@ function build(nodes: Readonly<Record<string, unknown>>): Map<string, FreeEnd[]>
         z: port.position[2],
         dx: port.direction[0],
         dz: port.direction[2],
-        lane: conveyor.usefulWidth,
+        lane: usefulWidthMm(conveyor),
         height: transportHeightAt(conveyor, id),
       }
       const key = cellKey(end.x, end.z)
@@ -176,7 +176,7 @@ export function snapToLineEnd(
           // Head to tail: one end has to be a discharge and the other an infeed.
           if (end.isOutlet === other.isOutlet) continue
           // R1 — the lane a box travels through has to be the same lane.
-          if (other.lane !== conveyor.usefulWidth) continue
+          if (other.lane !== usefulWidthMm(conveyor)) continue
           // R2 — and it has to be at the same height, with no tolerance. A step
           // between two beds is a step a box falls down.
           if (Math.abs(other.height - transportHeightAt(conveyor, end.id)) > 1e-6) continue
@@ -238,9 +238,9 @@ export function jointProblems(
               : 'Two infeeds meet — no line delivers into this joint.',
           )
         }
-        if (other.usefulWidth !== conveyor.usefulWidth) {
+        if (usefulWidthMm(other) !== usefulWidthMm(conveyor)) {
           problems.push(
-            `Joined to a ${other.usefulWidth} mm lane; a box wider than ${Math.min(other.usefulWidth, conveyor.usefulWidth)} mm cannot cross.`,
+            `Joined to a ${usefulWidthMm(other)} mm lane; a box wider than ${Math.min(usefulWidthMm(other), usefulWidthMm(conveyor))} mm cannot cross.`,
           )
         }
         if (Math.abs(transportHeightAt(other, theirId) - transportHeightAt(conveyor, id)) > 1e-6) {

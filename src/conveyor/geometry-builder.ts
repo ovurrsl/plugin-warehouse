@@ -6,7 +6,9 @@ import {
   legHeightM,
   moduleLengthM,
   rollerPitchM,
+  rollerPitchMm,
   supportOffsetsX,
+  usefulWidthMm,
 } from './metrics'
 import type { ConveyorDetail, ConveyorPart, ConveyorPartRole } from './parts'
 import { conveyorParts } from './parts'
@@ -28,7 +30,7 @@ import type { ConveyorRollerNode } from './schema'
 
 // ── Box emitter ─────────────────────────────────────────────────────────────
 
-type Sink = {
+export type Sink = {
   positions: number[]
   normals: number[]
   colors: number[]
@@ -46,11 +48,11 @@ type Sink = {
  * boundary under filtering; the blank column takes its centre, which is as far
  * from either edge as it gets.
  */
-const ATLAS_COLUMN = 1 / 2
+export const ATLAS_COLUMN = 1 / 2
 const ATLAS_INSET = ATLAS_COLUMN * 0.04
-const ATLAS_BLANK_U = ATLAS_COLUMN / 2
-const ATLAS_ROLLER_U0 = ATLAS_COLUMN + ATLAS_INSET
-const ATLAS_ROLLER_U1 = 1 - ATLAS_INSET
+export const ATLAS_BLANK_U = ATLAS_COLUMN / 2
+export const ATLAS_ROLLER_U0 = ATLAS_COLUMN + ATLAS_INSET
+export const ATLAS_ROLLER_U1 = 1 - ATLAS_INSET
 
 /** Unit-cube faces as outward normal plus four CCW corners in half-extents. */
 const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, number]> }> = [
@@ -118,7 +120,7 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
  * them. Flat normals need four vertices per face, which is why corners are not
  * shared.
  */
-function emitPart(
+export function emitPart(
   sink: Sink,
   part: ConveyorPart,
   color: readonly [number, number, number],
@@ -167,7 +169,7 @@ const colorCache = new Map<string, [number, number, number]>()
  * colour. Writing the raw hex bytes straight into the attribute renders every
  * part visibly too bright.
  */
-function toLinear(hex: string): [number, number, number] {
+export function toLinear(hex: string): [number, number, number] {
   const cached = colorCache.get(hex)
   if (cached) return cached
   const color = new THREE.Color(hex)
@@ -177,7 +179,10 @@ function toLinear(hex: string): [number, number, number] {
 }
 
 /** Roles whose colour is fixed hardware rather than a finish the user picks. */
-const ROLE_COLORS: Record<Exclude<ConveyorPartRole, 'frame' | 'deck' | 'end-plate'>, string> = {
+export const ROLE_COLORS: Record<
+  Exclude<ConveyorPartRole, 'frame' | 'deck' | 'end-plate'>,
+  string
+> = {
   guide: PALETTE.profileGrey,
   'guide-bracket': PALETTE.feetGrey,
   leg: PALETTE.frameBlue,
@@ -215,6 +220,13 @@ function buildFrom(
     emitPart(sink, part, color, stripeSpan)
   }
 
+  return finish(sink)
+}
+
+/** Flat arrays to a buffer. Shared, because every shape family ends the same
+ *  way — and because forgetting the bounding sphere culls a six-metre module
+ *  against a default one and pops it in and out as the camera turns. */
+export function finish(sink: Sink): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(sink.positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(sink.normals, 3))
@@ -222,8 +234,6 @@ function buildFrom(
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(sink.uvs, 2))
   geometry.setIndex(sink.indices)
   geometry.computeBoundingBox()
-  // Without this a six-metre module is culled against a default sphere and pops
-  // in and out as the camera turns.
   geometry.computeBoundingSphere()
   return geometry
 }
@@ -270,10 +280,10 @@ export function conveyorGeometryKey(
     // mesh — two variants per shape, and the cheapest possible price for not
     // doubling the steel at every seam.
     hasDownstreamNeighbour ? 'U' : 'UD',
-    conveyor.usefulWidth,
+    usefulWidthMm(conveyor),
     frameWidthM(conveyor).toFixed(5),
     moduleLengthM(conveyor).toFixed(5),
-    conveyor.rollerPitch,
+    rollerPitchMm(conveyor),
     legHeightM(conveyor).toFixed(5),
     hasCrossbar(conveyor) ? 1 : 0,
     supportOffsetsX(conveyor)
@@ -312,19 +322,34 @@ const retained = new Map<string, number>()
  */
 const CACHE_LIMIT = 96
 
+/**
+ * The cache itself, keyed by a string and filled by a thunk.
+ *
+ * Kind-agnostic on purpose: a curve is a different shape family with a
+ * different parts emitter, and it has to share this pool rather than open a
+ * second one. Two caches would each hold their own copy of the eviction rule
+ * and the retain counts, and the limit would mean half of what it says.
+ */
+export function getCachedGeometry(
+  key: string,
+  build: () => THREE.BufferGeometry,
+): THREE.BufferGeometry {
+  const cached = cache.get(key)
+  if (cached) return cached
+  const geometry = build()
+  cache.set(key, geometry)
+  evict()
+  return geometry
+}
+
 export function getConveyorGeometry(
   conveyor: ConveyorRollerNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
 ): THREE.BufferGeometry {
-  const key = conveyorGeometryKey(conveyor, detail, hasDownstreamNeighbour)
-  const cached = cache.get(key)
-  if (cached) return cached
-
-  const geometry = buildFrom(conveyor, conveyorParts(conveyor, detail, hasDownstreamNeighbour))
-  cache.set(key, geometry)
-  evict()
-  return geometry
+  return getCachedGeometry(conveyorGeometryKey(conveyor, detail, hasDownstreamNeighbour), () =>
+    buildFrom(conveyor, conveyorParts(conveyor, detail, hasDownstreamNeighbour)),
+  )
 }
 
 function evict(): void {

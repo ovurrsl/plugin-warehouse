@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { isClearAt } from '../clash'
 import { PalletNode } from '../pallet/schema'
 import { MTR } from './catalog'
-import { MTR_STRIP_COUNT, MTR_STRIP_WIDTH_M } from './constants'
+import { MTR_STRIP_COUNT, MTR_STRIP_STROKE_M, MTR_STRIP_WIDTH_M } from './constants'
+import { buildNetwork, isLifting, publishLifting, resetLifting } from './flow-simulation'
 import {
   clearConveyorGeometryCache,
   conveyorGeometryCacheSize,
@@ -12,7 +13,7 @@ import { resetLineIndex } from './line-index'
 import { jointProblems, resetPortMagnet, snapToLineEnd } from './port-magnet'
 import { conveyorPorts, localPorts } from './ports'
 import { ConveyorRollerNode } from './schema'
-import { getTransferGeometry, transferGeometryKey } from './transfer-geometry'
+import { getTransferGeometry, transferGeometryKey, transferStripsKey } from './transfer-geometry'
 import {
   dischargeSign,
   frameWidthM,
@@ -24,7 +25,7 @@ import {
   widestRollerGapM,
 } from './transfer-metrics'
 import { conveyorTransferParametrics } from './transfer-parametrics'
-import { transferParts } from './transfer-parts'
+import { stripParts, transferParts } from './transfer-parts'
 import { ConveyorTransferNode } from './transfer-schema'
 
 const transfer = (overrides: Record<string, unknown> = {}) =>
@@ -101,11 +102,16 @@ describe('the rollers fall in the gaps the strips leave', () => {
 })
 
 describe('the strips are steel, and they lean towards the discharge', () => {
-  test('three of them, boxes rather than paint', () => {
-    // A painted line cannot rise, and rising is the whole machine.
-    const strips = transferParts(transfer(), 'full').filter((part) => part.role === 'strip')
+  test('three of them, boxes rather than paint, and out of the merged body', () => {
+    // A painted line cannot rise, and rising is the whole machine — so they are
+    // boxes; and a merged buffer cannot move one part of itself, so they are
+    // their own mesh.
+    const strips = stripParts(transfer())
     expect(strips).toHaveLength(MTR_STRIP_COUNT)
     for (const strip of strips) expect(strip.pattern).toBeUndefined()
+    expect(transferParts(transfer(), 'full').filter((part) => part.role === 'strip')).toHaveLength(
+      0,
+    )
   })
 
   test('asymmetric strips are shorter, and both builds reach the discharge edge', () => {
@@ -117,7 +123,7 @@ describe('the strips are steel, and they lean towards the discharge', () => {
       // Whatever the span, the far edge of a strip is the edge the box leaves
       // by — a strip that stopped short of it would set the box down inside.
       for (const node of [symmetric, asymmetric]) {
-        const strip = transferParts(node, 'full').find((part) => part.role === 'strip')
+        const strip = stripParts(node)[0]
         if (!strip) throw new Error('no strip')
         const far = strip.center[2] + (dischargeSign(node) * strip.size[2]) / 2
         expect(Math.abs(far)).toBeCloseTo(frameWidthM(node) / 2, 9)
@@ -255,20 +261,55 @@ describe('the mesh', () => {
     }
   })
 
-  test('a symmetric machine is one buffer mirrored, and an asymmetric one is two', () => {
-    // The tempting key entry is `dischargeSide`, and it is wrong: strips that
-    // span the whole body are centred whichever way the box leaves, so the two
-    // meshes are byte-identical and two buffers would be one mesh twice. Only
-    // the asymmetric build leans.
-    const left = transfer({ travel: 'symmetric', dischargeSide: 'left' })
-    const right = transfer({ travel: 'symmetric', dischargeSide: 'right' })
-    expect(sameMesh(buildFresh(left), buildFresh(right))).toBe(true)
-    expect(transferGeometryKey(left, 'full')).toBe(transferGeometryKey(right, 'full'))
+  test('the body is one buffer for every side and travel, now the strips have left', () => {
+    // Both fields moved out with the strips: the body's four bed segments are
+    // bounded by `stripOffsetsX`, which depends on neither. A key that still
+    // carried them would split this buffer four ways for a difference it does
+    // not contain — the over-reporting half of the key law, and the same one
+    // the sweep caught on `dischargeSide` before the split.
+    const bodies = (['symmetric', 'asymmetric'] as const).flatMap((travel) =>
+      (['left', 'right'] as const).map((dischargeSide) => transfer({ travel, dischargeSide })),
+    )
+    const first = bodies[0]
+    if (!first) throw new Error('no body')
+    const reference = buildFresh(first)
+    for (const node of bodies) {
+      expect(sameMesh(buildFresh(node), reference)).toBe(true)
+      expect(transferGeometryKey(node, 'full')).toBe(transferGeometryKey(first, 'full'))
+    }
+  })
+
+  test('the strips carry the difference instead, and the stroke never reaches a key', () => {
+    // A leaning strip set really is different steel; a *lifted* one is the same
+    // three boxes at a different height, and a height is a transform. Keying on
+    // the stroke would put two buffers behind every transfer in the building.
+    const symmetric = transfer({ travel: 'symmetric', dischargeSide: 'left' })
+    const mirrored = transfer({ travel: 'symmetric', dischargeSide: 'right' })
+    expect(transferStripsKey(symmetric)).toBe(transferStripsKey(mirrored))
 
     const leanLeft = transfer({ travel: 'asymmetric', dischargeSide: 'left' })
     const leanRight = transfer({ travel: 'asymmetric', dischargeSide: 'right' })
-    expect(sameMesh(buildFresh(leanLeft), buildFresh(leanRight))).toBe(false)
-    expect(transferGeometryKey(leanLeft, 'full')).not.toBe(transferGeometryKey(leanRight, 'full'))
+    expect(transferStripsKey(leanLeft)).not.toBe(transferStripsKey(leanRight))
+    expect(transferStripsKey(leanLeft)).not.toBe(transferStripsKey(symmetric))
+    expect(transferStripsKey(symmetric)).not.toContain(String(MTR_STRIP_STROKE_M))
+  })
+
+  test('the strips lift only for a box crossing, not for one passing through', () => {
+    // Route 1 is the cross discharge; route 0 goes straight over strips that
+    // stay down. Getting that backwards would have every transfer twitching as
+    // the main line runs past it.
+    const node = transfer()
+    const network = buildNetwork({ [node.id]: node })
+    resetLifting()
+
+    publishLifting(network, [{ nodeId: node.id, routeIndex: 0, distance: 0.2, seed: 1 }])
+    expect(isLifting(node.id)).toBe(false)
+
+    publishLifting(network, [{ nodeId: node.id, routeIndex: 1, distance: 0.2, seed: 1 }])
+    expect(isLifting(node.id)).toBe(true)
+
+    publishLifting(network, [])
+    expect(isLifting(node.id)).toBe(false)
   })
 
   test('it shares the straight’s pool, because it is one kind', () => {

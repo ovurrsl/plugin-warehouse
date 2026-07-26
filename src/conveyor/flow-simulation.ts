@@ -231,6 +231,40 @@ export function step(
   return alive
 }
 
+/**
+ * Transfers with a box on their cross route, republished every frame.
+ *
+ * A module-scope set rather than a store field, for the reason the boxes
+ * themselves are not nodes: this is a fact about the current frame, read by the
+ * transfer renderers and true for about a second at a time. The same memoised-
+ * index shape the line index and the magnet already use.
+ *
+ * A renderer reading it one frame late is invisible — the whole travel is eight
+ * millimetres — so nothing here needs to force a render.
+ */
+let lifting: ReadonlySet<string> = new Set()
+
+export function publishLifting(network: FlowNetwork, boxes: readonly FlowBox[]): void {
+  const next = new Set<string>()
+  for (const box of boxes) {
+    const module = network.modules.get(box.nodeId)
+    if (!module || !isTransferModule(module)) continue
+    // Route 1 is the cross discharge — see `./flow-routes`. A box on the
+    // through route passes over strips that stay down.
+    if (box.routeIndex === 1) next.add(box.nodeId)
+  }
+  lifting = next
+}
+
+export function isLifting(nodeId: string): boolean {
+  return lifting.has(nodeId)
+}
+
+/** Drops the published set. Only needed so tests do not leak between cases. */
+export function resetLifting(): void {
+  lifting = new Set()
+}
+
 /** Where a box is, in world space, and which way it faces. */
 export function poseOf(network: FlowNetwork, box: FlowBox): FlowPose | null {
   const module = network.modules.get(box.nodeId)

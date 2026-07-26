@@ -6,7 +6,14 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useWarehouseStore } from '../store'
-import { buildNetwork, FLOW_BOX_M, type FlowBox, poseOf, step } from './flow-simulation'
+import {
+  buildNetwork,
+  FLOW_BOX_M,
+  type FlowBox,
+  poseOf,
+  publishLifting,
+  step,
+} from './flow-simulation'
 
 /**
  * Every box on every conveyor in the scene, in one draw call.
@@ -83,6 +90,7 @@ export default function ConveyorFlowSystem() {
 
     if (!running || isExporting) {
       mesh.count = 0
+      publishLifting(network, [])
       return
     }
 
@@ -90,6 +98,8 @@ export default function ConveyorFlowSystem() {
       seedRef.current += 1
       return seedRef.current
     })
+
+    publishLifting(network, boxesRef.current)
 
     let index = 0
     for (const box of boxesRef.current) {

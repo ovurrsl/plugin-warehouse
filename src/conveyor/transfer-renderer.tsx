@@ -11,11 +11,18 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { MTR_STRIP_STROKE_M } from './constants'
+import { isLifting } from './flow-simulation'
 import type { ConveyorDetail } from './geometry-builder'
 import { releaseGeometry } from './geometry-builder'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
-import { getTransferGeometry, retainTransferGeometry } from './transfer-geometry'
+import {
+  getTransferGeometry,
+  getTransferStripsGeometry,
+  retainTransferGeometry,
+  retainTransferStripsGeometry,
+} from './transfer-geometry'
 import { frameWidthM, moduleLengthM } from './transfer-metrics'
 import type { ConveyorTransferNode } from './transfer-schema'
 
@@ -117,11 +124,24 @@ export default function ConveyorTransferRenderer({ node }: { node: ConveyorTrans
   useEffect(() => {
     const near = retainTransferGeometry(node, 'full', abutted)
     const far = retainTransferGeometry(node, 'simple', abutted)
+    const strips = retainTransferStripsGeometry(node)
     return () => {
       releaseGeometry(near)
       releaseGeometry(far)
+      releaseGeometry(strips)
     }
   }, [node, abutted])
+
+  /**
+   * The strips, in a mesh of their own so they can rise.
+   *
+   * The one place in this kind where a shape is two buffers rather than one,
+   * and it buys the machine's whole mechanism: without it a box slides sideways
+   * for no visible reason. Three boxes and one draw call, on a shape a layout
+   * has a handful of.
+   */
+  const stripsRef = useRef<THREE.Mesh>(null)
+  const stripGeometry = useMemo(() => getTransferStripsGeometry(node), [node])
 
   const frameRef = useRef(0)
   const phase = useMemo(() => hashPhase(node.id), [node.id])
@@ -154,6 +174,19 @@ export default function ConveyorTransferRenderer({ node }: { node: ConveyorTrans
     mesh.castShadow = next === 'full'
   })
 
+  /**
+   * Eased rather than switched, because a strip that snapped up in one frame
+   * would read as a glitch and not as a lift. Its own `useFrame` so the LOD
+   * check above keeps its every-eighth-frame stride.
+   */
+  useFrame((_, delta) => {
+    const strips = stripsRef.current
+    if (!strips) return
+    const target = isLifting(node.id) ? MTR_STRIP_STROKE_M : 0
+    const rate = Math.min(1, delta * 12)
+    strips.position.y += (target - strips.position.y) * rate
+  })
+
   const length = moduleLengthM(node)
   const width = frameWidthM(node)
   // The collider wraps the bed and the space a box travelling on it occupies —
@@ -178,6 +211,14 @@ export default function ConveyorTransferRenderer({ node }: { node: ConveyorTrans
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
+        <mesh
+          dispose={null}
+          geometry={stripGeometry}
+          material={material}
+          raycast={NO_RAYCAST}
+          ref={stripsRef}
+        />
+
         <mesh
           castShadow={isExporting || detailRef.current === 'full'}
           // Never dispose: shared by every module of this shape.

@@ -19,7 +19,7 @@ import {
   stripOffsetsX,
   stripSpanM,
 } from './transfer-metrics'
-import { type TransferPartRole, transferParts } from './transfer-parts'
+import { stripParts, type TransferPartRole, transferParts } from './transfer-parts'
 import type { ConveyorTransferNode } from './transfer-schema'
 
 /**
@@ -73,18 +73,12 @@ function buildFrom(
  * Two entries are the ones a careless key would miss, and both were named by an
  * adversarial read of this kind's earlier shapes:
  *
- * - **`stripCentreZM`, not `dischargeSide`.** The tempting entry is the side,
- *   and it is wrong: strips that span the whole body are centred whichever way
- *   the box leaves, so a *symmetric* machine's mesh is byte-identical mirrored
- *   and keying on the side would give it two buffers. Only the asymmetric build
- *   leans, and the offset says so — zero when there is nothing to say.
- * - **`stripSpanM`**, because asymmetric strips are shorter and that moves
- *   vertices.
- *
- * **`MTR_STRIP_STROKE_M` is deliberately absent**, and will stay absent when the
- * strips are animated: a strip at rest and a strip lifted are the same module,
- * and keying on the stroke would put two buffers behind every transfer in the
- * building for a difference no placement can see.
+ * **`stripOffsetsX` stays and the strips' own figures leave.** The offsets
+ * bound the four bed segments, so the body genuinely depends on them; the strip
+ * centre, the span and the strip colour describe only the strips, which are no
+ * longer in this buffer. A key listing them would split the body's cache on a
+ * difference the body does not contain — the over-reporting half of the key
+ * law, and the same one the sweep caught on `dischargeSide` before this split.
  */
 export function transferGeometryKey(
   transfer: ConveyorTransferNode,
@@ -99,14 +93,45 @@ export function transferGeometryKey(
     stripOffsetsX(transfer)
       .map((offset) => offset.toFixed(5))
       .join(','),
-    stripSpanM(transfer).toFixed(5),
-    stripCentreZM(transfer).toFixed(5),
     legHeightM(transfer).toFixed(5),
     skirtDepthM(transfer).toFixed(5),
     transfer.frameColor,
     transfer.rollerColor,
+  ].join('|')
+}
+
+/**
+ * Identity of the strip set, which is a different question from the body's.
+ *
+ * **`MTR_STRIP_STROKE_M` is deliberately absent**, and stays absent now that the
+ * strips animate: a strip at rest and a strip lifted are the same three boxes
+ * at a different height, and the height is a transform rather than a vertex.
+ * Keying on the stroke would put two buffers behind every transfer in the
+ * building for a difference the mesh does not have.
+ */
+export function transferStripsKey(transfer: ConveyorTransferNode): string {
+  return [
+    stripOffsetsX(transfer)
+      .map((offset) => offset.toFixed(5))
+      .join(','),
+    stripSpanM(transfer).toFixed(5),
+    stripCentreZM(transfer).toFixed(5),
+    transfer.transportHeight.toFixed(5),
     transfer.stripColor,
   ].join('|')
+}
+
+export function getTransferStripsGeometry(transfer: ConveyorTransferNode): THREE.BufferGeometry {
+  return getCachedGeometry(`mtr-strips|${transferStripsKey(transfer)}`, () => {
+    const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
+    const color = toLinear(transfer.stripColor)
+    for (const part of stripParts(transfer)) emitPart(sink, part, color, 0)
+    return finish(sink)
+  })
+}
+
+export function retainTransferStripsGeometry(transfer: ConveyorTransferNode): string {
+  return retainGeometry(`mtr-strips|${transferStripsKey(transfer)}`)
 }
 
 export function getTransferGeometry(

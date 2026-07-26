@@ -63,6 +63,31 @@ export type TransferPart = {
   stripeSpan?: number
 }
 
+/**
+ * The belt strips, on their own.
+ *
+ * **Not in the merged body**, and that is what lets them move. Everything else
+ * in this kind is one buffer per shape because nothing in it ever moves
+ * relative to anything else — but a strip rises, and rising is the entire
+ * machine. Three boxes in a mesh of their own is thirty-six triangles and one
+ * more draw call on a shape a layout has a handful of.
+ *
+ * The consequence lands on the cache key: the figures that describe only the
+ * strips leave the body's key and become the strips' own. A key that still
+ * listed them would split the body's cache on a difference the body no longer
+ * contains.
+ */
+export function stripParts(transfer: ConveyorTransferNode): TransferPart[] {
+  const top = transfer.transportHeight
+  const span = stripSpanM(transfer)
+  const stripZ = stripCentreZM(transfer)
+  return stripOffsetsX(transfer).map((x) => ({
+    role: 'strip' as const,
+    center: [x, top - ROLLER_DIAMETER_M / 2, stripZ] as [number, number, number],
+    size: [MTR_STRIP_WIDTH_M, ROLLER_DIAMETER_M, span] as [number, number, number],
+  }))
+}
+
 export function transferParts(
   transfer: ConveyorTransferNode,
   detail: ConveyorDetail,
@@ -113,20 +138,6 @@ export function transferParts(
       stripeSpan: MTR_ROLLERS_PER_GAP,
       center: [(from + to) / 2, top - ROLLER_DIAMETER_M / 2, 0],
       size: [to - from, ROLLER_DIAMETER_M, width - SIDE_PROFILE_THICKNESS_M * 2],
-    })
-  }
-
-  // ── The belt strips ───────────────────────────────────────────────────────
-  // Between the rollers and flush with them at rest, so the bed reads as one
-  // surface until they lift. Boxes rather than paint: a painted line cannot
-  // rise, and rising is the whole machine.
-  const span = stripSpanM(transfer)
-  const stripZ = stripCentreZM(transfer)
-  for (const x of stripOffsetsX(transfer)) {
-    parts.push({
-      role: 'strip',
-      center: [x, top - ROLLER_DIAMETER_M / 2, stripZ],
-      size: [MTR_STRIP_WIDTH_M, ROLLER_DIAMETER_M, span],
     })
   }
 

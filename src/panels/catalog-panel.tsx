@@ -72,6 +72,7 @@ function CatalogTab() {
               <h3 style={tokens.sectionTitle}>{section.label}</h3>
             </div>
             <p style={tokens.blurb}>{section.blurb}</p>
+            {section.id === 'conveyance' && <FlowSwitch />}
             {items.length > 0 ? (
               <div style={tokens.tileGrid}>
                 {items.map((item) => (
@@ -85,6 +86,49 @@ function CatalogTab() {
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Runs the boxes.
+ *
+ * Scene-wide rather than per-node, and in the catalog rather than in an
+ * inspector, because it is a property of *looking* at the layout rather than of
+ * any one module — six conveyor panels each carrying the same switch would be
+ * six ways to set one thing.
+ *
+ * Off by default: a layout tool that animates the moment it opens is a layout
+ * tool nobody can read.
+ */
+function FlowSwitch() {
+  const running = useWarehouseStore((s) => s.flowRunning)
+  const setRunning = useWarehouseStore((s) => s.setFlowRunning)
+
+  return (
+    <button
+      onClick={() => setRunning(!running)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginBottom: '0.5rem',
+        borderRadius: '0.375rem',
+        border: `1px solid ${running ? 'color-mix(in oklab, #e87722 55%, transparent)' : 'var(--border)'}`,
+        background: running ? 'color-mix(in oklab, #e87722 12%, transparent)' : 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--foreground)',
+        cursor: 'pointer',
+      }}
+      type="button"
+    >
+      <Icon height={13} icon={running ? 'lucide:pause' : 'lucide:play'} width={13} />
+      <span>{running ? 'Stop the boxes' : 'Run the boxes'}</span>
+      <span style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }}>
+        every line at its own speed
+      </span>
+    </button>
   )
 }
 

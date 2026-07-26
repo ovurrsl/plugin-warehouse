@@ -136,6 +136,18 @@ export const conveyorRollerDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * The flow simulation, mounted **once for the whole scene**.
+   *
+   * `def.system` is rendered per *kind*, not per node, so this straight's entry
+   * is where every conveyor's boxes are drawn — including the bends' and the
+   * junctions'. Declaring it on each shape would mount six copies of one
+   * simulation. That it hangs off the straight rather than a shape of its own
+   * is arbitrary and stated so: the straight is simply the one kind a line
+   * cannot be built without.
+   */
+  system: { module: () => import('./flow-system'), priority: 5 },
+
   floorplan: buildConveyorFloorplan,
 
   tool: () => import('./tool'),

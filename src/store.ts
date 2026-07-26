@@ -41,6 +41,17 @@ type WarehouseStore = {
   setSlabFilter: (ids: ReadonlySet<string> | null) => void
   toggleSlab: (id: string, allIds: readonly string[]) => void
 
+  /**
+   * Whether the conveyor flow simulation is running.
+   *
+   * Off by default: a layout tool that animates the moment it opens is a layout
+   * tool nobody can read. It lives here rather than in `useViewer` because a
+   * plugin does not extend the host's stores — and it is scene-wide rather than
+   * per-node, because a line is not a node either.
+   */
+  flowRunning: boolean
+  setFlowRunning: (running: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /** Preset the next placed pallet uses. */
   palletPreset: PalletPreset
@@ -109,6 +120,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     // slabs are included by default instead of silently missing from the total.
     set({ slabFilter: next.size === allIds.length ? null : next })
   },
+
+  flowRunning: false,
+  setFlowRunning: (flowRunning) => set({ flowRunning }),
 
   palletPreset: 'epal-1',
   setPalletPreset: (palletPreset) => set({ palletPreset }),

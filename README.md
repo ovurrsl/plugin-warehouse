@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6d582fd`](https://github.com/ovurrsl/plugin-warehouse/commit/6d582fde8ddf886acbe979ae2c31928151fcb28a))
 - Refresh generated README blocks [skip ci] ([`7459a92`](https://github.com/ovurrsl/plugin-warehouse/commit/7459a9265dc44df5122f6c6c638b8f0b350cda61))
 - Refresh generated README blocks [skip ci] ([`00cb3d3`](https://github.com/ovurrsl/plugin-warehouse/commit/00cb3d33875b7709caefbf95c8a0fb36f9c1d2ce))
 - Refresh generated README blocks [skip ci] ([`24aff10`](https://github.com/ovurrsl/plugin-warehouse/commit/24aff1072a3d60f6950944c12236c9aa2caf52ca))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Features
 
-- A roller conveyor module, and a clash test the host cannot do ([`b448d7e`](https://github.com/ovurrsl/plugin-warehouse/commit/b448d7e1c8ee004e67f56b70396ab6646ab0ff29))
 
 …
 

@@ -8,6 +8,7 @@ import {
   rowOffsets,
   runExtent,
 } from './multiply'
+import { pendingPlacements } from './multiply-command'
 import { hasRightNeighbour, resetNeighbourIndex } from './neighbours'
 import { PalletRackNode } from './schema'
 import { bayPitch, rowDepth } from './slots'
@@ -112,6 +113,64 @@ describe('laying a run down from one bay', () => {
     for (const [index, value] of actual.entries()) {
       expect(value).toBeCloseTo(expected[index] ?? 0, 9)
     }
+  })
+})
+
+describe('what Multiply will actually place', () => {
+  /** A rack exactly as the placement tool commits one: parsed, parented to a
+   *  level, standing on a slab, one bay. */
+  const placed = () =>
+    PalletRackNode.parse({
+      id: 'pallet_rack_placed',
+      parentId: 'level_a',
+      position: [3, 0, -2],
+      supportSlabId: 'slab_a',
+    })
+
+  const scene = (...racks: Array<ReturnType<typeof placed>>) =>
+    Object.fromEntries([
+      ['level_a', { id: 'level_a', children: racks.map((r) => r.id) }],
+      ...racks.map((r) => [r.id, r] as const),
+    ]) as Record<string, unknown>
+
+  test('a bay straight off the placement tool multiplies', () => {
+    // The whole point of the kind: take a rack from the panel, set a count,
+    // press. Nothing about having just been placed may stand in the way.
+    resetNeighbourIndex()
+    const source = placed()
+    const nodes = scene(source)
+    expect(pendingPlacements(source, spec({ bays: 20 }), nodes)).toHaveLength(19)
+    expect(
+      pendingPlacements(source, spec({ bays: 3, rows: 2, backToBack: true }), nodes),
+    ).toHaveLength(5)
+  })
+
+  test('one bay places nothing, which is what the disabled button says', () => {
+    resetNeighbourIndex()
+    const source = placed()
+    expect(pendingPlacements(source, spec({ bays: 1 }), scene(source))).toHaveLength(0)
+  })
+
+  test('pressing it twice does not stack a second run inside the first', () => {
+    // The spec outlives the selection, so a run laid down with ] and then
+    // clicked on offered to place the same bays again, at the same coordinates.
+    // Filtering against the scene is what makes the count honest.
+    resetNeighbourIndex()
+    const source = placed()
+    const run = [source]
+    for (const placement of multiplyPlacements(source, spec({ bays: 5 }))) {
+      run.push(
+        PalletRackNode.parse({
+          ...source,
+          id: `pallet_rack_s${run.length}`,
+          position: placement.position,
+          rotation: placement.rotation,
+        }),
+      )
+    }
+    expect(pendingPlacements(source, spec({ bays: 5 }), scene(...run))).toHaveLength(0)
+    // And extending it still works: two more bays are two more nodes.
+    expect(pendingPlacements(source, spec({ bays: 7 }), scene(...run))).toHaveLength(2)
   })
 })
 

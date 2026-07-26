@@ -24,7 +24,7 @@ import { getRackMaterial } from './materials'
 import { hasRightNeighbour } from './neighbours'
 import { occupiedSlots, slotDraw } from './occupancy'
 import type { PalletRackNode } from './schema'
-import { palletSlotsOf, totalDepth, totalWidth } from './slots'
+import { orientedPalletFootprint, palletSlotsOf, totalDepth, totalWidth } from './slots'
 
 const NO_RAYCAST = () => {}
 
@@ -265,6 +265,22 @@ function GhostStock({ node }: { node: PalletRackNode }) {
   const geometry = useMemo(() => getPalletGeometry(node.palletPreset), [node.palletPreset])
   const material = getPalletMaterial()
 
+  /**
+   * The pallet mesh is built with its **length along local X**, and the slot
+   * does not have to want it that way.
+   *
+   * `palletOrientation` is a property of the rack — how it is loaded — and
+   * `orientedPalletFootprint` already reports the slot's extents accordingly.
+   * The geometry knows none of that, and nothing here turned it, so on the
+   * default `short-side-out` rack every ghost pallet was drawn a quarter turn
+   * out: 1.2 m along a run whose slots are pitched 0.875 m apart, so each pallet
+   * overlapped both neighbours by 325 mm, and only 0.8 m into a 1.1 m frame, so
+   * its bottom boards ran *along* the beams with nothing underneath. That is not
+   * a pallet loaded badly; it is a pallet that would fall through the rack.
+   */
+  const [alongRun, intoDepth] = orientedPalletFootprint(node)
+  const turned = Math.abs(alongRun - spec.length) > 1e-9
+
   const placements = useMemo(() => {
     const result: Array<{ position: [number, number, number]; load: number }> = []
     for (const slot of palletSlotsOf(node)) {
@@ -283,17 +299,25 @@ function GhostStock({ node }: { node: PalletRackNode }) {
     const loads = loadRef.current
     if (!pallets || !loads) return
     const matrix = new THREE.Matrix4()
+    const loadSize = new THREE.Vector3()
     placements.forEach((placement, index) => {
       const [x, y, z] = placement.position
       matrix.makeTranslation(x, y, z)
+      // A quarter turn about Y when the slot wants the other face out. The
+      // pallet is not symmetric — its bottom boards run along its length, which
+      // is exactly what decides whether it lands across the beams or along them.
+      if (turned) matrix.multiply(QUARTER_TURN)
       pallets.setMatrixAt(index, matrix)
+
+      // The load is a plain box with no grain, so it takes the oriented
+      // footprint straight rather than a rotation.
       matrix.makeTranslation(x, y + spec.height + placement.load / 2, z)
-      matrix.scale(new THREE.Vector3(spec.length - 0.04, placement.load, spec.width - 0.04))
+      matrix.scale(loadSize.set(alongRun - 0.04, placement.load, intoDepth - 0.04))
       loads.setMatrixAt(index, matrix)
     })
     pallets.instanceMatrix.needsUpdate = true
     loads.instanceMatrix.needsUpdate = true
-  }, [placements, spec.height, spec.length, spec.width])
+  }, [placements, spec.height, turned, alongRun, intoDepth])
 
   if (placements.length === 0) return null
 
@@ -321,6 +345,10 @@ function GhostStock({ node }: { node: PalletRackNode }) {
     </>
   )
 }
+
+/** One shared quarter turn about Y, for the pallets a slot wants the other way
+ *  round. A matrix per instance per frame is an allocation for a constant. */
+const QUARTER_TURN = new THREE.Matrix4().makeRotationY(Math.PI / 2)
 
 /** Unit cube scaled per instance, so every ghost load shares one buffer. */
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)

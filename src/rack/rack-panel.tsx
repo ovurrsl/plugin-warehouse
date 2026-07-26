@@ -190,23 +190,30 @@ function Stepper({
    * The text while it is being typed, or null when the field simply shows the
    * value.
    *
-   * A controlled `<input type="number">` clamping on every keystroke cannot be
-   * emptied: `Number('')` is `0`, which passes a finite check and clamps to the
-   * minimum, so selecting all and pressing Delete — the ordinary way to clear a
-   * field before typing a new number — snapped the box to 1 mid-edit and left
-   * the caret after it. Typing "20" then gave 120.
+   * Two failures, opposite to each other, and the field has to avoid both.
    *
-   * So the draft is held here and committed on blur or Enter. An empty or
-   * unparseable draft reverts rather than clamping, because "I cleared the box"
-   * is not a request for the minimum.
+   * A controlled `<input type="number">` that clamps on every keystroke cannot
+   * be emptied: `Number('')` is `0`, which passes a finite check and clamps to
+   * the minimum, so selecting all and pressing Delete — the ordinary way to
+   * clear a field before typing a new number — snapped the box to 1 mid-edit
+   * and left the caret after it. Typing "20" then gave 120.
+   *
+   * Committing only on blur is worse, and it is what shipped. At one bay there
+   * is nothing to place, so the button is inert; typing 20 changed no state, the
+   * button stayed inert, and pressing it only blurred the box. The count arrived
+   * one click too late and Multiply read as simply broken.
+   *
+   * So: commit live, but never read an empty box as a number. The draft carries
+   * what was typed, so the field can show nothing while the store keeps the last
+   * real value, and blur puts the two back in step.
    */
   const [draft, setDraft] = useState<string | null>(null)
 
-  const commitDraft = () => {
-    if (draft === null) return
-    const parsed = Number(draft)
-    if (draft.trim() !== '' && Number.isFinite(parsed)) clamp(parsed)
-    setDraft(null)
+  const type = (text: string) => {
+    setDraft(text)
+    if (text.trim() === '') return
+    const parsed = Number(text)
+    if (Number.isFinite(parsed)) clamp(parsed)
   }
 
   return (
@@ -223,11 +230,10 @@ function Stepper({
           inputMode="numeric"
           max={max}
           min={min}
-          onBlur={commitDraft}
-          onChange={(event) => setDraft(event.target.value)}
+          onBlur={() => setDraft(null)}
+          onChange={(event) => type(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') commitDraft()
-            if (event.key === 'Escape') setDraft(null)
+            if (event.key === 'Enter' || event.key === 'Escape') setDraft(null)
           }}
           step={1}
           style={styles.input}
@@ -396,15 +402,22 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
         </>
       ) : null}
 
-      {pending > 0 ? (
-        <button onClick={commit} style={confirming ? styles.danger : styles.primary} type="button">
-          {confirming
+      {/* Always a button, in the same place, whether or not there is anything to
+          place. Swapping it for a div meant the control the user was reaching
+          for moved out from under the cursor as they typed — and the click that
+          would have grown the run went to a dead element instead. */}
+      <button
+        disabled={pending === 0}
+        onClick={commit}
+        style={pending === 0 ? styles.disabled : confirming ? styles.danger : styles.primary}
+        type="button"
+      >
+        {pending === 0
+          ? 'Nothing to place — the run is already here'
+          : confirming
             ? `Confirm ${pending.toLocaleString()} bays — ${(pending + 1).toLocaleString()} draw calls`
             : `Place ${pending.toLocaleString()} more ${pending === 1 ? 'bay' : 'bays'}`}
-        </button>
-      ) : (
-        <div style={styles.disabled}>Nothing to place — the run is already here</div>
-      )}
+      </button>
 
       <p style={styles.hint}>
         Each bay is placed as its own object carrying this one's settings, so you can select, move,

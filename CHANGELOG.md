@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`cc09423`](https://github.com/ovurrsl/plugin-warehouse/commit/cc09423cca19e85baefa76a9e17f93a221219940))
 - Refresh generated README blocks [skip ci] ([`ed6ada4`](https://github.com/ovurrsl/plugin-warehouse/commit/ed6ada4e2633863dfa24b90b3b103d86f7e05268))
 - Refresh generated README blocks [skip ci] ([`66c2e20`](https://github.com/ovurrsl/plugin-warehouse/commit/66c2e202e479915eb45a5100c1cb3a6eb9443571))
 - Refresh generated README blocks [skip ci] ([`66b53fe`](https://github.com/ovurrsl/plugin-warehouse/commit/66b53feb6ca1772952000e756560d7f4823e4f22))
@@ -36,6 +37,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Boxes run the lines — increment 5a ([`d51960a`](https://github.com/ovurrsl/plugin-warehouse/commit/d51960a4877909c9962f82cc95607356bc4b5708))
 - CNV-OBQ oblique branch — increment 4 complete ([`112df12`](https://github.com/ovurrsl/plugin-warehouse/commit/112df120fde9e7418372655de2866a8c0b34b9fd))
 - CNV-MTR mixed transfer — a line crosses without the box turning ([`a7c2a7d`](https://github.com/ovurrsl/plugin-warehouse/commit/a7c2a7d078cdaab1622e18944492162faf727359))
 - CNV-BST booster — the tightest frame in the family ([`60a1d32`](https://github.com/ovurrsl/plugin-warehouse/commit/60a1d32cac7dc625e783ade3ad65386faa814797))

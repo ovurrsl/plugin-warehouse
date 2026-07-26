@@ -94,6 +94,17 @@ export const PALETTE = {
   accentOrange: '#e87722',
 } as const
 
+/**
+ * **How far a launcher's lateral bed reaches past the main line.**
+ *
+ * Not published. Read off the render, where the stub is about one box deep —
+ * which is also what it must be for the launched box to sit clear of the main
+ * line before the next one arrives, so the estimate has a reason as well as a
+ * measurement. The catalogue fixes this type's box at 400 mm, so that is the
+ * reach.
+ */
+export const LAUNCHER_LATERAL_REACH_M = mm(400)
+
 /** Leg section, from the renders. Square tube. */
 export const LEG_SECTION_M = mm(60)
 /** Base plate under each leg, and how far it overhangs the tube. */

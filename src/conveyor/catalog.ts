@@ -68,6 +68,46 @@ export function exteriorWidthM(usefulWidthMm: number): number {
   return mm(usefulWidthMm) + STRAIGHT_FRAME_OVERHANG_M
 }
 
+// ── The transfer family ─────────────────────────────────────────────────────
+
+/**
+ * Unit load for the transfer family — **50 kg per box**, where CAR is 100 kg
+ * per *metre* of bed.
+ *
+ * Two different quantities, and the difference is the machine. A straight
+ * carries a distributed load because one motor pulls a continuous run; a
+ * transfer lifts, launches or diverts one box at a time, so its limit is per
+ * box. Circuit rule R7 is the cross-check, and it cannot be written against the
+ * straight's figure.
+ */
+export const TRANSFER_UNIT_LOAD_KG = 50
+
+/**
+ * CNV-LNC · Launcher Roller.
+ *
+ * A T: the main bed runs through and a short lateral bed launches the box off
+ * it at ninety degrees with a motorised roller.
+ *
+ * **One speed and one box length, both fixed.** The launch is a timed impulse
+ * rather than a setting, so neither is a field — the panel reports them and the
+ * schema does not carry them. The frame is the straight family's 147 mm over
+ * the lane, which is why this type does not bring its own overhang.
+ */
+export const LNC = {
+  id: 'CNV-LNC',
+  nameEn: 'Launcher Roller Conveyor',
+  loadKg: TRANSFER_UNIT_LOAD_KG,
+  usefulWidthsMm: [400, 600] as const,
+  exteriorWidthMaxM: mm(747),
+  lengthM: mm(900),
+  /** Fixed, not a range: the launcher is dimensioned around one box. */
+  boxLengthM: mm(400),
+  speedMPerMin: 60,
+  maxInclinationDeg: 0,
+  /** R8 — a box leaves a launcher facing ninety degrees from how it arrived. */
+  changesBoxOrientation: true,
+} as const
+
 // ── CNV-CAR · Continuous Activated Roller ───────────────────────────────────
 
 /**

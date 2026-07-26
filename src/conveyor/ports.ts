@@ -8,6 +8,14 @@ import {
   usefulWidthMm as curveUsefulWidthMm,
 } from './curve-metrics'
 import type { ConveyorCurveNode } from './curve-schema'
+import {
+  lateralOuterZM,
+  frameWidthM as launcherFrameWidthM,
+  moduleLengthM as launcherLengthM,
+  usefulWidthMm as launcherUsefulWidthMm,
+  launchSign,
+} from './launcher-metrics'
+import type { ConveyorLauncherNode } from './launcher-schema'
 import { frameWidthM, moduleLengthM, usefulWidthMm } from './metrics'
 import type { ConveyorRollerNode } from './schema'
 
@@ -37,7 +45,7 @@ import type { ConveyorRollerNode } from './schema'
 /** The one place metres become inches, because one host field is in inches. */
 const INCHES_PER_METRE = 39.3701
 
-export type ConveyorModule = ConveyorRollerNode | ConveyorCurveNode
+export type ConveyorModule = ConveyorRollerNode | ConveyorCurveNode | ConveyorLauncherNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -71,10 +79,18 @@ export type PortRole = 'in' | 'out' | 'both'
  *  this rather than a list per file — a kind missing from it is a kind whose
  *  ends the line index cannot see, which shows up as doubled steel at a seam
  *  rather than as an error. */
-const CONVEYOR_KINDS = new Set(['warehouse:conveyor-roller', 'warehouse:conveyor-curve'])
+const CONVEYOR_KINDS = new Set([
+  'warehouse:conveyor-roller',
+  'warehouse:conveyor-curve',
+  'warehouse:conveyor-launcher',
+])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
   return module.type === 'warehouse:conveyor-curve'
+}
+
+export function isLauncherModule(module: ConveyorModule): module is ConveyorLauncherNode {
+  return module.type === 'warehouse:conveyor-launcher'
 }
 
 /** Narrow an unknown scene node to a module of this kind, any shape. */
@@ -116,7 +132,9 @@ export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId)
 /** The lane a box travels through, in the catalogue's millimetres. What two
  *  modules must agree on to be joined — circuit rule R1. */
 export function moduleLaneMm(module: ConveyorModule): number {
-  return isCurveModule(module) ? curveUsefulWidthMm(module) : usefulWidthMm(module)
+  if (isCurveModule(module)) return curveUsefulWidthMm(module)
+  if (isLauncherModule(module)) return launcherUsefulWidthMm(module)
+  return usefulWidthMm(module)
 }
 
 /**
@@ -128,13 +146,17 @@ export function moduleLaneMm(module: ConveyorModule): number {
  * would make every panel that reports a line's length wrong by the difference.
  */
 export function moduleRunLengthM(module: ConveyorModule): number {
-  return isCurveModule(module) ? curveCentrelineLengthM(module) : moduleLengthM(module)
+  if (isCurveModule(module)) return curveCentrelineLengthM(module)
+  if (isLauncherModule(module)) return launcherLengthM(module)
+  return moduleLengthM(module)
 }
 
 /** Outside of one side member to the outside of the other. Two families, two
  *  overhangs — 111 mm on a bend, 147 on a straight. */
 export function moduleFrameWidthM(module: ConveyorModule): number {
-  return isCurveModule(module) ? curveFrameWidthM(module) : frameWidthM(module)
+  if (isCurveModule(module)) return curveFrameWidthM(module)
+  if (isLauncherModule(module)) return launcherFrameWidthM(module)
+  return frameWidthM(module)
 }
 
 export type LocalPort = {
@@ -205,6 +227,47 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         frameWidthM: frame,
       }
     })
+  }
+
+  if (isLauncherModule(module)) {
+    const half = launcherLengthM(module) / 2
+    const lane = launcherUsefulWidthMm(module)
+    const frame = launcherFrameWidthM(module)
+    const side = launchSign(module)
+    const outlet = outletPort(module)
+
+    const main = (['a', 'b'] as const).map((id) => {
+      const sign = id === 'b' ? 1 : -1
+      return {
+        id,
+        x: sign * half,
+        y: module.transportHeight,
+        z: 0,
+        dx: sign,
+        dz: 0,
+        role: (id === outlet ? 'out' : 'in') as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
+      }
+    })
+
+    // The launch. Always a discharge: the machine throws a box off the main
+    // line, it does not accept one from the side — which is the difference
+    // between a launcher and the oblique transfer's bidirectional branch.
+    return [
+      ...main,
+      {
+        id: 'c' as ConveyorPortId,
+        x: 0,
+        y: module.transportHeight,
+        z: side * lateralOuterZM(module),
+        dx: 0,
+        dz: side,
+        role: 'out' as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
+      },
+    ]
   }
 
   const half = moduleLengthM(module) / 2

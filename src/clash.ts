@@ -14,6 +14,8 @@ import {
 import type { ConveyorLauncherNode } from './conveyor/launcher-schema'
 import { localBoundsM } from './conveyor/metrics'
 import type { ConveyorRollerNode } from './conveyor/schema'
+import { localBoundsM as transferBoundsM } from './conveyor/transfer-metrics'
+import type { ConveyorTransferNode } from './conveyor/transfer-schema'
 import { specOf, unitLoadHeight } from './pallet/presets'
 import type { PalletNode } from './pallet/schema'
 import { rackParts } from './rack/parts'
@@ -202,6 +204,23 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
     )
+  }
+
+  if (placement.type === 'warehouse:conveyor-transfer') {
+    const transfer = node as ConveyorTransferNode
+    const local = transferBoundsM(transfer)
+    return [
+      toWorldBox(
+        [
+          (local.min[0] + local.max[0]) / 2,
+          (local.min[1] + local.max[1]) / 2,
+          (local.min[2] + local.max[2]) / 2,
+        ],
+        [local.max[0] - local.min[0], local.max[1] - local.min[1], local.max[2] - local.min[2]],
+        placement.position,
+        placement.rotationY,
+      ),
+    ]
   }
 
   if (placement.type === 'warehouse:conveyor-booster') {

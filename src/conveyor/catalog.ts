@@ -123,6 +123,44 @@ export function boosterExteriorWidthM(usefulWidthMm: number): number {
 }
 
 /**
+ * CNV-MTR · Mixed Transfer Roller & Belt.
+ *
+ * A fixed square body: a roller bed with belt strips that rise *between* the
+ * rollers to carry the box the other way, and a collapsible limit buffer that
+ * positions it during the transfer.
+ *
+ * **This type has no frame overhang, because it has no lane.** The body is
+ * 708 × 723 whatever it carries; the 400 mm figure is the widest box the rollers
+ * take in their own direction, not a channel the frame is built around. Every
+ * other shape in the family is lane-plus-something; this one is a machine of a
+ * size.
+ *
+ * Two figures are unlike anything else here and both are real constraints. The
+ * **variable height floor is 500 mm, not 370** — the lift mechanism lives under
+ * the bed and needs the room. And the **speeds stop at 45**, where the rest of
+ * the family reaches 60: the box is being lifted and set down, not carried past.
+ */
+export const MTR = {
+  id: 'CNV-MTR',
+  nameEn: 'Mixed Transfer Roller & Belt Conveyor',
+  loadKg: TRANSFER_UNIT_LOAD_KG,
+  /** The body, fixed in both directions. */
+  lengthM: mm(708),
+  widthM: mm(723),
+  /** The widest box the rollers carry, in their own direction. The one class
+   *  this type is built in, so anything it joins must be that class too. */
+  boxWidthWithRollersMaxM: mm(400),
+  boxLengthRollerDirRangeM: [mm(250), mm(600)] as const,
+  /** The family's floor is 370; the lift mechanism under the bed raises it. */
+  transportHeightRangeM: [mm(500), mm(3000)] as const,
+  speedsMPerMin: [25, 45] as const,
+  maxInclinationDeg: 0,
+  /** R8 — a box leaves a mixed transfer facing ninety degrees from how it
+   *  arrived. A curve preserves orientation; this does not. */
+  changesBoxOrientation: true,
+} as const
+
+/**
  * CNV-LNC · Launcher Roller.
  *
  * A T: the main bed runs through and a short lateral bed launches the box off

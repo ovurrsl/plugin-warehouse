@@ -120,6 +120,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'A short driven section that regulates a load’s passage and tightens the cycle. Its drive sits under the bed, which makes it the tightest frame in the family.',
     icon: 'lucide:chevrons-right',
   },
+  {
+    kind: 'warehouse:conveyor-transfer',
+    label: 'Mixed Transfer',
+    sectionId: 'conveyance',
+    description:
+      'Crosses a line through ninety degrees without turning the box: belt strips rise between the rollers and carry it off sideways. H flips the discharge side.',
+    icon: 'lucide:move-diagonal',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

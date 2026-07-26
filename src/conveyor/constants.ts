@@ -95,6 +95,31 @@ export const PALETTE = {
 } as const
 
 /**
+ * **A10 — how far a mixed transfer's belt strip rises above the roller line.**
+ *
+ * Eight millimetres, from the catalogue imagery. **Animation only.** It changes
+ * no clearance and no port, so it must never reach a geometry cache key: a strip
+ * at rest and a strip lifted are the same module, and keying on it would put two
+ * buffers behind every transfer in the building.
+ */
+export const MTR_STRIP_STROKE_M = mm(8)
+
+/**
+ * **The belt strips that carry the box across a mixed transfer.**
+ *
+ * Three of them, and each is a box rather than a painted stripe. The atlas
+ * exists for repeated detail — hundreds of rollers on one bed — and three strips
+ * are not that; more decisively, a strip *rises*, and a painted line cannot.
+ * Thirty-six triangles a machine is the whole cost.
+ */
+export const MTR_STRIP_COUNT = 3
+export const MTR_STRIP_WIDTH_M = mm(40)
+
+/** Rollers in each gap the strips leave. Two, from the imagery: a 147 mm gap
+ *  takes a pair at the family's usual spacing and the bed reads as continuous. */
+export const MTR_ROLLERS_PER_GAP = 2
+
+/**
  * **How far a launcher's lateral bed reaches past the main line.**
  *
  * Not published. Read off the render, where the stub is about one box deep —

@@ -130,7 +130,17 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
  */
 export function emitPart(
   sink: Sink,
-  part: ConveyorPart,
+  /**
+   * Only what the emitter actually reads. Typed structurally rather than as
+   * `ConveyorPart` so a shape with parts of its own — a transfer's belt strips,
+   * which no other shape can emit — can carry its own role union without this
+   * function having to hear about it.
+   */
+  part: {
+    center: readonly [number, number, number]
+    size: readonly [number, number, number]
+    pattern?: 'rollers'
+  },
   color: readonly [number, number, number],
   stripeSpan: number,
   rotationY = 0,

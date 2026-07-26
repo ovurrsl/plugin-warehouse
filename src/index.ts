@@ -4,6 +4,7 @@ import { conveyorBoosterDefinition } from './conveyor/booster-definition'
 import { conveyorCurveDefinition } from './conveyor/curve-definition'
 import { conveyorRollerDefinition } from './conveyor/definition'
 import { conveyorLauncherDefinition } from './conveyor/launcher-definition'
+import { conveyorTransferDefinition } from './conveyor/transfer-definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
@@ -37,6 +38,7 @@ export const warehousePlugin: Plugin = {
     conveyorCurveDefinition as unknown as AnyNodeDefinition,
     conveyorLauncherDefinition as unknown as AnyNodeDefinition,
     conveyorBoosterDefinition as unknown as AnyNodeDefinition,
+    conveyorTransferDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -63,6 +65,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:conveyor-curve',
     'warehouse:conveyor-launcher',
     'warehouse:conveyor-booster',
+    'warehouse:conveyor-transfer',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

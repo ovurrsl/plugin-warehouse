@@ -28,31 +28,29 @@ import {
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
-import { footprintCentreZM, footprintM } from './launcher-metrics'
-import ConveyorLauncherPreview from './launcher-preview'
-import { ConveyorLauncherNode } from './launcher-schema'
+import { footprintM } from './transfer-metrics'
+import ConveyorTransferPreview from './transfer-preview'
+import { ConveyorTransferNode } from './transfer-schema'
 
 /** 45° steps, matching the R / T rotation every built-in placement tool uses. */
 const ROTATION_STEP = Math.PI / 4
 
 /**
- * Placement for a launcher.
+ * Placement for a mixed transfer.
  *
- * One at a time, like a bend: this is the piece a line branches at, and there is
- * one of them per branch. `H` flips which side the box is launched to, because
- * that is the decision a person is making while the ghost is under the cursor —
- * and it is a mirror rather than a rotation, since turning the machine round
- * would also swap which end is the infeed.
+ * One at a time: this is the piece a line crosses at, and there is one of them
+ * per crossing. `H` flips which side the box is taken off to — a mirror rather
+ * than a rotation, since turning the machine round would also swap which end is
+ * the infeed.
  *
  * **Validity is this tool's own, and that is the point.** The host's collision
  * test compares plan rectangles with no height at all, so it cannot tell a
  * conveyor threading the walkway under a racking run from one driven through its
  * uprights. `floorPlaced.collides` is therefore off and the test lives in
- * `../clash`, in three dimensions — and for a launcher it is run against the two
- * boxes the steel actually occupies, because the rectangle round an L is a third
- * empty and that corner is where the branch's own line goes.
+ * `../clash`, in three dimensions, against the volume this machine actually
+ * occupies from the floor to the top of its guides.
  */
-export default function ConveyorLauncherTool() {
+export default function ConveyorTransferTool() {
   const activeLevelId = useViewer((s) => s.selection.levelId)
   const unit = useViewer((s) => s.unit)
 
@@ -61,7 +59,7 @@ export default function ConveyorLauncherTool() {
   const [cursorPosition, setCursorPosition] = useState<[number, number, number]>([0, 0, 0])
   const [cursorRotationY, setCursorRotationY] = useState(0)
   const [valid, setValid] = useState(true)
-  const [launchSide, setLaunchSide] = useState<'left' | 'right'>('left')
+  const [dischargeSide, setDischargeSide] = useState<'left' | 'right'>('left')
 
   const rotationRef = useRef(0)
   const validRef = useRef(true)
@@ -70,13 +68,12 @@ export default function ConveyorLauncherTool() {
   const previousSnapRef = useRef<string | null>(null)
 
   const previewNode = useMemo(
-    () => ConveyorLauncherNode.parse({ launchSide, position: [0, 0, 0], rotation: [0, 0, 0] }),
-    [launchSide],
+    () => ConveyorTransferNode.parse({ dischargeSide, position: [0, 0, 0], rotation: [0, 0, 0] }),
+    [dischargeSide],
   )
 
-  // Read through a ref so flipping the launch side re-measures the box in place
-  // rather than tearing the tool down and losing the rotation with it — the rack
-  // shipped that bug and it is the same effect here.
+  // Read through a ref so a rebuilt preview does not tear the tool down and lose
+  // the rotation with it — the rack shipped that bug and it is the same here.
   const previewRef = useRef(previewNode)
   previewRef.current = previewNode
 
@@ -106,7 +103,7 @@ export default function ConveyorLauncherTool() {
       }
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const rotationY = rotationRef.current
-      const placed = ConveyorLauncherNode.parse({
+      const placed = ConveyorTransferNode.parse({
         ...previewRef.current,
         id: undefined,
         position: visual,
@@ -126,15 +123,9 @@ export default function ConveyorLauncherTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      // The steel is not centred on the node — the arm sticks out one side — so
-      // the measuring box sits off the ghost by however far the two differ,
-      // carried into world space by the module's own rotation.
-      const offset = footprintCentreZM(previewRef.current)
-      setCursorPosition([
-        visual[0] + offset * Math.sin(rotationRef.current),
-        visual[1],
-        visual[2] + offset * Math.cos(rotationRef.current),
-      ])
+      // A transfer's body is square and centred on its node, so the box and the
+      // ghost share a position.
+      setCursorPosition(visual)
       lastPositionRef.current = position
       recomputeValidity(visual)
 
@@ -179,7 +170,7 @@ export default function ConveyorLauncherTool() {
       }
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const launcher = ConveyorLauncherNode.parse({
+      const transfer = ConveyorTransferNode.parse({
         ...previewRef.current,
         id: undefined,
         position,
@@ -191,9 +182,9 @@ export default function ConveyorLauncherTool() {
       // same way a run of straights does: one store write, one undo step, and
       // the new node selected when it arrives.
       useScene.getState().applyNodeChanges({
-        create: [{ node: launcher as unknown as AnyNode, parentId: activeLevelId as AnyNodeId }],
+        create: [{ node: transfer as unknown as AnyNode, parentId: activeLevelId as AnyNodeId }],
       })
-      useViewer.getState().setSelection({ selectedIds: [launcher.id] as unknown as AnyNodeId[] })
+      useViewer.getState().setSelection({ selectedIds: [transfer.id] as unknown as AnyNodeId[] })
 
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
@@ -217,7 +208,7 @@ export default function ConveyorLauncherTool() {
       if (event.key === 'h' || event.key === 'H') {
         event.preventDefault()
         triggerSFX('sfx:item-rotate')
-        setLaunchSide((current) => (current === 'left' ? 'right' : 'left'))
+        setDischargeSide((current) => (current === 'left' ? 'right' : 'left'))
         return
       }
 
@@ -253,8 +244,7 @@ export default function ConveyorLauncherTool() {
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
     }
-    // Deliberately not `previewNode`: the launch side is read through a ref, so
-    // flipping it does not tear the tool down and reset the rotation.
+    // Deliberately not `previewNode`: it is read through a ref.
   }, [activeLevelId])
 
   if (!activeLevelId) return null
@@ -262,7 +252,7 @@ export default function ConveyorLauncherTool() {
   return (
     <>
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
-        <ConveyorLauncherPreview node={previewNode} />
+        <ConveyorTransferPreview node={previewNode} />
       </group>
       {cursorVisible && (
         <PlacementBox

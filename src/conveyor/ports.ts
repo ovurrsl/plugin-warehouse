@@ -24,6 +24,13 @@ import {
 import type { ConveyorLauncherNode } from './launcher-schema'
 import { frameWidthM, moduleLengthM, usefulWidthMm } from './metrics'
 import type { ConveyorRollerNode } from './schema'
+import {
+  dischargeSign,
+  frameWidthM as transferFrameWidthM,
+  laneMm as transferLaneMm,
+  moduleLengthM as transferLengthM,
+} from './transfer-metrics'
+import type { ConveyorTransferNode } from './transfer-schema'
 
 /**
  * Where a module can be joined, and to what — for **every** shape in the kind.
@@ -56,6 +63,7 @@ export type ConveyorModule =
   | ConveyorCurveNode
   | ConveyorLauncherNode
   | ConveyorBoosterNode
+  | ConveyorTransferNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -94,6 +102,7 @@ const CONVEYOR_KINDS = new Set([
   'warehouse:conveyor-curve',
   'warehouse:conveyor-launcher',
   'warehouse:conveyor-booster',
+  'warehouse:conveyor-transfer',
 ])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
@@ -106,6 +115,10 @@ export function isLauncherModule(module: ConveyorModule): module is ConveyorLaun
 
 export function isBoosterModule(module: ConveyorModule): module is ConveyorBoosterNode {
   return module.type === 'warehouse:conveyor-booster'
+}
+
+export function isTransferModule(module: ConveyorModule): module is ConveyorTransferNode {
+  return module.type === 'warehouse:conveyor-transfer'
 }
 
 /** Narrow an unknown scene node to a module of this kind, any shape. */
@@ -150,6 +163,7 @@ export function moduleLaneMm(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveUsefulWidthMm(module)
   if (isLauncherModule(module)) return launcherUsefulWidthMm(module)
   if (isBoosterModule(module)) return boosterUsefulWidthMm(module)
+  if (isTransferModule(module)) return transferLaneMm(module)
   return usefulWidthMm(module)
 }
 
@@ -165,6 +179,7 @@ export function moduleRunLengthM(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveCentrelineLengthM(module)
   if (isLauncherModule(module)) return launcherLengthM(module)
   if (isBoosterModule(module)) return boosterLengthM(module)
+  if (isTransferModule(module)) return transferLengthM(module)
   return moduleLengthM(module)
 }
 
@@ -174,6 +189,7 @@ export function moduleFrameWidthM(module: ConveyorModule): number {
   if (isCurveModule(module)) return curveFrameWidthM(module)
   if (isLauncherModule(module)) return launcherFrameWidthM(module)
   if (isBoosterModule(module)) return boosterFrameWidthM(module)
+  if (isTransferModule(module)) return transferFrameWidthM(module)
   return frameWidthM(module)
 }
 
@@ -279,6 +295,47 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         x: 0,
         y: module.transportHeight,
         z: side * lateralOuterZM(module),
+        dx: 0,
+        dz: side,
+        role: 'out' as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
+      },
+    ]
+  }
+
+  if (isTransferModule(module)) {
+    const half = transferLengthM(module) / 2
+    const lane = transferLaneMm(module)
+    const frame = transferFrameWidthM(module)
+    const side = dischargeSign(module)
+    const outlet = outletPort(module)
+
+    const rollerLine = (['a', 'b'] as const).map((id) => {
+      const sign = id === 'b' ? 1 : -1
+      return {
+        id,
+        x: sign * half,
+        y: module.transportHeight,
+        z: 0,
+        dx: sign,
+        dz: 0,
+        role: (id === outlet ? 'out' : 'in') as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
+      }
+    })
+
+    // The cross discharge. Always an outlet: the belt strips lift the box off
+    // the roller line, they never set one onto it — which is what makes this a
+    // transfer rather than a crossing.
+    return [
+      ...rollerLine,
+      {
+        id: 'c' as ConveyorPortId,
+        x: 0,
+        y: module.transportHeight,
+        z: (side * frame) / 2,
         dx: 0,
         dz: side,
         role: 'out' as PortRole,

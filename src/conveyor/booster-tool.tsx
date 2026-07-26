@@ -167,7 +167,7 @@ export default function ConveyorBoosterTool() {
       }
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const bend = ConveyorBoosterNode.parse({
+      const booster = ConveyorBoosterNode.parse({
         ...previewRef.current,
         id: undefined,
         position,
@@ -179,9 +179,9 @@ export default function ConveyorBoosterTool() {
       // same way a run of straights does: one store write, one undo step, and
       // the new node selected when it arrives.
       useScene.getState().applyNodeChanges({
-        create: [{ node: bend as unknown as AnyNode, parentId: activeLevelId as AnyNodeId }],
+        create: [{ node: booster as unknown as AnyNode, parentId: activeLevelId as AnyNodeId }],
       })
-      useViewer.getState().setSelection({ selectedIds: [bend.id] as unknown as AnyNodeId[] })
+      useViewer.getState().setSelection({ selectedIds: [booster.id] as unknown as AnyNodeId[] })
 
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()

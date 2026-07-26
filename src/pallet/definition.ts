@@ -32,20 +32,16 @@ export const palletDefinition = {
   // A pallet has a front: fork entry is across the 1200 mm faces.
   facingIndicator: true,
 
-  defaults: () => ({
-    object: 'node' as const,
-    name: 'Pallet',
-    parentId: null,
-    visible: true,
-    metadata: {},
-    position: [0, 0, 0] as [number, number, number],
-    rotation: [0, 0, 0] as [number, number, number],
-    preset: 'epal-1' as const,
-    loadHeight: 0,
-    slotAddress: null,
-    slotRackId: null,
-    supportSlabId: null,
-  }),
+  /**
+   * Derived from the schema rather than restated, as every other kind in this
+   * package does it. Written out by hand, the two drifted the moment a field was
+   * added: the list above was a second copy of every default, and it silently
+   * stopped matching.
+   */
+  defaults: () => {
+    const { id: _id, type: _type, ...rest } = PalletNode.parse({})
+    return { ...rest, name: 'Pallet' }
+  },
 
   capabilities: {
     selectable: { hitVolume: 'bbox' },

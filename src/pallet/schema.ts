@@ -23,8 +23,47 @@ export const PalletNode = BaseNode.extend({
 
   preset: z.enum(PALLET_PRESET_IDS).default('epal-1'),
 
-  /** Height of the goods stacked on the deck, metres. 0 is an empty pallet. */
+  /** Height of the goods stacked on the deck, metres. 0 is an empty pallet.
+   *  Read only while `cargo` is `'none'` — a typed load derives its height from
+   *  the variant its seed resolves to. */
   loadHeight: z.number().min(0).max(2.4).default(0),
+
+  // ── The load ──────────────────────────────────────────────────────────────
+
+  /**
+   * What the pallet is carrying, or `'none'` for the plain block this kind has
+   * always drawn.
+   *
+   * **`'none'` is the default and that is a compatibility decision, not a
+   * preference.** Every scene saved before this field existed parses without it,
+   * defaults to `'none'`, and renders exactly as it did — no migration, and no
+   * pallet quietly changing height because a continuous `loadHeight` was snapped
+   * to the nearest prepared variant.
+   */
+  cargo: z.enum(['none', 'carton', 'drum']).default('none'),
+
+  /**
+   * The fill range the placement panel was set to, as fractions.
+   *
+   * **The range is stored and the fill is not.** A pallet's actual fill is
+   * `resolveVariant(type, id, range)` — a pure function of its own id — so the
+   * scene is a function of its file: reload, export, re-import and undo all
+   * reproduce it exactly, where a stored roll would have to be preserved through
+   * every one of those paths and a re-rolled one would change the warehouse
+   * under the user.
+   */
+  fillRange: z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]).default([0.4, 1]),
+
+  /** Detail elements. Defaulted per type at placement time — a carton pallet is
+   *  filmed and a drum pallet is not — and overridable after. */
+  wrapped: z.boolean().default(true),
+  strapped: z.boolean().default(true),
+  labelled: z.boolean().default(true),
+
+  /** The goods' own colour. Kraft for cartons, drum blue for drums; each pallet
+   *  takes a small seeded tint off it so a rack full of them does not read as
+   *  one object pasted a thousand times. */
+  cargoColor: z.string().default('#c8a06a'),
 
   /**
    * Slot this pallet occupies, as `bay-level-position`, or null when it is

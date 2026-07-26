@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`33dbf79`](https://github.com/ovurrsl/plugin-warehouse/commit/33dbf7959278cf890bba0c20ddc88ec5ba4da35f))
 - Refresh generated README blocks [skip ci] ([`30199c4`](https://github.com/ovurrsl/plugin-warehouse/commit/30199c472370b6cb83852f393a2199bc771011aa))
 - Refresh generated README blocks [skip ci] ([`28fb3d2`](https://github.com/ovurrsl/plugin-warehouse/commit/28fb3d2238574b7271b2f5fcef224d26f770dbd7))
 - Refresh generated README blocks [skip ci] ([`4e3dc16`](https://github.com/ovurrsl/plugin-warehouse/commit/4e3dc166803de22b752ab8d5ac98870d73912884))
@@ -30,6 +31,9 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The curve ships — panel, plan, tool, clash, registration ([`ced40ed`](https://github.com/ovurrsl/plugin-warehouse/commit/ced40edfe3ef499fdd2b60171bfd66a1bf8b4ccd))
+- A line is made of shapes, not only of straights ([`c4fd1cb`](https://github.com/ovurrsl/plugin-warehouse/commit/c4fd1cbfeb64a806a7f979f7549962370e7a20d5))
+- Curve module geometry, metrics and parts ([`b8892ae`](https://github.com/ovurrsl/plugin-warehouse/commit/b8892aeae433f50d2964dd644de51ff31811811f))
 - Ports, the magnet, and a line that is read rather than stored ([`ae536c1`](https://github.com/ovurrsl/plugin-warehouse/commit/ae536c1e8a7a2425b16ada53d9e6595f484af467))
 - A roller conveyor module, and a clash test the host cannot do ([`b448d7e`](https://github.com/ovurrsl/plugin-warehouse/commit/b448d7e1c8ee004e67f56b70396ab6646ab0ff29))
 - Magnet a dragged bay onto the seam of a run ([`53924b6`](https://github.com/ovurrsl/plugin-warehouse/commit/53924b61b8e54199ba467d29e15ae2b68e418008))

@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`8e01fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/8e01fa100f1611d7183a324ba0342b02f98c0458))
 - Refresh generated README blocks [skip ci] ([`24384d4`](https://github.com/ovurrsl/plugin-warehouse/commit/24384d4b75921919b56d1221943fec969eaa11b6))
 - Refresh generated README blocks [skip ci] ([`22275af`](https://github.com/ovurrsl/plugin-warehouse/commit/22275aff7d6d898b74e22dd2d58fa1aabb016227))
 - Refresh generated README blocks [skip ci] ([`747ff61`](https://github.com/ovurrsl/plugin-warehouse/commit/747ff6195f406d235d6c2fc770e3e7e44fbb3e41))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Shift-select bays, and a panel that only shows what applies ([`533cc0c`](https://github.com/ovurrsl/plugin-warehouse/commit/533cc0c8ded4dfb8636100b430433b287c7c5d54))
 - Delete one bay, not the whole run ([`189715c`](https://github.com/ovurrsl/plugin-warehouse/commit/189715cab00f5f84fd6422eef440e92a82e2f180))
 - Click a bay, configure that bay — and the tunnel finally has a UI ([`553491e`](https://github.com/ovurrsl/plugin-warehouse/commit/553491eda482abbd88645d0fd3eeafaa367b762b))
-- The beam's endplate was in the post, and one bay by default ([`f75ecb4`](https://github.com/ovurrsl/plugin-warehouse/commit/f75ecb455e3f30d904c03081abc24185a04b1cdd))
 
 …
 

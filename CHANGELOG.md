@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`8e01fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/8e01fa100f1611d7183a324ba0342b02f98c0458))
 - Refresh generated README blocks [skip ci] ([`24384d4`](https://github.com/ovurrsl/plugin-warehouse/commit/24384d4b75921919b56d1221943fec969eaa11b6))
 - Refresh generated README blocks [skip ci] ([`22275af`](https://github.com/ovurrsl/plugin-warehouse/commit/22275aff7d6d898b74e22dd2d58fa1aabb016227))
 - Refresh generated README blocks [skip ci] ([`747ff61`](https://github.com/ovurrsl/plugin-warehouse/commit/747ff6195f406d235d6c2fc770e3e7e44fbb3e41))
@@ -45,6 +46,8 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Render the invariants, reach the derived fields, and stop Multiply repeating itself ([`0f89de1`](https://github.com/ovurrsl/plugin-warehouse/commit/0f89de13dc8d653ddb58de4be4542c2b267a913f))
+- Make decking visible, and stop the footprint refusing shared posts ([`d26e3db`](https://github.com/ovurrsl/plugin-warehouse/commit/d26e3db44d0f22558ca38d942b6d145a226c9a03))
 - The bay panel crashed — trailingSection is rendered with no props ([`162907b`](https://github.com/ovurrsl/plugin-warehouse/commit/162907b821e973db98a2417f65df11243c889eaf))
 - Place pallets on the surface, and refuse overlapping drops ([`925252b`](https://github.com/ovurrsl/plugin-warehouse/commit/925252b983493bcc80809094aedfcb7f12025fa6))
 - Render the rail panel as a plain container, not inspector chrome ([`210a7ed`](https://github.com/ovurrsl/plugin-warehouse/commit/210a7edccfec36ea0e47ff5022cab52f75a65b2c))

@@ -1,5 +1,6 @@
 import type { NodeDefinition } from '@pascal-app/core'
 import { buildPalletRackFloorplan } from './floorplan'
+import { snapToNeighbourSeam } from './magnet'
 import { palletRackParametrics } from './parametrics'
 import { PalletRackNode } from './schema'
 import { bayPitch, totalDepth, totalWidth } from './slots'
@@ -56,7 +57,33 @@ export const palletRackDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: {
+      axes: ['x', 'z'],
+      gridSnap: true,
+      /**
+       * The magnet, and the reason a run can be built by hand at all.
+       *
+       * Bays share a post only at *exactly* one bay pitch — half a millimetre of
+       * tolerance — and nothing the host offers reaches that. Alignment guides
+       * pull edge to edge, which is the right distance, but only inside an 8 cm
+       * window; grid snap actively fights it, because 2.822 m is not a multiple
+       * of any grid step. And Duplicate drops its copy one metre along world X
+       * and Z, ignoring the pitch and the rack's own rotation entirely, so the
+       * copy lands askew and overlapping and there is nothing to pull it home.
+       *
+       * `groupMoveSnap` is the host's kind-owned attachment hook — the same one
+       * a cabinet uses to settle flush against a wall. It runs in every snapping
+       * mode but Off, takes precedence over grid snap, and the host clears the
+       * alignment guides when it fires. See `./magnet`.
+       */
+      groupMoveSnap: ({ node, candidatePosition, movingIds, nodes }) =>
+        snapToNeighbourSeam(
+          node as unknown as PalletRackNode,
+          candidatePosition,
+          movingIds as readonly string[],
+          nodes as Readonly<Record<string, unknown>>,
+        ),
+    },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},
 

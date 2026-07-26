@@ -52,6 +52,11 @@ function asRack(node: unknown): RackLike | null {
  * the bays face the same way — a shallower neighbour, or one turned a few
  * degrees, leaves a post that genuinely is not shared, and omitting it would
  * open a gap in the steel rather than tidy one up.
+ *
+ * Exported through `shapeKeyOf` so the drag magnet in `./magnet` asks the same
+ * question the frame builder does. Two definitions of "these two bays match"
+ * would drift, and the drift is invisible: the magnet would pull a bay into a
+ * seam whose post the builder then refuses to share.
  */
 const TWO_PI = Math.PI * 2
 
@@ -63,6 +68,11 @@ const TWO_PI = Math.PI * 2
  * write, which during a drag is every pointermove.
  */
 const shapeKeys = new WeakMap<object, string>()
+
+export function shapeKeyOf(rack: unknown): string | null {
+  const record = asRack(rack)
+  return record ? shapeKey(record) : null
+}
 
 function shapeKey(rack: RackLike): string {
   const cached = shapeKeys.get(rack as object)

@@ -59,6 +59,9 @@ const CLICK_TRIGGER_KINDS = [
   // without this a second rack cannot be placed against the first — the cursor
   // is over the run you are aligning to, and nothing commits.
   'warehouse:pallet-rack',
+  // Same reason: a run is built by placing module after module, so the cursor
+  // is nearly always over the conveyor you are extending.
+  'warehouse:conveyor-roller',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

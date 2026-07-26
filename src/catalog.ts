@@ -88,6 +88,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
     icon: 'lucide:rows-3',
   },
+  {
+    kind: 'warehouse:conveyor-roller',
+    label: 'Roller Conveyor',
+    sectionId: 'conveyance',
+    description:
+      'One module of continuously driven roller conveyor. Lay a run with [ and ]; each module is its own object.',
+    icon: 'lucide:move-right',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

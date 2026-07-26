@@ -1,5 +1,6 @@
 import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
+import { conveyorRollerDefinition } from './conveyor/definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
@@ -29,6 +30,7 @@ export const warehousePlugin: Plugin = {
   nodes: [
     palletDefinition as unknown as AnyNodeDefinition,
     palletRackDefinition as unknown as AnyNodeDefinition,
+    conveyorRollerDefinition as unknown as AnyNodeDefinition,
   ],
 }
 

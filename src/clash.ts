@@ -165,9 +165,14 @@ export function footprintBox(node: unknown): ClashBox | null {
  * tunnel is a walkway a conveyor is meant to run through. `rackParts` at the
  * far tier is posts and beams, which is exactly the structure something can
  * hit, and a tunnelled level contributes nothing to it because the builder
- * emits nothing there. Footplates are excluded with the rest of the near tier,
- * deliberately: a conveyor leg standing beside a rack leg on the same slab is
- * a normal thing to draw.
+ * emits nothing there.
+ *
+ * Read at the **near** tier, deliberately. The far tier is posts and beams, and
+ * what it drops is the bracing — the diagonals that fill a frame's depth plane
+ * from the floor to the top of the post. Reading it left the narrow side of a
+ * pair of uprights looking like open air, so a conveyor could be run straight
+ * through a braced frame. Footplates come along with it, which is right too:
+ * two base plates in the same place are two base plates in the same place.
  */
 export function occupiedVolumes(node: unknown): ClashBox[] {
   const placement = placementOf(node)
@@ -175,7 +180,13 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
 
   if (placement.type === 'warehouse:pallet-rack') {
     const rack = node as PalletRackNode
-    return rackParts(rack, 'simple').map((part) =>
+    // `full`, not `simple`. The far tier is posts and beams only, and the
+    // bracing is exactly what it drops — so a frame's depth plane, which
+    // diagonals fill from the floor to the top of the post, read as open air
+    // and a conveyor could be pushed straight through the narrow side of a
+    // pair of uprights. Decking and support bars go the same way: a deck is a
+    // surface, and nothing passes through a surface.
+    return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
     )
   }

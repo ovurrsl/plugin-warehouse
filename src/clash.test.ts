@@ -111,13 +111,38 @@ describe('and the arrangements a warehouse is made of still work', () => {
     expect(hits(moving, [1, 0, 0], 0, scene(standing))).toEqual(['pallet_rack_standing'])
   })
 
-  test('a rack straddles a conveyor running through its bay', () => {
-    // Physically true and worth pinning, because it looks like a clash and is
-    // not: a 0.747 m bed passes between uprights standing 1.02 m apart, and the
-    // first beam is 1.5 m up. A test that forbade this would forbid the layout
-    // the tunnel feature exists to draw.
-    const belt = conveyor({ position: [0, 0, 0] })
-    expect(hits(rack(), [0, 0, 0], 0, scene(belt))).toEqual([])
+  test('bracing is steel, and a run along the aisle goes through it', () => {
+    // The narrow side of a pair of uprights looks like open air and is not:
+    // z- and x-bracing fill a frame's depth plane with diagonals from the floor
+    // to the top of the post. This is why the clash volume reads the *near*
+    // tier — the far tier is posts and beams, and bracing is exactly what it
+    // drops, so a conveyor could be run straight through a braced frame.
+    const belt = conveyor({ transportHeight: 0.75 })
+    for (const bracing of ['z-bracing', 'x-bracing'] as const) {
+      const braced = rack({ id: 'pallet_rack_braced', bracing, tunnelLevels: 2 })
+      expect({ bracing, hits: hits(belt, [0, 0, 0], 0, scene(braced)) }).toEqual({
+        bracing,
+        hits: ['pallet_rack_braced'],
+      })
+    }
+    // An unbraced frame really is open, and the test has to say so rather than
+    // refusing every rack on principle.
+    const open = rack({ id: 'pallet_rack_open', bracing: 'open', tunnelLevels: 2 })
+    expect(hits(belt, [0, 0, 0], 0, scene(open))).toEqual([])
+  })
+
+  test('crossing the bay through a tunnel clears the frames entirely', () => {
+    // The other axis, and the one the tunnel is for: a conveyor running across
+    // the depth passes between the frames rather than through them, so bracing
+    // never enters into it.
+    const belt = conveyor({ transportHeight: 0.75 })
+    for (const bracing of ['z-bracing', 'x-bracing', 'open'] as const) {
+      const braced = rack({ id: 'pallet_rack_x', bracing, tunnelLevels: 2 })
+      expect({ bracing, hits: hits(belt, [0, 0, 0], Math.PI / 2, scene(braced)) }).toEqual({
+        bracing,
+        hits: [],
+      })
+    }
   })
 
   test('two conveyor modules butt end to end', () => {

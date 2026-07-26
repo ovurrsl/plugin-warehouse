@@ -1,0 +1,27 @@
+version: 2
+updates:
+  # `@pascal-app/*` are peer dependencies and deliberately unpinned — a pinned
+  # copy creates a second `nodeRegistry` singleton and the kinds silently never
+  # resolve. Dependabot only ever touches `devDependencies` here, which is
+  # exactly the surface where a bump is safe.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      types:
+        patterns: ['@types/*']
+
+  # Workflows pin third-party actions to a commit SHA. Dependabot understands
+  # the `SHA # tag` form and bumps both halves together, which is what makes
+  # SHA pinning maintainable rather than a thing that quietly goes stale.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci

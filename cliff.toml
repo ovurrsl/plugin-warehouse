@@ -1,0 +1,77 @@
+# git-cliff — changelog from conventional commits.
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """
+# Changelog
+
+Generated from the commit history. Every entry links the commit that made the
+change, because the commit message is where the reasoning is — this file is an
+index to it, not a replacement for it.
+"""
+
+body = """
+{% if version %}\
+## {{ version | trim_start_matches(pat="v") }} — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## Unreleased
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}\
+{% if commit.id %} ([`{{ commit.id | truncate(length=7, end="") }}`](<REPO>/commit/{{ commit.id }})){% endif %}\
+{% endfor %}\
+{% endfor %}\n
+"""
+
+footer = ""
+trim = true
+
+# The repository URL is substituted after rendering rather than interpolated in
+# the template. git-cliff's `remote.*` context is only populated when it can
+# resolve a remote — which it cannot in a shallow or detached checkout — and a
+# template that reads it renders a broken link instead of failing.
+postprocessors = [
+  { pattern = '<REPO>', replace = "https://github.com/ovurrsl/plugin-warehouse" },
+]
+
+[git]
+conventional_commits = true
+# Commits that are not conventional still appear, under "Other". Dropping them
+# would make the changelog quietly incomplete, which is worse than untidy.
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+topo_order = false
+sort_commits = "newest"
+
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactors" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^ci|^build", group = "Build and CI" },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore", group = "Chores" },
+  # The plugin's own history uses `rack:` / `pallet:` scopes without a
+  # conventional type. They are real changes and belong in the log.
+  { message = "^rack|^pallet|^panel", group = "Features" },
+  { message = ".*", group = "Other" },
+]
+
+commit_preprocessors = [
+  # Strip the co-author trailer: it is on nearly every commit and repeating it
+  # under each bullet turns the changelog into a wall of the same line.
+  { pattern = '\n+Co-Authored-By:.*', replace = "" },
+  # Keep only the subject. The body is where the reasoning lives and it belongs
+  # in the commit, not flattened into a list item.
+  { pattern = '\n[\s\S]*', replace = "" },
+]
+
+[git.tag]
+pattern = "v[0-9]*"

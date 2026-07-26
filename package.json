@@ -17,8 +17,11 @@
   ],
   "scripts": {
     "check-types": "tsc --noEmit",
-    "lint": "biome lint",
-    "test": "bun test"
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "bun test",
+    "verify": "bun run check-types && biome ci . && bun test",
+    "changelog": "git-cliff --output CHANGELOG.md && bun run scripts/update-readme.mjs"
   },
   "peerDependencies": {
     "@iconify/react": "^6",

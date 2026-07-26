@@ -1,0 +1,32 @@
+# Cut a GitHub release from a `v*` tag, with notes generated from the commits
+# since the previous tag.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.0
+
+      # `--latest` is the range since the previous tag; `--strip header` drops
+      # the "# Changelog" title, which reads as a stray heading inside a release
+      # body that already has one.
+      - name: Notes
+        run: bunx git-cliff@latest --latest --strip header --output RELEASE_NOTES.md
+
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          body_path: RELEASE_NOTES.md

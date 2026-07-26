@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "biomejs.biome",
+    "usernamehw.errorlens",
+    "yoavbls.pretty-ts-errors",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+    "bierner.markdown-mermaid",
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuggly.todo-tree"
+  ],
+  "unwantedRecommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
+  ]
+}

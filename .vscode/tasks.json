@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check-types",
+      "type": "shell",
+      "command": "bun run check-types",
+      "problemMatcher": ["$tsc"],
+      "presentation": { "reveal": "silent", "clear": true }
+    },
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "bunx biome check .",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "clear": true }
+    },
+    {
+      "label": "lint:fix",
+      "type": "shell",
+      "command": "bunx biome check --write .",
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "bun test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "verify",
+      "dependsOrder": "sequence",
+      "dependsOn": ["check-types", "lint", "test"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "changelog",
+      "type": "shell",
+      "command": "bunx git-cliff --output CHANGELOG.md && bun run scripts/update-readme.mjs",
+      "problemMatcher": []
+    }
+  ]
+}

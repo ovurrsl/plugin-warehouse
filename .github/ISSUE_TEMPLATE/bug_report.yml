@@ -1,0 +1,54 @@
+name: Bug report
+description: Something renders, measures or counts wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things make a warehouse bug reproducible: the **node settings** and
+        the **host version**. A screenshot without them usually cannot be acted
+        on, because most of what is wrong here is arithmetic.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: Node settings
+      description: >
+        The node's fields — bay count, rows, levels, clear width, pallet preset,
+        orientation. Copying them from the inspector is enough.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: host
+    attributes:
+      label: Editor version
+      description: The `@pascal-app/core` version the host is on, and the plugin commit.
+      placeholder: 'core 0.9.2 · plugin 553491e'
+    validations:
+      required: true
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console
+      description: >
+        Paste the `[pascal:registry]` and `[ovurrsl:warehouse]` lines. If they
+        are missing, that is itself the finding — the plugin never loaded.
+      render: text
+
+  - type: checkboxes
+    id: figures
+    attributes:
+      label: If a number is wrong
+      options:
+        - label: I have said what the number should be, and where that comes from.

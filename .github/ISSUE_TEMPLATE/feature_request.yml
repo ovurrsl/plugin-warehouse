@@ -1,0 +1,36 @@
+name: Feature request
+description: A rack type, a field, or a capability that is missing
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you want to model
+      description: >
+        Describe the real thing, not the field. "A block where the middle bay is
+        a fire route" is actionable; "add a `skipBay` boolean" pre-decides the
+        shape of the answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: Reference
+      description: >
+        A manufacturer's catalogue page, a standard, or a photograph. Real
+        dimensions are the difference between modelling this and inventing it.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Racking
+        - Pallets and unit loads
+        - Handling equipment
+        - Capacity and statistics
+        - Floor plan
+        - Something else
+    validations:
+      required: true

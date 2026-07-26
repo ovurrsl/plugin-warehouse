@@ -1,0 +1,52 @@
+# Regenerate CHANGELOG.md and the generated blocks of README.md on every push
+# to main, then commit the result back.
+#
+# The recursion everyone expects here does not happen: GitHub does not start a
+# new workflow run for events triggered by the built-in GITHUB_TOKEN (the
+# documented exceptions are `workflow_dispatch` and `repository_dispatch`).
+# `paths-ignore` and `[skip ci]` are belt and braces — they make the intent
+# legible without being the thing that holds it together.
+name: README
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - README.md
+      - CHANGELOG.md
+      - .github/workflows/readme.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history: git-cliff reads every commit to build the changelog, and a
+      # shallow clone silently produces a changelog covering one commit.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.0
+
+      - name: Changelog
+        run: bunx git-cliff@latest --output CHANGELOG.md
+
+      # Rewrites only the marked blocks in README.md, and only when their
+      # contents actually change — so a push that alters nothing generated
+      # produces no commit at all.
+      - name: README blocks
+        run: bun run scripts/update-readme.mjs
+
+      - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d # v7.2.0
+        with:
+          commit_message: 'docs: refresh generated README blocks [skip ci]'
+          file_pattern: README.md CHANGELOG.md

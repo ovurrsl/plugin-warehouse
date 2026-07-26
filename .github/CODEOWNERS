@@ -1,0 +1,4 @@
+# Every path, one owner. Kept as a single line rather than a per-directory
+# table: a table that lists directories goes stale the first time one is added,
+# and a stale CODEOWNERS silently stops requesting review.
+* @ovurrsl

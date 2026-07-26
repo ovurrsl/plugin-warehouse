@@ -1,8 +1,57 @@
 # @ovurrsl/plugin-warehouse
 
+<!-- BADGES:START -->
+[![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
+![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
+![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
+![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
+<!-- BADGES:END -->
+
 Warehouse & logistics equipment for the [Pascal editor](https://editor.pascal.app) — pallets, racking, handling equipment, and a capacity readout.
 
 Built against **plugin API v1** ([contract](https://editor.pascal.app/docs/developers/plugins)).
+
+## Architecture
+
+<!-- ARCH:START -->
+```mermaid
+flowchart TD
+  subgraph host["Pascal host"]
+    core["@pascal-app/core<br/>nodeRegistry · useScene"]
+    editor["@pascal-app/editor<br/>panels · controls"]
+    viewer["@pascal-app/viewer<br/>R3F canvas"]
+  end
+
+  subgraph plugin["@ovurrsl/plugin-warehouse"]
+    manifest["index.ts<br/><i>manifest barrel — SSR-eager</i>"]
+    adapter["host-adapter.ts<br/><i>every host-schema read,<br/>behind runtime guards</i>"]
+    kinds["warehouse: node kinds<br/>schema · parts · slots"]
+    geom["geometry-builder.ts<br/><i>one merged mesh per shape</i>"]
+    panels["panels/<br/><i>inline styles, host CSS vars</i>"]
+    store["store.ts<br/><i>plugin-owned zustand</i>"]
+  end
+
+  manifest -->|"Plugin · NodeDefinition"| core
+  panels -->|"EditorHostPanel"| editor
+  kinds --> geom
+  geom -->|"renderer"| viewer
+  panels --> store
+  store --> kinds
+  adapter -.->|"guarded reads only"| core
+  kinds -.->|"area figures"| adapter
+
+  classDef owned fill:#1e3a8a22,stroke:#1e40af;
+  classDef guarded fill:#c2410c22,stroke:#c2410c;
+  class manifest,kinds,geom,panels,store owned;
+  class adapter guarded;
+```
+
+Capacity figures come entirely from this plugin's own schemas, so a host change
+cannot break them. Only the *area* figures cross the dashed line, and those
+degrade to "no data" rather than throwing.
+<!-- ARCH:END -->
 
 ## Design constraint: survive a host upgrade
 
@@ -48,13 +97,18 @@ Three edits in the host app:
 **1. Depend on it**
 
 ```jsonc
-// package.json — this repository is private, so use the git+ssh form
-"@ovurrsl/plugin-warehouse": "git+ssh://git@github.com/ovurrsl/plugin-warehouse.git#<commit-sha>"
-// …public repo: "github:owner/repo#<commit-sha>"
-// …or, inside the editor monorepo: "*"
+// package.json — this repository is public, so the shorthand works
+"@ovurrsl/plugin-warehouse": "github:ovurrsl/plugin-warehouse#<commit-sha>"
+// …inside the editor monorepo: "*"
+// …if you make your fork private, see the note below
 ```
 
-> **`github:` does not work for a private repository.** Bun resolves that
+Pin a commit SHA rather than a branch. A branch pin means `bun install` can
+change the plugin under a host that did not ask for it, and the symptom — a
+kind that used to register and now does not — points at the host.
+
+> **`github:` does not work for a *private* repository**, which is worth
+> recording because the failure names the wrong thing. Bun resolves that
 > shorthand through `api.github.com/repos/.../tarball/…` and fetches it
 > unauthenticated, so a private repo answers `404` and the install fails with
 > `failed to resolve`. Bun 1.3 has no token setting that changes this —
@@ -62,10 +116,11 @@ Three edits in the host app:
 > `NPM_CONFIG_TOKEN` and `~/.netrc` were each verified to make no difference,
 > and `git+https://github.com/…` is rewritten to the same tarball URL.
 >
-> The `git+ssh://` form is what makes bun shell out to `git` instead, and git
-> authenticates the way it already does for `push` — through the credential
-> helper. On a machine where `git push` works this installs with no extra
-> setup and **no SSH key is required**, despite the scheme name.
+> The `git+ssh://git@github.com/owner/repo.git#<sha>` form is what makes bun
+> shell out to `git` instead, and git authenticates the way it already does for
+> `push` — through the credential helper. On a machine where `git push` works
+> this installs with no extra setup and **no SSH key is required**, despite the
+> scheme name.
 
 **2. Transpile it** — the package ships TypeScript source, not built JS:
 
@@ -147,6 +202,42 @@ That is the anchor. If those lines are missing, fix the wiring before debugging 
 ## Scripts
 
 ```sh
-bun run check-types
-bun test
+bun run check-types                 # tsc --noEmit
+bun test                            # bun's runner
+bunx biome check .                  # lint + format, `--write` to fix
+bun run scripts/update-readme.mjs   # regenerate the blocks below
+bunx git-cliff --output CHANGELOG.md
 ```
+
+## Recent changes
+
+<!-- CHANGELOG:START -->
+## Unreleased
+
+
+### Documentation
+
+- Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
+- Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
+
+### Features
+
+- Click a bay, configure that bay — and the tunnel finally has a UI ([`553491e`](https://github.com/ovurrsl/plugin-warehouse/commit/553491eda482abbd88645d0fd3eeafaa367b762b))
+- The beam's endplate was in the post, and one bay by default ([`f75ecb4`](https://github.com/ovurrsl/plugin-warehouse/commit/f75ecb455e3f30d904c03081abc24185a04b1cdd))
+- Back to back is a count too, not a two-value pattern ([`79beac0`](https://github.com/ovurrsl/plugin-warehouse/commit/79beac06393d52c71e0c8f67bcae6fe64a55e4dd))
+- Rows multiply inside the node, and a layout card to set them ([`8d39106`](https://github.com/ovurrsl/plugin-warehouse/commit/8d39106f8229b7dbb872b8d9d761c5fd6c4369fc))
+- Per-bay skips, tunnels and level counts ([`1806fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/1806fddfeac67d27abc4ef3c325bbace80b10d32))
+- Drop the Shift row gesture — it collided with the host's snap key ([`6c4dca1`](https://github.com/ovurrsl/plugin-warehouse/commit/6c4dca1863db4bae9d74d84dfdaa237024a2adc1))
+- One part list for 3D, 2D and the tests — and fix beams cutting through posts ([`450d11b`](https://github.com/ovurrsl/plugin-warehouse/commit/450d11bc6763b53f3356de58aa3f2c8e115ce918))
+- Definition, tool, floorplan and inspector — the rack is placeable ([`d79bfba`](https://github.com/ovurrsl/plugin-warehouse/commit/d79bfbac0b968df5e1f34f4e0acbb8198216dba3))
+- Tidy the occupancy type guard ([`7e4cfda`](https://github.com/ovurrsl/plugin-warehouse/commit/7e4cfda5c5e7035fee0ad338dfb3486f463b6805))
+- Renderer, ghost stock, and a self-checking cache key ([`90efce5`](https://github.com/ovurrsl/plugin-warehouse/commit/90efce5f39b4a85c9073843bf93fc1d0d34641cb))
+- Merged geometry, shared per shape, with a far tier ([`ed86fe0`](https://github.com/ovurrsl/plugin-warehouse/commit/ed86fe0fe528d97334491d7fa310cd2925aedfeb))
+- Picking levels, containers, and a decision on rowCount ([`f5fa15c`](https://github.com/ovurrsl/plugin-warehouse/commit/f5fa15cc9a72dc2d5f9867905eca620d155ba936))
+- Double-deep positions and pallet support bars ([`958659c`](https://github.com/ovurrsl/plugin-warehouse/commit/958659c461543b6410356236647ce1991091e695))
+- Encode the catalogue and EN 15620 data as tested tables ([`e4658b9`](https://github.com/ovurrsl/plugin-warehouse/commit/e4658b9b15df5451bfed2f8e0cf1364c3ae1266a))
+
+…
+
+Full history in [CHANGELOG.md](CHANGELOG.md).
+<!-- CHANGELOG:END -->

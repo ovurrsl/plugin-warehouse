@@ -22,6 +22,7 @@ import {
   palletSlotCount,
   palletSlotsOf,
   palletSupportBarCount,
+  palletSupportBarsDrawn,
   parseSlotAddress,
   pickingBoxesAcross,
   pickingBoxesDeep,
@@ -347,14 +348,30 @@ describe('pallet support bars', () => {
     ).toBe(1)
   })
 
-  test('removing the bars from a turned rack is reported, not silently corrected', () => {
-    const unsound = rack({ palletOrientation: 'long-side-out', palletSupportBars: 0 })
-    expect(hasUnsupportedPallets(unsound)).toBe(true)
+  test('removing the bars from a turned rack on open beams is reported', () => {
+    const open = { decking: 'open', palletOrientation: 'long-side-out' }
+    expect(hasUnsupportedPallets(rack({ ...open, palletSupportBars: 0 }))).toBe(true)
     // Every other combination is sound.
-    expect(hasUnsupportedPallets(rack({ palletOrientation: 'long-side-out' }))).toBe(false)
+    expect(hasUnsupportedPallets(rack(open))).toBe(false)
     expect(
-      hasUnsupportedPallets(rack({ palletOrientation: 'short-side-out', palletSupportBars: 0 })),
+      hasUnsupportedPallets(
+        rack({ decking: 'open', palletOrientation: 'short-side-out', palletSupportBars: 0 }),
+      ),
     ).toBe(false)
+  })
+
+  test('decking answers the same problem the bars do', () => {
+    // A deck carries the pallet whichever way round it sits, so a decked rack is
+    // never unsupported — and the geometry refuses to draw bars on one, because
+    // the two mount in the same place.
+    for (const decking of ['wire-mesh', 'steel', 'timber']) {
+      const turned = { decking, palletOrientation: 'long-side-out' }
+      expect(hasUnsupportedPallets(rack({ ...turned, palletSupportBars: 0 }))).toBe(false)
+      expect(palletSupportBarsDrawn(rack(turned))).toBe(false)
+    }
+    expect(
+      palletSupportBarsDrawn(rack({ decking: 'open', palletOrientation: 'long-side-out' })),
+    ).toBe(true)
   })
 
   test('a square pallet needs bars in neither orientation by geometry alone', () => {

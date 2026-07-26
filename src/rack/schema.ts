@@ -23,8 +23,13 @@ export const PalletRackNode = BaseNode.extend({
 
   // ── Run layout ────────────────────────────────────────────────────────────
 
-  /** Bays along the run. Frames are shared, so this is one fewer than frames. */
-  bayCount: z.number().int().min(1).max(40).default(3),
+  /**
+   * Bays along the run. Frames are shared, so this is one fewer than frames.
+   *
+   * One by default: a rack you drop in is a single bay you then multiply, not a
+   * three-bay run you have to cut back.
+   */
+  bayCount: z.number().int().min(1).max(40).default(1),
 
   /** Clear entry width of one bay, measured between the two uprights. */
   bayClearWidth: z.number().min(0.6).max(6).default(2.7),

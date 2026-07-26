@@ -3,10 +3,12 @@ import type { RackDetail, RackPart, RackPartRole } from './parts'
 import { PART_BUDGET, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
+  bayShapeDepartures,
   beamedLevels,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
+  palletSupportBarsDrawn,
   rowFacing,
   rowGapBefore,
   slotOffsetsX,
@@ -242,7 +244,9 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
  * on purpose: two racks that look the same must share one geometry.
  */
 export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): string {
-  const bars = palletSupportBarCount(rack)
+  // Zero unless a bar is actually built: a decked level carries the pallet, so
+  // the bar count on a decked rack moves nothing.
+  const bars = palletSupportBarsDrawn(rack) ? palletSupportBarCount(rack) : 0
   const beamed = beamedLevels(rack)
   const hasPicking = beamed.some((level) => levelTypeOf(rack, level) === 'picking')
   const levels = beamed
@@ -266,10 +270,7 @@ export function rackGeometryKey(rack: PalletRackNode, detail: RackDetail): strin
     // a rack carrying one cannot share a geometry with a uniform one. Serialised
     // in key order so two racks with the same overrides written in a different
     // order still collapse onto one mesh.
-    Object.keys(rack.bayOverrides)
-      .sort()
-      .map((key) => `${key}:${JSON.stringify(rack.bayOverrides[key])}`)
-      .join(';'),
+    bayShapeDepartures(rack).join(';'),
     rack.rowCount,
     // The gap sequence the block actually uses, rather than the two gap fields
     // and the group size raw. A single run consumes neither gap, a pair never

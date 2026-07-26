@@ -107,7 +107,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     set({ palletLoadHeight: Math.max(0, palletLoadHeight) }),
 
   rackBrush: {
-    bayCount: 3,
+    bayCount: 1,
     bayClearWidth: 2.7,
     depth: 1.1,
     uprightHeight: 5,

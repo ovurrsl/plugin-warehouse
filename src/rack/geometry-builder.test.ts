@@ -228,7 +228,7 @@ describe('cache key coverage', () => {
     ['levelClear', 1.7],
     ['groundLevelStorage', false],
     ['hasGroundBeam', true],
-    ['bayOverrides', { 'R1-B2': { skipped: true } }],
+    ['bayOverrides', { 'R1-B1': { tunnelLevels: 1 } }],
     ['pickingLevels', 2],
     ['levelTypes', ['picking', 'pallet', 'pallet', 'pallet']],
     ['pickingLevelClear', 0.8],
@@ -250,6 +250,9 @@ describe('cache key coverage', () => {
     ['beamColor', '#ff00ff'],
     // Fields that must NOT move a vertex — included so the test also catches a
     // key that over-reports and needlessly splits the cache.
+    // An override left behind on a bay the run no longer has. Shrinking a run
+    // does not clear them, so this is the ordinary case, not a contrived one.
+    ['bayOverrides', { 'R1-B9': { skipped: true } }],
     ['ghostFill', 0.8],
     ['levelCapacity', 5000],
     ['name', 'Aisle 7'],

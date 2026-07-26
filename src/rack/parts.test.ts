@@ -89,6 +89,66 @@ describe('beam to upright fit', () => {
     }
   })
 
+  /**
+   * Roles that may share material, and why.
+   *
+   * Everything else that overlaps is a defect. The check this replaces looked
+   * only at beams against uprights, which is exactly why the beam's *end
+   * connector* sank three millimetres into the post's flange unnoticed: a
+   * different role, wearing a beam-ish colour, sitting where a beam ends — so on
+   * screen it read as the beam running into the upright.
+   */
+  const JOINTS: ReadonlySet<string> = new Set([
+    // Diagonals meet the horizontals, and each other, at their end nodes. Real
+    // frames bolt or weld there, so the steel genuinely occupies one volume.
+    'brace × brace',
+    // A folded section's web and flanges share the corner they are folded from.
+    'upright × upright',
+    // A post is welded to its baseplate and stands in its thickness.
+    'footplate × upright',
+    // The endplate is welded to the beam's end and wraps it, which is the whole
+    // point of moving it inboard: it now occupies the beam rather than the post.
+    'beam × connector',
+  ])
+
+  test('nothing interpenetrates that is not a joint', () => {
+    for (const config of [
+      {},
+      { bayCount: 4, levels: 3 },
+      { rowCount: 2, depthPositions: 2 },
+      { hasGroundBeam: true, pickingLevels: 1, levels: 2 },
+      { bracing: 'x-bracing' },
+      { palletOrientation: 'long-side-out' },
+      { uprightWidth: 0.101, uprightDepth: 0.069, beamHeight: 0.17 },
+    ]) {
+      const r = rack(config)
+      const parts = rackParts(r, 'full')
+      const boxes = parts.map(bounds)
+      for (let i = 0; i < parts.length; i++) {
+        for (let j = i + 1; j < parts.length; j++) {
+          const pair = [parts[i]?.role, parts[j]?.role].sort().join(' × ')
+          if (JOINTS.has(pair)) continue
+          const hit = penetration(boxes[i] as Aabb, boxes[j] as Aabb)
+          expect({ config, pair, hit }).toEqual({ config, pair, hit: 0 })
+        }
+      }
+    }
+  })
+
+  test('the end connector stops at the upright face', () => {
+    const r = rack({ bayCount: 3 })
+    const frames = frameCentersX(r)
+    const faces = frames.flatMap((x) => [x - r.uprightWidth / 2, x + r.uprightWidth / 2])
+    for (const connector of partsOf(r, 'connector')) {
+      const outer = [
+        connector.center[0] - connector.size[0] / 2,
+        connector.center[0] + connector.size[0] / 2,
+      ]
+      // One end lands on a post face; the other is inside the bay.
+      expect(outer.some((edge) => faces.some((face) => Math.abs(face - edge) < 1e-9))).toBe(true)
+    }
+  })
+
   test('a beam sits on the frame face rather than inside the post', () => {
     const r = rack()
     const depth = totalDepth(r)

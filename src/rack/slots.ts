@@ -268,6 +268,60 @@ export function bayOverrideOf(rack: PalletRackNode, row: number, bay: number): B
   return rack.bayOverrides[formatBayAddress(row, bay)] ?? {}
 }
 
+/**
+ * Override keys addressing a bay the block actually has, sorted.
+ *
+ * Overrides outlive the bays they were set on: shrink a ten-bay run to three and
+ * the entries for bays four to ten stay in the record, harmless and invisible.
+ * Harmless to the geometry, at least — left in the cache key they made a rack
+ * carrying them unable to share a mesh with an identical rack that never had
+ * them. Sorted so two racks whose overrides were written in a different order
+ * still collapse onto one geometry.
+ */
+export function activeBayOverrideKeys(rack: PalletRackNode): string[] {
+  return Object.keys(rack.bayOverrides)
+    .filter((key) => {
+      const address = parseBayAddress(key)
+      if (!address) return false
+      if (address.row < 1 || address.row > rack.rowCount) return false
+      return address.bay >= 1 && address.bay <= rack.bayCount
+    })
+    .sort()
+}
+
+/** What the builder emits for a bay, as a short string. */
+function bayShape(rack: PalletRackNode, row: number, bay: number): string {
+  if (isBaySkipped(rack, row, bay)) return 'skip'
+  const present = new Set(bayStorageLevels(rack, row, bay))
+  const levels = beamedLevels(rack).filter((level) => present.has(level))
+  return `${levels.join('/')}:${bayDecking(rack, row, bay)}`
+}
+
+/**
+ * Bays whose built shape departs from a plain one, for the geometry key.
+ *
+ * The departure rather than the override, because the two are not the same
+ * thing. A one-level tunnel through a rack with no ground beam removes the floor
+ * position — which carries no steel — so the override is set, and the mesh is
+ * unchanged. Keying on the record split the cache on a setting that moved
+ * nothing; keying on the shape collapses it back.
+ *
+ * Walks the override record rather than every bay, so a forty-by-twenty block
+ * with no overrides costs nothing here. The key is computed on every lookup, not
+ * only on a miss.
+ */
+export function bayShapeDepartures(rack: PalletRackNode): string[] {
+  const plain = `${beamedLevels(rack).join('/')}:${rack.decking}`
+  const departures: string[] = []
+  for (const key of activeBayOverrideKeys(rack)) {
+    const address = parseBayAddress(key)
+    if (!address) continue
+    const shape = bayShape(rack, address.row, address.bay)
+    if (shape !== plain) departures.push(`${key}=${shape}`)
+  }
+  return departures
+}
+
 /** A skipped bay is a deliberate gap — for a column, a doorway — so the run
  *  keeps its length and only this bay's contents are omitted. */
 export function isBaySkipped(rack: PalletRackNode, row: number, bay: number): boolean {
@@ -793,11 +847,34 @@ export function palletSupportBarCount(rack: PalletRackNode): number {
 }
 
 /**
- * A rack turned long-side-out with the bars explicitly removed. Surfaced rather
- * than silently corrected: the user may be modelling a rack that really is
- * built that way, but nothing should report it as a sound configuration.
+ * Whether any bar is actually built.
+ *
+ * A decked level never gets one — the two mount in the same place and the deck
+ * already does the job. So on a decked rack the bar count moves no vertex, and
+ * anything that keys on it (the geometry cache) has to know that or it splits
+ * the cache on a number nothing reads.
+ */
+export function palletSupportBarsDrawn(rack: PalletRackNode): boolean {
+  if (palletSupportBarCount(rack) === 0) return false
+  if (rack.decking === 'open') return true
+  return activeBayOverrideKeys(rack).some((key) => {
+    const address = parseBayAddress(key)
+    return address !== null && bayDecking(rack, address.row, address.bay) === 'open'
+  })
+}
+
+/**
+ * A rack turned long-side-out with nothing under the pallet.
+ *
+ * Decking answers the same problem the bars do — it carries the pallet whichever
+ * way round it sits — so a decked rack is not unsupported however many bars it
+ * declares. Reporting it as unsupported would push the user to add bars that the
+ * geometry then refuses to draw, because bars and decking mount in the same
+ * place. Surfaced rather than silently corrected when it is real: the user may
+ * be modelling a rack that really is built that way.
  */
 export function hasUnsupportedPallets(rack: PalletRackNode): boolean {
+  if (rack.decking !== 'open') return false
   return requiresPalletSupportBars(rack) && palletSupportBarCount(rack) === 0
 }
 

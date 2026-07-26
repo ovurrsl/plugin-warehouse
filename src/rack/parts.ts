@@ -65,6 +65,14 @@ export type RackPart = {
 
 /** Wall thickness of the upright's cold-formed section. */
 const SECTION_WALL = 0.003
+/**
+ * Baseplate thickness.
+ *
+ * Named because the ground beam has to clear it: the plate is wider than the
+ * post it carries, so it reaches into the bay exactly where a ground beam's end
+ * connector comes down.
+ */
+const FOOTPLATE_HEIGHT = 0.02
 /** Width a beam's end connector laps onto the upright face. */
 const CONNECTOR_LAP = 0.02
 /** How far the connector's hooks reach past the beam, above and below. */
@@ -112,8 +120,8 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
             // wider at the floor than the declared footprint.
             parts.push({
               role: 'footplate',
-              center: [x, 0.01, z],
-              size: [uprightWidth + 0.053, 0.02, uprightDepth + 0.039],
+              center: [x, FOOTPLATE_HEIGHT / 2, z],
+              size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
             })
           }
         })
@@ -135,10 +143,14 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
           const beamHeight = levelBeamHeight(rack, level)
           const surface = levelSurfaceY(rack, level)
           // Every other level hangs its beam under the load surface; a ground
-          // beam has no surface above it to hang from. It sits on its own
-          // connectors rather than on the floor, because the hooks reach below
-          // the beam and would otherwise be buried in the slab.
-          const beamY = level === 0 ? beamHeight / 2 + CONNECTOR_REACH : surface - beamHeight / 2
+          // beam has no surface above it to hang from. It stands on its own
+          // connectors, clear of the baseplate — the hooks reach below the
+          // section, and the plate is wider than the post, so a ground beam set
+          // from the floor buried its connectors in both.
+          const beamY =
+            level === 0
+              ? FOOTPLATE_HEIGHT + CONNECTOR_REACH + beamHeight / 2
+              : surface - beamHeight / 2
           const beamTop = beamY + beamHeight / 2
 
           for (const sign of [1, -1]) {
@@ -154,30 +166,38 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
             })
 
             if (full) {
-              // End connectors lap the post face, the way the real endplate
-              // does. Sized so they stop at the post centreline rather than
-              // passing through to the far side.
-              const proud = 0.004
+              // The endplate welded to the beam's end, whose hooks engage the
+              // upright's punched face.
+              //
+              // It occupies the beam's own last stretch rather than reaching
+              // past it. Lapping outward — which is what "the plate sits against
+              // the post" suggests — drove it three millimetres into the post's
+              // near flange, the full thickness of the folded section. Nothing
+              // in the model said so, and because the plate carries a beam-ish
+              // colour and sits exactly where a beam ends, what it looked like
+              // on screen was the beam itself running into the upright.
               for (const end of [-1, 1]) {
                 parts.push({
                   role: 'connector',
                   center: [
-                    centerX + (end * (rack.bayClearWidth + CONNECTOR_LAP)) / 2,
+                    centerX + (end * (rack.bayClearWidth - CONNECTOR_LAP)) / 2,
                     beamY,
-                    // Thicker than the beam it wraps, but grown inward only:
-                    // the beam is already flush with the frame's outer face, so
-                    // a symmetric endplate would stand proud of the declared
-                    // footprint and let two runs touch while the editor still
-                    // called the placement clear.
-                    beamZ - (sign * proud) / 2,
+                    // Exactly the beam's thickness and exactly its Z. What makes
+                    // the plate legible is its height — the hooks reach above
+                    // and below the section, which is what you actually see on a
+                    // real beam end. Standing it proud instead put it 4 mm into
+                    // the decking, which begins at the beams' inner faces.
+                    beamZ,
                   ],
-                  size: [CONNECTOR_LAP, beamHeight + 2 * CONNECTOR_REACH, beamThickness + proud],
+                  size: [CONNECTOR_LAP, beamHeight + 2 * CONNECTOR_REACH, beamThickness],
                 })
               }
             }
           }
 
-          if (full && levelHasShelf(rack, level) && bayDecking(rack, row, bay) !== 'open') {
+          const decked = levelHasShelf(rack, level) && bayDecking(rack, row, bay) !== 'open'
+
+          if (full && decked) {
             const thickness = shelfThickness(rack, level, bayDecking(rack, row, bay))
             // Flush-mounted: the panel drops between the beams and its top
             // finishes level with them, so the load surface stays exactly where
@@ -189,7 +209,12 @@ export function rackParts(rack: PalletRackNode, detail: RackDetail): RackPart[] 
             })
           }
 
-          if (full) {
+          // Bars and decking are alternatives, not layers. Both mount on top of
+          // the beams, so a decked level fitted with bars had the two occupying
+          // the same six millimetres — and the reason it is a real rule rather
+          // than a drawing tidy-up is that a deck already carries the pallet
+          // whichever way round it sits, which is the entire job of the bars.
+          if (full && !decked) {
             const bars = palletSupportBarCount(rack)
             if (bars > 0) {
               const barHeight = 0.03

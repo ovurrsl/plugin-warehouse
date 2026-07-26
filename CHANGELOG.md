@@ -6,6 +6,11 @@ index to it, not a replacement for it.
 ## Unreleased
 
 
+### Build and CI
+
+- Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
+- CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
+
 ### Documentation
 
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))

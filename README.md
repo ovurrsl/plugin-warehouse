@@ -215,6 +215,11 @@ bunx git-cliff --output CHANGELOG.md
 ## Unreleased
 
 
+### Build and CI
+
+- Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
+- CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
+
 ### Documentation
 
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
@@ -231,11 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - One part list for 3D, 2D and the tests — and fix beams cutting through posts ([`450d11b`](https://github.com/ovurrsl/plugin-warehouse/commit/450d11bc6763b53f3356de58aa3f2c8e115ce918))
 - Definition, tool, floorplan and inspector — the rack is placeable ([`d79bfba`](https://github.com/ovurrsl/plugin-warehouse/commit/d79bfbac0b968df5e1f34f4e0acbb8198216dba3))
 - Tidy the occupancy type guard ([`7e4cfda`](https://github.com/ovurrsl/plugin-warehouse/commit/7e4cfda5c5e7035fee0ad338dfb3486f463b6805))
-- Renderer, ghost stock, and a self-checking cache key ([`90efce5`](https://github.com/ovurrsl/plugin-warehouse/commit/90efce5f39b4a85c9073843bf93fc1d0d34641cb))
-- Merged geometry, shared per shape, with a far tier ([`ed86fe0`](https://github.com/ovurrsl/plugin-warehouse/commit/ed86fe0fe528d97334491d7fa310cd2925aedfeb))
-- Picking levels, containers, and a decision on rowCount ([`f5fa15c`](https://github.com/ovurrsl/plugin-warehouse/commit/f5fa15cc9a72dc2d5f9867905eca620d155ba936))
-- Double-deep positions and pallet support bars ([`958659c`](https://github.com/ovurrsl/plugin-warehouse/commit/958659c461543b6410356236647ce1991091e695))
-- Encode the catalogue and EN 15620 data as tested tables ([`e4658b9`](https://github.com/ovurrsl/plugin-warehouse/commit/e4658b9b15df5451bfed2f8e0cf1364c3ae1266a))
 
 …
 

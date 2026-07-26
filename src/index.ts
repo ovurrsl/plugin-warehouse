@@ -1,5 +1,6 @@
 import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
+import { conveyorCurveDefinition } from './conveyor/curve-definition'
 import { conveyorRollerDefinition } from './conveyor/definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
@@ -31,6 +32,7 @@ export const warehousePlugin: Plugin = {
     palletDefinition as unknown as AnyNodeDefinition,
     palletRackDefinition as unknown as AnyNodeDefinition,
     conveyorRollerDefinition as unknown as AnyNodeDefinition,
+    conveyorCurveDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -50,7 +52,12 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   pluginUrl: 'https://github.com/ovurrsl/plugin-warehouse',
   // Kept in sync with the manifest so `panelForKind` can route the host's
   // "find in catalog" action to this panel.
-  kinds: ['warehouse:pallet', 'warehouse:pallet-rack'],
+  kinds: [
+    'warehouse:pallet',
+    'warehouse:pallet-rack',
+    'warehouse:conveyor-roller',
+    'warehouse:conveyor-curve',
+  ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild
   // the lazy boundary on every render.

@@ -3,6 +3,7 @@ import {
   angleRad,
   arcPointLocal,
   centrelineRadiusM,
+  centrelineLengthM as curveCentrelineLengthM,
   frameWidthM as curveFrameWidthM,
   usefulWidthMm as curveUsefulWidthMm,
 } from './curve-metrics'
@@ -88,6 +89,18 @@ export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId)
  *  modules must agree on to be joined — circuit rule R1. */
 export function moduleLaneMm(module: ConveyorModule): number {
   return isCurveModule(module) ? curveUsefulWidthMm(module) : usefulWidthMm(module)
+}
+
+/**
+ * How far a box travels through this module.
+ *
+ * The bed length on a straight and the **centreline arc** on a bend — not the
+ * bend's footprint, which is the box it occupies rather than the distance goods
+ * cover in it. A line's length is the sum of these, so getting a bend's wrong
+ * would make every panel that reports a line's length wrong by the difference.
+ */
+export function moduleRunLengthM(module: ConveyorModule): number {
+  return isCurveModule(module) ? curveCentrelineLengthM(module) : moduleLengthM(module)
 }
 
 /** Outside of one side member to the outside of the other. Two families, two

@@ -301,6 +301,44 @@ export function boxClearsTheBend(curve: ConveyorCurveNode, boxLength: number): b
   return boxLength <= longestBoxThroughBendM(curve) + 1e-9
 }
 
+/** Longest arc one stand-in box may span, in radians. Thirty degrees keeps the
+ *  chord within four centimetres of the arc at every radius the schema allows. */
+const COLLIDER_STEP = Math.PI / 6
+
+/**
+ * Boxes that stand in for the bend when something is clicked.
+ *
+ * **Not the bounding box**, which is what a single collider would have to be —
+ * and a quarter annulus fills less than a third of its own square, so a bend
+ * tucked into a corner would swallow clicks aimed at the rack beside it. A
+ * handful of chord-length boxes following the arc is a tight picker instead, and
+ * costs nothing to draw: they are mounted invisible, so three's raycaster keeps
+ * hitting them while the renderer skips them entirely.
+ *
+ * Radially over-deep by the chord's bulge, so the segments cover the arc they
+ * approximate rather than cutting its corners off.
+ */
+export function colliderSegments(
+  curve: ConveyorCurveNode,
+): Array<{ center: [number, number]; size: [number, number]; rotationY: number }> {
+  const sweep = angleRad(curve)
+  const count = Math.max(1, Math.ceil(sweep / COLLIDER_STEP))
+  const step = sweep / count
+  const outer = outerRadiusM(curve)
+  const radius = (curve.innerRadius + outer) / 2
+  const depth = outer - curve.innerRadius + 2 * radius * (1 - Math.cos(step / 2))
+  const hand = curve.handed === 'left' ? 1 : -1
+
+  return Array.from({ length: count }, (_, index) => {
+    const mid = (index + 0.5) * step
+    return {
+      center: arcPointLocal(curve, radius, mid),
+      size: [2 * radius * Math.sin(step / 2), depth] as [number, number],
+      rotationY: hand * mid,
+    }
+  })
+}
+
 /** The volume the module occupies, as a box in its own local frame. */
 export function localBoundsM(curve: ConveyorCurveNode): {
   min: [number, number, number]

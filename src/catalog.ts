@@ -96,6 +96,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'One module of continuously driven roller conveyor. Lay a run with [ and ]; each module is its own object.',
     icon: 'lucide:move-right',
   },
+  {
+    kind: 'warehouse:conveyor-curve',
+    label: 'Curved Conveyor',
+    sectionId: 'conveyance',
+    description:
+      'Turns a line through 45, 90 or 180°, keeping every box facing the way it entered. [ and ] set the angle, H flips the hand.',
+    icon: 'lucide:corner-up-left',
+  },
 ] as const
 
 export function itemsInSection(sectionId: string): CatalogItem[] {

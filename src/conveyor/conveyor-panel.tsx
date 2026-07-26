@@ -20,6 +20,8 @@ import {
 } from './metrics'
 import { conveyorRollerParametrics } from './parametrics'
 import { jointProblems } from './port-magnet'
+import type { ConveyorModule } from './ports'
+import { asConveyorModule, moduleRunLengthM } from './ports'
 import type { ConveyorRollerNode } from './schema'
 
 /**
@@ -276,14 +278,16 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
  * deleted out of the middle splits the line the instant the store writes, with
  * nothing to heal.
  */
-function describeLine(node: ConveyorRollerNode, nodes: Record<string, unknown>): string {
+export function describeLine(node: ConveyorModule, nodes: Record<string, unknown>): string {
   const line = lineOf(nodes, node.id)
   if (line.length <= 1) return 'on its own'
 
+  // Summed through the family-level length, because a line is not all straights:
+  // a bend contributes the arc a box actually travels, not its footprint.
   let length = 0
   for (const id of line) {
-    const member = nodes[id] as ConveyorRollerNode | undefined
-    if (member) length += moduleLengthM(member)
+    const member = asConveyorModule(nodes[id])
+    if (member) length += moduleRunLengthM(member)
   }
   const ends: string[] = []
   if (!hasUpstreamNeighbour(nodes, node)) ends.push('head')

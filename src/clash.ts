@@ -1,4 +1,6 @@
 import { nodeRegistry } from '@pascal-app/core'
+import { colliderSegments, localBoundsM as curveBoundsM } from './conveyor/curve-metrics'
+import type { ConveyorCurveNode } from './conveyor/curve-schema'
 import { localBoundsM } from './conveyor/metrics'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { specOf, unitLoadHeight } from './pallet/presets'
@@ -188,6 +190,26 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // surface, and nothing passes through a surface.
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
+    )
+  }
+
+  if (placement.type === 'warehouse:conveyor-curve') {
+    // The arc, not the box around it. A quarter annulus fills under a third of
+    // its own bounding square, so a single box would refuse a rack standing in
+    // the corner the bend curls around — a corner that is, in a real layout,
+    // exactly where the racking goes. The segments are the same ones the picker
+    // uses, and both are floor-to-guide-top: a bend that fits under a tunnel
+    // has to fit with its legs.
+    const curve = node as ConveyorCurveNode
+    const bounds = curveBoundsM(curve)
+    const height = bounds.max[1] - bounds.min[1]
+    return colliderSegments(curve).map((segment) =>
+      toWorldBox(
+        [segment.center[0], bounds.min[1] + height / 2, segment.center[1]],
+        [segment.size[0], height, segment.size[1]],
+        placement.position,
+        placement.rotationY + segment.rotationY,
+      ),
     )
   }
 

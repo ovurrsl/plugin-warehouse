@@ -228,3 +228,28 @@ describe('row fields in the geometry key', () => {
     )
   })
 })
+
+describe('scenes saved before back-to-back was a count', () => {
+  test('the boolean it used to be still parses', () => {
+    // Rejecting it would fail the whole node, so the rack would not come back
+    // at all — a much worse outcome than the field being guarded.
+    expect(rack({ backToBack: true }).backToBack).toBe(2)
+    expect(rack({ backToBack: false }).backToBack).toBe(1)
+  })
+
+  test('and the two values mean what they meant', () => {
+    const pair = rack({ rowCount: 2, backToBack: true })
+    const single = rack({ rowCount: 2, backToBack: false })
+    // `true` was a back-to-back pair: one spine gap, rows facing away.
+    expect(rowGapBefore(pair, 2)).toBeCloseTo(pair.backToBackGap, 9)
+    expect(rowFacing(pair, 2)).toBe(-1)
+    // `false` was a lone run, so two rows are two independent ones.
+    expect(rowGapBefore(single, 2)).toBeCloseTo(single.aisleWidth, 9)
+    expect(rowFacing(single, 2)).toBe(1)
+  })
+
+  test('a nonsense value is still rejected', () => {
+    expect(() => rack({ backToBack: 'yes' })).toThrow()
+    expect(() => rack({ backToBack: 0 })).toThrow()
+  })
+})

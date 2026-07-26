@@ -38,8 +38,14 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   // the scene graph's `installedPlugins`, and the one the rail filters on.
   pluginId: PLUGIN_ID,
   label: 'Warehouse',
-  description: 'Pallets, racking, handling equipment, and a warehouse capacity readout.',
+  description: 'Pallet racking, pallets, and warehouse layout tools.',
   icon: { kind: 'iconify', name: 'lucide:warehouse' },
+  // Fills the host's plugin detail card — `plugins-panel.tsx` renders Creator
+  // and a "View plugin" link from these, and omits each row when its field is
+  // absent. They live on the panel rather than the `Plugin` manifest because
+  // the card is host UI reading `EditorHostPanel`, not the registry.
+  creator: { name: 'ovurrsl', url: 'https://github.com/ovurrsl' },
+  pluginUrl: 'https://github.com/ovurrsl/plugin-warehouse',
   // Kept in sync with the manifest so `panelForKind` can route the host's
   // "find in catalog" action to this panel.
   kinds: ['warehouse:pallet', 'warehouse:pallet-rack'],

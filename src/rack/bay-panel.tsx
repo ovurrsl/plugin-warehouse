@@ -5,6 +5,7 @@ import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { SegmentedControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { useWarehouseStore } from '../store'
+import { deleteBay } from './bay-commands'
 import type { PalletRackNode } from './schema'
 import {
   type BayOverride,
@@ -86,6 +87,17 @@ const styles = {
     fontSize: '0.6875rem',
     color: MUTED,
     cursor: 'pointer',
+  },
+  danger: {
+    borderRadius: '0.5rem',
+    border: '1px solid color-mix(in oklab, #ef4444 45%, transparent)',
+    background: 'color-mix(in oklab, #ef4444 12%, transparent)',
+    padding: '0.4375rem 0.625rem',
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: '#f87171',
+    cursor: 'pointer',
+    textAlign: 'center',
   },
 } satisfies Record<string, CSSProperties>
 
@@ -188,13 +200,19 @@ export default function RackBayPanel({ node }: { node: PalletRackNode }) {
                   tunnelLevels: value === '0' ? undefined : Number(value),
                 })
               }
+              // Derived from the levels this frame actually carries, not a
+              // fixed 1–3. A tunnel through every level is a legitimate thing
+              // to ask for — it is the shape a fire route takes through a tall
+              // block — and a hardcoded ceiling both hid that and misreported
+              // an existing deeper tunnel as 3.
               options={[
                 { label: 'None', value: '0' },
-                { label: '1 level', value: '1' },
-                { label: '2', value: '2' },
-                { label: '3', value: '3' },
+                ...Array.from({ length: fitted }, (_, index) => ({
+                  label: index === 0 ? '1 level' : String(index + 1),
+                  value: String(index + 1),
+                })),
               ]}
-              value={String(Math.min(3, tunnel))}
+              value={String(Math.min(fitted, tunnel))}
             />
           </div>
 
@@ -264,6 +282,16 @@ export default function RackBayPanel({ node }: { node: PalletRackNode }) {
         </button>
       ) : null}
 
+      <div style={styles.field}>
+        <span style={styles.label}>
+          <span>Remove</span>
+          <span style={{ opacity: 0.7 }}>Del</span>
+        </span>
+        <button onClick={() => deleteBay(node, bay)} style={styles.danger} type="button">
+          {removalLabel(node, bay)}
+        </button>
+      </div>
+
       <p style={styles.hint}>
         Bays that match the run cost nothing. A bay that differs makes this rack's shape unique, so
         a line of identical racks that shared one mesh becomes one mesh each —{' '}
@@ -271,4 +299,19 @@ export default function RackBayPanel({ node }: { node: PalletRackNode }) {
       </p>
     </div>
   )
+}
+
+/**
+ * Say what the button will actually do before it does it.
+ *
+ * Removing a bay has three quite different outcomes depending on where it sits,
+ * and the one that surprises people is the middle: a run cannot lose an
+ * interior bay and stay one run without dragging half of itself across the
+ * other half, so it becomes two. Naming that on the button is cheaper than
+ * explaining it after.
+ */
+function removalLabel(node: PalletRackNode, bay: number): string {
+  if (node.bayCount <= 1) return 'Delete this rack'
+  if (bay === 1 || bay === node.bayCount) return 'Remove this bay'
+  return 'Remove this bay — splits the run in two'
 }

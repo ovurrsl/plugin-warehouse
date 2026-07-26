@@ -2,6 +2,7 @@
 
 import { emitter } from '@pascal-app/core'
 import { type FocusedBay, useWarehouseStore } from '../store'
+import { ensureBayDeleteRouting } from './bay-commands'
 import type { PalletRackNode } from './schema'
 import { bayAt, totalDepth, totalWidth } from './slots'
 
@@ -51,6 +52,10 @@ let subscribed = false
 export function ensureBayFocusSubscription(): void {
   if (subscribed) return
   subscribed = true
+
+  // Delete routing rides along: both are one-time browser-side setup, and the
+  // routing is meaningless without a focused bay to route to.
+  ensureBayDeleteRouting()
 
   // The host types its event map over the built-in kinds, which by construction
   // cannot include a plugin's. Same cast the placement subscriptions use.

@@ -68,7 +68,17 @@ export const PalletRackNode = BaseNode.extend({
    * face at all; the inspector says so rather than leaving it to be discovered
    * from a truck that cannot reach half the block.
    */
-  backToBack: z.number().int().min(1).max(6).default(2),
+  backToBack: z
+    .preprocess(
+      // This field was a boolean before it was a count, and a scene saved then
+      // still holds one. Zod would reject it and the whole node would fail to
+      // parse — the rack does not come back at all, which is a much worse
+      // outcome than the field it is guarding. `true` was a back-to-back pair
+      // and `false` was a lone run, so the two values map exactly.
+      (value) => (typeof value === 'boolean' ? (value ? 2 : 1) : value),
+      z.number().int().min(1).max(6),
+    )
+    .default(2),
 
   /** Spine-to-spine gap between two rows in the same group. */
   backToBackGap: z.number().min(0).max(1.5).default(0.2),

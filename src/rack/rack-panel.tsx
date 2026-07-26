@@ -4,13 +4,14 @@ import { Icon } from '@iconify/react'
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { SegmentedControl } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useState } from 'react'
 import { useWarehouseStore } from '../store'
-import RackAutoFields from './auto-fields'
-import { multiplyPlacements, runExtent } from './multiply'
-import { multiplyRack } from './multiply-command'
+import { runExtent } from './multiply'
+import { multiplyRack, pendingPlacements } from './multiply-command'
+import { occupiedSlots } from './occupancy'
+import { palletRackParametrics } from './parametrics'
 import type { PalletRackNode } from './schema'
-import { palletSlotCount } from './slots'
+import { directAccessSlotCount, fittedLevelCount, palletSlotCount, pickingSlotCount } from './slots'
 
 /**
  * Turning one bay into a run.
@@ -109,6 +110,42 @@ const styles = {
     lineHeight: 1.5,
     color: MUTED,
   },
+  danger: {
+    borderRadius: '0.5rem',
+    border: '1px solid color-mix(in oklab, #f59e0b 55%, transparent)',
+    background: 'color-mix(in oklab, #f59e0b 16%, transparent)',
+    padding: '0.4375rem 0.625rem',
+    fontSize: '0.75rem',
+    fontWeight: 500,
+    color: FG,
+    cursor: 'pointer',
+    textAlign: 'center',
+  },
+  issues: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.375rem',
+    borderRadius: '0.5rem',
+    border: '1px solid color-mix(in oklab, #f59e0b 40%, transparent)',
+    background: 'color-mix(in oklab, #f59e0b 10%, transparent)',
+    padding: '0.5rem 0.625rem',
+  },
+  issue: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '0.375rem',
+    margin: 0,
+    fontSize: '0.6875rem',
+    lineHeight: 1.5,
+    color: FG,
+  },
+  capacity: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.375rem',
+    paddingBottom: '0.75rem',
+    borderBottom: `1px solid ${BORDER}`,
+  },
 } satisfies Record<string, CSSProperties>
 
 /**
@@ -148,6 +185,30 @@ function Stepper({
   value: number
 }) {
   const clamp = (next: number) => onChange(Math.max(min, Math.min(max, Math.round(next))))
+
+  /**
+   * The text while it is being typed, or null when the field simply shows the
+   * value.
+   *
+   * A controlled `<input type="number">` clamping on every keystroke cannot be
+   * emptied: `Number('')` is `0`, which passes a finite check and clamps to the
+   * minimum, so selecting all and pressing Delete — the ordinary way to clear a
+   * field before typing a new number — snapped the box to 1 mid-edit and left
+   * the caret after it. Typing "20" then gave 120.
+   *
+   * So the draft is held here and committed on blur or Enter. An empty or
+   * unparseable draft reverts rather than clamping, because "I cleared the box"
+   * is not a request for the minimum.
+   */
+  const [draft, setDraft] = useState<string | null>(null)
+
+  const commitDraft = () => {
+    if (draft === null) return
+    const parsed = Number(draft)
+    if (draft.trim() !== '' && Number.isFinite(parsed)) clamp(parsed)
+    setDraft(null)
+  }
+
   return (
     <div style={styles.field}>
       <span style={styles.label}>
@@ -162,14 +223,16 @@ function Stepper({
           inputMode="numeric"
           max={max}
           min={min}
-          onChange={(event) => {
-            const next = Number(event.target.value)
-            if (Number.isFinite(next)) clamp(next)
+          onBlur={commitDraft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commitDraft()
+            if (event.key === 'Escape') setDraft(null)
           }}
           step={1}
           style={styles.input}
           type="number"
-          value={value}
+          value={draft ?? String(value)}
         />
         <button onClick={() => clamp(value + 1)} style={styles.step} type="button">
           +
@@ -179,20 +242,68 @@ function Stepper({
   )
 }
 
+/**
+ * How many nodes one press may create before it has to be asked twice.
+ *
+ * The pivot budgeted a 15,000 m² warehouse at about two thousand bays, and the
+ * two axes multiply: Bays 200 × Rows 50 is 10,000 nodes on one click, five times
+ * the whole building. Not forbidden — someone may genuinely want it — but not
+ * something to do by accident either, and the number is worth reading twice.
+ */
+const CONFIRM_ABOVE = 500
+
 export default function RackPanel({ node: provided }: { node?: PalletRackNode }) {
   const spec = useWarehouseStore((s) => s.multiply)
   const setMultiply = useWarehouseStore((s) => s.setMultiply)
   const node = useInspectedRack(provided)
+  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const [confirming, setConfirming] = useState(false)
 
   // The inspector is open for something that is not a rack — or for nothing.
   if (!node) return null
 
-  const pending = multiplyPlacements(node, spec).length
+  // What pressing the button will actually create, not what the spec describes.
+  // Bays that already stand where the spec would put one are filtered out, so
+  // pressing Multiply on a run that already exists is a no-op rather than a
+  // second run stacked invisibly inside the first.
+  const pending = pendingPlacements(node, spec, nodes).length
   const extent = runExtent(node, spec)
-  const slots = palletSlotCount(node) * spec.bays * spec.rows
+  const issues = palletRackParametrics.invariants?.flatMap((check) => check(node)) ?? []
+
+  const commit = () => {
+    if (pending > CONFIRM_ABOVE && !confirming) {
+      setConfirming(true)
+      return
+    }
+    multiplyRack(node, spec)
+    setConfirming(false)
+  }
 
   return (
     <div style={styles.root}>
+      {/* The descriptor's invariants, which nothing else renders. The host
+          declares `parametrics.invariants` in its types and has no consumer for
+          it, so five warnings a rack computes about itself — levels that do not
+          fit, pallets with nothing under them, a tunnel that empties the bay —
+          were being produced and dropped on the floor. */}
+      {issues.length > 0 && (
+        <div style={styles.issues}>
+          {issues.map((issue) => (
+            <p key={`${issue.field ?? ''}:${issue.msg}`} style={styles.issue}>
+              <Icon
+                height={12}
+                icon={issue.severity === 'error' ? 'lucide:octagon-alert' : 'lucide:triangle-alert'}
+                style={{ flexShrink: 0, marginTop: '0.125rem' }}
+                width={12}
+              />
+              <span>{issue.msg}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
+      <Capacity node={node} nodes={nodes} />
+
       <span style={styles.title}>
         <Icon height={13} icon="lucide:copy-plus" width={13} />
         Multiply
@@ -202,7 +313,10 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
         label="Bays"
         max={200}
         min={1}
-        onChange={(bays) => setMultiply({ bays })}
+        onChange={(bays) => {
+          setMultiply({ bays })
+          setConfirming(false)
+        }}
         suffix={`${extent.width.toFixed(2)} m`}
         value={spec.bays}
       />
@@ -211,7 +325,10 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
         label="Rows"
         max={50}
         min={1}
-        onChange={(rows) => setMultiply({ rows })}
+        onChange={(rows) => {
+          setMultiply({ rows })
+          setConfirming(false)
+        }}
         suffix={spec.rows > 1 ? `${extent.depth.toFixed(2)} m deep` : undefined}
         value={spec.rows}
       />
@@ -237,14 +354,35 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
             />
           </div>
 
+          {spec.backToBack ? (
+            <div style={styles.field}>
+              <span style={styles.label}>
+                <span>Spine gap</span>
+                <span style={{ opacity: 0.7 }}>{(spec.backToBackGap * 1000).toFixed(0)} mm</span>
+              </span>
+              {/* It had no control at all, while still setting the depth the
+                  panel reports and the box the tool collides — an invisible
+                  constant governing every back-to-back layout. */}
+              <SegmentedControl
+                onChange={(value: string) => setMultiply({ backToBackGap: Number(value) })}
+                options={[
+                  { label: '100', value: '0.1' },
+                  { label: '200', value: '0.2' },
+                  { label: '300', value: '0.3' },
+                ]}
+                value={String(spec.backToBackGap)}
+              />
+            </div>
+          ) : null}
+
           <div style={styles.field}>
             <span style={styles.label}>
               <span>Aisle</span>
               <span style={{ opacity: 0.7 }}>{spec.aisleWidth.toFixed(2)} m</span>
             </span>
             {/* The figure that decides how much of a building is racking: a
-                reach truck works 3.2 m, a counterbalanced forklift wants 3.5,
-                and a turret truck turns in 1.6. */}
+                turret truck turns in 1.8 m, a reach truck works 3.2, and a
+                counterbalanced forklift wants 3.5. */}
             <SegmentedControl
               onChange={(value: string) => setMultiply({ aisleWidth: Number(value) })}
               options={[
@@ -259,20 +397,67 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
       ) : null}
 
       {pending > 0 ? (
-        <button onClick={() => multiplyRack(node, spec)} style={styles.primary} type="button">
-          Place {pending} more {pending === 1 ? 'bay' : 'bays'}
+        <button onClick={commit} style={confirming ? styles.danger : styles.primary} type="button">
+          {confirming
+            ? `Confirm ${pending.toLocaleString()} bays — ${(pending + 1).toLocaleString()} draw calls`
+            : `Place ${pending.toLocaleString()} more ${pending === 1 ? 'bay' : 'bays'}`}
         </button>
       ) : (
-        <div style={styles.disabled}>This bay is the whole run</div>
+        <div style={styles.disabled}>Nothing to place — the run is already here</div>
       )}
 
       <p style={styles.hint}>
         Each bay is placed as its own object carrying this one's settings, so you can select, move,
         copy or delete any of them on their own. Bays standing together share a post — pull one
-        clear and it grows its own. {slots.toLocaleString()} pallet positions at this size.
+        clear and it grows its own.
       </p>
+    </div>
+  )
+}
 
-      <RackAutoFields />
+/**
+ * What the bay actually holds.
+ *
+ * `levelCapacity` was editable, persisted, and read by nothing at all — its own
+ * schema comment promised a capacity panel that does not exist. So were
+ * `directAccessSlotCount` and `pickingSlotCount`, both defined and never called.
+ * They are the numbers a rack is specified *for*, and this is the one place they
+ * are being edited.
+ *
+ * Direct access is called out separately because it is the figure a headline
+ * "positions" number hides: on a double-deep bay half the positions cannot be
+ * reached until the pallet in front of them is moved.
+ */
+function Capacity({ node, nodes }: { node: PalletRackNode; nodes: Record<string, unknown> }) {
+  const positions = palletSlotCount(node)
+  const direct = directAccessSlotCount(node)
+  const picking = pickingSlotCount(node)
+  const occupied = occupiedSlots(nodes, node.id).size
+  const levels = fittedLevelCount(node)
+  const load = levels * node.levelCapacity
+
+  const rows: Array<[string, string]> = [
+    ['Pallet positions', positions === direct ? `${positions}` : `${positions} · ${direct} direct`],
+    ...(picking > 0 ? [['Container positions', `${picking}`] as [string, string]] : []),
+    ['Occupied', `${occupied}`],
+    [
+      'Rated load',
+      `${node.levelCapacity.toLocaleString()} kg/level · ${(load / 1000).toFixed(1)} t`,
+    ],
+  ]
+
+  return (
+    <div style={styles.capacity}>
+      <span style={styles.title}>
+        <Icon height={13} icon="lucide:scale" width={13} />
+        This bay
+      </span>
+      {rows.map(([label, value]) => (
+        <div key={label} style={styles.label}>
+          <span>{label}</span>
+          <span style={{ color: FG, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+        </div>
+      ))}
     </div>
   )
 }

@@ -3,15 +3,15 @@ import type { RackDetail, RackPart, RackPartRole } from './parts'
 import { rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
-  beamedLevels,
   type DeckFinish,
   deckFinishOf,
+  drawnLevels,
+  drawnPickingLevels,
   levelSurfaceY,
   levelTypeOf,
   palletSupportBarCount,
   palletSupportBarsDrawn,
   slotOffsetsX,
-  storageLevelsPresent,
 } from './slots'
 
 /**
@@ -312,9 +312,8 @@ export function rackGeometryKey(
   // opens up. Deriving it rather than listing `tunnelLevels` keeps a tunnel that
   // reaches no level — one set under a rack whose ground level carries no beam —
   // from splitting the cache off an identical rack without one.
-  const present = new Set(storageLevelsPresent(rack))
-  const drawn = beamedLevels(rack).filter((level) => present.has(level))
-  const hasPicking = drawn.some((level) => levelTypeOf(rack, level) === 'picking')
+  const drawn = drawnLevels(rack)
+  const hasPicking = drawnPickingLevels(rack).length > 0
   const levels = drawn
     .map((level) => `${levelTypeOf(rack, level)}@${levelSurfaceY(rack, level).toFixed(5)}`)
     .join(',')
@@ -367,22 +366,53 @@ export function rackGeometryKey(
   ].join('|')
 }
 
+/**
+ * Insertion-ordered, so the oldest entry is the first one `keys()` yields.
+ * That is the eviction order and the only reason a plain `Map` is enough.
+ */
 const cache = new Map<string, THREE.BufferGeometry>()
+
+/**
+ * Geometries a mounted rack is currently drawing from, by cache key.
+ *
+ * Eviction must never free a buffer something is rendering — that would blank
+ * the rack, and it would blank every other rack sharing the shape. So the
+ * renderer says what it is holding, and held entries are simply skipped.
+ */
+const retained = new Map<string, number>()
+
+/**
+ * Distinct shapes kept before the oldest unheld one is dropped.
+ *
+ * A realistic layout mints a handful — one shape per rack type, times two detail
+ * tiers, times the two frame variants. 96 is far above anything a scene reaches
+ * and far below what a drag produces, which is the gap this exploits.
+ */
+const CACHE_LIMIT = 96
 
 /**
  * Shared geometry for a rack shape.
  *
- * Never disposed while the app lives. That is deliberate rather than a leak:
- * the geometry belongs to the shape, not to any node, so disposing it when one
- * rack is deleted would blank every other rack that shares it — the same trap
- * the pallet renderer documents around `<GeometrySystem>`. A warehouse's worth
- * of distinct shapes is a few dozen meshes.
+ * A placed rack's geometry is never disposed, and that is deliberate rather than
+ * a leak: the geometry belongs to the shape, not to any node, so freeing it when
+ * one rack is deleted would blank every other rack that shares it — the same
+ * trap the pallet renderer documents around `<GeometrySystem>`.
  *
  * This is what makes one node per bay affordable at all. Two thousand bays in a
  * 15 000 m² building are two thousand *nodes*, but a run is one shape repeated,
  * so they resolve to a handful of buffers — 4 per shape counting the two detail
  * tiers against the two frame variants. The draw calls are the price; the memory
  * is not.
+ *
+ * **The transient shapes are the problem, and they are a different problem.**
+ * The host's slider fires an update per step of a drag, so scrubbing
+ * `uprightHeight` from 1 to 20 mints a geometry at every value it passes
+ * through — hundreds of buffers and tens of megabytes that nothing will ever
+ * draw again, in exactly the session where the warehouse is about to be filled.
+ * So the cache is bounded: past the limit, the oldest entry **no mounted rack is
+ * holding** is disposed. Held entries are skipped, so no rack can be blanked,
+ * and a scrub's leftovers are the first things to go because nothing retains
+ * them.
  */
 export function getRackGeometry(
   rack: PalletRackNode,
@@ -395,7 +425,41 @@ export function getRackGeometry(
 
   const geometry = buildFrom(rack, rackParts(rack, detail, hasRightNeighbour))
   cache.set(key, geometry)
+  evict()
   return geometry
+}
+
+function evict(): void {
+  if (cache.size <= CACHE_LIMIT) return
+  for (const [key, geometry] of cache) {
+    if (cache.size <= CACHE_LIMIT) return
+    if ((retained.get(key) ?? 0) > 0) continue
+    cache.delete(key)
+    geometry.dispose()
+  }
+}
+
+/**
+ * Claim a shape while a rack is drawing it, and release it when that rack stops.
+ *
+ * Called from the renderer's layout effect, which is the only place that knows
+ * a buffer is actually on screen. Returns the key so the caller can release the
+ * exact entry it claimed rather than re-deriving one that may have changed.
+ */
+export function retainRackGeometry(
+  rack: PalletRackNode,
+  detail: RackDetail,
+  hasRightNeighbour: boolean,
+): string {
+  const key = rackGeometryKey(rack, detail, hasRightNeighbour)
+  retained.set(key, (retained.get(key) ?? 0) + 1)
+  return key
+}
+
+export function releaseRackGeometry(key: string): void {
+  const count = (retained.get(key) ?? 0) - 1
+  if (count > 0) retained.set(key, count)
+  else retained.delete(key)
 }
 
 /** Distinct shapes built so far. Test and diagnostic hook for the sharing that
@@ -405,7 +469,7 @@ export function rackGeometryCacheSize(): number {
 }
 
 export function clearRackGeometryCache(): void {
-  // Deduped: an over-budget block files the same geometry under both tiers.
   for (const geometry of new Set(cache.values())) geometry.dispose()
   cache.clear()
+  retained.clear()
 }

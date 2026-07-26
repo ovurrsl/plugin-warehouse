@@ -277,6 +277,27 @@ export function beamedLevels(rack: PalletRackNode): number[] {
   return storageLevels(rack).filter((level) => level > 0 || rack.hasGroundBeam)
 }
 
+/**
+ * The levels the builder actually draws: beamed, and not opened up by a tunnel.
+ *
+ * The one list the mesh, the cache key and the inspector's `visibleIf`
+ * predicates must all read. Each of them had its own near-miss version, and each
+ * near-miss was a bug: the key gated the picking profiles on one list while the
+ * panel gated their controls on another, so `pickingLevels: 1` on a rack with no
+ * ground beam showed two profile fields that moved nothing — the level they
+ * describe is the floor, and the floor carries no beam.
+ */
+export function drawnLevels(rack: PalletRackNode): number[] {
+  const present = new Set(storageLevelsPresent(rack))
+  return beamedLevels(rack).filter((level) => present.has(level))
+}
+
+/** Drawn levels that are picked by hand. The predicate behind every picking
+ *  control and the picking half of the cache key. */
+export function drawnPickingLevels(rack: PalletRackNode): number[] {
+  return drawnLevels(rack).filter((level) => levelTypeOf(rack, level) === 'picking')
+}
+
 /** A picking level always carries a shelf — containers cannot sit on beams. */
 export function levelHasShelf(rack: PalletRackNode, level: number): boolean {
   if (level <= 0) return false

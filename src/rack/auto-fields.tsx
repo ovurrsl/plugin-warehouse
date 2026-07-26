@@ -1,9 +1,6 @@
 'use client'
 
-import { Icon } from '@iconify/react'
-import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { SegmentedControl } from '@pascal-app/editor'
-import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import type { PalletRackNode } from './schema'
 import {
@@ -21,40 +18,23 @@ import {
  * from 2.7 m to 3.5 m starts holding four pallets instead of three without
  * anyone editing a second field.
  *
- * The host's inspector cannot express that. `parametric-inspector.tsx` renders
- * a number field as `typeof value === 'number' ? value : 0`, so a null shows as
- * 0 — clamped by the slider to whatever its minimum happens to be — and the
- * first drag writes a real number over the null, silently converting a value
- * that tracked the geometry into a frozen one. There is no `kind` in
- * `ParamField` for a nullable number, so these four cannot live in `groups` at
- * all; they live here, in the plugin's own trailing section, where the control
- * can say *Auto — 3* and mean it.
+ * The host's plain number field cannot express that — `parametric-inspector.tsx`
+ * renders a number as `typeof value === 'number' ? value : 0`, so a null shows
+ * as 0, clamped by the slider to its minimum, and the first drag writes a real
+ * number over the null: a value that tracked the geometry is silently frozen.
+ *
+ * These used to live in the plugin's own trailing section on the stated grounds
+ * that `ParamField` had no kind for a nullable number. That was simply wrong —
+ * `kind: 'custom'` exists, the host subscribes the node and passes `onUpdate`,
+ * and first-party kinds already use it for exactly this. Being wrong about it
+ * cost more than the duplicated markup: a field in the trailing section is
+ * exempt from `parametrics.test.ts`'s coverage assertions, so all four sat
+ * outside the one test that checks every schema field is reachable.
  */
 
-const FG = 'var(--foreground)'
 const MUTED = 'var(--muted-foreground)'
-const BORDER = 'var(--border)'
 
 const styles = {
-  root: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.625rem',
-    marginBottom: '0.875rem',
-    paddingBottom: '0.875rem',
-    borderBottom: `1px solid ${BORDER}`,
-    color: FG,
-  },
-  title: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.375rem',
-    fontSize: '0.6875rem',
-    fontWeight: 500,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: MUTED,
-  },
   field: { display: 'flex', flexDirection: 'column', gap: '0.3125rem' },
   label: {
     display: 'flex',
@@ -110,68 +90,68 @@ function AutoField({
 }
 
 /**
- * Reads the selection rather than taking a node.
+ * One component per field, each matching the host's custom-field contract:
+ * `{ node, onUpdate }`, rendered inside the group it belongs to.
  *
- * It is mounted from the trailing section, and the host renders that with no
- * props at all — so a required `node` prop would arrive `undefined` and throw on
- * the first property read, however carefully the parent passed one.
+ * The bounds are passed as literals here and asserted against the schema in
+ * `parametrics.test.ts` — they used to match by inspection only, which is the
+ * kind of agreement that holds until someone widens a schema range.
  */
-export default function RackAutoFields() {
-  const selectedId = useViewer((s) => s.selection.selectedIds[0])
-  const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
-  if (!selected || (selected as { type?: string }).type !== 'warehouse:pallet-rack') return null
-  const node = selected as unknown as PalletRackNode
+type CustomField = { node: PalletRackNode; onUpdate: (patch: Partial<PalletRackNode>) => void }
 
-  const write = (patch: Partial<PalletRackNode>) =>
-    useScene.getState().updateNode(node.id as AnyNodeId, patch as unknown as Partial<AnyNode>)
+export const PALLETS_PER_LEVEL_BOUNDS = { min: 1, max: 12 } as const
+export const SUPPORT_BARS_BOUNDS = { min: 0, max: 3 } as const
+export const BOXES_ACROSS_BOUNDS = { min: 1, max: 30 } as const
+export const BOXES_DEEP_BOUNDS = { min: 1, max: 10 } as const
 
-  const picking = node.pickingLevels > 0
-
+export function PalletsPerLevelField({ node, onUpdate }: CustomField) {
   return (
-    <div style={styles.root}>
-      <span style={styles.title}>
-        <Icon height={13} icon="lucide:wand-sparkles" width={13} />
-        Derived
-      </span>
+    <AutoField
+      auto={autoPalletsPerLevel(node)}
+      label="Pallets per level"
+      max={PALLETS_PER_LEVEL_BOUNDS.max}
+      min={PALLETS_PER_LEVEL_BOUNDS.min}
+      onChange={(palletsPerLevel) => onUpdate({ palletsPerLevel })}
+      value={node.palletsPerLevel}
+    />
+  )
+}
 
-      <AutoField
-        auto={autoPalletsPerLevel(node)}
-        label="Pallets per level"
-        max={12}
-        min={1}
-        onChange={(palletsPerLevel) => write({ palletsPerLevel })}
-        value={node.palletsPerLevel}
-      />
+export function PalletSupportBarsField({ node, onUpdate }: CustomField) {
+  return (
+    <AutoField
+      auto={autoPalletSupportBars(node)}
+      label="Pallet support bars"
+      max={SUPPORT_BARS_BOUNDS.max}
+      min={SUPPORT_BARS_BOUNDS.min}
+      onChange={(palletSupportBars) => onUpdate({ palletSupportBars })}
+      value={node.palletSupportBars}
+    />
+  )
+}
 
-      <AutoField
-        auto={autoPalletSupportBars(node)}
-        label="Pallet support bars"
-        max={3}
-        min={0}
-        onChange={(palletSupportBars) => write({ palletSupportBars })}
-        value={node.palletSupportBars}
-      />
+export function PickingBoxesAcrossField({ node, onUpdate }: CustomField) {
+  return (
+    <AutoField
+      auto={autoPickingBoxesAcross(node)}
+      label="Boxes across"
+      max={BOXES_ACROSS_BOUNDS.max}
+      min={BOXES_ACROSS_BOUNDS.min}
+      onChange={(pickingBoxesAcross) => onUpdate({ pickingBoxesAcross })}
+      value={node.pickingBoxesAcross}
+    />
+  )
+}
 
-      {picking ? (
-        <>
-          <AutoField
-            auto={autoPickingBoxesAcross(node)}
-            label="Boxes across"
-            max={30}
-            min={1}
-            onChange={(pickingBoxesAcross) => write({ pickingBoxesAcross })}
-            value={node.pickingBoxesAcross}
-          />
-          <AutoField
-            auto={autoPickingBoxesDeep(node)}
-            label="Boxes deep"
-            max={10}
-            min={1}
-            onChange={(pickingBoxesDeep) => write({ pickingBoxesDeep })}
-            value={node.pickingBoxesDeep}
-          />
-        </>
-      ) : null}
-    </div>
+export function PickingBoxesDeepField({ node, onUpdate }: CustomField) {
+  return (
+    <AutoField
+      auto={autoPickingBoxesDeep(node)}
+      label="Boxes deep"
+      max={BOXES_DEEP_BOUNDS.max}
+      min={BOXES_DEEP_BOUNDS.min}
+      onChange={(pickingBoxesDeep) => onUpdate({ pickingBoxesDeep })}
+      value={node.pickingBoxesDeep}
+    />
   )
 }

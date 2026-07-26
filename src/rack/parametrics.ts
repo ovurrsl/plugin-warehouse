@@ -1,16 +1,39 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
+import {
+  PalletSupportBarsField,
+  PalletsPerLevelField,
+  PickingBoxesAcrossField,
+  PickingBoxesDeepField,
+} from './auto-fields'
 import type { PalletRackNode } from './schema'
 import {
   autoPalletsPerLevel,
+  drawnPickingLevels,
   fittedLevelCount,
   hasUnsupportedPallets,
+  levelClearHeight,
   levelSurfaceY,
+  palletSupportBarsDrawn,
+  requiresPalletSupportBars,
+  storageLevels,
   storageLevelsPresent,
 } from './slots'
 import { en15620Clearance } from './standards'
 
 const PRESET_KEYS = Object.keys(PALLET_PRESETS) as (keyof typeof PALLET_PRESETS)[]
+
+/**
+ * A unit load, pallet included, for the headroom check.
+ *
+ * A rack does not know what it will hold, and the clearance the standard asks
+ * for is measured above the *load*. 1.2 m overall — a 144 mm pallet under about
+ * a metre of goods — is the figure bay pitches are planned around, and it is the
+ * one that makes the 1.4 m default opening come out comfortable rather than
+ * marginal. Stated here rather than buried in the message, so it can be argued
+ * with.
+ */
+const ASSUMED_UNIT_LOAD = 1.2
 
 /**
  * Auto-derived inspector fields rather than a `customPanel`, for the reason the
@@ -91,9 +114,13 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0,
           max: 15,
           step: 1,
-          // A tunnel through a bay with nothing under it is a setting with no
-          // effect; the field appears once there is a level for it to clear.
-          visibleIf: (node) => fittedLevelCount(node) > 0,
+          // `storageLevels`, which is the list the tunnel actually filters —
+          // **not** `fittedLevelCount`, which was the near-miss. They differ on
+          // the ground level: a bay with `levels: 0` and a ground beam has a
+          // fitted count of 0 and a storage level all the same, so the control
+          // vanished on exactly the bay where a tunnel still deletes the ground
+          // beam and takes the bay's only position with it.
+          visibleIf: (node) => storageLevels(node).length > 0,
         },
         { key: 'levelCapacity', kind: 'number', unit: 'kg', min: 0, max: 20_000, step: 100 },
       ],
@@ -117,6 +144,20 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           max: 0.4,
           step: 0.005,
         },
+        {
+          key: 'palletsPerLevel',
+          kind: 'custom',
+          component: PalletsPerLevelField,
+        },
+        {
+          key: 'palletSupportBars',
+          kind: 'custom',
+          component: PalletSupportBarsField,
+          // Bars only exist where a level has no panel over it. Shown against
+          // the same predicate the builder and the cache key use, so the control
+          // can never be visible and inert.
+          visibleIf: (node) => palletSupportBarsDrawn(node) || requiresPalletSupportBars(node),
+        },
         { key: 'ghostFill', kind: 'number', min: 0, max: 1, step: 0.05 },
       ],
     },
@@ -124,8 +165,11 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
       label: 'Picking',
       fields: [
         { key: 'pickingLevels', kind: 'number', min: 0, max: 15, step: 1 },
-        // Everything below describes hand-picked container shelves. On an
-        // all-pallet rack it is five controls for a thing that does not exist.
+        // Everything below describes hand-picked container shelves, and is shown
+        // against `drawnPickingLevels` rather than `pickingLevels > 0`. The two
+        // differ on the ground level: `pickingLevels: 1` designates the floor,
+        // which carries no beam and no shelf, so the profile fields were visible
+        // and moved nothing at exactly the setting a user reaches for first.
         {
           key: 'pickingLevelClear',
           kind: 'number',
@@ -142,7 +186,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.04,
           max: 0.2,
           step: 0.005,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
         {
           key: 'pickingShelfThickness',
@@ -151,8 +195,11 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.005,
           max: 0.06,
           step: 0.005,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
+        // The container block. These drive the slot enumeration and the capacity
+        // readout in the trailing section; nothing draws the boxes yet, which is
+        // why they sit behind the levels rather than beside them.
         {
           key: 'pickingBoxWidth',
           kind: 'number',
@@ -160,7 +207,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.1,
           max: 1.5,
           step: 0.05,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
         {
           key: 'pickingBoxDepth',
@@ -169,7 +216,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.1,
           max: 1.5,
           step: 0.05,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
         {
           key: 'pickingBoxHeight',
@@ -178,7 +225,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0.05,
           max: 1,
           step: 0.02,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
         {
           key: 'pickingBoxGap',
@@ -187,7 +234,19 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           min: 0,
           max: 0.2,
           step: 0.005,
-          visibleIf: (node) => node.pickingLevels > 0,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
+        },
+        {
+          key: 'pickingBoxesAcross',
+          kind: 'custom',
+          component: PickingBoxesAcrossField,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
+        },
+        {
+          key: 'pickingBoxesDeep',
+          kind: 'custom',
+          component: PickingBoxesDeepField,
+          visibleIf: (node) => drawnPickingLevels(node).length > 0,
         },
       ],
     },
@@ -270,18 +329,40 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         })
       }
 
-      // EN 15620 widens the required clearance with height, and the top level
-      // is the one that runs out of room first.
-      const top = levelSurfaceY(node, fitted)
-      const required = en15620Clearance(top, '400')
-      if (required && node.levelClear < required.y) {
+      // EN 15620 asks for a clearance **above the unit load**, and it widens
+      // with height. The check has to compare like with like, and it did not:
+      // it tested `levelClear` — the whole opening from one load surface to the
+      // next beam's underside — against a figure measured above the load. It was
+      // also unsatisfiable, since the largest clearance in the table is 175 mm
+      // and the schema floors `levelClear` at 200 mm, so the branch could never
+      // fire on any node the schema would accept. An unreachable check is worse
+      // than none: it reads as coverage.
+      //
+      // The **top** level is deliberately not tested. What sits above it is the
+      // building, not the rack — a 5 m frame whose top beam is at 4.66 m carries
+      // loads that stand well above the frame, and that is ordinary. The rack
+      // does not know the building, so it does not get to warn about it.
+      for (let level = 1; level < fitted; level++) {
+        const surface = levelSurfaceY(node, level)
+        const required = en15620Clearance(surface, '400')
+        if (!required) continue
+        const headroom = levelClearHeight(node, level) - ASSUMED_UNIT_LOAD
+        if (headroom >= required.y) continue
         issues.push({
+          // Reported against `levelClear`, which is the field that fixes it —
+          // but only when the inspector is showing it. A single-level rack has
+          // no interior opening to be tight, so this cannot fire there.
           field: 'levelClear',
           severity: 'warning',
-          msg: `EN 15620 asks for at least ${(required.y * 1000).toFixed(0)} mm above the load at ${top.toFixed(1)} m for counterbalanced and reach trucks.`,
+          msg: `Level ${level} leaves ${(headroom * 1000).toFixed(0)} mm over a ${(ASSUMED_UNIT_LOAD * 1000).toFixed(0)} mm unit load; EN 15620 asks for ${(required.y * 1000).toFixed(0)} mm at ${surface.toFixed(1)} m.`,
         })
+        // One is enough. Every level above a tight one is usually tight too, and
+        // a wall of identical warnings buries the rest of the panel.
+        break
       }
-      if (!required && top > 0) {
+
+      const top = levelSurfaceY(node, fitted)
+      if (!en15620Clearance(top, '400') && top > 0) {
         issues.push({
           field: 'uprightHeight',
           severity: 'warning',

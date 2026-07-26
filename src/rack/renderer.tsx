@@ -9,12 +9,17 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
-import { getRackGeometry, type RackDetail } from './geometry-builder'
+import {
+  getRackGeometry,
+  type RackDetail,
+  releaseRackGeometry,
+  retainRackGeometry,
+} from './geometry-builder'
 import { getRackMaterial } from './materials'
 import { hasRightNeighbour } from './neighbours'
 import { occupiedSlots, slotDraw } from './occupancy'
@@ -126,6 +131,27 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     [node, abutted, isExporting],
   )
   const material = getRackMaterial()
+
+  /**
+   * Tell the cache this shape is on screen.
+   *
+   * The cache is bounded now — a slider scrub mints a geometry per step and
+   * would otherwise leave hundreds behind — and eviction must never free a
+   * buffer something is drawing. This is the only place that knows.
+   *
+   * Deliberately keyed on the *full* tier rather than the current one: the LOD
+   * swaps between them at frame rate, and re-registering on every swap would be
+   * churn for nothing. The two tiers of one shape are minted together and are
+   * both worth keeping while the rack exists.
+   */
+  useEffect(() => {
+    const key = retainRackGeometry(node, 'full', abutted)
+    const far = retainRackGeometry(node, 'simple', abutted)
+    return () => {
+      releaseRackGeometry(key)
+      releaseRackGeometry(far)
+    }
+  }, [node, abutted])
 
   const frameRef = useRef(0)
   // Spread the checks across the interval so the racks do not all land on the

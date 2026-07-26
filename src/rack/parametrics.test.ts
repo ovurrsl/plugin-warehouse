@@ -1,4 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import {
+  BOXES_ACROSS_BOUNDS,
+  BOXES_DEEP_BOUNDS,
+  PALLETS_PER_LEVEL_BOUNDS,
+  SUPPORT_BARS_BOUNDS,
+} from './auto-fields'
 import { palletRackParametrics } from './parametrics'
 import { PalletRackNode } from './schema'
 
@@ -150,34 +156,21 @@ describe('coverage', () => {
    * by hand-editing the scene.
    */
   const DELIBERATELY_HIDDEN = new Set([
-    // `BaseNode` plumbing — identity, tree position, and the two runtime
-    // handles the host attaches. None of it is a rack setting.
+    // `BaseNode` plumbing — identity, tree position, and the runtime handles the
+    // host attaches. None of it is a rack setting.
+    'object',
     'id',
     'type',
     'name',
     'parentId',
     'visible',
-    'locked',
     'metadata',
-    'slots',
-    'material',
-    'materialPreset',
-    'object',
     'camera',
-    // Per-bay departures: edited by clicking a bay, not from a list of every
-    // bay in the run.
-    'bayOverrides',
     // The escape hatch for a rack that is mixed out of order; `pickingLevels`
     // covers the ordinary case and an array control would be noise.
     'levelTypes',
     // Elected at placement from the slab under the cursor.
     'supportSlabId',
-    // Derived-or-declared: rendered by the plugin's own bay panel, because the
-    // host's number control cannot express "auto".
-    'palletsPerLevel',
-    'palletSupportBars',
-    'pickingBoxesAcross',
-    'pickingBoxesDeep',
   ])
 
   test('every schema field is either shown or listed as hidden', () => {
@@ -192,5 +185,164 @@ describe('coverage', () => {
     const shown = new Set(fields.map(({ field }) => String(field.key)))
     const contradictory = [...DELIBERATELY_HIDDEN].filter((key) => shown.has(key))
     expect(contradictory).toEqual([])
+  })
+
+  test('and nothing is listed as hidden that the schema no longer has', () => {
+    // The third direction, and the one that was missing. Without it the set only
+    // ever grows: `bayOverrides` sat here for a whole refactor after the field
+    // was deleted, along with four `BaseNode` keys that never existed, and both
+    // coverage assertions stayed green — a stale excuse silently excuses nothing
+    // and looks exactly like a live one.
+    const stale = [...DELIBERATELY_HIDDEN].filter((key) => !(key in shape))
+    expect(stale).toEqual([])
+  })
+})
+
+describe('the invariants are reachable, and each one can actually fire', () => {
+  /**
+   * None of this was tested, and one of them could not fire at all.
+   *
+   * `invariants` has no consumer in the host — it is declared in the registry's
+   * types and read by nothing — so five warnings a rack computes about itself
+   * were produced and dropped. The plugin's own trailing section renders them
+   * now, which makes them worth pinning: an unsatisfiable check is worse than no
+   * check, because it reads as coverage.
+   */
+  const issuesFor = (overrides: Record<string, unknown>) =>
+    (palletRackParametrics.invariants ?? []).flatMap((check) =>
+      check(PalletRackNode.parse({ id: 'pallet_rack_inv', ...overrides })),
+    )
+
+  const fieldsOf = (overrides: Record<string, unknown>) =>
+    issuesFor(overrides).map((issue) => issue.field)
+
+  test('a default bay is clean', () => {
+    expect(issuesFor({})).toEqual([])
+  })
+
+  test('levels that do not fit the upright are reported', () => {
+    expect(fieldsOf({ levels: 10, uprightHeight: 5 })).toContain('levels')
+  })
+
+  test('pallets turned long-side-out with nothing under them are reported', () => {
+    // `decking: 'open'` is load-bearing here, not incidental: a decked level
+    // carries the pallet whichever way round it sits, so a wire-decked rack
+    // turned long-side-out is *not* unsupported and must not be warned about.
+    expect(
+      fieldsOf({ palletOrientation: 'long-side-out', palletSupportBars: 0, decking: 'open' }),
+    ).toContain('palletSupportBars')
+    expect(
+      fieldsOf({ palletOrientation: 'long-side-out', palletSupportBars: 0, decking: 'wire-mesh' }),
+    ).not.toContain('palletSupportBars')
+  })
+
+  test('a declared count above what the bay fits is reported', () => {
+    expect(fieldsOf({ palletsPerLevel: 9 })).toContain('palletsPerLevel')
+  })
+
+  test('a tunnel that empties the bay is reported', () => {
+    expect(fieldsOf({ levels: 2, tunnelLevels: 15 })).toContain('tunnelLevels')
+  })
+
+  test('the EN 15620 headroom check can fire at all', () => {
+    // It could not. It compared `levelClear` — the whole opening — against a
+    // clearance measured *above the load*, and the largest value in the table is
+    // 175 mm while the schema floors `levelClear` at 200 mm. The branch was
+    // unreachable for every node the schema would accept.
+    expect(fieldsOf({ levels: 3, uprightHeight: 8, levelClear: 1.25 })).toContain('levelClear')
+    // And it holds its tongue when there is genuinely room — including on the
+    // defaults, which is the bar an always-on warning has to clear.
+    expect(fieldsOf({ levels: 3, uprightHeight: 8, levelClear: 1.4 })).not.toContain('levelClear')
+    expect(fieldsOf({})).not.toContain('levelClear')
+  })
+
+  test('the top level is never the one reported', () => {
+    // What is above the top level is the building, not the rack. A 5 m frame
+    // with its top beam at 4.66 m carries loads that stand above the frame, and
+    // that is ordinary racking — the earlier version warned about every default
+    // rack in existence because it treated the frame top as a ceiling.
+    const tall = fieldsOf({ levels: 3, uprightHeight: 5, levelClear: 1.4 })
+    expect(tall).not.toContain('levelClear')
+    expect(tall).toEqual([])
+  })
+
+  test('a rack too tall for any forklift is reported', () => {
+    // The clearance table stops at 15 m; above it no forklift is rated and the
+    // answer is a turret truck or a crane.
+    expect(fieldsOf({ levels: 11, uprightHeight: 20, levelClear: 1.4 })).toContain('uprightHeight')
+  })
+
+  test('every issue names a field the schema has', () => {
+    // The field key is what orders the list and what a future host would anchor
+    // the message to. One naming a deleted field is a silent mis-anchor.
+    const shapeKeys = new Set(Object.keys(shape))
+    for (const overrides of [
+      { levels: 10, uprightHeight: 5 },
+      { palletOrientation: 'long-side-out', palletSupportBars: 0 },
+      { palletsPerLevel: 9 },
+      { levels: 2, tunnelLevels: 15 },
+      { levels: 3, uprightHeight: 8, levelClear: 1.25 },
+    ]) {
+      for (const issue of issuesFor(overrides)) {
+        expect({ overrides, field: issue.field, known: shapeKeys.has(issue.field ?? '') }).toEqual({
+          overrides,
+          field: issue.field,
+          known: true,
+        })
+        expect(issue.msg.length).toBeGreaterThan(0)
+      }
+    }
+  })
+})
+
+describe('the derived fields are reachable and correctly bounded', () => {
+  /**
+   * The four `number | null` fields, where null means "work it out from the
+   * geometry". They cannot be plain number controls — the host renders a null as
+   * 0 and the first drag freezes a value that was tracking the bay's width — so
+   * they are `kind: 'custom'`.
+   *
+   * They used to live in the plugin's own trailing section, which put them
+   * outside the coverage assertions above entirely: exempted as "deliberately
+   * hidden" while actually being rendered, so nothing checked either that they
+   * were still reachable or that the bounds passed to them matched the schema.
+   */
+  const DERIVED = [
+    ['palletsPerLevel', PALLETS_PER_LEVEL_BOUNDS],
+    ['palletSupportBars', SUPPORT_BARS_BOUNDS],
+    ['pickingBoxesAcross', BOXES_ACROSS_BOUNDS],
+    ['pickingBoxesDeep', BOXES_DEEP_BOUNDS],
+  ] as const
+
+  test('each is a custom field with a component', () => {
+    for (const [key] of DERIVED) {
+      const entry = fields.find(({ field }) => field.key === key)
+      expect({ key, kind: entry?.field.kind }).toEqual({ key, kind: 'custom' })
+      expect({
+        key,
+        component: typeof (entry?.field as { component?: unknown })?.component,
+      }).toEqual({ key, component: 'function' })
+    }
+  })
+
+  test('each accepts null, which is what makes it derived at all', () => {
+    for (const [key] of DERIVED) {
+      expect({ key, null: shape[key]?.safeParse(null).success }).toEqual({ key, null: true })
+    }
+  })
+
+  test('the bounds it offers are the schema bounds', () => {
+    // They matched by inspection before, which is the kind of agreement that
+    // holds right up until someone widens a range.
+    for (const [key, bounds] of DERIVED) {
+      const field = shape[key]
+      expect({ key, min: field?.safeParse(bounds.min).success }).toEqual({ key, min: true })
+      expect({ key, max: field?.safeParse(bounds.max).success }).toEqual({ key, max: true })
+      expect({ key, under: field?.safeParse(bounds.min - 1).success }).toEqual({
+        key,
+        under: false,
+      })
+      expect({ key, over: field?.safeParse(bounds.max + 1).success }).toEqual({ key, over: false })
+    }
   })
 })

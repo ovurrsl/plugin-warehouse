@@ -117,6 +117,21 @@ export default function PalletRackTool() {
     [previewNode, spec],
   )
 
+  /**
+   * The run's shape, read through a ref rather than a dependency.
+   *
+   * The subscription effect below resets the rotation and hides the cursor when
+   * it re-runs, which is right for a level change and wrong for everything else.
+   * With `extent` in its deps, pressing `]` — which only grows the run — tore the
+   * whole thing down: the rotation the user had set with R/T snapped back to 0
+   * and the ghost vanished until the mouse moved again. Adjusting the run length
+   * against a wall is exactly when the rotation matters most.
+   */
+  const extentRef = useRef(extent)
+  extentRef.current = extent
+  const boxRef = useRef(boxDimensions)
+  boxRef.current = boxDimensions
+
   useEffect(() => {
     if (!activeLevelId) return
     setCursorVisible(false)
@@ -139,7 +154,7 @@ export default function PalletRackTool() {
       origin: [number, number, number],
       rotationY: number,
     ): [number, number, number] => {
-      const [localX, localZ] = extent.centerLocal
+      const [localX, localZ] = extentRef.current.centerLocal
       const cos = Math.cos(rotationY)
       const sin = Math.sin(rotationY)
       return [
@@ -158,7 +173,7 @@ export default function PalletRackTool() {
       const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
         activeLevelId,
         runCenter(visual, rotationRef.current),
-        boxDimensions,
+        boxRef.current,
         [0, rotationRef.current, 0],
         [],
       )
@@ -302,7 +317,10 @@ export default function PalletRackTool() {
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
     }
-  }, [activeLevelId, previewNode, boxDimensions, extent])
+    // Deliberately not `extent` or `boxDimensions`: both are read through refs
+    // above, so growing the run with `[` / `]` adjusts the box in place instead
+    // of tearing the tool down and losing the rotation with it.
+  }, [activeLevelId, previewNode])
 
   if (!activeLevelId) return null
 

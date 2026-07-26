@@ -165,4 +165,43 @@ export function hasRightNeighbour(
 export function resetNeighbourIndex(): void {
   indexedFrom = null
   index = new Set()
+  occupiedFrom = null
+  occupied = new Set()
+}
+
+/**
+ * Every place a bay already stands, quantised to the same tolerance.
+ *
+ * Multiply is a *command*, not a description: pressing it twice must not stack a
+ * second run on top of the first. The spec lives in the store and survives
+ * selection changes, so laying a 20-bay run down and then clicking any bay of it
+ * left the panel offering to place the same nineteen bays again — at the same
+ * nineteen coordinates.
+ *
+ * Deliberately position-only, ignoring shape: a bay of any size standing where
+ * one would go is a bay in the way, and putting a second node inside it is never
+ * what was meant.
+ */
+let occupiedFrom: unknown = null
+let occupied: ReadonlySet<string> = new Set()
+
+export function occupiedPlaces(nodes: Readonly<Record<string, unknown>>): ReadonlySet<string> {
+  if (nodes !== occupiedFrom) {
+    const places = new Set<string>()
+    for (const value of Object.values(nodes)) {
+      const rack = asRack(value)
+      if (!rack) continue
+      const [x, , z] = rack.position as number[]
+      places.add(positionKey(x ?? 0, z ?? 0))
+    }
+    occupied = places
+    occupiedFrom = nodes
+  }
+  return occupied
+}
+
+/** The key `occupiedPlaces` files a position under, so a caller can ask about a
+ *  place it has computed rather than one it has found. */
+export function placeKey(x: number, z: number): string {
+  return positionKey(x, z)
 }

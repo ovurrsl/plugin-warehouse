@@ -4,6 +4,8 @@ import {
   getRackGeometry,
   rackGeometryCacheSize,
   rackGeometryKey,
+  releaseRackGeometry,
+  retainRackGeometry,
 } from './geometry-builder'
 import { PalletRackNode } from './schema'
 
@@ -381,6 +383,31 @@ describe('cache key coverage', () => {
     expect([...mesh].some((color) => !steel.has(color) && !timber.has(color))).toBe(true)
     expect([...steel].some((color) => !mesh.has(color) && !timber.has(color))).toBe(true)
     expect([...timber].some((color) => !mesh.has(color) && !steel.has(color))).toBe(true)
+  })
+
+  test('a scrub does not leak, and cannot evict what a rack is drawing', () => {
+    // The host's slider fires an update per step of a drag, so scrubbing a
+    // dimension mints a geometry at every value it passes through — hundreds of
+    // buffers nothing will draw again, in the session where the warehouse is
+    // about to be filled. The cache is bounded for that, and the bound must
+    // never reach a shape a mounted rack is holding.
+    clearRackGeometryCache()
+    const placed = rack({ uprightHeight: 5 })
+    const held = retainRackGeometry(placed, 'full', false)
+    const holding = getRackGeometry(placed, 'full')
+
+    // A scrub across the whole legal range, at the step the inspector uses.
+    for (let height = 1; height <= 20; height += 0.1) {
+      getRackGeometry(rack({ uprightHeight: Number(height.toFixed(1)) }), 'full')
+    }
+
+    expect(rackGeometryCacheSize()).toBeLessThanOrEqual(96)
+    // The held shape is still there and still the same buffer, so the rack it
+    // belongs to is still drawing rather than blank.
+    expect(getRackGeometry(placed, 'full')).toBe(holding)
+    expect(holding.getAttribute('position').count).toBeGreaterThan(0)
+
+    releaseRackGeometry(held)
   })
 
   test('the shared-frame flag reaches the key, in both directions', () => {

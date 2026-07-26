@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`30199c4`](https://github.com/ovurrsl/plugin-warehouse/commit/30199c472370b6cb83852f393a2199bc771011aa))
 - Refresh generated README blocks [skip ci] ([`28fb3d2`](https://github.com/ovurrsl/plugin-warehouse/commit/28fb3d2238574b7271b2f5fcef224d26f770dbd7))
 - Refresh generated README blocks [skip ci] ([`4e3dc16`](https://github.com/ovurrsl/plugin-warehouse/commit/4e3dc166803de22b752ab8d5ac98870d73912884))
 - Refresh generated README blocks [skip ci] ([`6d582fd`](https://github.com/ovurrsl/plugin-warehouse/commit/6d582fde8ddf886acbe979ae2c31928151fcb28a))
@@ -55,6 +56,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Store catalogue enums as strings so Duplicate works ([`f9c9548`](https://github.com/ovurrsl/plugin-warehouse/commit/f9c9548bd932afb9f266e4e9bb6ac49df08ced12))
 - Bracing is steel, and the far tier drops it ([`65a734a`](https://github.com/ovurrsl/plugin-warehouse/commit/65a734a1baa8506fd35530cca8c3f6672eb3db8b))
 - One clash test, for every kind in the package and every kind in the editor ([`7429789`](https://github.com/ovurrsl/plugin-warehouse/commit/742978947d1a3fb8945ecd16f45c85ac7f35697b))
 - Turn the ghost pallets, and let Multiply hear the count you typed ([`ab3f723`](https://github.com/ovurrsl/plugin-warehouse/commit/ab3f723d41289e67bd16c259d51ff0d0226dc147))

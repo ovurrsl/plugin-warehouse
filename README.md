@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`30199c4`](https://github.com/ovurrsl/plugin-warehouse/commit/30199c472370b6cb83852f393a2199bc771011aa))
 - Refresh generated README blocks [skip ci] ([`28fb3d2`](https://github.com/ovurrsl/plugin-warehouse/commit/28fb3d2238574b7271b2f5fcef224d26f770dbd7))
 - Refresh generated README blocks [skip ci] ([`4e3dc16`](https://github.com/ovurrsl/plugin-warehouse/commit/4e3dc166803de22b752ab8d5ac98870d73912884))
 - Refresh generated README blocks [skip ci] ([`6d582fd`](https://github.com/ovurrsl/plugin-warehouse/commit/6d582fde8ddf886acbe979ae2c31928151fcb28a))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`5644d5c`](https://github.com/ovurrsl/plugin-warehouse/commit/5644d5cf4bf11c3bcb76e04f41545f44410135fc))
 - Record the git+ssh requirement for a private repo ([`4bfd580`](https://github.com/ovurrsl/plugin-warehouse/commit/4bfd580a5fc1008fc5e0490e1c665567118e97bf))
 - Record the host clipboard limitation and its patch ([`a308a25`](https://github.com/ovurrsl/plugin-warehouse/commit/a308a252c1d10520ac59463398f6849b5221f283))
-
 
 …
 

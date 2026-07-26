@@ -20,6 +20,7 @@ import {
   supportOffsetsX,
   usefulWidthM,
 } from './metrics'
+import { outletPort } from './ports'
 import type { ConveyorRollerNode } from './schema'
 
 /**
@@ -150,11 +151,20 @@ export function conveyorParts(
   // ── Supports ──────────────────────────────────────────────────────────────
   const legHeight = legHeightM(conveyor)
   const stations = supportOffsetsX(conveyor)
-  const lastStation = stations.length - 1
+  /**
+   * The station at the **discharge** end, not simply the last one.
+   *
+   * `hasDownstreamNeighbour` asks whether the *outlet* is mated, and under
+   * reverse flow the outlet is the −X end. Naming the last station regardless
+   * therefore deleted the leg pair at the *free* end of a reverse-flow module
+   * and left doubled steel at the seam — the exact failure this rule exists to
+   * prevent, inverted.
+   */
+  const cededStation = outletPort(conveyor) === 'b' ? stations.length - 1 : 0
 
   stations.forEach((x, index) => {
     // The downstream station belongs to the neighbour when there is one.
-    if (hasDownstreamNeighbour && index === lastStation) return
+    if (hasDownstreamNeighbour && index === cededStation) return
     if (legHeight <= 0) return
 
     for (const sign of [1, -1]) {

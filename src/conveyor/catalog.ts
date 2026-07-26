@@ -92,25 +92,3 @@ export const CAR = {
   maxInclinationDeg: 6,
   accumulation: 'contact',
 } as const
-
-/**
- * Circuit rules that bear on a straight run, from the catalogue's own list.
- * The rest arrive with the kinds they constrain — a rule about lifts is not
- * worth writing before there is a lift.
- *
- * These are the conveyor's `parametrics.invariants`: a plausible set of numbers
- * can describe a conveyor nobody would ship, and every one of these failures is
- * quiet.
- */
-export const CIRCUIT_RULES = {
-  /** R1 — joined ports must carry the same useful width class. */
-  matchingWidthClass: 'R1',
-  /** R2 — joined ports must sit at the same transport height, no tolerance. */
-  matchingTransportHeight: 'R2',
-  /** R3 — inclination is per type; CAR tops out at 6°. */
-  inclinationByType: 'R3',
-  /** R6 — above 60 m/min the catalogue moves you to a belt. */
-  speedCeiling: 'R6',
-  /** R11 — the shortest box a line accepts is set by its tightest section. */
-  boxLengthNarrowing: 'R11',
-} as const

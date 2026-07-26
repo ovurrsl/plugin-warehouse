@@ -12,14 +12,15 @@ import {
   angleRad,
   arcPointLocal,
   frameBottomY,
+  kerbStepRad,
   legHeightM,
   outerRadiusM,
-  rollerStepRad,
   supportAngles,
   zoneCount,
 } from './curve-metrics'
 import type { ConveyorCurveNode } from './curve-schema'
 import type { ConveyorDetail, ConveyorPartRole } from './parts'
+import { outletPort } from './ports'
 
 /**
  * Every piece of a curve module, as boxes that may be turned about Y.
@@ -56,7 +57,9 @@ export function curveParts(
   const parts: CurvePart[] = []
   const full = detail === 'full'
   const sweep = angleRad(curve)
-  const step = rollerStepRad(curve)
+  // The kerbs and the guides, not the rollers: formed steel is segmented finely
+  // enough not to show its facets, which is a coarser question than the pitch.
+  const step = kerbStepRad(curve)
   const bottom = frameBottomY(curve)
   const top = curve.transportHeight
   const inner = curve.innerRadius
@@ -141,10 +144,12 @@ export function curveParts(
   // of it.
   const legHeight = legHeightM(curve)
   const stations = supportAngles(curve)
-  const lastStation = stations.length - 1
+  /** The station at the discharge end. See `./parts` — naming the last one
+   *  regardless drops the free end's legs on a reverse-flow module. */
+  const cededStation = outletPort(curve) === 'b' ? stations.length - 1 : 0
 
   stations.forEach((theta, index) => {
-    if (hasDownstreamNeighbour && index === lastStation) return
+    if (hasDownstreamNeighbour && index === cededStation) return
     if (legHeight <= 0) return
 
     for (const radius of [inner + LEG_SECTION_M, outer - LEG_SECTION_M]) {

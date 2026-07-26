@@ -160,12 +160,52 @@ describe('geometry', () => {
     // And it is one bit in the key, not a new shape family.
     expect(conveyorGeometryKey(node, 'full', true)).not.toBe(conveyorGeometryKey(node, 'full'))
   })
+  test('the ceded station is the one that actually abuts, whichever way goods travel', () => {
+    // The bug this pins: `hasDownstreamNeighbour` asks whether the *outlet* is
+    // mated, and under reverse flow the outlet is 'a' — the −X end. The parts
+    // list dropped `index === lastStation`, always +X. So a reverse-flow module
+    // butted at −X deleted the leg pair at its *free* end and left doubled steel
+    // at the seam: the exact failure the shared-support rule exists to prevent.
+    const legXs = (node: ReturnType<typeof conveyor>, abutted: boolean) =>
+      [
+        ...new Set(
+          conveyorParts(node, 'full', abutted)
+            .filter((part) => part.role === 'leg')
+            .map((part) => Number(part.center[0].toFixed(6))),
+        ),
+      ].sort((a, b) => a - b)
+
+    const forward = conveyor({ flow: 'forward' })
+    const reverse = conveyor({ flow: 'reverse' })
+    const stations = legXs(forward, false)
+
+    // Alone, both build every station.
+    expect(legXs(reverse, false)).toEqual(stations)
+
+    // Abutted, each drops the station at its own discharge end.
+    expect(legXs(forward, true)).toEqual(stations.slice(0, -1))
+    expect(legXs(reverse, true)).toEqual(stations.slice(1))
+  })
+
+  test('the ceded end reaches the cache key, so two abutted flows are two meshes', () => {
+    // Once the dropped station follows the flow, the flow moves a vertex — and a
+    // key that did not carry it would hand a reverse module the forward mesh.
+    // `flow` only reached the key through the motor block, so a module with no
+    // drive was exactly the case that shared one buffer for two shapes.
+    const forward = conveyor({ flow: 'forward', hasDrive: false })
+    const reverse = conveyor({ flow: 'reverse', hasDrive: false })
+    expect(conveyorGeometryKey(forward, 'full', true)).not.toBe(
+      conveyorGeometryKey(reverse, 'full', true),
+    )
+    // And unabutted they are the same mesh, because nothing is dropped.
+    expect(conveyorGeometryKey(forward, 'full')).toBe(conveyorGeometryKey(reverse, 'full'))
+  })
 })
 
 describe('the cache key is derived, never raw', () => {
-  const buildFresh = (node: ReturnType<typeof conveyor>): Float32Array => {
+  const buildFresh = (node: ReturnType<typeof conveyor>, abutted = false): Float32Array => {
     clearConveyorGeometryCache()
-    const geometry = getConveyorGeometry(node, 'full')
+    const geometry = getConveyorGeometry(node, 'full', abutted)
     const positions = geometry.getAttribute('position').array as ArrayLike<number>
     const colors = geometry.getAttribute('color').array as ArrayLike<number>
     const combined = new Float32Array(positions.length + colors.length)
@@ -203,15 +243,27 @@ describe('the cache key is derived, never raw', () => {
   ]
 
   test('every field that changes the mesh changes the key, and none that do not', () => {
-    const base = conveyor()
-    const baseMesh = buildFresh(base)
-    const baseKey = conveyorGeometryKey(base, 'full')
+    /**
+     * Swept at **both** abutment states, and that is not thoroughness for its
+     * own sake.
+     *
+     * Run only unabutted, this sweep reported `flow` as key-covered because flow
+     * reached the key through the motor block — while an abutted module's mesh
+     * also depends on flow, through which support station it cedes. A module
+     * with `hasDrive: false` therefore had two shapes behind one key and the
+     * sweep could not see it.
+     */
+    for (const abutted of [false, true]) {
+      const base = conveyor()
+      const baseMesh = buildFresh(base, abutted)
+      const baseKey = conveyorGeometryKey(base, 'full', abutted)
 
-    for (const [field, value] of VARIANTS) {
-      const variant = conveyor({ [field]: value })
-      const changesMesh = !sameMesh(buildFresh(variant), baseMesh)
-      const changesKey = conveyorGeometryKey(variant, 'full') !== baseKey
-      expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
+      for (const [field, value] of VARIANTS) {
+        const variant = conveyor({ [field]: value })
+        const changesMesh = !sameMesh(buildFresh(variant, abutted), baseMesh)
+        const changesKey = conveyorGeometryKey(variant, 'full', abutted) !== baseKey
+        expect({ abutted, field, changesKey }).toEqual({ abutted, field, changesKey: changesMesh })
+      }
     }
   })
 

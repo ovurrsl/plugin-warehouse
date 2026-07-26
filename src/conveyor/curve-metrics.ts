@@ -113,6 +113,32 @@ export function rollerStepRad(curve: ConveyorCurveNode): number {
   return angleRad(curve) / rollerCount(curve)
 }
 
+/**
+ * Longest arc one formed kerb or guide segment may span.
+ *
+ * Ten degrees, and the number is chosen against the eye rather than against the
+ * hardware: a chord over that arc sits within six millimetres of the curve it
+ * approximates at every radius the schema allows, which is inside a rolled
+ * section's own forming tolerance.
+ */
+const FORMED_SECTION_STEP = Math.PI / 18
+
+/**
+ * The angular step the kerbs and guides are segmented at — **not** the roller
+ * step.
+ *
+ * Dividing formed steel at the roller pitch is the mistake this exists to
+ * undo. It tied a cosmetic subdivision to a functional one and made a 90° bend
+ * cost seventeen segments per rail where nine are indistinguishable: two thirds
+ * of a curve's parts were kerbs and guides, and a third of its triangles went
+ * on a facet nobody can see. The collider already made this distinction and the
+ * shape did not.
+ */
+export function kerbStepRad(curve: ConveyorCurveNode): number {
+  const sweep = angleRad(curve)
+  return sweep / Math.max(1, Math.ceil(sweep / FORMED_SECTION_STEP))
+}
+
 /** Arc pitch at a given radius. The inner one is what the support rule reads. */
 export function pitchAtRadiusM(curve: ConveyorCurveNode, radius: number): number {
   return rollerStepRad(curve) * radius

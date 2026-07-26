@@ -26,6 +26,7 @@ import {
   toLinear,
 } from './geometry-builder'
 import type { ConveyorDetail } from './parts'
+import { outletPort } from './ports'
 
 /**
  * One merged BufferGeometry per curve *shape*, out of the straight's pool.
@@ -171,7 +172,9 @@ export function curveGeometryKey(
 ): string {
   return [
     detail,
-    hasDownstreamNeighbour ? 'U' : 'UD',
+    // Which end cedes its support. Named rather than counted: the ceded station
+    // follows the flow, and flow reaches a curve's mesh through nothing else.
+    hasDownstreamNeighbour ? `U${outletPort(curve)}` : 'UD',
     angleDeg(curve),
     curve.handed,
     curve.innerRadius.toFixed(5),

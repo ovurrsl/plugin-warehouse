@@ -12,6 +12,7 @@ import {
 } from './metrics'
 import type { ConveyorDetail, ConveyorPart, ConveyorPartRole } from './parts'
 import { conveyorParts } from './parts'
+import { outletPort } from './ports'
 import type { ConveyorRollerNode } from './schema'
 
 /**
@@ -291,11 +292,13 @@ export function conveyorGeometryKey(
 ): string {
   return [
     detail,
-    // One support at the far end or none. A module with something standing
+    // Which end cedes its support, or neither. A module with something standing
     // against it leaves that support to its neighbour, which is a different
-    // mesh — two variants per shape, and the cheapest possible price for not
-    // doubling the steel at every seam.
-    hasDownstreamNeighbour ? 'U' : 'UD',
+    // mesh — and *which* station goes follows the flow, so the end has to be
+    // named rather than counted. A bare abutted/not bit handed a reverse-flow
+    // module the forward mesh whenever it carried no motor, which was the only
+    // other way flow reached this key.
+    hasDownstreamNeighbour ? `U${outletPort(conveyor)}` : 'UD',
     usefulWidthMm(conveyor),
     frameWidthM(conveyor).toFixed(5),
     moduleLengthM(conveyor).toFixed(5),

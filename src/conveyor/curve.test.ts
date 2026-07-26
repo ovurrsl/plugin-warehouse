@@ -328,9 +328,9 @@ describe('the mesh', () => {
    * field it did not need; UVs matter more here than on a straight, since the
    * curve's entire stripe correctness is the V index per angular step.
    */
-  const buildFresh = (node: ReturnType<typeof curve>): Float32Array => {
+  const buildFresh = (node: ReturnType<typeof curve>, abutted = false): Float32Array => {
     clearConveyorGeometryCache()
-    const geometry = getCurveGeometry(node, 'full')
+    const geometry = getCurveGeometry(node, 'full', abutted)
     const parts = (['position', 'color', 'uv'] as const).map(
       (name) => geometry.getAttribute(name).array as ArrayLike<number>,
     )
@@ -370,15 +370,20 @@ describe('the mesh', () => {
   ]
 
   test('every field that changes the mesh changes the key, and none that do not', () => {
-    const base = curve()
-    const baseMesh = buildFresh(base)
-    const baseKey = curveGeometryKey(base, 'full')
+    // Both abutment states. Unabutted, a curve's mesh does not follow `flow` at
+    // all; abutted it does, through which support station it cedes — so half the
+    // sweep cannot see half the key. The straight shipped exactly that gap.
+    for (const abutted of [false, true]) {
+      const base = curve()
+      const baseMesh = buildFresh(base, abutted)
+      const baseKey = curveGeometryKey(base, 'full', abutted)
 
-    for (const [field, value] of VARIANTS) {
-      const variant = curve({ [field]: value })
-      const changesMesh = !sameMesh(buildFresh(variant), baseMesh)
-      const changesKey = curveGeometryKey(variant, 'full') !== baseKey
-      expect({ field, changesKey }).toEqual({ field, changesKey: changesMesh })
+      for (const [field, value] of VARIANTS) {
+        const variant = curve({ [field]: value })
+        const changesMesh = !sameMesh(buildFresh(variant, abutted), baseMesh)
+        const changesKey = curveGeometryKey(variant, 'full', abutted) !== baseKey
+        expect({ abutted, field, changesKey }).toEqual({ abutted, field, changesKey: changesMesh })
+      }
     }
   })
 

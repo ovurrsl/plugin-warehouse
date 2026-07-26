@@ -73,11 +73,15 @@ export const CARTON: CargoType = {
 /**
  * Two-hundred-litre steel drums, Ø 585 × 880 mm.
  *
- * **Two to a Euro pallet, and that is arithmetic rather than choice**: two
- * across is 1170 mm against the deck's 1200, and a third would have to hang
- * over. The plan's optional four-up variant is exactly the overhanging case, so
- * it is not built here — a load that leaves the footprint has to be refused by
- * the placement chain before it can be offered, and that chain is the next step.
+ * **How many fit is arithmetic, and it is arithmetic in two directions.** Two
+ * across a Euro deck is 1170 mm against its 1200, and a third would hang over —
+ * but the same drum on a 1200 × 1200 takes two by two, and on an EPAL 3
+ * (1000 × 1200) it takes one by two. The count follows the deck, which is why
+ * `unitsPerLayer` is asked rather than a number being written down here.
+ *
+ * On a quarter pallet it takes none at all: 585 mm does not fit inside 400 mm in
+ * any orientation, and {@link fitsOnDeck} says so rather than rounding it up to
+ * one and letting 92 mm of steel hang over both long edges.
  *
  * Wrapping is off by default: drums are strapped in practice, not filmed.
  */
@@ -158,16 +162,39 @@ export function resolveVariant(
 
 // ── What a variant means, per type ──────────────────────────────────────────
 
-/** Units across the deck in one layer, and how they are arranged. */
+/**
+ * Units across the deck in one layer, and how they are arranged.
+ *
+ * **Zero is a legal answer and is not clamped away.** The obvious guard —
+ * `Math.max(1, …)` so a layer is never empty — is wrong for a unit larger than
+ * the deck: it reported one drum on a 400 mm quarter pallet and the builder duly
+ * drew 585 mm of steel hanging 92 mm over both long edges. Worse, the footprint
+ * and the clash box are both built from the pallet's own dimensions, so the
+ * overhang passed straight through collision. The honest answer for a unit that
+ * does not fit is none, and {@link fitsOnDeck} is what the callers ask.
+ */
 export function unitsPerLayer(
   type: CargoType,
   preset: PalletPreset,
 ): { alongX: number; alongZ: number } {
   const spec = PALLET_PRESETS[preset]
   return {
-    alongX: Math.max(1, Math.floor(spec.length / type.unitM[0] + 1e-6)),
-    alongZ: Math.max(1, Math.floor(spec.width / type.unitM[2] + 1e-6)),
+    alongX: Math.floor(spec.length / type.unitM[0] + 1e-6),
+    alongZ: Math.floor(spec.width / type.unitM[2] + 1e-6),
   }
+}
+
+/**
+ * Whether this cargo can stand on this deck at all.
+ *
+ * The consumer `overhang` was declared for and never had. A type that may not
+ * leave the footprint and does not fit inside it is not a load to be drawn
+ * smaller — it is a combination that does not exist, and the panel says so.
+ */
+export function fitsOnDeck(type: CargoType, preset: PalletPreset): boolean {
+  if (type.overhang) return true
+  const perLayer = unitsPerLayer(type, preset)
+  return perLayer.alongX >= 1 && perLayer.alongZ >= 1
 }
 
 /**
@@ -179,11 +206,12 @@ export function unitsPerLayer(
  */
 export function unitCount(type: CargoType, preset: PalletPreset, variant: number): number {
   const perLayer = unitsPerLayer(type, preset)
+  const most = perLayer.alongX * perLayer.alongZ
+  if (most <= 0) return 0
   if (type.fill === 'layers') {
     const layers = Math.max(1, Math.round(variant * type.variants.length))
-    return layers * perLayer.alongX * perLayer.alongZ
+    return layers * most
   }
-  const most = perLayer.alongX * perLayer.alongZ
   return Math.max(1, Math.round(variant * most))
 }
 
@@ -211,6 +239,10 @@ export function loadHeightOf(node: {
 }): number {
   if (node.cargo === 'none') return Math.max(0, node.loadHeight)
   const type = CARGO_TYPES[node.cargo]
+  // A cargo that does not fit its deck is not drawn, so it must not reserve
+  // height either — a collision box standing a metre taller than the pallet it
+  // describes is the same renderer/collider disagreement in the other axis.
+  if (!fitsOnDeck(type, node.preset)) return Math.max(0, node.loadHeight)
   return cargoHeightM(type, resolveVariant(type, node.id, node.fillRange))
 }
 

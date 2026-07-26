@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { type CargoRegionId, type UVRect, uvOf } from './cargo-atlas-regions'
+import { CARTON_ROW_CELLS, type CargoRegionId, type UVRect, uvOf } from './cargo-atlas-regions'
 import { CORNER_BOARD_MIN_FILL } from './cargo-constants'
 import { type CargoInput, type CargoPart, cargoParts, loadExtent } from './cargo-parts'
 import { unitCount, unitsPerLayer } from './cargo-types'
@@ -143,7 +143,18 @@ function emitBox(
   for (const key of ['px', 'nx', 'py', 'ny', 'pz', 'nz'] as const) {
     if (!part.faces[key]) continue
     const basis = FACE_BASIS[key]
-    const rect = rectOf(key === 'py' || key === 'ny' ? part.topRegion : part.sideRegion)
+    const top = key === 'py' || key === 'ny'
+    const full = rectOf(top ? part.topRegion : part.sideRegion)
+    // A face shows as many of the row's cells as it has units across, not all of
+    // them: the short face of a Euro deck is two cartons, and painting four
+    // across it halves the module width at the tier switch.
+    const cells =
+      top || !part.rowCells
+        ? CARTON_ROW_CELLS
+        : key === 'px' || key === 'nx'
+          ? part.rowCells.alongZ
+          : part.rowCells.alongX
+    const rect = narrowU(full, cells)
     const bands = SIDE_FACES.includes(key) ? Math.max(1, Math.round(part.vRepeat ?? 1)) : 1
 
     const at = (uFrac: number, vFrac: number): [number, number, number] => [
@@ -167,6 +178,13 @@ function emitBox(
       )
     }
   }
+}
+
+/** The first `cells` of a row region, so a face paints the cartons it has. */
+function narrowU(rect: UVRect, cells: number): UVRect {
+  const clamped = Math.max(1, Math.min(CARTON_ROW_CELLS, Math.round(cells)))
+  if (clamped === CARTON_ROW_CELLS) return rect
+  return { ...rect, uMax: rect.uMin + (rect.uMax - rect.uMin) * (clamped / CARTON_ROW_CELLS) }
 }
 
 function emitCylinder(
@@ -335,14 +353,28 @@ export function getCargoGeometry(input: CargoInput): THREE.BufferGeometry {
 
   const built = buildCargoGeometry(input)
   cache.set(key, built)
-  evict()
+  evict(key)
   return built
 }
 
-function evict(): void {
+/**
+ * Drops the oldest unheld loads.
+ *
+ * **The entry just built is never a candidate.** The renderer claims its keys in
+ * an effect, which runs *after* the render that asked for the geometry, so a
+ * freshly built load is unretained for exactly as long as it takes React to
+ * commit. A `Map` iterates in insertion order and the new entry is last, so at a
+ * full cache it was the only one the retain guard did not skip: disposed, and
+ * then returned to be mounted. The mesh survived — three re-uploads a buffer it
+ * has not seen — but the entry was gone from the cache, so every other pallet
+ * resolving to that load rebuilt and re-disposed it, and the sharing this whole
+ * design rests on was permanently off for that key.
+ */
+function evict(justBuilt: string): void {
   if (cache.size <= CACHE_LIMIT) return
   for (const [key, geometry] of cache) {
     if (cache.size <= CACHE_LIMIT) return
+    if (key === justBuilt) continue
     if ((retained.get(key) ?? 0) > 0) continue
     cache.delete(key)
     geometry.dispose()

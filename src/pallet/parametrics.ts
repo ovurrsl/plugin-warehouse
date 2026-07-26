@@ -1,6 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { CARGO_COLOR_IDS } from './cargo-constants'
-import { CARGO_TYPE_IDS } from './cargo-types'
+import { CARGO_TYPE_IDS, CARGO_TYPES, fitsOnDeck } from './cargo-types'
 import { PALLET_PRESETS, specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -55,7 +55,9 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
         },
         { key: 'strapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
         { key: 'labelled', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
-        { key: 'wrapped', kind: 'boolean', visibleIf: (node) => node.cargo !== 'none' },
+        // `wrapped` is deliberately absent until the stretch film is built. A
+        // switch that changes no pixels is worse than a missing one: the user
+        // toggles it, sees nothing, and stops trusting the panel.
       ],
     },
     {
@@ -71,6 +73,18 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
     (node): Issue[] => {
       const spec = specOf(node.preset)
       const issues: Issue[] = []
+
+      // A unit larger than the deck fits none of it. Said here rather than
+      // drawn smaller or drawn overhanging: the footprint and the clash box are
+      // both built from the pallet's own dimensions, so an overhanging load
+      // would pass straight through collision.
+      if (node.cargo !== 'none' && !fitsOnDeck(CARGO_TYPES[node.cargo], node.preset)) {
+        issues.push({
+          field: 'cargo',
+          severity: 'error',
+          msg: `A ${CARGO_TYPES[node.cargo].label.toLowerCase().replace(/s$/, '')} does not fit a ${spec.label} — nothing is drawn.`,
+        })
+      }
       // Advisory, not a hard limit: the figure is the pallet's rated load, and
       // whether a given stack exceeds it depends on what is on it, which the
       // scene does not model. Flagging an implausible stack height is useful;

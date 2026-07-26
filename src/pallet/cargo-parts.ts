@@ -17,6 +17,7 @@ import {
   CARGO_TYPES,
   type CargoType,
   cargoHeightM,
+  fitsOnDeck,
   resolveVariant,
   unitCount,
   unitsPerLayer,
@@ -75,6 +76,16 @@ export type CargoPart = {
    * the tier exists to preserve.
    */
   vRepeat?: number
+  /**
+   * How many of the side region's cells each pair of faces shows.
+   *
+   * The carton row is drawn as a fixed number of cells, and a face that maps the
+   * whole region shows all of them however wide it is. On a Euro deck the long
+   * faces are four cartons and the short faces are two — mapping the full row to
+   * both painted four 200 mm cartons across a face that carries two 400 mm ones,
+   * so the module width halved and the count doubled at the tier switch.
+   */
+  rowCells?: { alongX: number; alongZ: number }
 }
 
 export type CargoInput = {
@@ -103,6 +114,11 @@ const ALL_FACES: FaceSet = { px: true, nx: true, py: true, ny: true, pz: true, n
 export function cargoInputOf(node: PalletNode, detail: CargoDetail): CargoInput | null {
   if (node.cargo === 'none') return null
   const type = CARGO_TYPES[node.cargo]
+  // A load that may not leave the footprint and does not fit inside it is drawn
+  // as nothing rather than drawn overhanging: the footprint and the clash box
+  // are both built from the pallet's own dimensions, so an overhang would be
+  // invisible to collision.
+  if (!fitsOnDeck(type, node.preset)) return null
   return {
     type,
     preset: node.preset,
@@ -122,8 +138,27 @@ export function loadExtent(input: CargoInput): readonly [number, number, number]
     const perLayer = unitsPerLayer(type, preset)
     return [perLayer.alongX * type.unitM[0], height, perLayer.alongZ * type.unitM[2]]
   }
-  const count = unitCount(type, preset, variant)
-  return [count * type.unitM[0], height, type.unitM[2]]
+  // From the rows and columns the units actually occupy, not from the count
+  // times one unit's width. Reading it off the count assumes a single row, which
+  // is what put four drums in a 2340 mm line on a 1200 mm deck.
+  const grid = countGrid(input)
+  return [grid.columns * type.unitM[0], height, grid.rows * type.unitM[2]]
+}
+
+/**
+ * How a count-filled load is arranged: row-major across the deck's own grid.
+ *
+ * Two by two on a 1200 × 1200, one by two on an EPAL 3, two by one on a Euro
+ * pallet — the arrangement follows the deck, because the count already did.
+ */
+function countGrid(input: CargoInput): { columns: number; rows: number } {
+  const perLayer = unitsPerLayer(input.type, input.preset)
+  const count = unitCount(input.type, input.preset, input.variant)
+  if (count <= 0 || perLayer.alongX <= 0) return { columns: 0, rows: 0 }
+  return {
+    columns: Math.min(count, perLayer.alongX),
+    rows: Math.ceil(count / perLayer.alongX),
+  }
 }
 
 /** Layers a variant resolves to. Both tiers need it — one to stack boxes, the
@@ -209,16 +244,20 @@ function drumParts(input: CargoInput): CargoPart[] {
   const { type, preset, variant } = input
   const color = CARGO_COLORS[input.color]
   const count = unitCount(type, preset, variant)
+  const grid = countGrid(input)
   const [diameter, height] = type.unitM
   const lidHeight = height * 0.035
   const parts: CargoPart[] = []
 
   for (let index = 0; index < count; index++) {
-    const x = (index - (count - 1) / 2) * diameter
+    const column = index % Math.max(1, grid.columns)
+    const row = Math.floor(index / Math.max(1, grid.columns))
+    const x = (column - (grid.columns - 1) / 2) * diameter
+    const z = (row - (grid.rows - 1) / 2) * diameter
     parts.push({
       kind: 'drum',
       shape: 'cylinder',
-      center: [x, height / 2, 0],
+      center: [x, height / 2, z],
       size: [diameter, height, diameter],
       faces: { ...ALL_FACES, py: false, ny: false },
       sideRegion: 'drumBody',
@@ -228,7 +267,7 @@ function drumParts(input: CargoInput): CargoPart[] {
     parts.push({
       kind: 'drumLid',
       shape: 'cylinder',
-      center: [x, height - lidHeight / 2, 0],
+      center: [x, height - lidHeight / 2, z],
       size: [diameter, lidHeight, diameter],
       faces: { ...ALL_FACES, py: true, ny: false },
       sideRegion: 'drumBody',
@@ -264,11 +303,16 @@ function strapParts(extent: readonly [number, number, number]): CargoPart[] {
       color: CARGO_PALETTE.strapGreen,
     })
     for (const side of [-1, 1]) {
+      // Run the leg up to the band's own top face. Stopping at `loadY` left a
+      // 1.5 mm break at all four corners of both straps — the same magnitude as
+      // the offsets in this file that exist deliberately, so not sub-pixel at
+      // the range a placed pallet is inspected at.
+      const legHeight = loadY + stand + STRAP_THICKNESS_M / 2
       parts.push({
         kind: 'strap',
         shape: 'box',
-        center: [x, loadY / 2, side * (loadZ / 2 + stand)],
-        size: [STRAP_WIDTH_M, loadY, STRAP_THICKNESS_M],
+        center: [x, legHeight / 2, side * (loadZ / 2 + stand)],
+        size: [STRAP_WIDTH_M, legHeight, STRAP_THICKNESS_M],
         faces: ALL_FACES,
         sideRegion: 'strap',
         topRegion: 'strap',
@@ -352,18 +396,27 @@ export function cargoParts(input: CargoInput): CargoPart[] {
   const [loadX, loadY, loadZ] = extent
 
   if (input.detail === 'simple') {
-    const cartons = input.type.fill === 'layers'
+    // **A count-filled load keeps its own drums at the far tier.** Collapsing
+    // them into one cylinder took its radius from the block's X extent and
+    // ignored Z, so two 585 mm drums became a single 1170 mm tank overhanging
+    // the deck by 356 mm a side — and the silhouette snapped between the two
+    // shapes as the camera crossed the tier boundary. Ten segments instead of
+    // twenty is where the saving comes from for this type.
+    if (input.type.fill !== 'layers') return drumParts(input)
+
+    const perLayer = unitsPerLayer(input.type, input.preset)
     return [
       {
-        kind: cartons ? 'carton' : 'drum',
-        shape: cartons ? 'box' : 'cylinder',
+        kind: 'carton',
+        shape: 'box',
         center: [0, loadY / 2, 0],
         size: [loadX, loadY, loadZ],
         faces: { ...ALL_FACES, ny: false },
-        sideRegion: cartons ? 'cartonRow' : 'drumBody',
-        topRegion: cartons ? 'cartonTop' : 'drumLid',
+        sideRegion: 'cartonRow',
+        topRegion: 'cartonTop',
         color: CARGO_COLORS[input.color],
-        vRepeat: cartons ? layerCount(input) : 1,
+        vRepeat: layerCount(input),
+        rowCells: { alongX: perLayer.alongX, alongZ: perLayer.alongZ },
       },
     ]
   }

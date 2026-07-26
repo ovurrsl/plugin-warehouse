@@ -3,6 +3,7 @@ import {
   ATLAS_SIZE,
   CARGO_REGION_IDS,
   CARGO_REGIONS,
+  CARTON_ROW_CELLS,
   type CargoRegionId,
   type PixelRect,
 } from './cargo-atlas-regions'
@@ -168,8 +169,8 @@ function drawCartonTop(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 function drawCartonRow(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  const cell = w / 4
-  for (let i = 0; i < 4; i++) {
+  const cell = w / CARTON_ROW_CELLS
+  for (let i = 0; i < CARTON_ROW_CELLS; i++) {
     ctx.save()
     ctx.beginPath()
     ctx.rect(i * cell, 0, cell, h)

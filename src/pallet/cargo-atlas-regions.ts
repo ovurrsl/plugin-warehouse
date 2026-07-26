@@ -54,6 +54,16 @@ export const GUTTER_PX = 24
  */
 export const INSET_PX = 3
 
+/**
+ * How many cartons the `cartonRow` region is drawn as.
+ *
+ * Named here rather than in the drawer because the geometry has to narrow its
+ * UVs to a fraction of the row, and a face that took the wrong fraction would
+ * paint the wrong number of cartons — the drawer and the mapper disagreeing
+ * about the same picture, which is exactly what this module exists to prevent.
+ */
+export const CARTON_ROW_CELLS = 4
+
 export type PixelRect = { x: number; y: number; w: number; h: number }
 export type UVRect = { uMin: number; uMax: number; vMin: number; vMax: number }
 

@@ -1,10 +1,22 @@
 import { describe, expect, test } from 'bun:test'
 import type * as THREE from 'three'
-import { uvOf } from './cargo-atlas-regions'
-import { buildCargoGeometry, cargoCacheKey } from './cargo-geometry'
-import { type CargoDetail, type CargoInput, cargoParts, loadExtent } from './cargo-parts'
-import { CARTON, DRUM, loadHeightOf } from './cargo-types'
-import { PALLET_PRESETS } from './presets'
+import { CARTON_ROW_CELLS, uvOf } from './cargo-atlas-regions'
+import {
+  buildCargoGeometry,
+  cargoCacheKey,
+  cargoGeometryCacheSize,
+  getCargoGeometry,
+} from './cargo-geometry'
+import {
+  type CargoDetail,
+  type CargoInput,
+  cargoInputOf,
+  cargoParts,
+  loadExtent,
+} from './cargo-parts'
+import { CARTON, DRUM, fitsOnDeck, loadHeightOf, unitCount, unitsPerLayer } from './cargo-types'
+import { PALLET_PRESET_IDS, PALLET_PRESETS } from './presets'
+import { PalletNode } from './schema'
 
 const BASE: CargoInput = {
   type: CARTON,
@@ -310,5 +322,204 @@ describe('one height, so collision and the renderer cannot disagree', () => {
         loadHeight: 0.93,
       }),
     ).toBe(0.93)
+  })
+})
+
+/** The plan's stated placement tolerance: hardware may stand this far off the
+ *  goods without counting as an overhang. */
+const TOLERANCE = 0.015
+
+describe('a load never leaves the deck it was built for', () => {
+  test('no cargo overhangs any preset, in either axis', () => {
+    // **The invariant that would have caught it.** Drums were counted on two
+    // axes by `unitsPerLayer` and then laid out on one by the builder, so four
+    // drums on a 1200 x 1200 became a 2340 mm line on a 1200 mm deck — and
+    // because the footprint and the clash box are both built from the pallet's
+    // own dimensions, 570 mm of steel passed through the neighbouring pallet
+    // and collision reported clear. Every earlier test pinned epal-1, the one
+    // Euro preset where the drum grid happens to be one deep.
+    const offenders: string[] = []
+    for (const preset of PALLET_PRESET_IDS) {
+      for (const type of [CARTON, DRUM]) {
+        if (!fitsOnDeck(type, preset)) continue
+        for (const variant of type.variants) {
+          const input = at({ type, preset, variant })
+          const [x, , z] = loadExtent(input)
+          const spec = PALLET_PRESETS[preset]
+          if (x > spec.length + 1e-9 || z > spec.width + 1e-9) {
+            offenders.push(
+              `${type.id} on ${preset} @${variant}: ${x.toFixed(3)} x ${z.toFixed(3)} on ${spec.length} x ${spec.width}`,
+            )
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('the built geometry agrees with the extent it reports', () => {
+    // An extent that is honest about an overhang is still an overhang. This
+    // checks the vertices themselves, so a builder that drifts from
+    // `loadExtent` is caught too.
+    //
+    // The tolerance is the plan's own 15 mm and it is not slack: the strapping
+    // stands 2.5 mm off the goods and the label floats 1 mm off the face, both
+    // deliberately, so a load that fills its deck exactly reaches a few
+    // millimetres past it in hardware. The failure this guards against was 570.
+    const offenders: string[] = []
+    for (const preset of PALLET_PRESET_IDS) {
+      for (const type of [CARTON, DRUM]) {
+        if (!fitsOnDeck(type, preset)) continue
+        const geometry = buildCargoGeometry(at({ type, preset, variant: 1 }))
+        const position = geometry.getAttribute('position')
+        const spec = PALLET_PRESETS[preset]
+        let maxX = 0
+        let maxZ = 0
+        for (let i = 0; i < position.count; i++) {
+          maxX = Math.max(maxX, Math.abs(position.getX(i)))
+          maxZ = Math.max(maxZ, Math.abs(position.getZ(i)))
+        }
+        if (maxX > spec.length / 2 + TOLERANCE || maxZ > spec.width / 2 + TOLERANCE) {
+          offenders.push(`${type.id} on ${preset}: ${maxX.toFixed(3)} / ${maxZ.toFixed(3)}`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
+  test('four drums on a square Euro deck are two by two, not four in a line', () => {
+    // The four-up variant is not the overhanging case after all — it was the
+    // one-dimensional layout that overhung. 2 x 585 is 1170 against 1200 in
+    // both directions.
+    const input = at({ type: DRUM, preset: 'euro-1200x1200', variant: 1, strapped: false })
+    expect(unitCount(DRUM, 'euro-1200x1200', 1)).toBe(4)
+    const [x, , z] = loadExtent(input)
+    expect(x).toBeCloseTo(1.17, 6)
+    expect(z).toBeCloseTo(1.17, 6)
+
+    const centres = cargoParts(input)
+      .filter((part) => part.kind === 'drum')
+      .map((part) => `${part.center[0].toFixed(4)},${part.center[2].toFixed(4)}`)
+    expect(new Set(centres).size).toBe(4)
+  })
+
+  test('an EPAL 3 takes its two drums along the deep axis', () => {
+    // 1000 x 1200: one across, two deep. Counted on Z and built on X was 1170
+    // on a 1000 mm deck.
+    const input = at({ type: DRUM, preset: 'epal-3', variant: 1, strapped: false })
+    const [x, , z] = loadExtent(input)
+    expect(x).toBeCloseTo(0.585, 6)
+    expect(z).toBeCloseTo(1.17, 6)
+  })
+
+  test('a drum does not fit a quarter pallet, and is refused rather than shrunk', () => {
+    // 585 mm inside 400 mm in no orientation. `Math.max(1, floor(...))` used to
+    // round that up to one drum hanging 92 mm over both long edges.
+    expect(fitsOnDeck(DRUM, 'quarter')).toBe(false)
+    expect(unitsPerLayer(DRUM, 'quarter').alongZ).toBe(0)
+    const node = PalletNode.parse({ id: 'pallet_toosmall', preset: 'quarter', cargo: 'drum' })
+    expect(cargoInputOf(node, 'full')).toBeNull()
+    // And it reserves no height either, so the clash box cannot stand a metre
+    // taller than the pallet it describes.
+    expect(loadHeightOf(node)).toBe(0)
+  })
+})
+
+describe('the far tier is the same load, drawn cheaper', () => {
+  test('drums keep their own shape at distance', () => {
+    // Collapsed into one cylinder, the radius came from the block's X extent
+    // and Z was never read: two 585 mm drums became one 1170 mm tank, 356 mm
+    // over each long edge, snapping into view at the tier boundary.
+    // Bare goods on both sides: the near tier carries a label standing 1 mm off
+    // the face and the far tier drops it, which is correct and would otherwise
+    // read as a shape change.
+    const near = buildCargoGeometry(
+      at({ type: DRUM, variant: 1, strapped: false, labelled: false }),
+    )
+    const far = buildCargoGeometry(
+      at({ type: DRUM, variant: 1, strapped: false, labelled: false, detail: 'simple' }),
+    )
+    near.computeBoundingBox()
+    far.computeBoundingBox()
+    const a = near.boundingBox
+    const b = far.boundingBox
+    // Within a tenth, not to the millimetre: a ten-sided drum is inscribed in
+    // the same circle as a twenty-sided one and so reads about 5% smaller
+    // across its flats. What this pins is the SCALE — the failure was a single
+    // cylinder taking its radius from the whole block's X extent, which doubled
+    // it and put 356 mm over each long edge.
+    const ratioX = (b?.max.x ?? 0) / (a?.max.x ?? 1)
+    const ratioZ = (b?.max.z ?? 0) / (a?.max.z ?? 1)
+    expect(ratioX).toBeGreaterThan(0.9)
+    expect(ratioX).toBeLessThan(1.1)
+    expect(ratioZ).toBeGreaterThan(0.9)
+    expect(ratioZ).toBeLessThan(1.1)
+    // Still cheaper: half the radial segments.
+    expect(far.getAttribute('position').count).toBeLessThan(near.getAttribute('position').count)
+  })
+
+  test('a short face paints the cartons it has, not the whole row', () => {
+    // The region is drawn as four cells. A face that maps all of them shows
+    // four cartons however wide it is, so the Euro deck's two-carton short face
+    // gained two at the tier switch and the module width halved.
+    const geometry = buildCargoGeometry(at({ detail: 'simple' }))
+    const normal = geometry.getAttribute('normal')
+    const uv = geometry.getAttribute('uv')
+    const row = uvOf('cartonRow')
+    const span = row.uMax - row.uMin
+
+    let shortMax = row.uMin
+    let longMax = row.uMin
+    for (let i = 0; i < normal.count; i++) {
+      if (Math.abs(normal.getX(i)) > 0.9) shortMax = Math.max(shortMax, uv.getX(i))
+      if (Math.abs(normal.getZ(i)) > 0.9) longMax = Math.max(longMax, uv.getX(i))
+    }
+    // EPAL 1: four cartons along X on the long faces, two along Z on the short.
+    expect((longMax - row.uMin) / span).toBeCloseTo(4 / CARTON_ROW_CELLS, 5)
+    expect((shortMax - row.uMin) / span).toBeCloseTo(2 / CARTON_ROW_CELLS, 5)
+  })
+})
+
+describe('the hardware is continuous where it is meant to be', () => {
+  test('a strap has no gap at its corners', () => {
+    // The legs stopped at the load's top while the band floated 1.5 mm above
+    // it, so both straps broke at all four corners and you looked through to
+    // the carton behind.
+    const parts = cargoParts(BASE).filter((part) => part.kind === 'strap')
+    const legs = parts.filter((part) => part.size[2] < part.size[0])
+    const bands = parts.filter((part) => part.size[2] > part.size[0])
+    expect(legs.length).toBeGreaterThan(0)
+    expect(bands.length).toBeGreaterThan(0)
+
+    const legTop = Math.max(...legs.map((part) => part.center[1] + part.size[1] / 2))
+    const bandBottom = Math.min(...bands.map((part) => part.center[1] - part.size[1] / 2))
+    expect(legTop).toBeGreaterThanOrEqual(bandBottom - 1e-9)
+  })
+})
+
+describe('the cache never frees what it is about to hand out', () => {
+  test('a load survives the eviction triggered by its own arrival', () => {
+    // The renderer claims its keys in an effect, which runs after the render
+    // that asked for the geometry — so a fresh load is unretained for exactly
+    // as long as React takes to commit. A Map iterates in insertion order and
+    // the new entry is last, so at a full cache it was the only candidate the
+    // retain guard did not skip: disposed, dropped from the cache, and still
+    // returned to be mounted.
+    const colors = ['kraft', 'white', 'bleached', 'blue', 'green', 'charcoal'] as const
+    let lastInput = BASE
+    let last = getCargoGeometry(lastInput)
+    for (const color of colors) {
+      for (const variant of CARTON.variants) {
+        for (const strapped of [true, false]) {
+          for (const labelled of [true, false]) {
+            lastInput = at({ color, variant, strapped, labelled })
+            last = getCargoGeometry(lastInput)
+          }
+        }
+      }
+    }
+    expect(cargoGeometryCacheSize()).toBeGreaterThan(0)
+    // Still shared: asking again returns the very object just handed out.
+    expect(getCargoGeometry(lastInput)).toBe(last)
   })
 })

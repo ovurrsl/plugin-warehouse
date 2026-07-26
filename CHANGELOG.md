@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e8f772a`](https://github.com/ovurrsl/plugin-warehouse/commit/e8f772a41607c883c02543d75bb31afc26fb5a7d))
 - Refresh generated README blocks [skip ci] ([`a5ed3cf`](https://github.com/ovurrsl/plugin-warehouse/commit/a5ed3cf5e3a45849e66abdfde96503ca3d032a73))
 - Refresh generated README blocks [skip ci] ([`33dbf79`](https://github.com/ovurrsl/plugin-warehouse/commit/33dbf7959278cf890bba0c20ddc88ec5ba4da35f))
 - Refresh generated README blocks [skip ci] ([`30199c4`](https://github.com/ovurrsl/plugin-warehouse/commit/30199c472370b6cb83852f393a2199bc771011aa))
@@ -32,6 +33,8 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The launcher ships — panel, plan, tool, clash, registration ([`6b2323d`](https://github.com/ovurrsl/plugin-warehouse/commit/6b2323d7e2b79fb470d7934eb072a7cc82469533))
+- CNV-LNC launcher — the kind's first three-ended shape ([`07012c8`](https://github.com/ovurrsl/plugin-warehouse/commit/07012c83b0b90225219b4cca8cfbfd4a6eda844b))
 - The port model widens to three ends, per-port lane and role ([`be99e5c`](https://github.com/ovurrsl/plugin-warehouse/commit/be99e5c7651959569bc0064938197cd5c6af4909))
 - The curve ships — panel, plan, tool, clash, registration ([`ced40ed`](https://github.com/ovurrsl/plugin-warehouse/commit/ced40edfe3ef499fdd2b60171bfd66a1bf8b4ccd))
 - A line is made of shapes, not only of straights ([`c4fd1cb`](https://github.com/ovurrsl/plugin-warehouse/commit/c4fd1cbfeb64a806a7f979f7549962370e7a20d5))

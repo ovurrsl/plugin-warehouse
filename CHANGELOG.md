@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b9a6e43`](https://github.com/ovurrsl/plugin-warehouse/commit/b9a6e43db01a50768fac28532634271970d93afe))
 - Refresh generated README blocks [skip ci] ([`ee3ad32`](https://github.com/ovurrsl/plugin-warehouse/commit/ee3ad323a0df66eb4a3ab91f491738180bbc38f4))
 - Refresh generated README blocks [skip ci] ([`a488732`](https://github.com/ovurrsl/plugin-warehouse/commit/a4887322931ec053051cdfae40320d0ed442acc7))
 - Refresh generated README blocks [skip ci] ([`6b0d0e4`](https://github.com/ovurrsl/plugin-warehouse/commit/6b0d0e488121db8116e4fb4b46ce43993056670a))
@@ -53,6 +54,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Show the corners that have been placed ([`b56ad61`](https://github.com/ovurrsl/plugin-warehouse/commit/b56ad615aa24ce764530394b0a9878524879bee3))
 - The route is drawable — tool, renderer, plan symbol, two tiles ([`5458793`](https://github.com/ovurrsl/plugin-warehouse/commit/5458793edf2985a85e411c8c641d33a85852d3e7))
 - The paint, as one buffer — and a guard the shared pools needed ([`591d517`](https://github.com/ovurrsl/plugin-warehouse/commit/591d5177254827a1ee565e0fb378e7f8409712c3))
 - The numbers and the mitre — a marked route, before anything is drawn ([`6477bc6`](https://github.com/ovurrsl/plugin-warehouse/commit/6477bc62b11fb28370eaf33f7969ed853c71c0a0))

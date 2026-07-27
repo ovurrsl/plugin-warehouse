@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`59e29c2`](https://github.com/ovurrsl/plugin-warehouse/commit/59e29c24c2622107f2735ddcc1dd702b0d404a7e))
 - Refresh generated README blocks [skip ci] ([`31b26aa`](https://github.com/ovurrsl/plugin-warehouse/commit/31b26aa891e996595a7cd89ac6f129ef4f9d043d))
 - Refresh generated README blocks [skip ci] ([`fa91bdd`](https://github.com/ovurrsl/plugin-warehouse/commit/fa91bdda04ece8f3212b7d787aa0b26ba834356b))
 - Refresh generated README blocks [skip ci] ([`e8be4dd`](https://github.com/ovurrsl/plugin-warehouse/commit/e8be4dd0ae901022cf17f52b2e8132d5c422a91b))
@@ -94,6 +95,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Hiding a conveyor is not a fact about storage ([`807c825`](https://github.com/ovurrsl/plugin-warehouse/commit/807c8250a661886e9ce1557a687093b25997fe92))
 - Six findings from the adversarial review of the cargo code ([`3745ac4`](https://github.com/ovurrsl/plugin-warehouse/commit/3745ac4f8c3b32613f7d81268f51d1ec1d2f7c66))
 - All fifteen findings from the adversarial review ([`5b7a62d`](https://github.com/ovurrsl/plugin-warehouse/commit/5b7a62dec51404b6e7c8a4443c43ef20e4947fe3))
 - The ceded support follows the flow, and the key says which end ([`07d792a`](https://github.com/ovurrsl/plugin-warehouse/commit/07d792af7767c93868a2f1b20f049b90c749443c))

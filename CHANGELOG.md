@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`a488732`](https://github.com/ovurrsl/plugin-warehouse/commit/a4887322931ec053051cdfae40320d0ed442acc7))
 - Refresh generated README blocks [skip ci] ([`6b0d0e4`](https://github.com/ovurrsl/plugin-warehouse/commit/6b0d0e488121db8116e4fb4b46ce43993056670a))
 - Refresh generated README blocks [skip ci] ([`5c2b4d3`](https://github.com/ovurrsl/plugin-warehouse/commit/5c2b4d317ef59f63023c8141a93a5807c86ed491))
 - Refresh generated README blocks [skip ci] ([`59e29c2`](https://github.com/ovurrsl/plugin-warehouse/commit/59e29c24c2622107f2735ddcc1dd702b0d404a7e))
@@ -51,6 +52,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The route is drawable — tool, renderer, plan symbol, two tiles ([`5458793`](https://github.com/ovurrsl/plugin-warehouse/commit/5458793edf2985a85e411c8c641d33a85852d3e7))
 - The paint, as one buffer — and a guard the shared pools needed ([`591d517`](https://github.com/ovurrsl/plugin-warehouse/commit/591d5177254827a1ee565e0fb378e7f8409712c3))
 - The numbers and the mitre — a marked route, before anything is drawn ([`6477bc6`](https://github.com/ovurrsl/plugin-warehouse/commit/6477bc62b11fb28370eaf33f7969ed853c71c0a0))
 - The aisle band, as one number two things can read ([`067e0db`](https://github.com/ovurrsl/plugin-warehouse/commit/067e0db24a2ccbc325f3aee8d82e670a12866d30))

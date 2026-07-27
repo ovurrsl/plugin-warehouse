@@ -24,6 +24,8 @@ import RoutePreview from './preview'
 import { RouteNode } from './schema'
 import type { Point } from './stripes'
 
+const NO_RAYCAST = () => {}
+
 /**
  * Drawing a route: click each corner, double-click or Enter to finish.
  *
@@ -227,6 +229,35 @@ export default function RouteTool() {
           valid={valid}
         />
       )}
+
+      {/**
+       * A marker on every corner already placed.
+       *
+       * The ghost paint shows where the run goes, but not where the user
+       * actually committed a corner — and on a long straight leg those are
+       * indistinguishable, so there is no way to tell a two-corner route from a
+       * five-corner one before finishing it. That matters most exactly when
+       * Backspace is about to be pressed.
+       */}
+      {vertices.map((vertex, index) => (
+        <mesh
+          // Position is the identity here: two corners never coincide, because
+          // `appendVertex` refuses a repeat of the last one.
+          key={`${vertex[0]},${vertex[1]}`}
+          position={[vertex[0], 0.02, vertex[1]]}
+          raycast={NO_RAYCAST}
+          rotation={[-Math.PI / 2, 0, 0]}
+        >
+          <circleGeometry args={[index === 0 ? 0.16 : 0.11, 16]} />
+          <meshBasicMaterial
+            color={brush.role === 'vehicle' ? '#f2c31d' : '#2f9e58'}
+            depthTest={false}
+            transparent
+            opacity={0.9}
+          />
+        </mesh>
+      ))}
+
       {draft.length >= 2 && <RoutePreview brush={brush} points={draft} />}
     </>
   )

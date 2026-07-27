@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`3863fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/3863fa1c75ad66a32079d65d45beaeae652a483b))
 - Refresh generated README blocks [skip ci] ([`4b9066f`](https://github.com/ovurrsl/plugin-warehouse/commit/4b9066ffe81586be523a6793c07313b3cf54acd2))
 - Refresh generated README blocks [skip ci] ([`9829b0c`](https://github.com/ovurrsl/plugin-warehouse/commit/9829b0c82c37573d9f9851cac43e8bb95381f6bf))
 - Refresh generated README blocks [skip ci] ([`b9a6e43`](https://github.com/ovurrsl/plugin-warehouse/commit/b9a6e43db01a50768fac28532634271970d93afe))
@@ -140,6 +141,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Stop recomposing static nodes' matrices every frame ([`8044114`](https://github.com/ovurrsl/plugin-warehouse/commit/80441140b17d3b1c06d35080c2ed4e680b06752f))
 - The deck gets a far tier — measured against a real scene ([`653a590`](https://github.com/ovurrsl/plugin-warehouse/commit/653a5907c942958ebbfc756366a35e4407d12785))
 
 ### Tests

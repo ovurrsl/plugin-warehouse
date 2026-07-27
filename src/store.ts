@@ -3,6 +3,8 @@ import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
+import { defaultWidthM } from './route/metrics'
+import type { RouteNode } from './route/schema'
 
 /**
  * The plugin's own state. Plugins do not extend `useScene` / `useEditor` /
@@ -75,6 +77,17 @@ type WarehouseStore = {
   setPalletBrush: (patch: Partial<PalletBrush>) => void
 
   /**
+   * Shape of the next drawn route.
+   *
+   * Changing the role or the truck class re-derives the width, because a route
+   * whose width did not follow its class would silently keep a forklift aisle's
+   * 3.2 m after being switched to a walkway — a number that was right once and
+   * is now just a leftover.
+   */
+  routeBrush: RouteBrush
+  setRouteBrush: (patch: Partial<RouteBrush>) => void
+
+  /**
    * Shape of the next placed rack.
    *
    * Held as a partial node rather than a handful of loose fields: a rack has
@@ -111,6 +124,11 @@ export type PalletBrush = Pick<
   | 'strapped'
   | 'labelled'
   | 'cargoColor'
+>
+
+export type RouteBrush = Pick<
+  RouteNode,
+  'role' | 'traffic' | 'width' | 'lineWidth' | 'requiredFor' | 'datum'
 >
 
 export type RackBrush = Pick<
@@ -179,6 +197,27 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
         next.labelled = patch.labelled ?? defaults.label
       }
       return { palletBrush: next }
+    }),
+
+  routeBrush: {
+    role: 'pedestrian',
+    traffic: 'two-way',
+    width: defaultWidthM('pedestrian', null),
+    lineWidth: 'standard',
+    requiredFor: null,
+    datum: 'load-face',
+  },
+  setRouteBrush: (patch) =>
+    set((state) => {
+      const next = { ...state.routeBrush, ...patch }
+      // The width follows the class unless the user is setting it directly.
+      if (
+        patch.width === undefined &&
+        (patch.role !== undefined || patch.requiredFor !== undefined)
+      ) {
+        next.width = defaultWidthM(next.role, next.requiredFor)
+      }
+      return { routeBrush: next }
     }),
 
   rackBrush: {

@@ -9,6 +9,7 @@ import { conveyorTransferDefinition } from './conveyor/transfer-definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
+import { routeDefinition } from './route/definition'
 
 /**
  * The manifest barrel — the entire public surface of this package.
@@ -41,6 +42,7 @@ export const warehousePlugin: Plugin = {
     conveyorBoosterDefinition as unknown as AnyNodeDefinition,
     conveyorTransferDefinition as unknown as AnyNodeDefinition,
     conveyorObliqueDefinition as unknown as AnyNodeDefinition,
+    routeDefinition as unknown as AnyNodeDefinition,
   ],
 }
 

@@ -62,6 +62,10 @@ const CLICK_TRIGGER_KINDS = [
   // Same reason: a run is built by placing module after module, so the cursor
   // is nearly always over the conveyor you are extending.
   'warehouse:conveyor-roller',
+  // A route is drawn across a hall that already has paint on it, and its own
+  // hit target covers the whole corridor — so without this the second route
+  // cannot be started anywhere the first one runs.
+  'warehouse:route',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

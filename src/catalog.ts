@@ -36,7 +36,9 @@ export type CatalogItem = {
    * them before anything else. One tile that silently remembered whichever it
    * was last would make the catalog lie about what the next click puts down.
    */
-  brush?: { cargo: 'none' | 'carton' | 'drum' }
+  brush?:
+    | { kind: 'pallet'; cargo: 'none' | 'carton' | 'drum' }
+    | { kind: 'route'; role: 'pedestrian' | 'vehicle'; traffic: 'one-way' | 'two-way' }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -91,7 +93,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'unit-loads',
     description: 'A bare deck. EPAL, GMA and plastic standards.',
     icon: 'lucide:package',
-    brush: { cargo: 'none' },
+    brush: { kind: 'pallet', cargo: 'none' },
   },
   {
     id: 'pallet-loaded',
@@ -101,7 +103,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Cartons or drums, wrapped and strapped. The fill is drawn from the range below, and the pallet snaps into a rack position.',
     icon: 'lucide:boxes',
-    brush: { cargo: 'carton' },
+    brush: { kind: 'pallet', cargo: 'carton' },
   },
   {
     id: 'pallet-rack',
@@ -111,6 +113,26 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
     icon: 'lucide:rows-3',
+  },
+  {
+    id: 'route-pedestrian',
+    kind: 'warehouse:route',
+    label: 'Yaya Yolu',
+    sectionId: 'layout',
+    description:
+      'A marked pedestrian way. Two continuous stripes; the width is the clear floor between them.',
+    icon: 'lucide:footprints',
+    brush: { kind: 'route', role: 'pedestrian', traffic: 'two-way' },
+  },
+  {
+    id: 'route-vehicle',
+    kind: 'warehouse:route',
+    label: 'Araç Koridoru',
+    sectionId: 'layout',
+    description:
+      'A marked vehicle aisle, sized from the published band for the truck class it names.',
+    icon: 'lucide:route',
+    brush: { kind: 'route', role: 'vehicle', traffic: 'one-way' },
   },
   {
     id: 'conveyor-roller',

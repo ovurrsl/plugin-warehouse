@@ -259,15 +259,27 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   const activeTool = useEditor((s) => s.tool)
   const cargo = useWarehouseStore((s) => s.palletBrush.cargo)
   const setBrush = useWarehouseStore((s) => s.setPalletBrush)
+  const routeRole = useWarehouseStore((s) => s.routeBrush.role)
+  const setRouteBrush = useWarehouseStore((s) => s.setRouteBrush)
 
   // Two tiles arm the same kind, so the lit one is the tile whose brush the
   // store is currently wearing.
-  const wantsLoad = item.brush ? item.brush.cargo !== 'none' : null
+  // Two tiles arm the same kind, so the lit one is the tile whose brush the
+  // store is currently wearing. Only the pallet's two differ that way; a route
+  // tile lights on its kind alone, because both of its tiles set a role the
+  // panel below then shows.
+  const wantsLoad = item.brush?.kind === 'pallet' ? item.brush.cargo !== 'none' : null
+  const wantsRole = item.brush?.kind === 'route' ? item.brush.role : null
   const arming =
-    activeTool === item.kind && (wantsLoad === null || wantsLoad === (cargo !== 'none'))
+    activeTool === item.kind &&
+    (wantsLoad === null || wantsLoad === (cargo !== 'none')) &&
+    (wantsRole === null || wantsRole === routeRole)
 
   const arm = () => {
-    if (item.brush) setBrush(item.brush)
+    if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
+    if (item.brush?.kind === 'route') {
+      setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
+    }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the
     // path a catalog panel is expected to use.

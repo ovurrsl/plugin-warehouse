@@ -30,7 +30,8 @@ import {
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
-import { specOf, unitLoadHeight } from './presets'
+import { unitLoadHeightOf } from './cargo-types'
+import { specOf } from './presets'
 import PalletPreview from './preview'
 import { PalletNode } from './schema'
 
@@ -69,8 +70,7 @@ const ROTATION_STEP = Math.PI / 4
 export default function PalletTool() {
   const activeLevelId = useViewer((s) => s.selection.levelId)
   const unit = useViewer((s) => s.unit)
-  const preset = useWarehouseStore((s) => s.palletPreset)
-  const loadHeight = useWarehouseStore((s) => s.palletLoadHeight)
+  const brush = useWarehouseStore((s) => s.palletBrush)
 
   const cursorRef = useRef<Group>(null)
   const [cursorVisible, setCursorVisible] = useState(false)
@@ -84,13 +84,26 @@ export default function PalletTool() {
   const lastPositionRef = useRef<[number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
 
+  /**
+   * Bumped after every placement, so the next ghost mints a fresh id.
+   *
+   * **The id is the load.** A cargo pallet's fill is a pure function of its own
+   * id, so a ghost showing one fill and committing a node with a different id
+   * would place a different pallet from the one the user was looking at. The
+   * commit below hands this node's id to the node it creates, and this counter
+   * is what stops the pallet after it inheriting the same one.
+   */
+  const [placementSerial, setPlacementSerial] = useState(0)
+
   const previewNode = useMemo(
-    () => PalletNode.parse({ preset, loadHeight, position: [0, 0, 0], rotation: [0, 0, 0] }),
-    [preset, loadHeight],
+    () => PalletNode.parse({ ...brush, position: [0, 0, 0], rotation: [0, 0, 0] }),
+    // The serial IS a dependency: it exists to re-mint this node with a fresh id
+    // after a placement, and nothing else in the body reads it.
+    [brush, placementSerial],
   )
 
-  const spec = specOf(preset)
-  const boxHeight = unitLoadHeight(preset, loadHeight)
+  const spec = specOf(brush.preset)
+  const boxHeight = unitLoadHeightOf(previewNode)
   const boxDimensions = useMemo(
     (): [number, number, number] => [spec.length, boxHeight, spec.width],
     [spec.length, spec.width, boxHeight],
@@ -212,7 +225,6 @@ export default function PalletTool() {
         return
       }
 
-      const brush = useWarehouseStore.getState()
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
 
       // The host has its own `resolveSupportSlabPatch`, but it is absent from
@@ -220,8 +232,9 @@ export default function PalletTool() {
       // Depending on it would bind this package to an unshipped symbol, which
       // is exactly the coupling `host-adapter` exists to avoid.
       const committed = PalletNode.parse({
-        preset: brush.palletPreset,
-        loadHeight: brush.palletLoadHeight,
+        ...previewNode,
+        // The ghost's own id, so what was shown is what is placed.
+        id: previewNode.id,
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,
@@ -246,6 +259,9 @@ export default function PalletTool() {
         previewNode.id,
         activeLevelId,
       )
+      // The id just spent belongs to a real pallet now; the next ghost needs its
+      // own, or two pallets placed in a row would resolve to the same load.
+      setPlacementSerial((serial) => serial + 1)
       event.stopPropagation?.()
     })
 

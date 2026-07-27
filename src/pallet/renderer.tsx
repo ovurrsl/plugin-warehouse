@@ -14,7 +14,7 @@ import { Vector3 } from 'three'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { type CargoDetail, cargoInputOf } from './cargo-parts'
-import { loadHeightOf } from './cargo-types'
+import { loadHeightOf, unitLoadHeightOf } from './cargo-types'
 import { getFilmGeometry, releaseFilmGeometry, retainFilmGeometry } from './film'
 import { getPalletGeometry } from './geometry-builder'
 import { getCargoMaterial, getFilmMaterial, getPalletMaterial } from './materials'
@@ -109,7 +109,7 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   // was typed, a cargo load with what its variant resolved to. The collider and
   // the clash test must not be able to disagree about it.
   const loadHeight = loadHeightOf(node)
-  const totalHeight = spec.height + loadHeight
+  const totalHeight = unitLoadHeightOf(node)
 
   return (
     <group visible={node.visible !== false} {...handlers}>

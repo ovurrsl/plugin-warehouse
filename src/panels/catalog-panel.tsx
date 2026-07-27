@@ -7,6 +7,7 @@ import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useState } from 'react'
 import { CATALOG_SECTIONS, type CatalogItem, itemsInSection } from '../catalog'
 import { reportHostCompatibility } from '../compat'
+import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
   type Qualification,
   resolveStatsScope,
@@ -78,6 +79,7 @@ function CatalogTab() {
               <h3 style={tokens.sectionTitle}>{section.label}</h3>
             </div>
             <p style={tokens.blurb}>{section.blurb}</p>
+            {section.id === 'unit-loads' && <LoadBrush />}
             {section.id === 'conveyance' && <FlowSwitch />}
             {items.length > 0 ? (
               <div style={tokens.tileGrid}>
@@ -135,6 +137,120 @@ function FlowSwitch() {
         every line at its own speed
       </span>
     </button>
+  )
+}
+
+/**
+ * What the next placed pallet is carrying.
+ *
+ * In the catalog beside the tile that places it, not in the inspector, because
+ * it describes the pallet you are about to make rather than one you have
+ * selected — the same reason the conveyor's flow switch lives here.
+ *
+ * The fill is offered as three named ranges rather than as a slider. The
+ * variants are quantised to begin with, so a continuous control would promise a
+ * precision the geometry does not have, and a 256 px rail has no room for a
+ * two-handled range anyway.
+ */
+function LoadBrush() {
+  const brush = useWarehouseStore((s) => s.palletBrush)
+  const setBrush = useWarehouseStore((s) => s.setPalletBrush)
+
+  const types = [
+    { value: 'none', label: 'Empty' },
+    { value: 'carton', label: 'Cartons' },
+    { value: 'drum', label: 'Drums' },
+  ] as const
+
+  const ranges = [
+    { label: 'Mixed', range: [0.4, 1] as [number, number], hint: '40–100%' },
+    { label: 'Light', range: [0.2, 0.6] as [number, number], hint: '20–60%' },
+    { label: 'Full', range: [1, 1] as [number, number], hint: '100%' },
+  ]
+
+  const loaded = brush.cargo !== 'none'
+  const sameRange = (a: readonly [number, number], b: readonly [number, number]) =>
+    a[0] === b[0] && a[1] === b[1]
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+      <div style={{ display: 'flex', gap: '0.25rem' }}>
+        {types.map((type) => (
+          <button
+            key={type.value}
+            onClick={() => setBrush({ cargo: type.value })}
+            style={{ ...listRow(brush.cargo === type.value), justifyContent: 'center' }}
+            type="button"
+          >
+            {type.label}
+          </button>
+        ))}
+      </div>
+
+      {loaded && (
+        <>
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {ranges.map((entry) => (
+              <button
+                key={entry.label}
+                onClick={() => setBrush({ fillRange: entry.range })}
+                style={{
+                  ...listRow(sameRange(brush.fillRange, entry.range)),
+                  justifyContent: 'center',
+                }}
+                title={entry.hint}
+                type="button"
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {CARGO_COLOR_IDS.map((id) => (
+              <button
+                aria-label={id}
+                key={id}
+                onClick={() => setBrush({ cargoColor: id })}
+                style={{
+                  flex: 1,
+                  height: '1.125rem',
+                  borderRadius: '0.25rem',
+                  border:
+                    brush.cargoColor === id
+                      ? '2px solid var(--sidebar-ring)'
+                      : '1px solid var(--sidebar-border)',
+                  background: CARGO_COLORS[id],
+                  cursor: 'pointer',
+                }}
+                title={id}
+                type="button"
+              />
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.25rem' }}>
+            {(
+              [
+                ['wrapped', 'Film'],
+                ['strapped', 'Straps'],
+                ['labelled', 'Label'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setBrush({ [key]: !brush[key] })}
+                style={{ ...listRow(brush[key]), justifyContent: 'center' }}
+                type="button"
+              >
+                <span style={checkbox(brush[key])}>{brush[key] ? '✓' : ''}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

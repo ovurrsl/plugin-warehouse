@@ -1,4 +1,4 @@
-import { PALLET_PRESETS, type PalletPreset } from './presets'
+import { PALLET_PRESETS, type PalletPreset, specOf } from './presets'
 
 /**
  * What a loaded pallet is carrying.
@@ -244,6 +244,18 @@ export function loadHeightOf(node: {
   // describes is the same renderer/collider disagreement in the other axis.
   if (!fitsOnDeck(type, node.preset)) return Math.max(0, node.loadHeight)
   return cargoHeightM(type, resolveVariant(type, node.id, node.fillRange))
+}
+
+/**
+ * Deck plus load — what collision, the drag box and the placement cursor are
+ * all actually about.
+ *
+ * One helper rather than `specOf(preset).height + loadHeightOf(node)` written
+ * out at each of five call sites, because the term that gets forgotten in that
+ * expression is always the deck.
+ */
+export function unitLoadHeightOf(node: Parameters<typeof loadHeightOf>[0]): number {
+  return specOf(node.preset).height + loadHeightOf(node)
 }
 
 /** Height of the goods alone, metres. The pallet's own deck is not in it. */

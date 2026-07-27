@@ -157,8 +157,3 @@ export function specOf(preset: PalletPreset): PalletSpec {
   // later remove still renders something.
   return PALLET_PRESETS[preset] ?? PALLET_PRESETS['epal-1']
 }
-
-/** Overall height including any load — what collision and stacking care about. */
-export function unitLoadHeight(preset: PalletPreset, loadHeight: number): number {
-  return specOf(preset).height + Math.max(0, loadHeight)
-}

@@ -1,5 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
-import { loadHeightOf } from './cargo-types'
+import { unitLoadHeightOf } from './cargo-types'
 import { buildPalletFloorplan } from './floorplan'
 import { palletParametrics } from './parametrics'
 import { specOf } from './presets'
@@ -58,7 +58,7 @@ export const palletDefinition = {
         const pallet = node as unknown as PalletNode
         const spec = specOf(pallet.preset)
         return {
-          dimensions: [spec.length, spec.height + loadHeightOf(pallet), spec.width],
+          dimensions: [spec.length, unitLoadHeightOf(pallet), spec.width],
           rotation: pallet.rotation ?? [0, 0, 0],
         }
       },
@@ -72,7 +72,7 @@ export const palletDefinition = {
     dragBounds: (node) => {
       const pallet = node as unknown as PalletNode
       const spec = specOf(pallet.preset)
-      const height = specOf(pallet.preset).height + loadHeightOf(pallet)
+      const height = unitLoadHeightOf(pallet)
       return { size: [spec.length, height, spec.width], centerY: height / 2 }
     },
   },

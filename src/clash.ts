@@ -26,7 +26,7 @@ import type { ConveyorObliqueNode } from './conveyor/oblique-schema'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { localBoundsM as transferBoundsM } from './conveyor/transfer-metrics'
 import type { ConveyorTransferNode } from './conveyor/transfer-schema'
-import { loadHeightOf } from './pallet/cargo-types'
+import { unitLoadHeightOf } from './pallet/cargo-types'
 import { specOf } from './pallet/presets'
 import type { PalletNode } from './pallet/schema'
 import { rackParts } from './rack/parts'
@@ -351,7 +351,7 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // Not `pallet.loadHeight`: a pallet carrying cargo derives its height from
     // the variant its seed resolved to, and testing the typed number instead
     // would clear a load that actually fouls the beam above it.
-    const height = specOf(pallet.preset).height + loadHeightOf(pallet)
+    const height = unitLoadHeightOf(pallet)
     return [
       toWorldBox(
         [0, height / 2, 0],

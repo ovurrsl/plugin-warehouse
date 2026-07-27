@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { PalletPreset } from './pallet/presets'
+import { CARGO_TYPES } from './pallet/cargo-types'
+import type { PalletNode } from './pallet/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 
@@ -64,12 +65,14 @@ type WarehouseStore = {
   setFlowRunning: (running: boolean) => void
 
   // ── Placement brush ────────────────────────────────────────────────────
-  /** Preset the next placed pallet uses. */
-  palletPreset: PalletPreset
-  setPalletPreset: (preset: PalletPreset) => void
-  /** Load height, metres. 0 places a bare pallet. */
-  palletLoadHeight: number
-  setPalletLoadHeight: (height: number) => void
+  /**
+   * Shape of the next placed pallet, held as a partial node for the same reason
+   * the rack's is: the tool parses it straight through `PalletNode.parse`, so
+   * anything absent takes the schema's own default and there is no second set of
+   * defaults to keep in step.
+   */
+  palletBrush: PalletBrush
+  setPalletBrush: (patch: Partial<PalletBrush>) => void
 
   /**
    * Shape of the next placed rack.
@@ -97,6 +100,18 @@ type WarehouseStore = {
   multiply: MultiplySpec
   setMultiply: (patch: Partial<MultiplySpec>) => void
 }
+
+export type PalletBrush = Pick<
+  PalletNode,
+  | 'preset'
+  | 'loadHeight'
+  | 'cargo'
+  | 'fillRange'
+  | 'wrapped'
+  | 'strapped'
+  | 'labelled'
+  | 'cargoColor'
+>
 
 export type RackBrush = Pick<
   PalletRackNode,
@@ -140,11 +155,31 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   flowRunning: false,
   setFlowRunning: (flowRunning) => set({ flowRunning }),
 
-  palletPreset: 'epal-1',
-  setPalletPreset: (palletPreset) => set({ palletPreset }),
-  palletLoadHeight: 0,
-  setPalletLoadHeight: (palletLoadHeight) =>
-    set({ palletLoadHeight: Math.max(0, palletLoadHeight) }),
+  palletBrush: {
+    preset: 'epal-1',
+    loadHeight: 0,
+    cargo: 'none',
+    fillRange: [0.4, 1],
+    wrapped: true,
+    strapped: true,
+    labelled: true,
+    cargoColor: 'kraft',
+  },
+  setPalletBrush: (patch) =>
+    set((state) => {
+      const next = { ...state.palletBrush, ...patch }
+      // Choosing a cargo type brings that type's own practice with it: cartons
+      // are filmed and drums are not. The flags are still the user's to change
+      // afterwards — this only decides what they start as, which is the one
+      // reader `CargoType.defaults` was declared for.
+      if (patch.cargo && patch.cargo !== 'none' && patch.cargo !== state.palletBrush.cargo) {
+        const defaults = CARGO_TYPES[patch.cargo].defaults
+        next.wrapped = patch.wrapped ?? defaults.wrap
+        next.strapped = patch.strapped ?? defaults.strapping
+        next.labelled = patch.labelled ?? defaults.label
+      }
+      return { palletBrush: next }
+    }),
 
   rackBrush: {
     bayClearWidth: 2.7,

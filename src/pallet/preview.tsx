@@ -3,9 +3,12 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { getCargoGeometry } from './cargo-geometry'
+import { cargoInputOf } from './cargo-parts'
 import { loadHeightOf } from './cargo-types'
+import { getFilmGeometry } from './film'
 import { getPalletGeometry } from './geometry-builder'
-import { getPalletPreviewMaterial } from './materials'
+import { getCargoPreviewMaterial, getPalletPreviewMaterial } from './materials'
 import { specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -30,15 +33,23 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
   /**
    * The same height source the renderer and the clash test use, so a ghost can
    * never promise one height and commit another.
-   *
-   * **The ghost deliberately does not draw modelled cargo yet.** A load's fill is
-   * a function of its node's id, and this node's id is minted for the preview and
-   * thrown away — the pallet that commits gets a different one. Drawing real
-   * variant geometry here before the placement path hands its id to the committed
-   * node would show the user one load and place another, which is worse than
-   * showing a plain block.
    */
   const loadHeight = loadHeightOf(node)
+
+  /**
+   * The real load, at the real fill — **safe only because the tool now hands
+   * this node's id to the pallet it creates.**
+   *
+   * A load's fill is a pure function of its node's id. While the commit minted
+   * an id of its own, drawing modelled cargo here would have shown the user one
+   * load and placed another; the plain block was the honest thing to draw. With
+   * the id carried through, the ghost is the pallet.
+   */
+  const cargo = useMemo(() => {
+    const input = cargoInputOf(node, 'full')
+    if (!input) return null
+    return { geometry: getCargoGeometry(input), film: node.wrapped ? getFilmGeometry(input) : null }
+  }, [node])
 
   // The overlay layer keeps the ghost out of export and snapshot passes.
   // Layers do not inherit, so every object in the subtree needs it set.
@@ -52,7 +63,28 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
           stops `grid:move` firing, and the tool then commits at whatever
           position it last saw. */}
       <mesh dispose={null} geometry={geometry} material={material} raycast={NO_RAYCAST} />
-      {loadHeight > 0 && (
+      {cargo && (
+        <>
+          <mesh
+            dispose={null}
+            geometry={cargo.geometry}
+            material={getCargoPreviewMaterial()}
+            position={[0, spec.height, 0]}
+            raycast={NO_RAYCAST}
+          />
+          {cargo.film && (
+            <mesh
+              dispose={null}
+              geometry={cargo.film}
+              material={getCargoPreviewMaterial()}
+              position={[0, spec.height, 0]}
+              raycast={NO_RAYCAST}
+              renderOrder={1}
+            />
+          )}
+        </>
+      )}
+      {!cargo && loadHeight > 0 && (
         <mesh
           material={material}
           position={[0, spec.height + loadHeight / 2, 0]}

@@ -21,7 +21,16 @@ const NO_RAYCAST = () => {}
  * drafted at slab + 20 mm while committing at slab + 1 mm, so the marking
  * visibly dropped the instant you finished drawing.
  */
-export default function RoutePreview({ points, brush }: { points: Point[]; brush: RouteBrush }) {
+export default function RoutePreview({
+  points,
+  brush,
+  surfaceY = 0,
+}: {
+  points: Point[]
+  brush: RouteBrush
+  /** The slab's own walking surface. A draft below it is a draft nobody sees. */
+  surfaceY?: number
+}) {
   const ref = useRef<Group>(null)
 
   const geometry = useMemo(() => {
@@ -63,7 +72,7 @@ export default function RoutePreview({ points, brush }: { points: Point[]; brush
   if (!geometry || !points[0]) return null
 
   return (
-    <group position={[points[0][0], 0.004, points[0][1]]} ref={ref}>
+    <group position={[points[0][0], surfaceY + 0.004, points[0][1]]} ref={ref}>
       <mesh
         dispose={null}
         geometry={geometry}

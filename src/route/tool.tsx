@@ -17,7 +17,13 @@ import {
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef, useState } from 'react'
-import { electSupportSlab, subscribeGridClicks, subscribeGridMove } from '../placement'
+import { slabAt } from '../host-adapter'
+import {
+  collectSlabs,
+  electSupportSlab,
+  subscribeGridClicks,
+  subscribeGridMove,
+} from '../placement'
 import { useWarehouseStore } from '../store'
 import { MAX_VERTICES } from './constants'
 import RoutePreview from './preview'
@@ -58,6 +64,16 @@ export default function RouteTool() {
   const [vertices, setVertices] = useState<Point[]>([])
   const [cursor, setCursor] = useState<Point | null>(null)
   const [valid, setValid] = useState(false)
+  /**
+   * The height of the slab under the cursor.
+   *
+   * **A draft that ignored this is invisible.** A slab's walking surface sits at
+   * its own `elevation` — 50 mm by default — and the draft was drawn at 4 mm, so
+   * it was under the floor it was being painted on. The committed node does not
+   * have this problem because the host lifts it; the draft is not a node yet, so
+   * it has to ask.
+   */
+  const [surfaceY, setSurfaceY] = useState(0)
 
   const verticesRef = useRef<Point[]>([])
   const cursorRef = useRef<Point | null>(null)
@@ -115,9 +131,10 @@ export default function RouteTool() {
       // width, because a verdict against an estimated band would launder the
       // estimate into a compliance statement.
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const onSlab = electSupportSlab(nodes, activeLevelId, point[0], point[1]) !== null
-      validRef.current = onSlab
-      setValid(onSlab)
+      const slab = slabAt(collectSlabs(nodes, activeLevelId), point[0], point[1])
+      validRef.current = slab !== null
+      setValid(slab !== null)
+      setSurfaceY(slab?.elevation ?? 0)
     })
 
     const finish = () => {
@@ -224,7 +241,7 @@ export default function RouteTool() {
       {cursor && (
         <PlacementBox
           dimensions={[0.35, 0.02, 0.35]}
-          position={[cursor[0], 0.01, cursor[1]]}
+          position={[cursor[0], surfaceY + 0.01, cursor[1]]}
           rotationY={0}
           valid={valid}
         />
@@ -244,7 +261,7 @@ export default function RouteTool() {
           // Position is the identity here: two corners never coincide, because
           // `appendVertex` refuses a repeat of the last one.
           key={`${vertex[0]},${vertex[1]}`}
-          position={[vertex[0], 0.02, vertex[1]]}
+          position={[vertex[0], surfaceY + 0.02, vertex[1]]}
           raycast={NO_RAYCAST}
           rotation={[-Math.PI / 2, 0, 0]}
         >
@@ -258,7 +275,7 @@ export default function RouteTool() {
         </mesh>
       ))}
 
-      {draft.length >= 2 && <RoutePreview brush={brush} points={draft} />}
+      {draft.length >= 2 && <RoutePreview brush={brush} points={draft} surfaceY={surfaceY} />}
     </>
   )
 }

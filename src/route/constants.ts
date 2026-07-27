@@ -82,6 +82,25 @@ export const DEPTH_BIAS = {
 export const MAX_VERTICES = 64
 
 /**
+ * **One millimetre, and not for z-fighting: for the raycast.**
+ *
+ * The host lifts a floor-placed node to `slabElevation + position[1]`, which
+ * puts flat paint exactly ON the slab's walking surface — coplanar with it. The
+ * depth buffer copes, because {@link DEPTH_BIAS} biases the paint toward the
+ * camera in depth-buffer units. **Picking does not**: a raycast uses real vertex
+ * positions and knows nothing about that bias, so against a coplanar pair it is
+ * a coin flip which surface the ray reports, and half the time a click on a
+ * route selects the slab underneath it.
+ *
+ * A millimetre is far below anything a depth buffer can resolve at any camera
+ * distance — so it cannot reintroduce the shimmer `polygonOffset` exists to
+ * prevent — and it is far above floating-point noise, so the intersection order
+ * is decided rather than drawn. The two mechanisms are answering two different
+ * questions and both are needed.
+ */
+export const PAINT_LIFT_M = 0.001
+
+/**
  * The direction arrow, metres. **Estimates**, and the basis is legibility
  * rather than a standard: no workplace instrument specifies an arrow at all —
  * one-way working is a design decision, not a duty — so these are sized to read

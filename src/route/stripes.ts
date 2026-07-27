@@ -35,6 +35,31 @@ export function outerHalfWidthM(widthM: number, lineWidth: LineWidthId): number 
 
 const EPSILON = 1e-9
 
+/**
+ * Coincident vertices dropped before anything is offset.
+ *
+ * **This is not tidiness; it is what keeps the mitre alive.** A zero-length leg
+ * makes `direction()` return `null`, which sends both of its endpoints down the
+ * end-vertex branch below — so each is offset along its own segment's normal
+ * instead of along the shared bisector, and the corner comes out chamfered:
+ * an unpainted wedge outside the bend and a crossed, short stripe inside it.
+ * That is precisely the failure this module exists to prevent, arriving through
+ * the back door.
+ *
+ * Duplicates are not hypothetical. Any click path that fires twice for one
+ * physical click produces them, and a hand-drawn polyline can carry one from a
+ * double click. Cleaning here means no caller has to remember.
+ */
+function withoutRepeats(points: readonly Point[]): Point[] {
+  const out: Point[] = []
+  for (const point of points) {
+    const previous = out.at(-1)
+    if (previous && Math.hypot(point[0] - previous[0], point[1] - previous[1]) < 1e-6) continue
+    out.push([point[0], point[1]])
+  }
+  return out
+}
+
 function direction(from: Point, to: Point): Point | null {
   const dx = to[0] - from[0]
   const dz = to[1] - from[1]
@@ -63,15 +88,17 @@ function normalOf(d: Point): Point {
  * grows a spike nobody drew, and the sharper the turn the longer the spike.
  */
 export function offsetCentreline(points: readonly Point[], offset: number): Point[] {
-  if (points.length < 2) return points.map((p) => [p[0], p[1]] as Point)
+  const cleaned = withoutRepeats(points)
+  if (cleaned.length < 2) return cleaned.map((p) => [p[0], p[1]] as Point)
 
+  const points_ = cleaned
   const result: Point[] = []
-  for (let i = 0; i < points.length; i++) {
-    const here = points[i]
+  for (let i = 0; i < points_.length; i++) {
+    const here = points_[i]
     if (!here) continue
 
-    const before = i > 0 ? points[i - 1] : undefined
-    const after = i < points.length - 1 ? points[i + 1] : undefined
+    const before = i > 0 ? points_[i - 1] : undefined
+    const after = i < points_.length - 1 ? points_[i + 1] : undefined
     const incoming = before ? direction(before, here) : null
     const outgoing = after ? direction(here, after) : null
 

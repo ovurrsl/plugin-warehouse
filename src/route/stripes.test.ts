@@ -131,6 +131,42 @@ describe('the corners mitre, and stop mitring before they spike', () => {
     expect(offsetCentreline(path, 0.6)).toHaveLength(path.length)
   })
 
+  test('a duplicated corner is still mitred, not chamfered', () => {
+    /**
+     * **The defect that hid behind "does not produce a NaN".**
+     *
+     * A zero-length leg has no direction, so both of its endpoints fall to the
+     * end-vertex branch and get offset along their own segment's normal rather
+     * than along the shared bisector — an unpainted wedge outside the bend and
+     * a crossed, short stripe inside it. Exactly the failure this module was
+     * written to prevent, arriving through the back door.
+     *
+     * The duplicates were not hypothetical: the drawing tool subscribed to a
+     * click path that fired twice per physical click, so every corner of every
+     * route ever drawn carried one.
+     */
+    const clean: Point[] = [
+      [0, 0],
+      [10, 0],
+      [10, 10],
+    ]
+    const duplicated: Point[] = [
+      [0, 0],
+      [10, 0],
+      [10, 0],
+      [10, 10],
+    ]
+    const offset = 1
+    const expected = offsetCentreline(clean, offset)[1]
+    const actual = offsetCentreline(duplicated, offset)[1]
+    if (!expected || !actual) throw new Error('expected a corner')
+
+    expect(actual[0]).toBeCloseTo(expected[0], 9)
+    expect(actual[1]).toBeCloseTo(expected[1], 9)
+    // And it is the mitre, not the chamfer: root two out, not one.
+    expect(Math.hypot(actual[0] - 10, actual[1])).toBeCloseTo(Math.SQRT2 * offset, 6)
+  })
+
   test('a repeated vertex does not break the run', () => {
     // A hand-drawn polyline can carry a duplicate from a double click.
     const repeated: Point[] = [
@@ -139,8 +175,10 @@ describe('the corners mitre, and stop mitring before they spike', () => {
       [5, 0],
       [5, 5],
     ]
+    // Three distinct corners come back, because the duplicate is dropped
+    // rather than carried — see the mitre test above.
     const out = offsetCentreline(repeated, 0.5)
-    expect(out).toHaveLength(4)
+    expect(out).toHaveLength(3)
     for (const point of out) {
       expect(Number.isFinite(point[0])).toBe(true)
       expect(Number.isFinite(point[1])).toBe(true)

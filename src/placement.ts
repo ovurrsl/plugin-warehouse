@@ -70,14 +70,87 @@ const CLICK_TRIGGER_KINDS = [
 
 export type PlacementClickEvent = { stopPropagation?: () => void }
 
+/**
+ * A physical click reaches this list **twice**, and every tool in this package
+ * was placing twice because of it.
+ *
+ * A rendered node synthesizes `<kind>:click` on `pointerup`
+ * (`viewer/hooks/use-node-events.ts`), and the browser's own `click` then fires
+ * a moment later and reaches the canvas-level listener that emits `grid:click`
+ * (`editor/hooks/use-grid-events.ts`) — which does no hit test at all, so it
+ * fires whatever the cursor is over. Subscribing to both, as this does, means
+ * one click over a slab appends two vertices or places two pallets.
+ *
+ * The host hit exactly this and says so in its own words at
+ * `nodes/shared/floor-placement.ts`: *"the browser's real `click` fires right
+ * after and would re-trigger the same placement through the canvas-level
+ * `grid:click` listener, which R3F stopPropagation cannot reach."* It eats the
+ * follow-up with a window-capture listener. That helper is not published, so
+ * the guard lives here instead.
+ *
+ * Collapsed on time AND position rather than on time alone: two genuine
+ * placements a tenth of a second apart at the *same* point are a double-click,
+ * which no tool in this package wants to treat as two.
+ */
+const DUPLICATE_WINDOW_MS = 200
+const SAME_POINT_M = 0.001
+
+let lastFiredAt = 0
+let lastPoint: readonly [number, number] | null = null
+
+function isFollowUpOfSameClick(event: PlacementClickEvent): boolean {
+  const now = Date.now()
+  const position = (event as { position?: [number, number, number] }).position
+  const here: readonly [number, number] | null = position ? [position[0], position[2]] : null
+
+  const withinWindow = now - lastFiredAt < DUPLICATE_WINDOW_MS
+  const samePlace =
+    here === null ||
+    lastPoint === null ||
+    (Math.abs(here[0] - lastPoint[0]) < SAME_POINT_M &&
+      Math.abs(here[1] - lastPoint[1]) < SAME_POINT_M)
+
+  if (withinWindow && samePlace) return true
+  lastFiredAt = now
+  lastPoint = here
+  return false
+}
+
 export function subscribePlacementClicks(
   handler: (event: PlacementClickEvent) => void,
 ): () => void {
-  const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
-  for (const name of events) emitter.on(name as never, handler as never)
-  return () => {
-    for (const name of events) emitter.off(name as never, handler as never)
+  const guarded = (event: PlacementClickEvent) => {
+    if (isFollowUpOfSameClick(event)) return
+    handler(event)
   }
+  const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
+  for (const name of events) emitter.on(name as never, guarded as never)
+  return () => {
+    for (const name of events) emitter.off(name as never, guarded as never)
+  }
+}
+
+/**
+ * Clicks from the canvas alone, with the browser's own click `detail`.
+ *
+ * A multi-point tool needs to tell "add a corner" from "finish", and the only
+ * honest source of that distinction is the native event's `detail`: 1 for the
+ * first click of a gesture, 2 for the second. The host's own wall tool finishes
+ * on `detail >= 2` for exactly this reason.
+ *
+ * Subscribing to the canvas listener alone rather than to every node kind is
+ * also what makes the count reliable — a node-surface click carries the
+ * `pointerup` that synthesized it, not the click sequence.
+ */
+export function subscribeGridClicks(
+  handler: (event: GridEvent, detail: number) => void,
+): () => void {
+  const onClick = (event: GridEvent) => {
+    const native = event.nativeEvent as unknown as { detail?: number } | undefined
+    handler(event, native?.detail ?? 1)
+  }
+  emitter.on('grid:click', onClick)
+  return () => emitter.off('grid:click', onClick)
 }
 
 /**

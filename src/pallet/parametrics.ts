@@ -67,6 +67,13 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
     },
   ],
 
+  // The invariants below, under the node's own fields rather than instead of
+  // them. Without this they are computed on every render and dropped: the host
+  // declares `parametrics.invariants` and reads it nowhere, so a kind that does
+  // not draw its own list has none. That silenced a `severity: 'error'` — a
+  // drum too wide for the deck is not drawn, and nothing said why.
+  trailingSection: () => import('./pallet-panel'),
+
   invariants: [
     (node): Issue[] => {
       const spec = specOf(node.preset)

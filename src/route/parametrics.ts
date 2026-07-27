@@ -49,6 +49,13 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
     },
   ],
 
+  // The readings below, under the node's own fields. Without this they are
+  // computed on every render and dropped — the host declares
+  // `parametrics.invariants` and reads it nowhere — which for this kind meant
+  // losing the feature itself: the published aisle band, the margin in
+  // millimetres, and the note that a pedestrian width is an estimate.
+  trailingSection: () => import('./route-panel'),
+
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []

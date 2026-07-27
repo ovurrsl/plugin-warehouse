@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`9291875`](https://github.com/ovurrsl/plugin-warehouse/commit/92918757bb1f83b64ef3ef1f2f8abe2a8e37b9ea))
 - Refresh generated README blocks [skip ci] ([`3b55081`](https://github.com/ovurrsl/plugin-warehouse/commit/3b55081ea8840cbd1cddf7cb5fea3a43f9f86624))
 - Refresh generated README blocks [skip ci] ([`c2ebb6c`](https://github.com/ovurrsl/plugin-warehouse/commit/c2ebb6c0e09010b5fc540bcd617adc5ac65514ac))
 - Refresh generated README blocks [skip ci] ([`3dab0b7`](https://github.com/ovurrsl/plugin-warehouse/commit/3dab0b7c771af595d6f8b1240508f67723633834))
@@ -43,6 +44,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The ghost is the pallet — placement carries the load ([`798d2b2`](https://github.com/ovurrsl/plugin-warehouse/commit/798d2b29f160f6a13ecbb56812b15c1fad84e945))
 - The stretch film, blended rather than dithered ([`44d9abe`](https://github.com/ovurrsl/plugin-warehouse/commit/44d9abe23bd46d7d052ae485fa96221ea6909d01))
 - Storage, picking and footprint — the readout, ported honestly ([`8cd7ae9`](https://github.com/ovurrsl/plugin-warehouse/commit/8cd7ae93dd861a64d1eaed69835a64f44389b58d))
 - Modelled cargo — cartons, drums and the load's hardware ([`725aafb`](https://github.com/ovurrsl/plugin-warehouse/commit/725aafbad1df4a889d8dab01cf6475cfd2eae831))

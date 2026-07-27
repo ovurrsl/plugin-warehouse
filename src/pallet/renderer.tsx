@@ -16,8 +16,13 @@ import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './c
 import { type CargoDetail, cargoInputOf } from './cargo-parts'
 import { loadHeightOf, unitLoadHeightOf } from './cargo-types'
 import { getFilmGeometry, releaseFilmGeometry, retainFilmGeometry } from './film'
-import { getPalletGeometry } from './geometry-builder'
-import { getCargoMaterial, getFilmMaterial, getPalletMaterial } from './materials'
+import { getPalletFarGeometry, getPalletGeometry } from './geometry-builder'
+import {
+  getCargoMaterial,
+  getFilmMaterial,
+  getPalletFarMaterial,
+  getPalletMaterial,
+} from './materials'
 import { specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -105,6 +110,52 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
   const material = getPalletMaterial()
 
+  /**
+   * The deck's own LOD, in the same hysteresis band the cargo uses.
+   *
+   * The deck was the one mesh in the package drawn at full detail at every
+   * distance — invisible at a few hundred pallets, and 228k triangles of
+   * sub-pixel boards on a real 3,704-bay scene. Past 25 m it swaps to a single
+   * box with a flat wood material; the maps would smear over a box's UVs, so
+   * the material swaps with the geometry.
+   */
+  const deckRef = useRef<Mesh>(null)
+  const deckTierRef = useRef<'full' | 'far'>('full')
+  const deckFrameRef = useRef(0)
+  const deckPhase = useMemo(() => hashPhase(node.id), [node.id])
+
+  useFrame(({ camera }) => {
+    const mesh = deckRef.current
+    if (!mesh || isExporting) return
+    deckFrameRef.current += 1
+    if ((deckFrameRef.current + deckPhase) % LOD_INTERVAL !== 0) return
+
+    const { elements } = mesh.matrixWorld
+    const distanceSq = camera.position.distanceToSquared(
+      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+    )
+    const current = deckTierRef.current
+    const next =
+      current === 'full'
+        ? distanceSq > LOD_FAR_SQ
+          ? 'far'
+          : 'full'
+        : distanceSq < LOD_NEAR_SQ
+          ? 'full'
+          : 'far'
+    if (next === current) return
+    deckTierRef.current = next
+    if (next === 'far') {
+      mesh.geometry = getPalletFarGeometry(node.preset)
+      mesh.material = getPalletFarMaterial()
+      mesh.castShadow = false
+    } else {
+      mesh.geometry = getPalletGeometry(node.preset)
+      mesh.material = getPalletMaterial()
+      mesh.castShadow = true
+    }
+  })
+
   // One height, from the one function that knows: a typed load answers with what
   // was typed, a cargo load with what its variant resolved to. The collider and
   // the clash test must not be able to disagree about it.
@@ -136,6 +187,7 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
           geometry={geometry}
           material={material}
           raycast={NO_RAYCAST}
+          ref={deckRef}
           receiveShadow
         />
         {node.cargo !== 'none' ? (
@@ -174,9 +226,17 @@ function PalletLoad({
 }) {
   const inset = 0.02
   return (
-    <mesh castShadow position={[0, y + height / 2, 0]} raycast={NO_RAYCAST} receiveShadow>
+    <mesh
+      castShadow
+      // The far-deck material doubles as the plain block's: both are "wood at a
+      // glance", and the inline material this replaces minted one instance per
+      // mounted pallet — 192 uniform uploads on a real scene, for one colour.
+      material={getPalletFarMaterial()}
+      position={[0, y + height / 2, 0]}
+      raycast={NO_RAYCAST}
+      receiveShadow
+    >
       <boxGeometry args={[length - inset, height, width - inset]} />
-      <meshStandardMaterial color="#c8b394" metalness={0} roughness={0.85} />
     </mesh>
   )
 }

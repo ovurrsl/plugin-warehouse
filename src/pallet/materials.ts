@@ -142,3 +142,23 @@ export function getCargoPreviewMaterial(): THREE.MeshStandardMaterial {
   cachedCargoPreviewMaterial.depthWrite = false
   return cachedCargoPreviewMaterial
 }
+
+let cachedFarMaterial: THREE.MeshStandardMaterial | null = null
+
+/**
+ * The deck at distance: flat wood, no maps, no vertex colours.
+ *
+ * Its own material rather than the atlas one, because the far geometry is a
+ * bare box with no meaningful UVs — sampling the branded atlas through it would
+ * smear the EPAL stamps across a twelve-triangle slab. At the range this tier
+ * exists for, a flat colour and the atlas are indistinguishable.
+ */
+export function getPalletFarMaterial(): THREE.MeshStandardMaterial {
+  if (cachedFarMaterial) return cachedFarMaterial
+  cachedFarMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb99a6b,
+    metalness: 0,
+    roughness: 0.9,
+  })
+  return cachedFarMaterial
+}

@@ -11,7 +11,7 @@ import {
 import type { CargoInput } from './cargo-parts'
 import { CARTON, DRUM, resolveVariant } from './cargo-types'
 import { buildFilmGeometry, filmGeometryCacheSize, getFilmGeometry } from './film'
-import { getPalletGeometry } from './geometry-builder'
+import { getPalletFarGeometry, getPalletGeometry } from './geometry-builder'
 import { PalletNode } from './schema'
 
 /**
@@ -106,6 +106,67 @@ describe('T7 — a loaded pallet, and an aisle full of them', () => {
     const meshesPerEmptyPallet = 1
     expect(54 * meshesPerLoadedPallet + 54 * meshesPerEmptyPallet).toBeGreaterThan(200)
     expect(meshesPerLoadedPallet).toBe(3)
+  })
+})
+
+describe('a real customer scene: 3,704 bays and 752 pallets', () => {
+  /**
+   * Not a synthetic budget — the shape of an actual uploaded project
+   * (Güzeller, 59,618 m², 5,218 nodes) that made the editor stutter. 4,456 of
+   * its nodes are this plugin's, so when that scene chokes, the plugin is the
+   * suspect until proven otherwise.
+   */
+  const RACKS = 3_704
+  const PALLETS = 752
+  const LOADED = 560
+
+  test('the deck LOD is what makes the pallet population affordable', () => {
+    // The deck was the one mesh with no far tier: 752 x 304 = 228k triangles of
+    // boards, most of them beyond forty metres where a 144 mm pallet stands
+    // under six pixels tall.
+    const far = triangles(getPalletFarGeometry('epal-1'))
+    expect(far).toBeLessThanOrEqual(12)
+    expect(far).toBeLessThan(PALLET * 0.05)
+  })
+
+  test('the whole scene at rest stays inside the budget', () => {
+    /**
+     * At rest the camera sees the near band at full detail and everything else
+     * at the far tiers. Near: ~54 loaded pallets and two rack runs, as in the
+     * aisle walk above. Far: every other bay a silhouette, every other pallet
+     * a box, film off.
+     */
+    const rack = PalletRackNode.parse({})
+    const rackFull = rackParts(rack, 'full', false).length * 12
+    const rackSimple = rackParts(rack, 'simple', false).length * 12
+    const deckFar = triangles(getPalletFarGeometry('epal-1'))
+
+    const nearRacks = 50 * rackFull
+    const farRacks = (RACKS - 50) * rackSimple
+    const nearPallets = 54 * (PALLET + CARGO_NEAR + FILM)
+    const farLoaded = (LOADED - 54) * (deckFar + CARGO_FAR)
+    const farEmpty = (PALLETS - LOADED) * deckFar
+
+    const total = nearRacks + farRacks + nearPallets + farLoaded + farEmpty
+    expect(total).toBeLessThan(4_000_000)
+    // And the honest number, so a regression is visible in the diff: the far
+    // tiers keep a 3,704-bay scene near half a million triangles.
+    expect(total).toBeLessThan(700_000)
+  })
+
+  test('what this file cannot promise, said out loud', () => {
+    /**
+     * Triangles are no longer the choke point at this scale — draw calls are.
+     * Every bay is one mesh and one draw, every pallet one to three more, so
+     * this scene submits roughly five thousand draws a frame however few
+     * triangles they carry. That cost is structural: the v1 plugin contract
+     * mounts a renderer per node and offers no scene-level gather to instance
+     * from. The named fix is a collective renderer under `def.system` — the
+     * pattern the conveyor's flow simulation already uses — and until it lands,
+     * this assertion records the gap rather than hiding it.
+     */
+    const drawsAtRest = RACKS + PALLETS + LOADED
+    expect(drawsAtRest).toBeGreaterThan(4_000)
   })
 })
 

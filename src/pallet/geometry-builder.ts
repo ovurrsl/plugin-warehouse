@@ -498,6 +498,32 @@ const cache = new Map<PalletPreset, THREE.BufferGeometry>()
  * Never dispose the returned geometry: it is shared. `renderer.tsx` mounts it
  * with `dispose={null}` for exactly this reason.
  */
+const farCache = new Map<PalletPreset, THREE.BufferGeometry>()
+
+/**
+ * The deck at distance: **one box, twelve triangles.**
+ *
+ * The full deck is 304 triangles of boards, blocks and chamfers, and it was
+ * drawn at every distance — the one kind in the package with no far tier. That
+ * was invisible at a few hundred pallets and became a fifth of the whole
+ * triangle budget on a real scene: 3,704 bays and 752 pallets put 228k
+ * triangles of deck detail on screen with most of it beyond forty metres,
+ * where a 144 mm pallet stands under six pixels tall and the boards are
+ * sub-pixel noise.
+ *
+ * A box is honest at that size. The near tier keeps every board.
+ */
+export function getPalletFarGeometry(preset: PalletPreset): THREE.BufferGeometry {
+  const cached = farCache.get(preset)
+  if (cached) return cached
+
+  const spec = specOf(preset)
+  const geo = new THREE.BoxGeometry(spec.length, spec.height, spec.width)
+  geo.translate(0, spec.height / 2, 0)
+  farCache.set(preset, geo)
+  return geo
+}
+
 export function getPalletGeometry(preset: PalletPreset): THREE.BufferGeometry {
   const cached = cache.get(preset)
   if (cached) return cached

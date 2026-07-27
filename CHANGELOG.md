@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6b0d0e4`](https://github.com/ovurrsl/plugin-warehouse/commit/6b0d0e488121db8116e4fb4b46ce43993056670a))
 - Refresh generated README blocks [skip ci] ([`5c2b4d3`](https://github.com/ovurrsl/plugin-warehouse/commit/5c2b4d317ef59f63023c8141a93a5807c86ed491))
 - Refresh generated README blocks [skip ci] ([`59e29c2`](https://github.com/ovurrsl/plugin-warehouse/commit/59e29c24c2622107f2735ddcc1dd702b0d404a7e))
 - Refresh generated README blocks [skip ci] ([`31b26aa`](https://github.com/ovurrsl/plugin-warehouse/commit/31b26aa891e996595a7cd89ac6f129ef4f9d043d))
@@ -50,6 +51,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The paint, as one buffer — and a guard the shared pools needed ([`591d517`](https://github.com/ovurrsl/plugin-warehouse/commit/591d5177254827a1ee565e0fb378e7f8409712c3))
 - The numbers and the mitre — a marked route, before anything is drawn ([`6477bc6`](https://github.com/ovurrsl/plugin-warehouse/commit/6477bc62b11fb28370eaf33f7969ed853c71c0a0))
 - The aisle band, as one number two things can read ([`067e0db`](https://github.com/ovurrsl/plugin-warehouse/commit/067e0db24a2ccbc325f3aee8d82e670a12866d30))
 - The aisle datum, and the 100 mm the multiply panel loses ([`92cfa6d`](https://github.com/ovurrsl/plugin-warehouse/commit/92cfa6df1f4a06a7c04f178e0ae1d1754ad85f4b))

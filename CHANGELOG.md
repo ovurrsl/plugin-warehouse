@@ -13,6 +13,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- The vehicle research, and the architecture it should have been written for ([`d5a9b87`](https://github.com/ovurrsl/plugin-warehouse/commit/d5a9b8730b270698187823548af4158d1a325812))
+- Refresh generated README blocks [skip ci] ([`2b4bf37`](https://github.com/ovurrsl/plugin-warehouse/commit/2b4bf375fb036d104c0994bb8a8f347050064b9c))
 - Refresh generated README blocks [skip ci] ([`c639e36`](https://github.com/ovurrsl/plugin-warehouse/commit/c639e3680401e6a162339b135fa01f478709ee53))
 - Refresh generated README blocks [skip ci] ([`a3faffc`](https://github.com/ovurrsl/plugin-warehouse/commit/a3faffc261d578518cd3b2ee2f4a470dcb79293f))
 - Refresh generated README blocks [skip ci] ([`3863fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/3863fa1c75ad66a32079d65d45beaeae652a483b))

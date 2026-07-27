@@ -376,6 +376,27 @@ describe('what is counted, and what is deliberately not', () => {
     expect(ghostReport.qualifications.map((entry) => entry.code)).toContain('ghost-fill')
   })
 
+  test('hiding a conveyor says nothing about storage', () => {
+    // The three figures here are storage, picking and floor area, and a hidden
+    // conveyor changes none of them. Filing it under storage put a sentence
+    // about pallet positions on screen because somebody hid a roller bed.
+    const nodes = scene(level('level_1', ['pallet_rack_1', 'conveyor_1']), rack('pallet_rack_1'), {
+      id: 'conveyor_1',
+      type: 'warehouse:conveyor-roller',
+      visible: false,
+    })
+    const report = reportFor(nodes)
+    expect(report.qualifications.map((entry) => entry.code)).not.toContain('hidden-nodes')
+  })
+
+  test('a conveyor under no level says nothing about storage either', () => {
+    const nodes = scene(level('level_1', []), {
+      id: 'conveyor_1',
+      type: 'warehouse:conveyor-roller',
+    })
+    expect(codes(nodes)).not.toContain('nodes-outside-levels')
+  })
+
   test('a hidden rack still holds pallets', () => {
     // Hiding is a view setting. A designer who hid a run and saw the figure
     // unchanged should be told why rather than left to guess.

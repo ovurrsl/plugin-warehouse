@@ -318,13 +318,15 @@ function buildIndex(nodes: Readonly<Record<string, unknown>>): SceneStats {
 
   levels.sort((a, b) => a.ordinal - b.ordinal)
 
+  // Racks only, for the same reason the hidden count is: a rack under no level
+  // contributes its positions to nothing and the storage figure is quietly
+  // short, which is a fact about storage. A conveyor in the same state is a
+  // fact about the scene graph, and this screen has no figure it belongs to.
   let outsideLevels = 0
   for (const [id, node] of Object.entries(nodes)) {
     if (counted.has(id)) continue
     const record = node as { type?: unknown } | null
-    if (record && typeof record.type === 'string' && record.type.startsWith(KIND_PREFIX)) {
-      outsideLevels += 1
-    }
+    if (record?.type === 'warehouse:pallet-rack') outsideLevels += 1
   }
 
   return {
@@ -387,11 +389,17 @@ function levelFigures(
     }
 
     if (!record.type.startsWith(KIND_PREFIX)) return
-    if (record.visible === false) hiddenNodes += 1
 
     if (record.type === 'warehouse:pallet-rack') {
       rackCount += 1
       rackIds.add(id)
+      // **Racks only.** The three figures on this screen are storage, picking
+      // and floor area, and hiding a conveyor changes none of them — filing it
+      // under storage put a sentence about pallet positions on screen because
+      // somebody hid a roller bed. A hidden rack is the one case where the
+      // qualification is true: its positions are still counted and the run is
+      // not on screen to explain why.
+      if (record.visible === false) hiddenNodes += 1
       const figures = rackFiguresOf(node as object)
       if (!figures) {
         unreadableRacks += 1

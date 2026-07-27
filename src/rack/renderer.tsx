@@ -30,16 +30,24 @@ import { orientedPalletFootprint, palletSlotsOf, totalDepth, totalWidth } from '
 const NO_RAYCAST = () => {}
 
 /**
- * Distance band at which a rack drops to its silhouette, in metres, squared to
- * keep the per-frame test off the square root.
+ * Distance band at which a rack drops to its reduced tier, in metres, squared
+ * to keep the per-frame test off the square root.
  *
  * The two bounds differ on purpose. A single threshold makes a rack sitting
  * exactly on it swap geometry every time the camera breathes, which reads as
- * flicker; widening the band means a rack must travel ten metres to change
+ * flicker; widening the band means a rack must travel a long way to change
  * tier, so no amount of jitter can oscillate it.
+ *
+ * Both figures moved out from 45/35 m. At 45 m a 250 m building is almost
+ * entirely on the far side of the band, so the reduced tier was not a fallback
+ * but the normal appearance of a rack — which is why dropping the decks and
+ * bracing from it was so visible. The far tier now carries them (see
+ * `rackParts`), and the band sits far enough out that the full section detail
+ * is reachable by backing off rather than by pressing the camera into the
+ * steel.
  */
-const LOD_FAR_SQ = 45 * 45
-const LOD_NEAR_SQ = 35 * 35
+const LOD_FAR_SQ = 70 * 70
+const LOD_NEAR_SQ = 55 * 55
 
 /**
  * Frames between distance tests, and how the racks are spread across them.

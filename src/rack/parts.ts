@@ -90,9 +90,31 @@ const CONNECTOR_REACH = 0.015
 export type RackDetail = 'full' | 'simple'
 
 /**
- * `simple` keeps posts and beams and drops everything else. Those are the parts
- * that stop reading past a few tens of metres, and in a warehouse almost every
- * rack is always at that distance.
+ * `simple` drops what stops reading at distance — and only that.
+ *
+ * ## What the first split got wrong
+ *
+ * It kept posts and beams and dropped everything else, which sounds like a
+ * silhouette and is actually a skeleton: ten boxes, four uprights and six
+ * beams. A rack drawn that way reads as a bundle of sticks, and because the
+ * band started at 45 m, almost every rack in a 60,000 m² building was always
+ * on the wrong side of it. The user's report was exactly that — "I have to get
+ * very close; from a distance it looks like sticks."
+ *
+ * The three parts that carry a rack's shape at range are the **deck panels**
+ * (the only large flat areas it has), the **frame bracing** (the diagonal
+ * lattice that says "racking" rather than "posts"), and the **footplates**
+ * (which sit it on the floor instead of floating). Those are now built at both
+ * tiers. What `simple` still drops is the sub-pixel work: the folded upright
+ * section collapses from five boxes to one, the beam endplates go, and so do
+ * the pallet support bars. That is 59 parts down to 31, and none of the
+ * difference is visible past a few metres.
+ *
+ * Spending triangles here is the right trade because triangles are not what
+ * costs: a CPU profile of the 3,704-bay scene put ~61% of frame time in
+ * per-object draw dispatch and ~25% in matrix maths, with geometry complexity
+ * nowhere in the profile. One rack costs about the same whether it is 120
+ * triangles or 372; what costs is that it is a separate object at all.
  */
 export function rackParts(
   rack: PalletRackNode,
@@ -133,20 +155,24 @@ export function rackParts(
           })
         }
 
-        if (full) {
-          // Catalogue footplates are wider than the post they carry — 175 x
-          // 119 mm under a 122 x 80 upright — so they overhang it by about
-          // 26 mm a side. Real, and the reason the built mesh is slightly
-          // wider at the floor than the declared footprint.
-          parts.push({
-            role: 'footplate',
-            center: [x, FOOTPLATE_HEIGHT / 2, z],
-            size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
-          })
-        }
+        // Catalogue footplates are wider than the post they carry — 175 x
+        // 119 mm under a 122 x 80 upright — so they overhang it by about
+        // 26 mm a side. Real, and the reason the built mesh is slightly
+        // wider at the floor than the declared footprint.
+        //
+        // Built at both tiers: four boxes, and without them a distant rack
+        // ends in mid-air at the floor line instead of standing on it.
+        parts.push({
+          role: 'footplate',
+          center: [x, FOOTPLATE_HEIGHT / 2, z],
+          size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
+        })
       })
 
-      if (full && rack.bracing !== 'open') {
+      // Built at both tiers. The diagonal lattice across the frame end is the
+      // single most recognisable thing about racking seen down an aisle, and
+      // dropping it is most of what made the far tier read as bare posts.
+      if (rack.bracing !== 'open') {
         pushFrameBracing(parts, x, centerZ, rack)
       }
     })
@@ -216,7 +242,9 @@ export function rackParts(
       // standing on a panel that was never built.
       const finish = deckFinishOf(rack, level)
 
-      if (full && finish) {
+      // Built at both tiers: a deck is the only large flat area a rack has, so
+      // it is what gives the shape mass at range. Three boxes on a default bay.
+      if (finish) {
         const thickness = panelThickness(rack, finish)
         // Flush-mounted: the panel drops between the beams and its top
         // finishes level with them, so the load surface stays exactly where
@@ -224,8 +252,17 @@ export function rackParts(
         parts.push({
           role: 'shelf',
           finish,
-          // Only a wire deck carries a pattern; the others are flat panels.
-          pattern: finish === 'wire-mesh' ? 'mesh' : undefined,
+          /**
+           * Only a wire deck carries a pattern, and only at the near tier.
+           *
+           * The mesh is a fine repeating texture; past the LOD band its cell
+           * is well under a pixel, and a sub-pixel repeat does not read as
+           * mesh — it aliases into moiré that crawls as the camera moves.
+           * The far tier keeps the panel (that is the mass it was missing)
+           * and drops the pattern, which is the one thing about a deck that
+           * gets worse rather than smaller with distance.
+           */
+          pattern: full && finish === 'wire-mesh' ? 'mesh' : undefined,
           center: [centerX, beamTop - thickness / 2, centerZ],
           size: [rack.bayClearWidth, thickness, depth - 2 * beamThickness],
         })

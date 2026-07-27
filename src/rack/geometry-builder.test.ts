@@ -63,15 +63,22 @@ describe('geometry content', () => {
     expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count)
   })
 
-  test('simple detail keeps the silhouette and drops most of the triangles', () => {
-    // Posts and beams survive; footplates, bracing, decking and support bars do
-    // not. Those are the parts that stop reading past a few tens of metres, and
-    // in a warehouse most racks are always at that distance.
+  test('the far tier drops the millimetre work and keeps the shape', () => {
+    // Re-derived when the far tier stopped being a skeleton. It keeps the deck
+    // panels, the frame bracing and the footplates — the three things that
+    // carry a rack's shape at range — and drops what goes sub-pixel: the
+    // folded upright section collapses to one box a post, the beam endplates
+    // go, and so do the support bars. 59 parts to 31.
+    //
+    // So the bound is a little over half, not a little under a half. Asking
+    // for more than that would be asking the far tier to look like sticks
+    // again; the saving that matters is the one against 59 parts of section
+    // detail nobody can resolve past a few metres.
     const r = rack()
     const full = triangleCount(r, 'full')
     const simple = triangleCount(r, 'simple')
-    expect(simple).toBeLessThan(full * 0.45)
-    expect(simple).toBeGreaterThan(0)
+    expect(simple).toBeLessThan(full * 0.6)
+    expect(simple).toBeGreaterThan(full * 0.35)
   })
 
   test('a warehouse-sized scene stays inside a sane triangle budget', () => {
@@ -82,19 +89,27 @@ describe('geometry content', () => {
     // aisle is 5.6 m per pair, so 100 m holds about 17 pairs, 34 rows. That is
     // roughly 1,800 bays, and 2,000 is the round number to budget against.
     //
-    // The LOD band is 35/45 m, so at any moment a few dozen bays are full and
-    // the rest are silhouettes. Fifty full and 1,950 silhouettes is well inside
-    // what any GPU that can open the editor draws without noticing.
+    // The LOD band is 55/70 m, so at any moment a hundred-odd bays are full and
+    // the rest are reduced. A hundred full and 1,900 reduced is the mix to
+    // budget against.
     //
-    // What this test does NOT measure is the cost that actually moved. Two
-    // thousand bays are two thousand draw calls, where the block this replaced
-    // was about ninety-five. That is the price of a bay being an ordinary
-    // object, it was paid deliberately, and LOD is the only thing holding it.
+    // The ceiling moved from 400k to 1M when the far tier gained its decks,
+    // bracing and footplates, and that is a deliberate re-derivation rather
+    // than a nudge: the far tier went from 120 to 372 triangles, so 1,900 of
+    // them is 707k where it used to be 234k. It is affordable because a CPU
+    // profile of the real 3,704-bay scene found ~61% of frame time in
+    // per-object draw dispatch and ~25% in matrix maths, and geometry
+    // complexity nowhere. Triangles were never what this scene was short of.
+    //
+    // What this test still does NOT measure is the cost that actually moved.
+    // Two thousand bays are two thousand draw calls, where the block this
+    // replaced was about ninety-five. That is the price of a bay being an
+    // ordinary object, it was paid deliberately, and only instancing fixes it.
     const full = triangleCount(rack(), 'full')
     const simple = triangleCount(rack(), 'simple')
     expect(full).toBeLessThan(1000)
-    expect(simple).toBeLessThan(200)
-    expect(50 * full + 1_950 * simple).toBeLessThan(400_000)
+    expect(simple).toBeLessThan(500)
+    expect(100 * full + 1_900 * simple).toBeLessThan(1_000_000)
   })
 
   test('a bay with something against its right builds one frame, not two', () => {
@@ -129,23 +144,29 @@ describe('geometry content', () => {
     const footprint = r.bayClearWidth + r.uprightWidth
     const steel = r.bayClearWidth + 2 * r.uprightWidth
 
-    const structure = getRackGeometry(r, 'simple').boundingBox
-    const structureWidth = (structure?.max.x ?? 0) - (structure?.min.x ?? 0)
-    expect(structureWidth).toBeCloseTo(steel, 5)
-    // Precision 5, not 9: this is measured off the built Float32 buffer, so the
-    // last few digits are the attribute's, not the arithmetic's.
-    expect(structureWidth - footprint).toBeCloseTo(r.uprightWidth, 5)
-
     // Catalogue footplates are wider than the post they carry — 175 mm under a
-    // 122 mm upright — so the full tier reaches a further 26 mm a side at floor
-    // level. Real, and asserted rather than ignored: anything larger means a
-    // part is escaping further than the design says it may.
+    // 122 mm upright — so the built mesh reaches a further 26 mm a side at
+    // floor level. Real, and asserted rather than ignored: anything larger
+    // means a part is escaping further than the design says it may.
     const full = getRackGeometry(r, 'full').boundingBox
     const fullWidth = (full?.max.x ?? 0) - (full?.min.x ?? 0)
     expect(fullWidth - steel).toBeCloseTo(0.053, 5)
+    // Precision 5, not 9: this is measured off the built Float32 buffer, so the
+    // last few digits are the attribute's, not the arithmetic's.
+    expect(steel - footprint).toBeCloseTo(r.uprightWidth, 5)
 
     expect(full?.min.y ?? -1).toBeGreaterThanOrEqual(-1e-9)
     expect(full?.max.y ?? 0).toBeCloseTo(r.uprightHeight, 5)
+
+    // Both tiers reach exactly the same width, which is what makes the LOD
+    // swap invisible: a rack that grew or shrank by 53 mm as it crossed the
+    // band would pop, and the footplates are the widest thing it builds. This
+    // is the assertion that the far tier is a reduction in detail and not in
+    // extent — it replaced one that read the bare-steel width off `simple`,
+    // which stopped being bare steel when the far tier gained its footplates.
+    const simple = getRackGeometry(r, 'simple').boundingBox
+    const simpleWidth = (simple?.max.x ?? 0) - (simple?.min.x ?? 0)
+    expect(simpleWidth).toBeCloseTo(fullWidth, 5)
   })
 
   test('a double-deep bay is twice as deep and still centred', () => {

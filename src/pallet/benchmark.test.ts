@@ -141,17 +141,32 @@ describe('a real customer scene: 3,704 bays and 752 pallets', () => {
     const rackSimple = rackParts(rack, 'simple', false).length * 12
     const deckFar = triangles(getPalletFarGeometry('epal-1'))
 
-    const nearRacks = 50 * rackFull
-    const farRacks = (RACKS - 50) * rackSimple
+    const nearRacks = 100 * rackFull
+    const farRacks = (RACKS - 100) * rackSimple
     const nearPallets = 54 * (PALLET + CARGO_NEAR + FILM)
     const farLoaded = (LOADED - 54) * (deckFar + CARGO_FAR)
     const farEmpty = (PALLETS - LOADED) * deckFar
 
     const total = nearRacks + farRacks + nearPallets + farLoaded + farEmpty
     expect(total).toBeLessThan(4_000_000)
-    // And the honest number, so a regression is visible in the diff: the far
-    // tiers keep a 3,704-bay scene near half a million triangles.
-    expect(total).toBeLessThan(700_000)
+    /**
+     * And the honest number, so a regression is visible in the diff.
+     *
+     * It moved from 700k to 1.6M, and the move is a re-derivation rather than
+     * a nudge to make the suite green. The rack's far tier stopped being posts
+     * and beams: it now carries its deck panels, frame bracing and footplates,
+     * because without them a bay past the band read as a bundle of sticks —
+     * which is the state the user actually reported. That is 120 triangles a
+     * bay to 372, and 3,600 of them is the whole of the increase. The near
+     * count also went 50 to 100 bays, because the band moved out to 55/70 m.
+     *
+     * It is affordable on evidence rather than on faith: a CPU profile of this
+     * exact scene put ~61% of frame time in per-object draw dispatch and ~25%
+     * in matrix maths, with geometry complexity absent from the profile. This
+     * scene is short of draw calls, not of triangles — see the test below,
+     * which is the one that records what still hurts.
+     */
+    expect(total).toBeLessThan(1_600_000)
   })
 
   test('what this file cannot promise, said out loud', () => {

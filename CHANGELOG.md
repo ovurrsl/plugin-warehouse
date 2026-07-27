@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`ee3ad32`](https://github.com/ovurrsl/plugin-warehouse/commit/ee3ad323a0df66eb4a3ab91f491738180bbc38f4))
 - Refresh generated README blocks [skip ci] ([`a488732`](https://github.com/ovurrsl/plugin-warehouse/commit/a4887322931ec053051cdfae40320d0ed442acc7))
 - Refresh generated README blocks [skip ci] ([`6b0d0e4`](https://github.com/ovurrsl/plugin-warehouse/commit/6b0d0e488121db8116e4fb4b46ce43993056670a))
 - Refresh generated README blocks [skip ci] ([`5c2b4d3`](https://github.com/ovurrsl/plugin-warehouse/commit/5c2b4d317ef59f63023c8141a93a5807c86ed491))
@@ -101,6 +102,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Drawing was built on a one-shot tool, and every corner doubled ([`a6e0cc1`](https://github.com/ovurrsl/plugin-warehouse/commit/a6e0cc13085873097adfc33f456b982f9aa4b588))
 - Hiding a conveyor is not a fact about storage ([`807c825`](https://github.com/ovurrsl/plugin-warehouse/commit/807c8250a661886e9ce1557a687093b25997fe92))
 - Six findings from the adversarial review of the cargo code ([`3745ac4`](https://github.com/ovurrsl/plugin-warehouse/commit/3745ac4f8c3b32613f7d81268f51d1ec1d2f7c66))
 - All fifteen findings from the adversarial review ([`5b7a62d`](https://github.com/ovurrsl/plugin-warehouse/commit/5b7a62dec51404b6e7c8a4443c43ef20e4947fe3))

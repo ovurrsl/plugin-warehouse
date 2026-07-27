@@ -14,6 +14,7 @@ import * as THREE from 'three'
 import { getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
+import { useStaticTransform } from '../static-transform'
 import {
   getRackGeometry,
   type RackDetail,
@@ -97,6 +98,17 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
   const rotation: [number, number, number] = live
     ? [baseRotation[0], live.rotation, baseRotation[2]]
     : baseRotation
+
+  // See `useStaticTransform`: three recomposes every registered group's local
+  // matrix on every frame unless told otherwise, and a warehouse at rest has
+  // thousands of these doing nothing. Live for exactly the window something
+  // is actually writing this rack's transform every tick.
+  useStaticTransform(
+    registeredRef,
+    position,
+    rotation,
+    live !== undefined || override !== undefined,
+  )
 
   /**
    * Whether the bay standing on this one's right builds the shared frame.

@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { type CargoDetail, cargoInputOf } from './cargo-parts'
@@ -105,6 +106,17 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   const rotation: [number, number, number] = live
     ? [baseRotation[0], live.rotation, baseRotation[2]]
     : baseRotation
+
+  // See `useStaticTransform`: three recomposes every registered group's local
+  // matrix on every frame unless told otherwise, and a warehouse at rest has
+  // thousands of these doing nothing. Live for exactly the window something
+  // is actually writing this pallet's transform every tick.
+  useStaticTransform(
+    registeredRef,
+    position,
+    rotation,
+    live !== undefined || override !== undefined,
+  )
 
   const spec = specOf(node.preset)
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4b9066f`](https://github.com/ovurrsl/plugin-warehouse/commit/4b9066ffe81586be523a6793c07313b3cf54acd2))
 - Refresh generated README blocks [skip ci] ([`9829b0c`](https://github.com/ovurrsl/plugin-warehouse/commit/9829b0c82c37573d9f9851cac43e8bb95381f6bf))
 - Refresh generated README blocks [skip ci] ([`b9a6e43`](https://github.com/ovurrsl/plugin-warehouse/commit/b9a6e43db01a50768fac28532634271970d93afe))
 - Refresh generated README blocks [skip ci] ([`ee3ad32`](https://github.com/ovurrsl/plugin-warehouse/commit/ee3ad323a0df66eb4a3ab91f491738180bbc38f4))
@@ -136,6 +137,10 @@ index to it, not a replacement for it.
 - Add schemaVersion ([`4ac9ec0`](https://github.com/ovurrsl/plugin-warehouse/commit/4ac9ec055808493241857588639b7930e25112ce))
 - Fix schema and jsx ([`e5fa603`](https://github.com/ovurrsl/plugin-warehouse/commit/e5fa6038dcb399569e00e14e6cb6b37af0616d7f))
 - Initial commit of warehouse plugin ([`5eb1076`](https://github.com/ovurrsl/plugin-warehouse/commit/5eb107697e8bd21a9cbd2aab2a72be02ed8adf04))
+
+### Performance
+
+- The deck gets a far tier — measured against a real scene ([`653a590`](https://github.com/ovurrsl/plugin-warehouse/commit/653a5907c942958ebbfc756366a35e4407d12785))
 
 ### Tests
 

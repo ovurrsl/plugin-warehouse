@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`c639e36`](https://github.com/ovurrsl/plugin-warehouse/commit/c639e3680401e6a162339b135fa01f478709ee53))
 - Refresh generated README blocks [skip ci] ([`a3faffc`](https://github.com/ovurrsl/plugin-warehouse/commit/a3faffc261d578518cd3b2ee2f4a470dcb79293f))
 - Refresh generated README blocks [skip ci] ([`3863fa1`](https://github.com/ovurrsl/plugin-warehouse/commit/3863fa1c75ad66a32079d65d45beaeae652a483b))
 - Refresh generated README blocks [skip ci] ([`4b9066f`](https://github.com/ovurrsl/plugin-warehouse/commit/4b9066ffe81586be523a6793c07313b3cf54acd2))
@@ -109,6 +110,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Their inspector warnings reach the user ([`31cbd03`](https://github.com/ovurrsl/plugin-warehouse/commit/31cbd03b72334667f5b79ebbff0e9a88ccf9be6a))
 - The paint was under the slab, and nothing was registered ([`8fd2e17`](https://github.com/ovurrsl/plugin-warehouse/commit/8fd2e179e9d3a2cdf8757328af4098bdf019e986))
 - Drawing was built on a one-shot tool, and every corner doubled ([`a6e0cc1`](https://github.com/ovurrsl/plugin-warehouse/commit/a6e0cc13085873097adfc33f456b982f9aa4b588))
 - Hiding a conveyor is not a fact about storage ([`807c825`](https://github.com/ovurrsl/plugin-warehouse/commit/807c8250a661886e9ce1557a687093b25997fe92))

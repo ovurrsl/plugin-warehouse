@@ -403,6 +403,61 @@ describe('what is counted, and what is deliberately not', () => {
   })
 })
 
+describe('occupancy is a fact a pallet carries, never one inferred', () => {
+  test('a pallet in a slot fills a position and is not a floor pallet', () => {
+    const nodes = scene(level('level_1', ['pallet_rack_1', 'pallet_1']), rack('pallet_rack_1'), {
+      id: 'pallet_1',
+      type: 'warehouse:pallet',
+      slotRackId: 'pallet_rack_1',
+      slotAddress: 'R1-B1-L0-P1-D1',
+    })
+    const report = reportFor(nodes)
+    expect(report.palletPositions).toBe(12)
+    expect(report.occupiedPositions).toBe(1)
+    expect(report.qualifications.map((entry) => entry.code)).not.toContain('floor-pallets')
+  })
+
+  test('a pallet standing on the floor fills nothing', () => {
+    // Nothing tests a pallet's position against a rack's box: a pallet visually
+    // inside a bay is not in that bay unless the placement chain put it there
+    // and wrote the address down.
+    const nodes = scene(level('level_1', ['pallet_rack_1', 'pallet_1']), rack('pallet_rack_1'), {
+      id: 'pallet_1',
+      type: 'warehouse:pallet',
+      position: [0, 0, 0],
+    })
+    const report = reportFor(nodes)
+    expect(report.occupiedPositions).toBe(0)
+    expect(report.qualifications.map((entry) => entry.code)).toContain('floor-pallets')
+  })
+
+  test('a claim on a rack that is gone counts as a pallet on the floor', () => {
+    // The honest reading of a stale address: the pallet is real and it is not in
+    // a rack. Counting it against a bay that no longer exists would report a
+    // warehouse fuller than it is.
+    const nodes = scene(level('level_1', ['pallet_1']), {
+      id: 'pallet_1',
+      type: 'warehouse:pallet',
+      slotRackId: 'pallet_rack_gone',
+      slotAddress: 'R1-B1-L0-P1-D1',
+    })
+    const report = reportFor(nodes)
+    expect(report.occupiedPositions).toBe(0)
+    expect(report.qualifications.map((entry) => entry.code)).toContain('floor-pallets')
+  })
+
+  test('occupancy never exceeds the positions on the same level', () => {
+    const nodes = scene(level('level_1', ['pallet_rack_1', 'pallet_1']), rack('pallet_rack_1'), {
+      id: 'pallet_1',
+      type: 'warehouse:pallet',
+      slotRackId: 'pallet_rack_1',
+      slotAddress: 'R1-B1-L0-P1-D1',
+    })
+    const report = reportFor(nodes)
+    expect(report.occupiedPositions).toBeLessThanOrEqual(report.palletPositions)
+  })
+})
+
 describe('the index is built once per store write', () => {
   test('the same node map returns the identical object', () => {
     // What lets the panel subscribe with a plain selector: `Object.is` on the

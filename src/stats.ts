@@ -102,6 +102,8 @@ export type LevelFigures = {
   tunnelledRacks: number
   tunnelRemoved: number
   ghostRacks: number
+  /** Pallets standing in a slot of a rack on this level. */
+  occupiedPositions: number
   floorPallets: number
   hiddenNodes: number
   unreadableRacks: number
@@ -139,6 +141,7 @@ export type StatsReport = {
   palletPositions: number
   directPositions: number
   containerPositions: number
+  occupiedPositions: number
   rackCount: number
   /** Sum over the slabs the filter admits, m². */
   area: number
@@ -349,6 +352,8 @@ function levelFigures(
   let tunnelRemoved = 0
   let ghostRacks = 0
   let floorPallets = 0
+  const rackIds = new Set<string>()
+  const racked: { rackId: string; address: string }[] = []
   let hiddenNodes = 0
   let unreadableRacks = 0
   let slabNodesPresent = 0
@@ -386,6 +391,7 @@ function levelFigures(
 
     if (record.type === 'warehouse:pallet-rack') {
       rackCount += 1
+      rackIds.add(id)
       const figures = rackFiguresOf(node as object)
       if (!figures) {
         unreadableRacks += 1
@@ -402,10 +408,32 @@ function levelFigures(
       return
     }
 
-    // A pallet standing in a bay is GOODS, not a location. Nothing here infers
-    // occupancy from geometry, so a pallet contributes to no headline.
-    if (record.type === 'warehouse:pallet') floorPallets += 1
+    /**
+     * A pallet is stock, and where it is stored is a fact it carries rather than
+     * one inferred from where it happens to sit.
+     *
+     * Nothing here tests a pallet's position against a rack's box: a pallet
+     * visually inside a bay is not in that bay unless the placement chain put it
+     * there and wrote the address down. That is why the slot fields exist.
+     */
+    if (record.type === 'warehouse:pallet') {
+      const claim = record as { slotRackId?: unknown; slotAddress?: unknown }
+      if (typeof claim.slotRackId === 'string' && typeof claim.slotAddress === 'string') {
+        racked.push({ rackId: claim.slotRackId, address: claim.slotAddress })
+      } else {
+        floorPallets += 1
+      }
+    }
   })
+
+  // Counted only against racks on this level, so a pallet whose rack was
+  // deleted, or whose claim names a bay somewhere else, cannot inflate the
+  // figure. It falls to the floor count instead, which is what it now is.
+  let occupiedPositions = 0
+  for (const claim of racked) {
+    if (rackIds.has(claim.rackId)) occupiedPositions += 1
+    else floorPallets += 1
+  }
 
   return {
     rackCount,
@@ -415,6 +443,7 @@ function levelFigures(
     tunnelledRacks,
     tunnelRemoved,
     ghostRacks,
+    occupiedPositions,
     floorPallets,
     hiddenNodes,
     unreadableRacks,
@@ -536,6 +565,7 @@ export function statsReport(
   let tunnelledRacks = 0
   let tunnelRemoved = 0
   let ghostRacks = 0
+  let occupiedPositions = 0
   let floorPallets = 0
   let hiddenNodes = 0
   let slabNodesPresent = 0
@@ -552,6 +582,7 @@ export function statsReport(
     tunnelledRacks += level.tunnelledRacks
     tunnelRemoved += level.tunnelRemoved
     ghostRacks += level.ghostRacks
+    occupiedPositions += level.occupiedPositions
     floorPallets += level.floorPallets
     hiddenNodes += level.hiddenNodes
     slabNodesPresent += level.slabNodesPresent
@@ -657,6 +688,7 @@ export function statsReport(
     palletPositions,
     directPositions,
     containerPositions,
+    occupiedPositions,
     rackCount,
     area,
     areaAllSlabs,

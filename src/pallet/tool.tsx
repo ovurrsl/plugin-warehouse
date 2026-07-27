@@ -34,6 +34,7 @@ import { unitLoadHeightOf } from './cargo-types'
 import { specOf } from './presets'
 import PalletPreview from './preview'
 import { PalletNode } from './schema'
+import { findSlotTarget, type SlotTarget } from './slot-placement'
 
 /** 45° steps, matching the R / T rotation every built-in placement tool uses. */
 const ROTATION_STEP = Math.PI / 4
@@ -95,6 +96,24 @@ export default function PalletTool() {
    */
   const [placementSerial, setPlacementSerial] = useState(0)
 
+  /**
+   * The rack slot under the cursor, or `null` for the floor.
+   *
+   * A ref because the move handler writes it many times a second and only the
+   * fill range it implies has to reach React.
+   */
+  const slotTargetRef = useRef<SlotTarget | null>(null)
+
+  /**
+   * The range the slot will actually accept, when it is narrower than the one
+   * the brush asked for.
+   *
+   * State rather than a ref: it changes what the ghost *looks like*, because a
+   * load clamped to clear the beam above it is a shorter stack, and the whole
+   * point of the ghost is that it is the pallet.
+   */
+  const [slotRange, setSlotRange] = useState<[number, number] | null>(null)
+
   const previewNode = useMemo(
     () => PalletNode.parse({ ...brush, position: [0, 0, 0], rotation: [0, 0, 0] }),
     // The serial IS a dependency: it exists to re-mint this node with a fresh id
@@ -102,8 +121,31 @@ export default function PalletTool() {
     [brush, placementSerial],
   )
 
+  /**
+   * The node the ghost draws: the preview, wearing whatever fill range the slot
+   * under the cursor allows.
+   *
+   * The id is untouched, so the load stays a function of the pallet that will be
+   * created — only the range it is drawn from narrows.
+   */
+  const ghostNode = useMemo(
+    () => (slotRange ? { ...previewNode, fillRange: slotRange } : previewNode),
+    [previewNode, slotRange],
+  )
+
+  /**
+   * The ghost as the subscriptions see it.
+   *
+   * The move and click handlers are set up once per `previewNode`, but the range
+   * a slot allows can narrow between two of those set-ups — so reading the node
+   * out of the closure would commit a load the ghost had already stopped
+   * showing. A ref updated every render is the shortest path to one answer.
+   */
+  const ghostNodeRef = useRef(ghostNode)
+  ghostNodeRef.current = ghostNode
+
   const spec = specOf(brush.preset)
-  const boxHeight = unitLoadHeightOf(previewNode)
+  const boxHeight = unitLoadHeightOf(ghostNode)
   const boxDimensions = useMemo(
     (): [number, number, number] => [spec.length, boxHeight, spec.width],
     [spec.length, spec.width, boxHeight],
@@ -168,17 +210,55 @@ export default function PalletTool() {
      *  resolved plan position. Shared by cursor movement and R / T, so a
      *  rotation with the cursor held still updates everything a move would. */
     const applyCursor = (position: [number, number, number]) => {
-      const visual = getFloorStackPreviewPosition({
-        node: previewNode as unknown as AnyNode,
-        position,
-        rotation: [0, rotationRef.current, 0],
-        levelId: activeLevelId,
+      /**
+       * A rack slot wins over the floor, and takes the pose with it.
+       *
+       * R and T are ignored while a slot has the pallet: the rack decides which
+       * way its loads face, and a pallet turned across its own beams is not a
+       * placement anyone wants to be offered.
+       *
+       * Only slots the chain would ACCEPT are ever returned, so this cannot snap
+       * to a position the click would then refuse — a ghost that jumps to a slot
+       * and then does nothing when clicked is worse than no snap at all.
+       */
+      const target = findSlotTarget(
+        useScene.getState().nodes as Readonly<Record<string, unknown>>,
+        activeLevelId,
+        position[0],
+        position[2],
+        brush,
+      )
+      slotTargetRef.current = target
+      setSlotRange((current) => {
+        const next = target?.clamped ? target.range : null
+        if (current === next) return current
+        if (current && next && current[0] === next[0] && current[1] === next[1]) return current
+        return next
       })
+
+      const rotationY = target ? target.rotationY : rotationRef.current
+      const visual = target
+        ? target.position
+        : getFloorStackPreviewPosition({
+            node: ghostNodeRef.current as unknown as AnyNode,
+            position,
+            rotation: [0, rotationRef.current, 0],
+            levelId: activeLevelId,
+          })
       cursorRef.current?.position.set(...visual)
-      cursorRef.current?.rotation.set(0, rotationRef.current, 0)
+      cursorRef.current?.rotation.set(0, rotationY, 0)
       setCursorPosition(visual)
+      setCursorRotationY(rotationY)
       lastPositionRef.current = position
-      recomputeValidity(visual)
+      // A slot has already been judged by the chain that found it, and a pallet
+      // standing in a rack legitimately overlaps the rack's own footprint — the
+      // floor test would refuse every correct placement.
+      if (target) {
+        validRef.current = true
+        setValid(true)
+      } else {
+        recomputeValidity(visual)
+      }
 
       // A pallet has a front — fork entry is across the 1200 mm faces — and the
       // kind declares `facingIndicator`, so publish the pose the host's single
@@ -186,7 +266,7 @@ export default function PalletTool() {
       // host explicitly warns against: it comes out invisible.
       useFacingPose.getState().set({
         position: visual,
-        rotationY: rotationRef.current,
+        rotationY,
         depth: boxDimensions[2],
       })
     }
@@ -231,14 +311,23 @@ export default function PalletTool() {
       // the published @pascal-app/core — it exists only in the monorepo source.
       // Depending on it would bind this package to an unshipped symbol, which
       // is exactly the coupling `host-adapter` exists to avoid.
+      const target = slotTargetRef.current
       const committed = PalletNode.parse({
-        ...previewNode,
+        ...ghostNodeRef.current,
         // The ghost's own id, so what was shown is what is placed.
         id: previewNode.id,
-        position,
-        rotation: [0, rotationRef.current, 0],
+        position: target ? target.position : position,
+        rotation: [0, target ? target.rotationY : rotationRef.current, 0],
         parentId: activeLevelId,
-        supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
+        // A pallet in a rack is addressed by its slot; one on the floor is
+        // addressed by the slab it stands on. Writing both would leave two
+        // answers to "where is this", and the host strips the slab id on the
+        // first drag anyway.
+        slotRackId: target ? target.rackId : null,
+        slotAddress: target ? target.address : null,
+        supportSlabId: target
+          ? null
+          : electSupportSlab(nodes, activeLevelId, position[0], position[2]),
       })
 
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
@@ -314,7 +403,7 @@ export default function PalletTool() {
   return (
     <>
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
-        <PalletPreview node={previewNode} />
+        <PalletPreview node={ghostNode} />
       </group>
       {cursorVisible && (
         <PlacementBox

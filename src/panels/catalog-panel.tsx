@@ -12,6 +12,7 @@ import {
   type Qualification,
   resolveStatsScope,
   type SlabFigure,
+  type StatsReport,
   sceneStats,
   statsReport,
 } from '../stats'
@@ -84,7 +85,7 @@ function CatalogTab() {
             {items.length > 0 ? (
               <div style={tokens.tileGrid}>
                 {items.map((item) => (
-                  <CatalogTile item={item} key={item.kind} />
+                  <CatalogTile item={item} key={item.id} />
                 ))}
               </div>
             ) : (
@@ -141,11 +142,15 @@ function FlowSwitch() {
 }
 
 /**
- * What the next placed pallet is carrying.
+ * What the loaded pallet is carrying.
  *
  * In the catalog beside the tile that places it, not in the inspector, because
  * it describes the pallet you are about to make rather than one you have
  * selected — the same reason the conveyor's flow switch lives here.
+ *
+ * Absent entirely while the empty pallet is armed. The two are separate tiles,
+ * so this is a statement about which one is chosen rather than a panel of
+ * controls greying itself out.
  *
  * The fill is offered as three named ranges rather than as a slider. The
  * variants are quantised to begin with, so a continuous control would promise a
@@ -157,7 +162,6 @@ function LoadBrush() {
   const setBrush = useWarehouseStore((s) => s.setPalletBrush)
 
   const types = [
-    { value: 'none', label: 'Empty' },
     { value: 'carton', label: 'Cartons' },
     { value: 'drum', label: 'Drums' },
   ] as const
@@ -168,9 +172,10 @@ function LoadBrush() {
     { label: 'Full', range: [1, 1] as [number, number], hint: '100%' },
   ]
 
-  const loaded = brush.cargo !== 'none'
   const sameRange = (a: readonly [number, number], b: readonly [number, number]) =>
     a[0] === b[0] && a[1] === b[1]
+
+  if (brush.cargo === 'none') return null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
@@ -187,78 +192,82 @@ function LoadBrush() {
         ))}
       </div>
 
-      {loaded && (
-        <>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {ranges.map((entry) => (
-              <button
-                key={entry.label}
-                onClick={() => setBrush({ fillRange: entry.range })}
-                style={{
-                  ...listRow(sameRange(brush.fillRange, entry.range)),
-                  justifyContent: 'center',
-                }}
-                title={entry.hint}
-                type="button"
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
+      <div style={{ display: 'flex', gap: '0.25rem' }}>
+        {ranges.map((entry) => (
+          <button
+            key={entry.label}
+            onClick={() => setBrush({ fillRange: entry.range })}
+            style={{
+              ...listRow(sameRange(brush.fillRange, entry.range)),
+              justifyContent: 'center',
+            }}
+            title={entry.hint}
+            type="button"
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
 
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {CARGO_COLOR_IDS.map((id) => (
-              <button
-                aria-label={id}
-                key={id}
-                onClick={() => setBrush({ cargoColor: id })}
-                style={{
-                  flex: 1,
-                  height: '1.125rem',
-                  borderRadius: '0.25rem',
-                  border:
-                    brush.cargoColor === id
-                      ? '2px solid var(--sidebar-ring)'
-                      : '1px solid var(--sidebar-border)',
-                  background: CARGO_COLORS[id],
-                  cursor: 'pointer',
-                }}
-                title={id}
-                type="button"
-              />
-            ))}
-          </div>
+      <div style={{ display: 'flex', gap: '0.25rem' }}>
+        {CARGO_COLOR_IDS.map((id) => (
+          <button
+            aria-label={id}
+            key={id}
+            onClick={() => setBrush({ cargoColor: id })}
+            style={{
+              flex: 1,
+              height: '1.125rem',
+              borderRadius: '0.25rem',
+              border:
+                brush.cargoColor === id
+                  ? '2px solid var(--sidebar-ring)'
+                  : '1px solid var(--sidebar-border)',
+              background: CARGO_COLORS[id],
+              cursor: 'pointer',
+            }}
+            title={id}
+            type="button"
+          />
+        ))}
+      </div>
 
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {(
-              [
-                ['wrapped', 'Film'],
-                ['strapped', 'Straps'],
-                ['labelled', 'Label'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setBrush({ [key]: !brush[key] })}
-                style={{ ...listRow(brush[key]), justifyContent: 'center' }}
-                type="button"
-              >
-                <span style={checkbox(brush[key])}>{brush[key] ? '✓' : ''}</span>
-                {label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      <div style={{ display: 'flex', gap: '0.25rem' }}>
+        {(
+          [
+            ['wrapped', 'Film'],
+            ['strapped', 'Straps'],
+            ['labelled', 'Label'],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setBrush({ [key]: !brush[key] })}
+            style={{ ...listRow(brush[key]), justifyContent: 'center' }}
+            type="button"
+          >
+            <span style={checkbox(brush[key])}>{brush[key] ? '✓' : ''}</span>
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
 
 function CatalogTile({ item }: { item: CatalogItem }) {
   const activeTool = useEditor((s) => s.tool)
-  const arming = activeTool === item.kind
+  const cargo = useWarehouseStore((s) => s.palletBrush.cargo)
+  const setBrush = useWarehouseStore((s) => s.setPalletBrush)
+
+  // Two tiles arm the same kind, so the lit one is the tile whose brush the
+  // store is currently wearing.
+  const wantsLoad = item.brush ? item.brush.cargo !== 'none' : null
+  const arming =
+    activeTool === item.kind && (wantsLoad === null || wantsLoad === (cargo !== 'none'))
 
   const arm = () => {
+    if (item.brush) setBrush(item.brush)
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the
     // path a catalog panel is expected to use.
@@ -336,11 +345,7 @@ function StatsTab() {
           <Figure
             icon="lucide:box"
             label="Storage"
-            note={
-              report.directPositions !== report.palletPositions
-                ? `${report.directPositions.toLocaleString()} reachable without moving another`
-                : undefined
-            }
+            note={storageNote(report)}
             unavailable={report.status.storage === 'unavailable'}
             unit="pallet positions"
             value={report.palletPositions}
@@ -479,12 +484,6 @@ function StatsTab() {
           ))}
         </section>
       )}
-
-      {/* Permanent, because a 0% that never moves reads as an empty warehouse
-          and a row that never renders is dead code. */}
-      <p style={tokens.blurb}>
-        Slot assignment does not exist yet, so nothing here reports how full the racking is.
-      </p>
     </div>
   )
 }
@@ -556,6 +555,26 @@ function SlabRow({
       <span style={tokens.rowArea}>{formatArea(slab.area, unit, 0)}</span>
     </button>
   )
+}
+
+/**
+ * The two things worth saying about a storage figure beyond its total.
+ *
+ * Occupancy first, because that is the question a warehouse designer is actually
+ * asking — and it is reportable at all only because the placement chain writes a
+ * slot address down. Nothing here infers it from where a pallet happens to sit.
+ * Reach second, and only when a bay is deep enough for the two to differ.
+ */
+function storageNote(report: StatsReport): string | undefined {
+  const parts: string[] = []
+  if (report.palletPositions > 0) {
+    const share = Math.round((report.occupiedPositions / report.palletPositions) * 100)
+    parts.push(`${report.occupiedPositions.toLocaleString()} occupied · ${share}%`)
+  }
+  if (report.directPositions !== report.palletPositions) {
+    parts.push(`${report.directPositions.toLocaleString()} reachable without moving another`)
+  }
+  return parts.length > 0 ? parts.join(' · ') : undefined
 }
 
 const SQUARE_FEET_PER_SQUARE_METRE = 10.7639

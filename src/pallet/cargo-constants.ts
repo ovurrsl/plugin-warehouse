@@ -140,6 +140,25 @@ export const FILM_CHAMFER_M = mm(30)
  * effective control is how many of them are on screen at once.
  */
 export const FILM_DRAW_DISTANCE_M = 30
+
+/**
+ * **Room to lift a pallet off its beams before drawing it out: 100 mm.**
+ *
+ * The plan's figure, and the reason a slot's clear opening is not the same as
+ * the load height it will take. A truck raises the forks before it reverses; a
+ * load sized to the opening exactly is a load that cannot come out again, and a
+ * capacity figure counting those positions is counting places nothing can be
+ * stored.
+ */
+export const LIFT_ALLOWANCE_M = mm(100)
+
+/**
+ * How far a pallet may exceed the footprint its slot was configured for.
+ *
+ * The plan's placement tolerance. Fifteen millimetres is a beam that was set out
+ * by hand, not a pallet of a different standard — those are refused.
+ */
+export const SLOT_FOOTPRINT_TOLERANCE_M = mm(15)
 /** How far the film pulls in at mid-height, as a fraction of the load's width. */
 export const FILM_WAIST = 0.015
 

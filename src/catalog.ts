@@ -20,12 +20,23 @@ export type CatalogSection = {
 }
 
 export type CatalogItem = {
+  /** Distinguishes two tiles that arm the same kind. */
+  id: string
   /** Node kind to arm for placement. Must match a registered `NodeDefinition.kind`. */
   kind: string
   label: string
   sectionId: string
   description: string
   icon: string
+  /**
+   * Applied to the pallet brush before the tool is armed.
+   *
+   * An empty pallet and a loaded one are the same node kind wearing a different
+   * `cargo`, but they are two different things to place and a user picks between
+   * them before anything else. One tile that silently remembered whichever it
+   * was last would make the catalog lie about what the next click puts down.
+   */
+  brush?: { cargo: 'none' | 'carton' | 'drum' }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -74,13 +85,26 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
  */
 export const CATALOG_ITEMS: readonly CatalogItem[] = [
   {
+    id: 'pallet-empty',
     kind: 'warehouse:pallet',
-    label: 'Pallet',
+    label: 'Empty Pallet',
     sectionId: 'unit-loads',
-    description: 'EPAL, GMA and plastic pallets. Set a load height to fill a rack position.',
+    description: 'A bare deck. EPAL, GMA and plastic standards.',
     icon: 'lucide:package',
+    brush: { cargo: 'none' },
   },
   {
+    id: 'pallet-loaded',
+    kind: 'warehouse:pallet',
+    label: 'Loaded Pallet',
+    sectionId: 'unit-loads',
+    description:
+      'Cartons or drums, wrapped and strapped. The fill is drawn from the range below, and the pallet snaps into a rack position.',
+    icon: 'lucide:boxes',
+    brush: { cargo: 'carton' },
+  },
+  {
+    id: 'pallet-rack',
     kind: 'warehouse:pallet-rack',
     label: 'Pallet Rack',
     sectionId: 'storage',
@@ -89,6 +113,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:rows-3',
   },
   {
+    id: 'conveyor-roller',
     kind: 'warehouse:conveyor-roller',
     label: 'Roller Conveyor',
     sectionId: 'conveyance',
@@ -97,6 +122,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:move-right',
   },
   {
+    id: 'conveyor-curve',
     kind: 'warehouse:conveyor-curve',
     label: 'Curved Conveyor',
     sectionId: 'conveyance',
@@ -105,6 +131,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:corner-up-left',
   },
   {
+    id: 'conveyor-launcher',
     kind: 'warehouse:conveyor-launcher',
     label: 'Launcher Conveyor',
     sectionId: 'conveyance',
@@ -113,6 +140,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:git-fork',
   },
   {
+    id: 'conveyor-booster',
     kind: 'warehouse:conveyor-booster',
     label: 'Booster Conveyor',
     sectionId: 'conveyance',
@@ -121,6 +149,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:chevrons-right',
   },
   {
+    id: 'conveyor-transfer',
     kind: 'warehouse:conveyor-transfer',
     label: 'Mixed Transfer',
     sectionId: 'conveyance',
@@ -129,6 +158,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:move-diagonal',
   },
   {
+    id: 'conveyor-oblique',
     kind: 'warehouse:conveyor-oblique',
     label: 'Oblique Transfer',
     sectionId: 'conveyance',

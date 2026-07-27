@@ -371,7 +371,7 @@ export function getCachedGeometry(
   if (cached) return cached
   const geometry = build()
   cache.set(key, geometry)
-  evict()
+  evict(key)
   return geometry
 }
 
@@ -385,10 +385,23 @@ export function getConveyorGeometry(
   )
 }
 
-function evict(): void {
+/**
+ * Drops the oldest unheld shapes.
+ *
+ * **The entry just built is never a candidate.** A renderer claims its keys in
+ * an effect, which runs *after* the render that asked for the geometry, so a
+ * freshly built shape is unretained for exactly as long as React takes to
+ * commit. A `Map` iterates in insertion order and the new entry is last, so at a
+ * full cache it was the only one the retain guard did not skip: disposed, and
+ * then returned to be mounted. The mesh survived, but the entry was gone, so
+ * every other node resolving to that shape rebuilt and re-disposed it and the
+ * sharing this design rests on was permanently off for that key.
+ */
+function evict(justBuilt: string): void {
   if (cache.size <= CACHE_LIMIT) return
   for (const [key, geometry] of cache) {
     if (cache.size <= CACHE_LIMIT) return
+    if (key === justBuilt) continue
     if ((retained.get(key) ?? 0) > 0) continue
     cache.delete(key)
     geometry.dispose()

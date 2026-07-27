@@ -80,3 +80,32 @@ export const DEPTH_BIAS = {
  * room to spare.
  */
 export const MAX_VERTICES = 64
+
+/**
+ * The direction arrow, metres. **Estimates**, and the basis is legibility
+ * rather than a standard: no workplace instrument specifies an arrow at all —
+ * one-way working is a design decision, not a duty — so these are sized to read
+ * at the scale a plan is printed at and to sit inside the narrowest route the
+ * schema allows.
+ */
+export const ARROW_LENGTH_M = 0.9
+export const ARROW_HALF_WIDTH_M = 0.22
+
+/**
+ * How many arrows a leg carries: one at its midpoint, and one more per 24 m.
+ *
+ * Capped at four. An arrow every N metres makes the primitive count grow with
+ * route LENGTH rather than with node count — a 200 m perimeter route would emit
+ * dozens, none of them legible at the zoom that shows the whole run.
+ */
+export const ARROW_SPACING_M = 24
+export const ARROWS_PER_LEG_MAX = 4
+
+/**
+ * The lane divider on a two-way vehicle aisle: 1 m of paint, 1 m of gap.
+ * **Estimates.** A dashed centre line is a road convention borrowed indoors;
+ * nothing in the workplace instruments describes one, and these are the
+ * proportions that read as a divider rather than as a damaged solid line.
+ */
+export const DIVIDER_DASH_M = 1
+export const DIVIDER_GAP_M = 1

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e8be4dd`](https://github.com/ovurrsl/plugin-warehouse/commit/e8be4dd0ae901022cf17f52b2e8132d5c422a91b))
 - Refresh generated README blocks [skip ci] ([`cf237e1`](https://github.com/ovurrsl/plugin-warehouse/commit/cf237e181ea52f7a369ae00f94b52db801e5093e))
 - Refresh generated README blocks [skip ci] ([`9291875`](https://github.com/ovurrsl/plugin-warehouse/commit/92918757bb1f83b64ef3ef1f2f8abe2a8e37b9ea))
 - Refresh generated README blocks [skip ci] ([`3b55081`](https://github.com/ovurrsl/plugin-warehouse/commit/3b55081ea8840cbd1cddf7cb5fea3a43f9f86624))
@@ -120,5 +121,6 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- T7–T10, in the half a node process can actually measure ([`3ccb27e`](https://github.com/ovurrsl/plugin-warehouse/commit/3ccb27eab72c3de277534ecb6ca1e4bb3707581c))
 - Test simple red material ([`b611bce`](https://github.com/ovurrsl/plugin-warehouse/commit/b611bceef6a7c685834a704f355dfb673015bb52))
 

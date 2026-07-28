@@ -66,6 +66,9 @@ const CLICK_TRIGGER_KINDS = [
   // hit target covers the whole corridor — so without this the second route
   // cannot be started anywhere the first one runs.
   'warehouse:route',
+  // Bir filo yan yana park eder: ikinci araç ilkinin kolideri üzerindeyken
+  // yerleştirilir.
+  'warehouse:truck',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

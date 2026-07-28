@@ -10,6 +10,7 @@ import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
+import { truckDefinition } from './truck/definition'
 
 /**
  * The manifest barrel — the entire public surface of this package.
@@ -43,6 +44,7 @@ export const warehousePlugin: Plugin = {
     conveyorTransferDefinition as unknown as AnyNodeDefinition,
     conveyorObliqueDefinition as unknown as AnyNodeDefinition,
     routeDefinition as unknown as AnyNodeDefinition,
+    truckDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -71,6 +73,10 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:conveyor-booster',
     'warehouse:conveyor-transfer',
     'warehouse:conveyor-oblique',
+    // Kayıtlı 9. ve 10. kind — `route` liste dışıydı (manifest 9 kaydediyor,
+    // liste 8 sayıyordu); araçla birlikte kapatıldı, T17 artık kilitli.
+    'warehouse:route',
+    'warehouse:truck',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild
@@ -88,4 +94,6 @@ export { PalletNode } from './pallet/schema'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
 export { palletRackDefinition } from './rack/definition'
 export { PalletRackNode } from './rack/schema'
+export { truckDefinition } from './truck/definition'
+export { TruckNode } from './truck/schema'
 export default warehousePlugin

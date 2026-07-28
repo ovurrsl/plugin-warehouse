@@ -5,6 +5,7 @@ import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 import { defaultWidthM } from './route/metrics'
 import type { RouteNode } from './route/schema'
+import type { TruckNode } from './truck/schema'
 
 /**
  * The plugin's own state. Plugins do not extend `useScene` / `useEditor` /
@@ -112,6 +113,15 @@ type WarehouseStore = {
    */
   multiply: MultiplySpec
   setMultiply: (patch: Partial<MultiplySpec>) => void
+
+  /**
+   * Shape of the next placed truck. `model` yamanınca `mastRowId` sıfırlanır —
+   * `setRouteBrush`'ın "genişlik sınıfı takip eder" kuralının aynısı: eski
+   * satır yeni modelin tablosu olmayabilir ve sessizce taşınmış bir mast,
+   * yanlış boyda çizilmiş bir makinedir.
+   */
+  truckBrush: TruckBrush
+  setTruckBrush: (patch: Partial<TruckBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -123,6 +133,8 @@ export type RouteBrush = Pick<
   RouteNode,
   'role' | 'traffic' | 'width' | 'lineWidth' | 'requiredFor' | 'datum'
 >
+
+export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
 
 export type RackBrush = Pick<
   PalletRackNode,
@@ -226,4 +238,19 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   multiply: DEFAULT_MULTIPLY,
   setMultiply: (patch) => set((state) => ({ multiply: { ...state.multiply, ...patch } })),
+
+  truckBrush: {
+    model: 'forklift-1300',
+    mastRowId: null,
+    referenceLoad: '1000x1200',
+    duty: 'parked',
+  },
+  setTruckBrush: (patch) =>
+    set((state) => {
+      const next = { ...state.truckBrush, ...patch }
+      if (patch.model !== undefined && patch.model !== state.truckBrush.model) {
+        next.mastRowId = patch.mastRowId ?? null
+      }
+      return { truckBrush: next }
+    }),
 }))

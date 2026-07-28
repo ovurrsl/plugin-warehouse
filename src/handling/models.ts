@@ -43,7 +43,17 @@ const mm = (value: number) => value / 1000
  */
 export type AstPair = { load1000x1200: number; load800x1200: number }
 
-export type TruckModelId = 'mpt-680x1150' | 'ept-2500' | 'forklift-1300' | 'rt-1800' | 'tt-1600'
+/** Değişmez sıralı liste — şemanın `z.enum`'u ve seçiciler bunu okur.
+ *  Kural: eklenir, asla yeniden adlandırılmaz (kimlik kalıcı sahne verisi). */
+export const TRUCK_MODEL_ID_LIST = [
+  'mpt-680x1150',
+  'ept-2500',
+  'forklift-1300',
+  'rt-1800',
+  'tt-1600',
+] as const
+
+export type TruckModelId = (typeof TRUCK_MODEL_ID_LIST)[number]
 
 export type TruckModel = {
   id: TruckModelId
@@ -79,6 +89,9 @@ export type TruckModel = {
   h6: number | null
   h7: number | null
   h8: number | null
+  /** En yüksek sabit nokta (VDI 4.31'in kapsadığı) — `tt`'de koruma çerçevesi
+   *  3.930 ve zarf yüksekliği budur, kabin tavanı (h6 2.550) değil. */
+  h12: number | null
   h13: number | null
   /** `ept`'te min/maks ÇİFT (1.215/1.275) — tek sayı seçmek uydurmak olur. */
   h14: number | readonly [number, number] | null
@@ -136,6 +149,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     h6: null,
     h7: null,
     h8: null,
+    h12: mm(171),
     h13: mm(51),
     h14: mm(1237),
     rearOverhang: null,
@@ -183,6 +197,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     h6: null,
     h7: null,
     h8: null,
+    h12: null,
     h13: mm(85),
     h14: [mm(1215), mm(1275)],
     rearOverhang: null,
@@ -229,6 +244,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     h6: mm(2040),
     h7: mm(920),
     h8: null,
+    h12: null,
     h13: null,
     h14: null,
     rearOverhang: mm(190),
@@ -275,6 +291,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     h6: mm(2190),
     h7: mm(1057),
     h8: mm(285),
+    h12: null,
     h13: null,
     h14: null,
     rearOverhang: null,
@@ -323,6 +340,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     h6: mm(2550),
     h7: mm(430),
     h8: null,
+    h12: mm(3930),
     h13: null,
     h14: null,
     rearOverhang: null,
@@ -347,7 +365,7 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
   },
 }
 
-export const TRUCK_MODEL_IDS = Object.keys(TRUCK_MODELS) as readonly TruckModelId[]
+export const TRUCK_MODEL_IDS: readonly TruckModelId[] = TRUCK_MODEL_ID_LIST
 
 /**
  * Kullanıcıya görünen aile adları — kullanıcının seçtiği İngilizce terimler.

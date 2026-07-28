@@ -77,7 +77,10 @@ export const MAST_TABLES: Record<MastTableId, MastTable> = {
   },
 }
 
-export type MastRowId = 'efg-a-zt-3000' | 'efg-b-zt-3000'
+/** Değişmez sıralı liste — şemanın `z.enum`'u bunu okur. */
+export const MAST_ROW_ID_LIST = ['efg-a-zt-3000', 'efg-b-zt-3000'] as const
+
+export type MastRowId = (typeof MAST_ROW_ID_LIST)[number]
 
 export type MastRow = {
   id: MastRowId

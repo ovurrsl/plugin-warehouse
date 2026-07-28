@@ -39,6 +39,7 @@ export type CatalogItem = {
   brush?:
     | { kind: 'pallet'; cargo: 'none' | 'carton' | 'drum' }
     | { kind: 'route'; role: 'pedestrian' | 'vehicle'; traffic: 'one-way' | 'two-way' }
+    | { kind: 'truck'; model: string }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -133,6 +134,55 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'A marked vehicle aisle, sized from the published band for the truck class it names.',
     icon: 'lucide:route',
     brush: { kind: 'route', role: 'vehicle', traffic: 'one-way' },
+  },
+  // Aile başına bir tile — kullanıcının seçtiği beş makine, İngilizce
+  // adlarıyla. Tek tile + panel model listesi (plan §6.5) yerine beş tile:
+  // seçim kataloğun kendisinde durur ve panel özel bölüm istemez.
+  {
+    id: 'truck-hand-pallet',
+    kind: 'warehouse:truck',
+    label: 'Hand pallet truck',
+    sectionId: 'handling',
+    description: 'Manual pallet truck, 680×1150 forks, 1.5 t. Carries at floor level.',
+    icon: 'lucide:package-open',
+    brush: { kind: 'truck', model: 'mpt-680x1150' },
+  },
+  {
+    id: 'truck-powered-pallet',
+    kind: 'warehouse:truck',
+    label: 'Electric pallet truck',
+    sectionId: 'handling',
+    description: 'Ride-on electric pallet truck, 2.5 t. Published VDI aisle: 2.35 m.',
+    icon: 'lucide:truck',
+    brush: { kind: 'truck', model: 'ept-2500' },
+  },
+  {
+    id: 'truck-forklift',
+    kind: 'warehouse:truck',
+    label: 'Electric forklift',
+    sectionId: 'handling',
+    description: 'Three-wheel counterbalanced, 1.3 t. Published VDI aisle: 3.11 m.',
+    icon: 'lucide:forklift',
+    brush: { kind: 'truck', model: 'forklift-1300' },
+  },
+  {
+    id: 'truck-reach',
+    kind: 'warehouse:truck',
+    label: 'Reach truck',
+    sectionId: 'handling',
+    description: 'Straddle-leg reach truck, 1.8 t. Published VDI aisle: 2.74 m.',
+    icon: 'lucide:container',
+    brush: { kind: 'truck', model: 'rt-1800' },
+  },
+  {
+    id: 'truck-turret',
+    kind: 'warehouse:truck',
+    label: 'Turret truck',
+    sectionId: 'handling',
+    description:
+      'Man-up VNA truck, 1.6 t. Ast unpublished — the class band (EN 15620, 1.7–1.9 m) governs.',
+    icon: 'lucide:building-2',
+    brush: { kind: 'truck', model: 'tt-1600' },
   },
   {
     id: 'conveyor-roller',

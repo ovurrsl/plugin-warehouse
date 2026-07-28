@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b56d575`](https://github.com/ovurrsl/plugin-warehouse/commit/b56d5756206de4727343ecd185d52fa7b55226b6))
 - The handling-vehicle plan, with what it refuses to guess ([`aca7840`](https://github.com/ovurrsl/plugin-warehouse/commit/aca7840c94be3431209eae02a9a74a7c1c25b468))
 - Refresh generated README blocks [skip ci] ([`502f0f2`](https://github.com/ovurrsl/plugin-warehouse/commit/502f0f2a8b5b762d2dcd9bf02cca9ed7353da2f8))
 - Refresh generated README blocks [skip ci] ([`88924fc`](https://github.com/ovurrsl/plugin-warehouse/commit/88924fce7a304be3c37d3ba43234dca5e498caef))
@@ -64,6 +65,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Freeze the VDI dimension chains, before anything can consume them ([`d04ea75`](https://github.com/ovurrsl/plugin-warehouse/commit/d04ea750105c997ccbe520861687fe372f11bcc5))
 - The far tier stops being a skeleton ([`3f61cb0`](https://github.com/ovurrsl/plugin-warehouse/commit/3f61cb0448e4058e62a78ebbe4133852799e284d))
 - Show the corners that have been placed ([`b56ad61`](https://github.com/ovurrsl/plugin-warehouse/commit/b56ad615aa24ce764530394b0a9878524879bee3))
 - The route is drawable — tool, renderer, plan symbol, two tiles ([`5458793`](https://github.com/ovurrsl/plugin-warehouse/commit/5458793edf2985a85e411c8c641d33a85852d3e7))

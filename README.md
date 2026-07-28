@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b56d575`](https://github.com/ovurrsl/plugin-warehouse/commit/b56d5756206de4727343ecd185d52fa7b55226b6))
 - The handling-vehicle plan, with what it refuses to guess ([`aca7840`](https://github.com/ovurrsl/plugin-warehouse/commit/aca7840c94be3431209eae02a9a74a7c1c25b468))
 - Refresh generated README blocks [skip ci] ([`502f0f2`](https://github.com/ovurrsl/plugin-warehouse/commit/502f0f2a8b5b762d2dcd9bf02cca9ed7353da2f8))
 - Refresh generated README blocks [skip ci] ([`88924fc`](https://github.com/ovurrsl/plugin-warehouse/commit/88924fce7a304be3c37d3ba43234dca5e498caef))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`b9a6e43`](https://github.com/ovurrsl/plugin-warehouse/commit/b9a6e43db01a50768fac28532634271970d93afe))
 - Refresh generated README blocks [skip ci] ([`ee3ad32`](https://github.com/ovurrsl/plugin-warehouse/commit/ee3ad323a0df66eb4a3ab91f491738180bbc38f4))
 - Refresh generated README blocks [skip ci] ([`a488732`](https://github.com/ovurrsl/plugin-warehouse/commit/a4887322931ec053051cdfae40320d0ed442acc7))
-- Refresh generated README blocks [skip ci] ([`6b0d0e4`](https://github.com/ovurrsl/plugin-warehouse/commit/6b0d0e488121db8116e4fb4b46ce43993056670a))
 
 …
 

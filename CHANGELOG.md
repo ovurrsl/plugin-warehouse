@@ -13,6 +13,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- The handling-vehicle plan, with what it refuses to guess ([`aca7840`](https://github.com/ovurrsl/plugin-warehouse/commit/aca7840c94be3431209eae02a9a74a7c1c25b468))
+- Refresh generated README blocks [skip ci] ([`502f0f2`](https://github.com/ovurrsl/plugin-warehouse/commit/502f0f2a8b5b762d2dcd9bf02cca9ed7353da2f8))
 - Refresh generated README blocks [skip ci] ([`88924fc`](https://github.com/ovurrsl/plugin-warehouse/commit/88924fce7a304be3c37d3ba43234dca5e498caef))
 - The vehicle research, and the architecture it should have been written for ([`d5a9b87`](https://github.com/ovurrsl/plugin-warehouse/commit/d5a9b8730b270698187823548af4158d1a325812))
 - Refresh generated README blocks [skip ci] ([`2b4bf37`](https://github.com/ovurrsl/plugin-warehouse/commit/2b4bf375fb036d104c0994bb8a8f347050064b9c))

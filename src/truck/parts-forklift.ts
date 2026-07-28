@@ -148,6 +148,19 @@ export function forkliftParts(
       const trackZ = (model.b10 ?? model.b1 - 0.16) / 2
       pushWheel(parts, { x: frontAxleX, z: trackZ, ...FRONT_TYRE, detail })
       pushWheel(parts, { x: frontAxleX, z: -trackZ, ...FRONT_TYRE, detail })
+      if (detail === 'full') {
+        // Çamurluklar tekerleğin üstüne kıvrılır — lastikten DAR (T20).
+        for (const side of [-1, 1] as const) {
+          parts.push({
+            kind: 'sloped',
+            role: 'cowl',
+            center: [frontAxleX, FRONT_TYRE.diameter + 0.09, side * trackZ],
+            size: [FRONT_TYRE.diameter + 0.12, 0.1, 0.17],
+            face: 'front',
+            drop: 0.06,
+          })
+        }
+      }
       return parts
     }
 
@@ -176,6 +189,21 @@ export function forkliftParts(
         crossbarYs: [0.3, h1 - 0.1],
         detail,
       })
+      if (detail === 'full') {
+        // Eğim silindirleri: şasiden mast ortasına yatık çift — forklifti
+        // önden tanıtan hat.
+        for (const side of [-1, 1] as const) {
+          parts.push({
+            kind: 'beam',
+            role: 'mast-rail',
+            from: [mastX - 0.45, 0.42],
+            to: [mastX - 0.05, 0.95],
+            z: side * 0.42,
+            thickness: 0.06,
+            width: 0.06,
+          })
+        }
+      }
       return parts
     }
 
@@ -189,6 +217,16 @@ export function forkliftParts(
         crossbarYs: [h1 - 0.28],
         detail,
       })
+      if (detail === 'full') {
+        // Kaldırma zincirleri: kademe önünde iki ince koyu şerit.
+        for (const side of [-1, 1] as const) {
+          parts.push({
+            role: 'mast-rail',
+            center: [mastX + 0.11, (h1 - 0.1) / 2 + 0.1, side * 0.14],
+            size: [0.015, h1 - 0.4, 0.03],
+          })
+        }
+      }
       return parts
     }
 

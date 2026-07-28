@@ -23,7 +23,7 @@ import type * as THREE from 'three'
 import { emitPart, finish, type Sink, toLinear } from '../conveyor/geometry-builder'
 import type { MastRow } from '../handling/masts'
 import type { TruckModel, TruckModelId } from '../handling/models'
-import { emitCylinder, emitSlopedBox } from './emitters'
+import { emitBeamXY, emitCylinder, emitSlopedBox } from './emitters'
 import { forkSpreadM, mastRowOf, modelOf } from './metrics'
 import { partColorOf, type TruckBody, type TruckDetail, truckParts } from './parts'
 
@@ -68,6 +68,7 @@ function buildBody(
     const color = toLinear(partColorOf(model.variant, part.role))
     if (part.kind === 'cyl') emitCylinder(sink, part, color)
     else if (part.kind === 'sloped') emitSlopedBox(sink, part, color)
+    else if (part.kind === 'beam') emitBeamXY(sink, part, color)
     else emitPart(sink, part, color, 0)
   }
   return finish(sink)

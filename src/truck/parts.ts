@@ -36,6 +36,7 @@ export type TruckPartRole =
   | 'tiller'
   | 'straddle-leg'
   | 'wheel'
+  | 'hub'
   | 'guide-roller'
 
 /**
@@ -70,6 +71,15 @@ export type TruckPart =
       face: 'front' | 'back'
       drop: number
     }
+  | {
+      kind: 'beam'
+      role: TruckPartRole
+      from: readonly [number, number]
+      to: readonly [number, number]
+      z: number
+      thickness: number
+      width: number
+    }
 
 /**
  * Renk, TOTAL kayıt — ternary zinciri değil: `rack`'te iki rolün tek dala
@@ -90,6 +100,7 @@ export const TRUCK_ROLE_COLORS: Record<TruckPartRole, string> = {
   tiller: '#2e333a',
   'straddle-leg': '#3d434b',
   wheel: '#1a1d21',
+  hub: '#8b939e',
   'guide-roller': '#4a525c',
 }
 
@@ -223,15 +234,29 @@ export function pushWheel(
   parts: TruckPart[],
   args: { x: number; z: number; diameter: number; width: number; detail: TruckDetail },
 ): void {
+  const radius = args.diameter / 2
   parts.push({
     kind: 'cyl',
     role: 'wheel',
-    center: [args.x, GROUND_CLEARANCE + args.diameter / 2, args.z],
-    radius: args.diameter / 2,
+    center: [args.x, GROUND_CLEARANCE + radius, args.z],
+    radius,
     length: args.width,
     axis: 'z',
     segments: args.detail === 'full' ? 12 : 8,
   })
+  // Jant — yalnız yakın katman ve yalnız görünür boyuttaki tekerlekte.
+  // Lastikten DAR kalır: zarf genişliği katmanla değişemez (T20).
+  if (args.detail === 'full' && args.diameter >= 0.12) {
+    parts.push({
+      kind: 'cyl',
+      role: 'hub',
+      center: [args.x, GROUND_CLEARANCE + radius, args.z],
+      radius: radius * 0.45,
+      length: args.width * 0.6,
+      axis: 'z',
+      segments: 10,
+    })
+  }
 }
 
 /**

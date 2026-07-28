@@ -34,65 +34,217 @@ export function buildTruckFloorplan(
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#8a5a13'
   const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#f5deb0'
 
-  const children: FloorplanGeometry[] = [
-    // Gövde: arka yüzden çatal sırtına. Çatallar ayrı çizilir ki sembol,
-    // makinenin en anlamlı plan bilgisini — çatal düzlemini — kaybetmesin.
-    // Genişlik faceX'ten: turret'te l2 çatal yüzü DEĞİLDİR ve jenerik l2
-    // gövdesi çatalları zarfın 914 mm dışına taşırırdı.
-    {
-      kind: 'rect',
-      x: -halfL,
-      y: -halfW,
-      width: faceX + halfL,
-      height: halfW * 2,
-      fill,
-      stroke,
-      strokeWidth: 0.02,
-    },
-  ]
-
-  // Mast çizgisi — gövde/çatal sınırının işareti.
-  children.push({
-    kind: 'rect',
-    x: faceX - 0.16,
-    y: -halfW * 0.85,
-    width: 0.1,
-    height: halfW * 1.7,
-    fill: stroke,
-    stroke,
-    strokeWidth: 0.01,
-  })
-
-  // İki çatal izi, gerçek açıklıkta ve gerçek boyda.
   const spread = forkSpreadM(model)
   const e = model.fork.e
-  for (const side of [-1, 1] as const) {
+  const children: FloorplanGeometry[] = []
+
+  // İki çatal izi — her ailede: makinenin en anlamlı plan bilgisi.
+  const pushForks = () => {
+    for (const side of [-1, 1] as const) {
+      children.push({
+        kind: 'rect',
+        x: faceX,
+        y: side * ((spread - e) / 2) - e / 2,
+        width: model.fork.length,
+        height: e,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+    }
+  }
+
+  // Ok başı: ileri = +X. Host'un facing göstergesi ±Z'ye kilitli olduğu için
+  // yön bilgisini sembol taşır.
+  const pushArrow = (x: number, size: number) => {
     children.push({
-      kind: 'rect',
-      x: faceX,
-      y: side * ((spread - e) / 2) - e / 2,
-      width: model.fork.length,
-      height: e,
+      kind: 'polygon',
+      points: [
+        [x, -size],
+        [x + size * 0.66, 0],
+        [x, size],
+      ],
       fill: stroke,
       stroke,
       strokeWidth: 0.01,
     })
   }
 
-  // Ok başı: ileri = +X. Host'un facing göstergesi ±Z'ye kilitli olduğu için
-  // yön bilgisini sembol taşır.
-  const arrowX = faceX - 0.5
-  children.push({
-    kind: 'polygon',
-    points: [
-      [arrowX, -halfW * 0.45],
-      [arrowX + 0.3, 0],
-      [arrowX, halfW * 0.45],
-    ],
-    fill: stroke,
-    stroke,
-    strokeWidth: 0.01,
-  })
+  // ── Aile sembolleri: her makine planında da kendisidir ─────────────────
+  switch (model.variant) {
+    case 'hand-pallet':
+    case 'powered-pallet': {
+      // Başlık + çatallar + kol izi. Başlık genişliği gerçek: mpt'de dar
+      // pompa gövdesi, ept'te tam gövde.
+      const headHalfW = model.variant === 'hand-pallet' ? 0.17 : halfW - 0.015
+      children.push({
+        kind: 'rect',
+        x: -halfL,
+        y: -headHalfW,
+        width: model.l2,
+        height: headHalfW * 2,
+        fill,
+        stroke,
+        strokeWidth: 0.02,
+      })
+      // Kol izi: başlıktan geriye kısa şerit + kulp çizgisi.
+      children.push({
+        kind: 'rect',
+        x: -halfL + 0.04,
+        y: -0.03,
+        width: 0.22,
+        height: 0.06,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+      children.push({
+        kind: 'rect',
+        x: -halfL + 0.02,
+        y: model.variant === 'hand-pallet' ? -0.21 : -0.25,
+        width: 0.05,
+        height: model.variant === 'hand-pallet' ? 0.42 : 0.5,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+      pushForks()
+      pushArrow(faceX + 0.15, Math.min(halfW * 0.4, 0.16))
+      break
+    }
+
+    case 'reach': {
+      const bodyFrontX = -halfL + 1.1
+      const legTipX = -halfL + 1.842 // l7 — ölçü çizimi satırı, parts-reach ile aynı
+      const legInner = (model.b4 ?? 0.94) / 2
+      // Gövde.
+      children.push({
+        kind: 'rect',
+        x: -halfL,
+        y: -halfW,
+        width: bodyFrontX + halfL,
+        height: halfW * 2,
+        fill,
+        stroke,
+        strokeWidth: 0.02,
+      })
+      // Straddle ayaklar: reach'in plan imzası — iç yüzler tam b4 açıklıkta.
+      for (const side of [-1, 1] as const) {
+        children.push({
+          kind: 'rect',
+          x: bodyFrontX,
+          y: side === 1 ? legInner : -halfW,
+          width: legTipX - bodyFrontX,
+          height: halfW - legInner,
+          fill,
+          stroke,
+          strokeWidth: 0.02,
+        })
+      }
+      // Mast bandı (geri pozisyonda, ayaklar arasında).
+      children.push({
+        kind: 'rect',
+        x: faceX - 0.16,
+        y: -legInner * 0.92,
+        width: 0.1,
+        height: legInner * 1.84,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+      pushForks()
+      pushArrow(bodyFrontX - 0.55, halfW * 0.4)
+      break
+    }
+
+    case 'turret': {
+      const bodyHalfW = model.b1 / 2
+      const cabRearX = 0.35
+      // Uzun gövde — b1 genişliğinde.
+      children.push({
+        kind: 'rect',
+        x: -halfL,
+        y: -bodyHalfW,
+        width: cabRearX + halfL,
+        height: bodyHalfW * 2,
+        fill,
+        stroke,
+        strokeWidth: 0.02,
+      })
+      // Kabin: GÖVDEDEN GENİŞ (b2) — planda da öyle; VNA'yı VNA yapan iz.
+      children.push({
+        kind: 'rect',
+        x: cabRearX,
+        y: -halfW,
+        width: faceX - 0.24 - cabRearX,
+        height: halfW * 2,
+        fill,
+        stroke,
+        strokeWidth: 0.02,
+      })
+      // Döner başlık.
+      children.push({
+        kind: 'rect',
+        x: faceX - 0.24,
+        y: -0.36,
+        width: 0.24,
+        height: 0.72,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+      pushForks()
+      pushArrow(-0.1, bodyHalfW * 0.4)
+      break
+    }
+
+    default: {
+      // forklift: gövde + yuvarlatılmış karşı ağırlık + ön tekerlek izleri.
+      const chamfer = 0.14
+      children.push({
+        kind: 'polygon',
+        points: [
+          [-halfL + chamfer, -halfW],
+          [faceX, -halfW],
+          [faceX, halfW],
+          [-halfL + chamfer, halfW],
+          [-halfL, halfW - chamfer],
+          [-halfL, -halfW + chamfer],
+        ],
+        fill,
+        stroke,
+        strokeWidth: 0.02,
+      })
+      // Mast bandı.
+      children.push({
+        kind: 'rect',
+        x: faceX - 0.16,
+        y: -halfW * 0.85,
+        width: 0.1,
+        height: halfW * 1.7,
+        fill: stroke,
+        stroke,
+        strokeWidth: 0.01,
+      })
+      // Ön tekerlek izleri — b10 gerçek iz genişliği.
+      const trackZ = (model.b10 ?? model.b1 - 0.16) / 2
+      const frontAxleX = -halfL + (model.rearOverhang ?? 0.19) + model.y
+      for (const side of [-1, 1] as const) {
+        children.push({
+          kind: 'rect',
+          x: frontAxleX - 0.23,
+          y: side * trackZ - 0.09,
+          width: 0.46,
+          height: 0.18,
+          fill: stroke,
+          stroke,
+          strokeWidth: 0.01,
+        })
+      }
+      pushForks()
+      pushArrow(faceX - 0.55, halfW * 0.45)
+    }
+  }
 
   if (selected) {
     // Ast bandı — yalnız yayınlandığı yerde. `tt`'de Ast yok ve hesaplanmış

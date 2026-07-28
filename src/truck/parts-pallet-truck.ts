@@ -172,18 +172,23 @@ export function palletTruckParts(
         pushWheel(parts, { x: rearX + 0.17, z: twinZ, ...MPT_STEER, detail })
         pushWheel(parts, { x: rearX + 0.17, z: -twinZ, ...MPT_STEER, detail })
       }
-      // Kol: kolon + kulp — tepe tam h14'te. Transpaleti transpalet yapan
-      // silüet budur; iki katmanda da durur.
-      const columnX = powered ? rearX + 0.5 : rearX + 0.17
-      const columnBase = powered ? 1.05 : 0.42
+      // Kol: YATIK kiriş — dik kolon transpaleti süpürgeye çevirir; gerçek
+      // kol arkaya yatar ve tepesi tam h14'te biter. İki katmanda da durur.
+      const columnBaseX = powered ? rearX + 0.72 : rearX + 0.3
+      const columnTopX = powered ? rearX + 0.4 : rearX + 0.08
+      const columnBaseY = powered ? 1.0 : 0.4
       parts.push({
+        kind: 'beam',
         role: 'tiller',
-        center: [columnX, (columnBase + h14Top - 0.06) / 2, 0],
-        size: [0.05, h14Top - 0.06 - columnBase, 0.07],
+        from: [columnBaseX, columnBaseY],
+        to: [columnTopX, h14Top - 0.06],
+        z: 0,
+        thickness: 0.055,
+        width: 0.07,
       })
       parts.push({
         role: 'tiller',
-        center: [columnX, h14Top - 0.03, 0],
+        center: [columnTopX, h14Top - 0.03, 0],
         size: [0.06, 0.06, powered ? 0.5 : 0.42],
       })
       if (detail === 'full') {
@@ -192,7 +197,7 @@ export function palletTruckParts(
         for (const side of [-1, 1] as const) {
           parts.push({
             role: 'tiller',
-            center: [columnX, h14Top - 0.08, side * (powered ? 0.22 : 0.18)],
+            center: [columnTopX, h14Top - 0.08, side * (powered ? 0.22 : 0.18)],
             size: [0.05, 0.12, 0.04],
           })
         }

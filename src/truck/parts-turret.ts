@@ -101,6 +101,31 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
         crossbarYs: [0.4, mastTopY / 2, mastTopY - 0.2],
         detail,
       })
+      if (detail === 'simple') {
+        // Uzak katman iskelet değil: tek kabuklu masta bir orta kuşak —
+        // banda (%30+) tam bu kutu döndürüyor.
+        parts.push({
+          role: 'mast-rail',
+          center: [mastX, mastTopY / 2, 0],
+          size: [0.16, 0.12, 1.06],
+        })
+      }
+      if (detail === 'full') {
+        // Çapraz kafes bağları — ağır VNA mastını kutu raydan ayıran doku.
+        for (let y = 0.9; y < mastTopY - 0.9; y += 1.1) {
+          for (const side of [-1, 1] as const) {
+            parts.push({
+              kind: 'beam',
+              role: 'mast-rail',
+              from: [mastX - 0.05, y],
+              to: [mastX + 0.05, y + 0.9],
+              z: side * 0.5,
+              thickness: 0.05,
+              width: 0.05,
+            })
+          }
+        }
+      }
       return parts
     }
 
@@ -143,6 +168,14 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
           center: [(cabRearX + cabFrontX) / 2, cabTopY - 0.03, 0],
           size: [cabFrontX - cabRearX, 0.06, (model.b2 ?? model.b1) - 0.06],
         })
+        // Korkuluk üst kuşağı — kabini açık platform yapan çizgi.
+        for (const side of [-1, 1] as const) {
+          parts.push({
+            role: 'cab',
+            center: [(cabRearX + cabFrontX) / 2, cabFloorY + 1.25, side * (cabHalfZ - 0.045)],
+            size: [cabFrontX - cabRearX - 0.06, 0.05, 0.04],
+          })
+        }
         for (const side of [-1, 1] as const) {
           parts.push({
             role: 'overhead-guard',
@@ -175,14 +208,12 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
         center: [faceX - 0.04, 0.32, 0],
         size: [0.06, 0.18, 1.1],
       })
-      if (detail === 'full') {
-        // Döndürme gövdesi.
-        parts.push({
-          role: 'carriage',
-          center: [faceX - 0.12, 1.05, 0],
-          size: [0.18, 0.16, 0.5],
-        })
-      }
+      // Döndürme gövdesi — başlığın tanımlayıcı hacmi, iki katmanda da.
+      parts.push({
+        role: 'carriage',
+        center: [faceX - 0.12, 1.05, 0],
+        size: [0.18, 0.16, 0.5],
+      })
       pushForkPair(parts, { faceX, model, detail })
       return parts
     }

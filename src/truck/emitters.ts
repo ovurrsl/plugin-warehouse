@@ -164,3 +164,78 @@ export function emitSlopedBox(
   quad('btr', 'ftr', 'ftl', 'btl', topNormal)
   quad('bbl', 'fbl', 'fbr', 'bbr', [0, -1, 0])
 }
+
+/**
+ * XY düzleminde iki nokta arasında eğik kiriş — transpalet kolu, mast eğim
+ * silindiri, korkuluk payandası. Dik kutunun çizemediği her gerçek makine
+ * hattı budur. Kesit `thickness` (eğim düzleminde) × `width` (Z'de).
+ */
+export function emitBeamXY(
+  sink: Sink,
+  args: {
+    from: readonly [number, number]
+    to: readonly [number, number]
+    z: number
+    thickness: number
+    width: number
+  },
+  color: readonly [number, number, number],
+): void {
+  const [x0, y0] = args.from
+  const [x1, y1] = args.to
+  const dx = x1 - x0
+  const dy = y1 - y0
+  const len = Math.hypot(dx, dy) || 1
+  // Eksene dik birim vektör (XY düzleminde).
+  const px = (-dy / len) * (args.thickness / 2)
+  const py = (dx / len) * (args.thickness / 2)
+  const hz = args.width / 2
+
+  const corner = (end: 0 | 1, sign: 1 | -1, z: 1 | -1): [number, number, number] => [
+    (end ? x1 : x0) + sign * px,
+    (end ? y1 : y0) + sign * py,
+    args.z + z * hz,
+  ]
+
+  const quad = (
+    a: [number, number, number],
+    b: [number, number, number],
+    c: [number, number, number],
+    d: [number, number, number],
+    n: [number, number, number],
+  ) => {
+    const base = sink.positions.length / 3
+    for (const p of [a, b, c, d]) {
+      sink.positions.push(p[0], p[1], p[2])
+      sink.normals.push(n[0], n[1], n[2])
+      sink.colors.push(color[0], color[1], color[2])
+      sink.uvs.push(0.25, 0)
+    }
+    sink.indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
+  }
+
+  const nAxis: [number, number, number] = [dx / len, dy / len, 0]
+  const nPerp: [number, number, number] = [px, py, 0].map((v) => v / (args.thickness / 2 || 1)) as [
+    number,
+    number,
+    number,
+  ]
+
+  // +Z / −Z yüzler.
+  quad(corner(0, -1, 1), corner(1, -1, 1), corner(1, 1, 1), corner(0, 1, 1), [0, 0, 1])
+  quad(corner(1, -1, -1), corner(0, -1, -1), corner(0, 1, -1), corner(1, 1, -1), [0, 0, -1])
+  // ± dik yüzler.
+  quad(corner(0, 1, 1), corner(1, 1, 1), corner(1, 1, -1), corner(0, 1, -1), nPerp)
+  quad(corner(1, -1, 1), corner(0, -1, 1), corner(0, -1, -1), corner(1, -1, -1), [
+    -nPerp[0],
+    -nPerp[1],
+    0,
+  ])
+  // Uç kapaklar.
+  quad(corner(1, 1, 1), corner(1, -1, 1), corner(1, -1, -1), corner(1, 1, -1), nAxis)
+  quad(corner(0, -1, 1), corner(0, 1, 1), corner(0, 1, -1), corner(0, -1, -1), [
+    -nAxis[0],
+    -nAxis[1],
+    0,
+  ])
+}

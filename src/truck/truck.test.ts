@@ -213,6 +213,11 @@ describe('T22 — plan zarfı = footprint = katalog', () => {
       if (child.kind === 'rect') {
         minX = Math.min(minX, child.x)
         maxX = Math.max(maxX, child.x + child.width)
+      } else if (child.kind === 'polygon') {
+        for (const [px] of child.points) {
+          minX = Math.min(minX, px)
+          maxX = Math.max(maxX, px)
+        }
       }
     }
     expect(minX).toBeCloseTo(-model.l1 / 2, 9)

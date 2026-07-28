@@ -81,6 +81,26 @@ export function reachParts(model: TruckModel, body: TruckBody, detail: TruckDeta
         yTop: guardTopY,
         detail,
       })
+      if (detail === 'full') {
+        // Reach rayları: mastın üzerinde kaydığı çift kızak — ailenin adı
+        // bu mekanizmadan geliyor, gövdede görünür olmalı.
+        for (const side of [-1, 1] as const) {
+          parts.push({
+            role: 'chassis',
+            center: [(bodyFrontX + faceX - 0.1) / 2, 0.32, side * (legInnerZ - 0.06)],
+            size: [faceX - 0.1 - bodyFrontX, 0.09, 0.07],
+          })
+        }
+        // Gövde üst kapağı arkaya eğimli.
+        parts.push({
+          kind: 'sloped',
+          role: 'chassis',
+          center: [(rearX + bodyFrontX) / 2, 1.2, 0],
+          size: [bodyFrontX - rearX - 0.08, 0.12, model.b1 - 0.1],
+          face: 'back',
+          drop: 0.08,
+        })
+      }
       // Straddle ayaklar: taban izinin ta kendisi — iki katmanda da, gerçek
       // kalınlıkta ve gerçek iç açıklıkta.
       for (const side of [-1, 1] as const) {

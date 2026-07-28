@@ -1,6 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { CARGO_COLOR_IDS } from './cargo-constants'
-import { CARGO_TYPE_IDS, CARGO_TYPES, fitsOnDeck } from './cargo-types'
+import { CARGO_TYPE_IDS, CARGO_TYPES, fitsOnDeck, loadHeightOf } from './cargo-types'
 import { PALLET_PRESETS, specOf } from './presets'
 import type { PalletNode } from './schema'
 
@@ -27,19 +27,11 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
       label: 'Pallet',
       fields: [
         { key: 'preset', kind: 'enum', options: PRESET_KEYS, display: 'select' },
-        // Only meaningful while the pallet carries the plain block. A typed
-        // cargo takes its height from the variant its seed resolves to, and
-        // leaving an editable field that silently does nothing is worse than
-        // hiding it.
-        {
-          key: 'loadHeight',
-          kind: 'number',
-          unit: 'm',
-          min: 0,
-          max: 2.4,
-          step: 0.05,
-          visibleIf: (node) => node.cargo === 'none',
-        },
+        // There is deliberately no height field here. The one that used to sit
+        // in this slot was visible only while `cargo` was `'none'` — a height
+        // control that appeared exactly when the pallet was empty — and what it
+        // produced was a wood-coloured block on an otherwise bare deck. A load
+        // has a height because it is a load; an empty pallet has none.
       ],
     },
     {
@@ -90,20 +82,24 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
           msg: `A ${CARGO_TYPES[node.cargo].label.toLowerCase().replace(/s$/, '')} does not fit a ${spec.label} — nothing is drawn.`,
         })
       }
+      // Measured off the derived height rather than a typed field — the field
+      // is gone, and this is the number the renderer and the collider both use.
+      const loadHeight = loadHeightOf(node)
+
       // Advisory, not a hard limit: the figure is the pallet's rated load, and
       // whether a given stack exceeds it depends on what is on it, which the
       // scene does not model. Flagging an implausible stack height is useful;
       // refusing it would be overreach.
-      if (node.loadHeight > 2.0) {
+      if (loadHeight > 2.0) {
         issues.push({
-          field: 'loadHeight',
+          field: 'cargo',
           severity: 'warning',
-          msg: `Load is ${node.loadHeight.toFixed(2)} m tall — check clearance to the beam above.`,
+          msg: `Load is ${loadHeight.toFixed(2)} m tall — check clearance to the beam above.`,
         })
       }
-      if (node.loadHeight > 0 && !spec.branded && node.preset === 'quarter') {
+      if (loadHeight > 0 && !spec.branded && node.preset === 'quarter') {
         issues.push({
-          field: 'loadHeight',
+          field: 'preset',
           severity: 'warning',
           msg: 'Quarter pallets are rated for 250 kg dynamic; confirm the load suits one.',
         })

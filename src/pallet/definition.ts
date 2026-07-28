@@ -113,6 +113,6 @@ export const palletDefinition = {
 
   mcp: {
     description:
-      'A warehouse pallet. `preset` selects the standard (EPAL 1/2/3/6, quarter, GMA 48x40, plastic euro). `cargo` is `none` for a bare deck or a plain block sized by `loadHeight` in metres, or `carton`/`drum` for modelled goods whose height comes from `fillRange` instead. Dimensions are metres.',
+      'A warehouse pallet. `preset` selects the standard (EPAL 1/2/3/6, quarter, GMA 48x40, plastic euro). `cargo` is `none` for a bare deck, or `carton`/`drum` for modelled goods whose height is derived from `fillRange` — a pallet has no typed load height. Dimensions are metres.',
   },
 } satisfies NodeDefinition<typeof PalletNode>

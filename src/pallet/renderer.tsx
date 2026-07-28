@@ -15,7 +15,7 @@ import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { type CargoDetail, cargoInputOf } from './cargo-parts'
-import { loadHeightOf, unitLoadHeightOf } from './cargo-types'
+import { unitLoadHeightOf } from './cargo-types'
 import { getFilmGeometry, releaseFilmGeometry, retainFilmGeometry } from './film'
 import { getPalletFarGeometry, getPalletGeometry } from './geometry-builder'
 import {
@@ -168,10 +168,9 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
     }
   })
 
-  // One height, from the one function that knows: a typed load answers with what
-  // was typed, a cargo load with what its variant resolved to. The collider and
-  // the clash test must not be able to disagree about it.
-  const loadHeight = loadHeightOf(node)
+  // One height, from the one function that knows: a cargo load answers with
+  // what its variant resolved to, an empty pallet with nothing. The collider
+  // and the clash test must not be able to disagree about it.
   const totalHeight = unitLoadHeightOf(node)
 
   return (
@@ -202,17 +201,12 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
           ref={deckRef}
           receiveShadow
         />
-        {node.cargo !== 'none' ? (
+        {/* Cargo or nothing. There is no third branch: the plain block that
+            used to be drawn when `cargo` was `'none'` and a typed height was
+            non-zero is gone, and with it the empty pallets that carried what
+            looked like cartons. */}
+        {node.cargo !== 'none' && (
           <CargoLoad isExporting={isExporting} node={node} y={spec.height} />
-        ) : (
-          loadHeight > 0 && (
-            <PalletLoad
-              height={loadHeight}
-              length={spec.length}
-              width={spec.width}
-              y={spec.height}
-            />
-          )
         )}
       </group>
     </group>
@@ -220,41 +214,7 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
 }
 
 /**
- * The goods on the deck. Deliberately plain — a stretch-wrapped block inset
- * slightly from the deck edge. At the two-to-twenty metre range a layout tool
- * is read at, silhouette and height carry the information; modelling individual
- * cartons would cost draw calls for detail nobody sees.
- */
-function PalletLoad({
-  length,
-  width,
-  height,
-  y,
-}: {
-  length: number
-  width: number
-  height: number
-  y: number
-}) {
-  const inset = 0.02
-  return (
-    <mesh
-      castShadow
-      // The far-deck material doubles as the plain block's: both are "wood at a
-      // glance", and the inline material this replaces minted one instance per
-      // mounted pallet — 192 uniform uploads on a real scene, for one colour.
-      material={getPalletFarMaterial()}
-      position={[0, y + height / 2, 0]}
-      raycast={NO_RAYCAST}
-      receiveShadow
-    >
-      <boxGeometry args={[length - inset, height, width - inset]} />
-    </mesh>
-  )
-}
-
-/**
- * The goods, when the pallet carries a type rather than a plain block.
+ * The goods.
  *
  * Mounted as its own mesh beside the pallet's, not merged into it: the deck is
  * one shared buffer per preset and there are eight of those, where a load is one

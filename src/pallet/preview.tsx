@@ -5,7 +5,6 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
 import { getCargoGeometry } from './cargo-geometry'
 import { cargoInputOf } from './cargo-parts'
-import { loadHeightOf } from './cargo-types'
 import { getFilmGeometry } from './film'
 import { getPalletGeometry } from './geometry-builder'
 import { getCargoPreviewMaterial, getPalletPreviewMaterial } from './materials'
@@ -30,12 +29,6 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
   const spec = specOf(node.preset)
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
   const material = getPalletPreviewMaterial()
-  /**
-   * The same height source the renderer and the clash test use, so a ghost can
-   * never promise one height and commit another.
-   */
-  const loadHeight = loadHeightOf(node)
-
   /**
    * The real load, at the real fill — **safe only because the tool now hands
    * this node's id to the pallet it creates.**
@@ -84,15 +77,8 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
           )}
         </>
       )}
-      {!cargo && loadHeight > 0 && (
-        <mesh
-          material={material}
-          position={[0, spec.height + loadHeight / 2, 0]}
-          raycast={NO_RAYCAST}
-        >
-          <boxGeometry args={[spec.length - 0.02, loadHeight, spec.width - 0.02]} />
-        </mesh>
-      )}
+      {/* No block when there is no cargo: an empty pallet previews as the bare
+          deck it will be placed as. */}
     </group>
   )
 }

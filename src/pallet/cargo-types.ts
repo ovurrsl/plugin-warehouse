@@ -219,30 +219,31 @@ export function unitCount(type: CargoType, preset: PalletPreset, variant: number
  * **How tall the goods on this pallet are — the one answer everything else asks
  * for.**
  *
- * A pallet carrying cargo has two candidate heights: the `loadHeight` field a
- * user typed, and the height the resolved variant actually builds to. They are
- * not the same number, and letting each caller pick meant collision testing one
- * while the renderer drew the other — a load that clashes with the beam above it
- * and reports itself clear, which is precisely the failure the whole clash
- * system exists to prevent.
+ * The height is derived, never typed. It used to be both: a `loadHeight` field
+ * a user could set, *and* the height the resolved cargo variant builds to. The
+ * two are different numbers, and letting each caller pick meant collision
+ * testing one while the renderer drew the other.
  *
- * So: cargo, when set, wins. `loadHeight` stays the answer for the plain block a
- * pallet has always been able to carry, which is why nothing about a scene saved
- * before cargo existed changes.
+ * The typed field is gone now, and with it the state it made reachable: a
+ * pallet with no cargo but a non-zero height, drawn as a plain block in a wood
+ * colour. On a real 752-pallet scene 192 of them were in exactly that state and
+ * read as cartons standing on empty pallets. An empty pallet is a bare deck —
+ * there is no third thing between empty and carrying a modelled load.
+ *
+ * So: no cargo, no height. A cargo that does not fit its deck is not drawn, and
+ * therefore reserves nothing either — a collision box standing a metre taller
+ * than the pallet it describes is the same renderer/collider disagreement in
+ * the other axis. The inspector says why, at `severity: 'error'`.
  */
 export function loadHeightOf(node: {
   id: string
   cargo: 'none' | CargoTypeId
   preset: PalletPreset
   fillRange: readonly [number, number]
-  loadHeight: number
 }): number {
-  if (node.cargo === 'none') return Math.max(0, node.loadHeight)
+  if (node.cargo === 'none') return 0
   const type = CARGO_TYPES[node.cargo]
-  // A cargo that does not fit its deck is not drawn, so it must not reserve
-  // height either — a collision box standing a metre taller than the pallet it
-  // describes is the same renderer/collider disagreement in the other axis.
-  if (!fitsOnDeck(type, node.preset)) return Math.max(0, node.loadHeight)
+  if (!fitsOnDeck(type, node.preset)) return 0
   return cargoHeightM(type, resolveVariant(type, node.id, node.fillRange))
 }
 

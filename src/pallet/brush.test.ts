@@ -10,7 +10,6 @@ beforeEach(() => {
   useWarehouseStore.setState({
     palletBrush: {
       preset: 'epal-1',
-      loadHeight: 0,
       cargo: 'none',
       fillRange: [0.4, 1],
       wrapped: true,

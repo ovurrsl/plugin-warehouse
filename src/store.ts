@@ -116,14 +116,7 @@ type WarehouseStore = {
 
 export type PalletBrush = Pick<
   PalletNode,
-  | 'preset'
-  | 'loadHeight'
-  | 'cargo'
-  | 'fillRange'
-  | 'wrapped'
-  | 'strapped'
-  | 'labelled'
-  | 'cargoColor'
+  'preset' | 'cargo' | 'fillRange' | 'wrapped' | 'strapped' | 'labelled' | 'cargoColor'
 >
 
 export type RouteBrush = Pick<
@@ -175,7 +168,6 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   palletBrush: {
     preset: 'epal-1',
-    loadHeight: 0,
     cargo: 'none',
     fillRange: [0.4, 1],
     wrapped: true,

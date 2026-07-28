@@ -112,13 +112,17 @@ describe('a fill percentage means different things to different cargo', () => {
 
 describe('the field lands without touching a single saved scene', () => {
   test('a pallet parsed without cargo is the pallet this kind always drew', () => {
-    // The compatibility decision, stated as a test: every scene saved before
-    // these fields existed parses without them and renders identically — no
-    // migration, and no pallet quietly changing height because a continuous
-    // loadHeight was snapped to the nearest prepared variant.
+    // The compatibility decision, stated as a test: a scene saved before these
+    // fields existed parses without them and comes back as an empty pallet.
+    //
+    // The `loadHeight` in this fixture is deliberate — it is what such a scene
+    // really carries. The field was removed, `BaseNode` is a plain z.object()
+    // and strips unknown keys, so it is dropped rather than migrated. That is
+    // the whole compatibility story for an external pack, which cannot add a
+    // `migrateNodes` entry to the host.
     const legacy = PalletNode.parse({ id: 'pallet_legacy1', preset: 'epal-1', loadHeight: 0.93 })
     expect(legacy.cargo).toBe('none')
-    expect(legacy.loadHeight).toBe(0.93)
+    expect('loadHeight' in legacy).toBe(false)
   })
 
   test('the stored range is the input and the fill is derived, never stored', () => {

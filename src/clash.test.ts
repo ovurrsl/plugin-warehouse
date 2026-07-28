@@ -52,7 +52,7 @@ describe('nothing may be placed inside anything else', () => {
     // The reported failure, both ways round. It was reachable because the test
     // only ever looked at racks: anything the package had not been told about
     // was invisible, silently, one kind at a time.
-    const load = pallet({ position: [0, 0, 0], loadHeight: 1 })
+    const load = pallet({ position: [0, 0, 0], cargo: 'carton' })
     expect(hits(conveyor(), [0, 0, 0], 0, scene(load))).toEqual(['pallet_a'])
 
     const belt = conveyor({ position: [0, 0, 0] })
@@ -96,7 +96,7 @@ describe('and the arrangements a warehouse is made of still work', () => {
   test('a pallet stands on the floor inside a bay', () => {
     // Ground-level storage: between the uprights, under the first beam.
     const standing = rack({ position: [0, 0, 0] })
-    expect(hits(pallet({ loadHeight: 1 }), [0, 0, 0], 0, scene(standing))).toEqual([])
+    expect(hits(pallet({ cargo: 'carton' }), [0, 0, 0], 0, scene(standing))).toEqual([])
   })
 
   test('two bays stand at the sharing pitch, frames and all', () => {

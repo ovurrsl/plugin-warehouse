@@ -348,9 +348,9 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // wrong as something set down inside the pallet.
     const pallet = node as PalletNode
     const spec = specOf(pallet.preset)
-    // Not `pallet.loadHeight`: a pallet carrying cargo derives its height from
-    // the variant its seed resolved to, and testing the typed number instead
-    // would clear a load that actually fouls the beam above it.
+    // Derived, never typed: a pallet carrying cargo takes its height from the
+    // variant its seed resolved to. There is no typed height to test instead —
+    // testing one would have cleared a load that actually fouls the beam above.
     const height = unitLoadHeightOf(pallet)
     return [
       toWorldBox(

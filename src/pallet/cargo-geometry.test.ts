@@ -298,30 +298,45 @@ describe('the load stands on the deck it was built for', () => {
 })
 
 describe('one height, so collision and the renderer cannot disagree', () => {
-  test('cargo wins over the typed load height', () => {
-    // The failure this prevents: clash testing the number a user typed while the
-    // renderer draws the number the variant resolved to — a load that fouls the
-    // beam above it and reports itself clear.
+  test('the height is the one the variant resolved to', () => {
+    // The failure this prevents: clash testing one number while the renderer
+    // draws another — a load that fouls the beam above it and reports itself
+    // clear. There is now only one number, and this is where it comes from.
     const height = loadHeightOf({
       id: 'pallet_typedcargo',
       cargo: 'carton',
       preset: 'epal-1',
       fillRange: [1, 1],
-      loadHeight: 0.3,
     })
     expect(height).toBeCloseTo(1.25, 9)
   })
 
-  test('a pallet with no cargo still answers with what was typed', () => {
+  test('a pallet with no cargo is a bare deck, and answers zero', () => {
+    // The state that used to sit between empty and loaded — no cargo but a
+    // typed height, drawn as a wood-coloured block — is gone. 192 pallets in a
+    // real scene were in it and read as cartons on empty pallets.
     expect(
       loadHeightOf({
         id: 'pallet_plainblock',
         cargo: 'none',
         preset: 'epal-1',
         fillRange: [0.4, 1],
-        loadHeight: 0.93,
       }),
-    ).toBe(0.93)
+    ).toBe(0)
+  })
+
+  test('a cargo that does not fit reserves nothing, because nothing is drawn', () => {
+    // A drum is wider than a quarter pallet: not drawn, so not reserved either.
+    // A collision box standing a metre taller than the pallet it describes is
+    // the same renderer/collider disagreement in the other axis.
+    expect(
+      loadHeightOf({
+        id: 'pallet_toobig',
+        cargo: 'drum',
+        preset: 'quarter',
+        fillRange: [1, 1],
+      }),
+    ).toBe(0)
   })
 })
 

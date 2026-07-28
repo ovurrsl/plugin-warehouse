@@ -4,11 +4,19 @@ import { CARGO_COLOR_IDS } from './cargo-constants'
 import { PALLET_PRESET_IDS } from './presets'
 
 /**
- * One kind covers both the empty pallet and an occupied rack position:
- * `loadHeight: 0` is a bare pallet, anything above it carries a unit load. The
- * fork this replaces shipped `euro-pallet` and `loaded-euro-pallet` as separate
- * kinds with the deck geometry duplicated verbatim between them, so every spec
- * fix had to be made twice.
+ * One kind covers both the empty pallet and an occupied rack position, and
+ * `cargo` is the only thing that separates them: `'none'` is a bare deck,
+ * anything else is a modelled load whose height it derives. The fork this
+ * replaces shipped `euro-pallet` and `loaded-euro-pallet` as separate kinds
+ * with the deck geometry duplicated verbatim between them, so every spec fix
+ * had to be made twice.
+ *
+ * There used to be a third state and it was a mistake: a `loadHeight` field,
+ * editable only while `cargo` was `'none'`, that drew a plain block on an
+ * otherwise empty pallet. On a real 752-pallet scene 192 pallets sat in it and
+ * read as cartons standing on empty pallets. The field is gone. Scenes saved
+ * with it still load — `BaseNode` is a plain `z.object()` and strips unknown
+ * keys — and those pallets come back as what they were always meant to be.
  *
  * Everything the capacity maths needs lives here rather than in the host's
  * untyped `metadata` blob. That is what makes the stats panel's figures
@@ -24,22 +32,15 @@ export const PalletNode = BaseNode.extend({
 
   preset: z.enum(PALLET_PRESET_IDS).default('epal-1'),
 
-  /** Height of the goods stacked on the deck, metres. 0 is an empty pallet.
-   *  Read only while `cargo` is `'none'` — a typed load derives its height from
-   *  the variant its seed resolves to. */
-  loadHeight: z.number().min(0).max(2.4).default(0),
-
   // ── The load ──────────────────────────────────────────────────────────────
 
   /**
-   * What the pallet is carrying, or `'none'` for the plain block this kind has
-   * always drawn.
+   * What the pallet is carrying, or `'none'` for a bare deck.
    *
    * **`'none'` is the default and that is a compatibility decision, not a
-   * preference.** Every scene saved before this field existed parses without it,
-   * defaults to `'none'`, and renders exactly as it did — no migration, and no
-   * pallet quietly changing height because a continuous `loadHeight` was snapped
-   * to the nearest prepared variant.
+   * preference.** Every scene saved before this field existed parses without it
+   * and comes back as an empty pallet, which is what a deck with nothing
+   * declared on it is.
    */
   cargo: z.enum(['none', 'carton', 'drum']).default('none'),
 

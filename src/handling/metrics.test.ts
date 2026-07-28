@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { HANDLING_EQUIPMENT } from '../rack/standards'
 import { TRUCK_EQUIPMENT, TRUCK_VARIANTS } from './catalog'
 import { MANOEUVRING_WIDTH_M } from './constants'
-import { aisleBandForVariant, aisleMarginM } from './metrics'
+import { aisleBandForVariant, aisleFigureForModel, aisleMarginM } from './metrics'
+import { TRUCK_MODEL_IDS } from './models'
 
 describe('a published band is quoted, never re-derived', () => {
   test('every rated variant reproduces its catalogue row exactly', () => {
@@ -76,5 +77,55 @@ describe('the margin is a number, not a verdict', () => {
     // basis travels with the band and the caller has to look at it.
     expect(aisleMarginM(2.4, 'hand-pallet')).toBeCloseTo(0.3, 9)
     expect(aisleBandForVariant('hand-pallet').basis).toBe('estimate')
+  })
+})
+
+describe('the model figure is a second instrument, not a second band', () => {
+  test('a published VDI figure is quoted per orientation, 123 mm apart', () => {
+    // The orientation must travel with the number: for the counterbalanced
+    // truck the two loads differ by 123 mm, and a figure quoted bare would be
+    // wrong for one of them.
+    const across = aisleFigureForModel('forklift-1300', '1000x1200')
+    const along = aisleFigureForModel('forklift-1300', '800x1200')
+    expect(across?.requiredM).toBeCloseTo(3.112, 9)
+    expect(along?.requiredM).toBeCloseTo(3.235, 9)
+    expect(across?.label).toContain('1000×1200')
+    expect(along?.label).toContain('800×1200')
+  })
+
+  test('the two instruments coexist and disagree, and neither replaces the other', () => {
+    // EN 15620 rates the class at 3.20 m; VDI measures this machine at
+    // 3.112 m. Both published, both shown, each with its instrument — the
+    // class band stays binding for aisles (see the module docstring).
+    const band = aisleBandForVariant('forklift')
+    const figure = aisleFigureForModel('forklift-1300', '1000x1200')
+    expect(band.basis).toBe('published')
+    expect(figure?.basis).toBe('published')
+    expect(figure?.instrument).toBe('VDI 2198')
+    expect(figure?.requiredM).not.toBeCloseTo(band.min, 3)
+  })
+
+  test('the safety margin is claimed only where it was printed', () => {
+    // Reach publishes a = 200 mm; the counterbalanced sheet publishes Ast
+    // without printing `a`. Quoting a margin nobody printed would grow the
+    // figure an invented appendix.
+    expect(aisleFigureForModel('rt-1800', '800x1200')?.note).toContain('200 mm')
+    expect(aisleFigureForModel('forklift-1300', '1000x1200')?.note).not.toContain('200 mm')
+  })
+
+  test('no VDI Ast means null, never a number — tt and mpt read the class band only', () => {
+    expect(aisleFigureForModel('tt-1600', '1000x1200')).toBeNull()
+    expect(aisleFigureForModel('tt-1600', '800x1200')).toBeNull()
+    expect(aisleFigureForModel('mpt-680x1150', '1000x1200')).toBeNull()
+  })
+
+  test('labels are brand-free, like every other user-facing string', () => {
+    for (const id of TRUCK_MODEL_IDS) {
+      for (const load of ['1000x1200', '800x1200'] as const) {
+        const figure = aisleFigureForModel(id, load)
+        if (!figure) continue
+        expect(figure.label).not.toMatch(/jungheinrich|efg|etv|etm|ekx/i)
+      }
+    }
   })
 })

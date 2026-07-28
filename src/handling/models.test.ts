@@ -25,20 +25,24 @@ import { envelopeWidthM, modelsOf, TRUCK_MODEL_IDS, TRUCK_MODELS, type TruckMode
 /**
  * `chains.test.ts` doküman literallerini kilitler; bu dosya AYNI zincirleri
  * `TRUCK_MODELS`'a uygular. İkisi farklı hatayı yakalar: orası dokümanın
- * kendi içi, burası dokümandan kataloğa TRANSKRİPSİYON. 600 küsur sayının
- * herhangi biri yanlış kopyalandıysa bir artık sıfırdan sapar.
+ * kendi içi, burası dokümandan kataloğa TRANSKRİPSİYON. Bir sayı yanlış
+ * kopyalandıysa bir artık sıfırdan sapar.
  */
 
 const ALL = TRUCK_MODEL_IDS.map((id) => TRUCK_MODELS[id])
 
 describe('katalog şekli', () => {
-  test('22 satır: 4 mpt + 2 ept + 7 forklift + 4 rt + 5 tt', () => {
-    expect(ALL.length).toBe(22)
-    expect(modelsOf('hand-pallet').length).toBe(4)
-    expect(modelsOf('powered-pallet').length).toBe(2)
-    expect(modelsOf('forklift').length).toBe(7)
-    expect(modelsOf('reach').length).toBe(4)
-    expect(modelsOf('turret').length).toBe(5)
+  test('kullanıcının filosu: aile başına bir satır, beş satır', () => {
+    expect(ALL.length).toBe(5)
+    for (const variant of [
+      'hand-pallet',
+      'powered-pallet',
+      'forklift',
+      'reach',
+      'turret',
+    ] as const) {
+      expect(modelsOf(variant).length, variant).toBe(1)
+    }
     expect(modelsOf('agv').length).toBe(0)
   })
 
@@ -62,68 +66,45 @@ describe('zincirler katalog satırlarına hakemlik eder', () => {
     }
   })
 
-  test('forklift: l2 = arkaSarkma + y + x, 7/7', () => {
-    for (const m of modelsOf('forklift')) {
-      expect(m.rearOverhang).not.toBeNull()
-      expect(m.x).not.toBeNull()
-      const residual = counterbalancedChainResidualM({
-        lengthToForkFaceL2: m.l2,
-        rearOverhangM: m.rearOverhang as number,
-        wheelbaseY: m.y,
-        loadDistanceX: m.x as number,
-      })
-      expect(chainCloses(residual), `${m.id}: artık ${residual}`).toBe(true)
-    }
+  test('forklift: l2 = arkaSarkma + y + x', () => {
+    const m = TRUCK_MODELS['forklift-1300']
+    const residual = counterbalancedChainResidualM({
+      lengthToForkFaceL2: m.l2,
+      rearOverhangM: m.rearOverhang as number,
+      wheelbaseY: m.y,
+      loadDistanceX: m.x as number,
+    })
+    expect(chainCloses(residual), `artık ${residual}`).toBe(true)
   })
 
-  test('reach: x = (0.210 + y) − l2, 4/4', () => {
-    for (const m of modelsOf('reach')) {
-      const residual = reachChainResidualM({
-        loadDistanceX: m.x as number,
-        rearToDriveAxleM: REACH_REAR_TO_DRIVE_AXLE_M.value,
-        wheelbaseY: m.y,
-        lengthToForkFaceL2: m.l2,
-      })
-      expect(chainCloses(residual), `${m.id}: artık ${residual}`).toBe(true)
-    }
+  test('reach: x = (0.210 + y) − l2', () => {
+    const m = TRUCK_MODELS['rt-1800']
+    const residual = reachChainResidualM({
+      loadDistanceX: m.x as number,
+      rearToDriveAxleM: REACH_REAR_TO_DRIVE_AXLE_M.value,
+      wheelbaseY: m.y,
+      lengthToForkFaceL2: m.l2,
+    })
+    expect(chainCloses(residual), `artık ${residual}`).toBe(true)
   })
 
-  test('turret jenerik zinciri REDDEDER: l1 − l2 = 0.286 sabit, sapma 914 mm', () => {
+  test('turret jenerik zinciri REDDEDER: l1 − l2 = 0.286, sapma 914 mm', () => {
     expect(forkChainApplies('turret')).toBe(false)
-    for (const m of modelsOf('turret')) {
-      expect(m.l1 - m.l2).toBeCloseTo(0.286, 9)
-      const wrong = forkChainResidualM({
-        overallLengthL1: m.l1,
-        lengthToForkFaceL2: m.l2,
-        forkLengthM: m.fork.length,
-      })
-      expect(wrong).toBeCloseTo(-0.914, 9)
-    }
-  })
-})
-
-describe("T4 — kompakt platform Ast'ın l1'den türetilemeyeceğini kanıtlar", () => {
-  const main = TRUCK_MODELS['ept-2500']
-  const compact = TRUCK_MODELS['ept-2500-compact']
-
-  test('yayınlanmış deltalar: l1/l2 −0.103, Ast −0.108', () => {
-    expect(main.l1 - compact.l1).toBeCloseTo(0.103, 9)
-    expect(main.l2 - compact.l2).toBeCloseTo(0.103, 9)
-    const dAst1000 = (main.ast?.load1000x1200 ?? 0) - (compact.ast?.load1000x1200 ?? 0)
-    const dAst800 = (main.ast?.load800x1200 ?? 0) - (compact.ast?.load800x1200 ?? 0)
-    expect(dAst1000).toBeCloseTo(0.108, 9)
-    expect(dAst800).toBeCloseTo(0.108, 9)
-  })
-
-  test('103 ≠ 108: formülle koridor uyduran her yol burada kırılır', () => {
-    expect(main.l1 - compact.l1).not.toBeCloseTo(0.108, 3)
+    const m = TRUCK_MODELS['tt-1600']
+    expect(m.l1 - m.l2).toBeCloseTo(0.286, 9)
+    const wrong = forkChainResidualM({
+      overallLengthL1: m.l1,
+      lengthToForkFaceL2: m.l2,
+      forkLengthM: m.fork.length,
+    })
+    expect(wrong).toBeCloseTo(-0.914, 9)
   })
 })
 
 describe('T5 — palet yönelimi: 1000×1200 her yayınlanmış çiftte dardır', () => {
-  test('14 yayınlanmış çift, hepsinde load1000x1200 < load800x1200', () => {
+  test('üç yayınlanmış çift (ept, forklift, rt), hepsinde load1000x1200 < load800x1200', () => {
     const published = ALL.filter((m) => m.ast !== null)
-    expect(published.length).toBe(14)
+    expect(published.map((m) => m.id).sort()).toEqual(['ept-2500', 'forklift-1300', 'rt-1800'])
     for (const m of published) {
       const ast = m.ast as NonNullable<TruckModel['ast']>
       expect(ast.load1000x1200, m.id).toBeLessThan(ast.load800x1200)
@@ -140,29 +121,23 @@ describe("T6 — sunulmayan paket null'dur, asla 0", () => {
     }
   })
 
-  test('rt-2500-narrow ve rt-2500 Efficiency sunmaz; rt-1800/rt-2000 sunar', () => {
-    expect(TRUCK_MODELS['rt-2500-narrow'].travelKmh.efficiency).toBeNull()
-    expect(TRUCK_MODELS['rt-2500'].travelKmh.efficiency).toBeNull()
-    expect(TRUCK_MODELS['rt-1800'].travelKmh.efficiency).toBe(11)
-    expect(TRUCK_MODELS['rt-2000'].travelKmh.efficiency).toBe(11)
+  test('mpt motorsuzdur: üç kanal da null — 0 yazılsaydı simülasyon hatası sanılırdı', () => {
+    const { travelKmh } = TRUCK_MODELS['mpt-680x1150']
+    expect(travelKmh.laden).toBeNull()
+    expect(travelKmh.efficiency).toBeNull()
+    expect(travelKmh.plus).toBeNull()
   })
 })
 
 describe('T7 — zarf genişliği yayınlanmış en geniş kesittir', () => {
-  test('tt: kabin gövdeden geniş, zarf 1.45', () => {
-    for (const m of modelsOf('turret')) {
-      expect(envelopeWidthM(m)).toBeCloseTo(1.45, 9)
-    }
+  test('tt-1600: kabin gövdeden 240 mm geniş, zarf 1.45', () => {
+    expect(envelopeWidthM(TRUCK_MODELS['tt-1600'])).toBeCloseTo(1.45, 9)
+    expect(TRUCK_MODELS['tt-1600'].b1).toBeCloseTo(1.21, 9)
   })
 
-  test('rt-2500-narrow: kabin şasiden DAR, zarf b1 = 1.198 (b2 ?? b1 burada yanlıştı)', () => {
-    expect(envelopeWidthM(TRUCK_MODELS['rt-2500-narrow'])).toBeCloseTo(1.198, 9)
-  })
-
-  test('b2 yayınlanmamışsa zarf b1', () => {
-    for (const m of modelsOf('forklift')) {
-      expect(envelopeWidthM(m)).toBe(m.b1)
-    }
+  test('b2 yayınlanmamışsa ya da eşitse zarf b1', () => {
+    expect(envelopeWidthM(TRUCK_MODELS['forklift-1300'])).toBe(TRUCK_MODELS['forklift-1300'].b1)
+    expect(envelopeWidthM(TRUCK_MODELS['rt-1800'])).toBeCloseTo(1.27, 9)
   })
 })
 
@@ -210,20 +185,16 @@ describe('T9 — satırlar arasından konfigürasyon uydurulamaz', () => {
     expect(mastRowFor(forklift, 'efg-a-zt-3000')?.h4).toBeCloseTo(3.59, 9)
   })
 
-  test('tt h3 tavanları modele göre; 18.0 yalnız tt-1600', () => {
-    expect(MAST_H3_CAP_M['tt-1000']).toBeCloseTo(11.5, 9)
-    expect(MAST_H3_CAP_M['tt-1200']).toBeCloseTo(11.5, 9)
-    expect(MAST_H3_CAP_M['tt-1400']).toBeCloseTo(13.0, 9)
-    expect(MAST_H3_CAP_M['tt-1600-short']).toBeCloseTo(14.0, 9)
+  test('tt-1600 h3 tavanı 18.0 — ve yalnız o modelde bir tavan var', () => {
     expect(MAST_H3_CAP_M['tt-1600']).toBeCloseTo(18.0, 9)
-    expect(MAST_H3_CAP_M['rt-1800' as keyof typeof MAST_H3_CAP_M]).toBeUndefined()
+    expect(Object.keys(MAST_H3_CAP_M)).toEqual(['tt-1600'])
   })
 })
 
 describe("T10 — her yayınlanmış null'ın gaps.ts'te karşılığı var", () => {
   test('ast === null olan her satıra Ast boşluk girişi dokunuyor', () => {
     const nullAst = ALL.filter((m) => m.ast === null)
-    expect(nullAst.length).toBe(8) // 3 mpt kısa varyant + 5 tt
+    expect(nullAst.map((m) => m.id).sort()).toEqual(['mpt-680x1150', 'tt-1600'])
     for (const m of nullAst) {
       const hit = gapsFor(m).some((gap) => gap.figure.includes('Ast'))
       expect(hit, `${m.id}: Ast boşluk girişi yok`).toBe(true)
@@ -237,12 +208,9 @@ describe("T10 — her yayınlanmış null'ın gaps.ts'te karşılığı var", ()
     }
   })
 
-  test('reach b10 null + kayıtlı; tt-1400 y çelişkisi kayıtlı', () => {
-    for (const m of modelsOf('reach')) {
-      expect(m.b10).toBeNull()
-    }
+  test('reach b10 null + kayıtlı', () => {
+    expect(TRUCK_MODELS['rt-1800'].b10).toBeNull()
     expect(KNOWN_GAPS.some((g) => g.scope === 'reach' && g.figure.includes('b10'))).toBe(true)
-    expect(KNOWN_GAPS.some((g) => g.scope === 'tt-1400' && g.figure.includes('y'))).toBe(true)
   })
 })
 
@@ -316,6 +284,7 @@ describe('T12 — birim disiplini: metre alanına milimetre yazılamaz', () => {
 describe('T13 — basis çamaşırhanesi yok: her tahmin ve boşluk gerekçeli', () => {
   test('her modelin notları boş değil', () => {
     for (const m of ALL) {
+      expect(m.notes.length, m.id).toBeGreaterThan(0)
       for (const note of m.notes) {
         expect(note.length, m.id).toBeGreaterThan(10)
       }
@@ -348,11 +317,8 @@ describe('T14 — kimlikler markasız ve işlevsel', () => {
 })
 
 describe('katalogda kilitli aile davranışları', () => {
-  test('rt-2500-narrow paleti ayak ÜZERİNDEN taşır (b4 < 0.8), diğer üç reach arasına indirir', () => {
-    expect(TRUCK_MODELS['rt-2500-narrow'].b4 as number).toBeLessThan(0.8)
-    for (const id of ['rt-1800', 'rt-2000', 'rt-2500'] as const) {
-      expect(TRUCK_MODELS[id].b4 as number).toBeGreaterThan(0.8)
-    }
+  test('rt-1800 paleti ayaklar ARASINA indirir (b4 > 0.8)', () => {
+    expect(TRUCK_MODELS['rt-1800'].b4 as number).toBeGreaterThan(0.8)
   })
 
   test('b5 şekli aileye göre: reach aralık, forklift null, gerisi sayı', () => {
@@ -369,13 +335,6 @@ describe('katalogda kilitli aile davranışları', () => {
     }
   })
 
-  test('mast tablo kümeleri: rt-2500-narrow yalnız A, rt-1800 A+B, rt-2000/rt-2500 A+B+C', () => {
-    expect(TRUCK_MODELS['rt-2500-narrow'].mastTables).toEqual(['reach-a'])
-    expect(TRUCK_MODELS['rt-1800'].mastTables).toEqual(['reach-a', 'reach-b'])
-    expect(TRUCK_MODELS['rt-2000'].mastTables).toEqual(['reach-a', 'reach-b', 'reach-c'])
-    expect(TRUCK_MODELS['rt-2500'].mastTables).toEqual(['reach-a', 'reach-b', 'reach-c'])
-  })
-
   test("rezidüel kapasite yalnız reach'te yayınlanmamış", () => {
     for (const m of ALL) {
       expect(m.residualCapacityPublished, m.id).toBe(m.variant !== 'reach')
@@ -383,28 +342,16 @@ describe('katalogda kilitli aile davranışları', () => {
   })
 
   test('dönüş pivotu: forklift y + 0.190 (Wa ile teyitli), reach 0.210 + y, transpaletlerde yok', () => {
-    for (const m of modelsOf('forklift')) {
-      expect((m.waPivotFromRear as number) - m.y).toBeCloseTo(0.19, 9)
-    }
-    for (const m of modelsOf('reach')) {
-      expect((m.waPivotFromRear as number) - m.y).toBeCloseTo(0.21, 9)
-    }
-    for (const m of [...modelsOf('hand-pallet'), ...modelsOf('powered-pallet')]) {
-      expect(m.waPivotFromRear).toBeNull()
-    }
+    const forklift = TRUCK_MODELS['forklift-1300']
+    expect((forklift.waPivotFromRear as number) - forklift.y).toBeCloseTo(0.19, 9)
+    const reach = TRUCK_MODELS['rt-1800']
+    expect((reach.waPivotFromRear as number) - reach.y).toBeCloseTo(0.21, 9)
+    expect(TRUCK_MODELS['mpt-680x1150'].waPivotFromRear).toBeNull()
+    expect(TRUCK_MODELS['ept-2500'].waPivotFromRear).toBeNull()
   })
 
-  test('tt-1600: pivot z + y yayınlanmış Wa ile tam örtüşür — ailenin tek doğrulama noktası', () => {
+  test('tt-1600: pivot z + y yayınlanmış Wa ile tam örtüşür — ailenin doğrulama noktası', () => {
     const m = TRUCK_MODELS['tt-1600']
     expect(m.waPivotFromRear).toBeCloseTo(m.Wa as number, 9)
-  })
-
-  test('mpt Ast/Wa yalnız standart varyantta', () => {
-    expect(TRUCK_MODELS['mpt-520x1150'].ast).not.toBeNull()
-    expect(TRUCK_MODELS['mpt-520x1150'].Wa).not.toBeNull()
-    for (const id of ['mpt-520x950', 'mpt-520x795', 'mpt-680x1150'] as const) {
-      expect(TRUCK_MODELS[id].ast).toBeNull()
-      expect(TRUCK_MODELS[id].Wa).toBeNull()
-    }
   })
 })

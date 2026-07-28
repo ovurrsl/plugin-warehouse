@@ -34,21 +34,14 @@ export const KNOWN_GAPS: readonly GapEntry[] = [
   },
   {
     scope: 'hand-pallet',
-    figure: 'Ast, Wa (kısa çatal ve 680 mm varyantları)',
+    figure: 'Ast, Wa (680×1150 varyantı)',
     note:
-      'Çıkarımda yalnız standart 520×1150 varyantı için yayınlanmış. Wa=1.274 dört varyantta ' +
-      'sabit olamaz (y 0.745–1.100 arasında değişiyor), bu yüzden diğer üç satıra kopyalanmadı: ' +
-      "ast/Wa orada null'dur ve koridor iddiası yalnız standart varyant için yapılır.",
+      'Çıkarımda yalnız standart 520×1150 varyantı için yayınlanmış (Ast 1.584/1.784, ' +
+      'Wa 1.274). Kataloglanan 680×1150 varyantının dingil mesafesi farklı (1.080 ↔ 1.100), ' +
+      'dolayısıyla figürler kopyalanamaz: ast/Wa null kalır ve koridor sınıf bandından ' +
+      'okunur — üretici teyidi gelirse satıra yazılır.',
   },
   // ── Elektrikli transpalet ─────────────────────────────────────────────
-  {
-    scope: 'ept-2500-compact',
-    figure: 'Wa',
-    note:
-      'Kompakt platform için yeniden yayınlanmamış; yalnız l1/l2 (−0.103) ve Ast (−0.108) ' +
-      "deltaları verilmiş. Ana satırın 1.894'ü kopyalanmaz — platform kısalması dönüş " +
-      'geometrisini değiştirmeyebilir ama bunu üretici söylemedi, biz söyleyemeyiz.',
-  },
   {
     scope: 'powered-pallet',
     figure: 'Gövde/kaput/yan koruma dikey ölçüleri',
@@ -77,9 +70,9 @@ export const KNOWN_GAPS: readonly GapEntry[] = [
     scope: 'reach',
     figure: 'Mast tabloları (satır satır)',
     note:
-      'Yalnız grup aralıkları (A 4.250–9.110, B 6.200–11.510, C 12.020–13.000) ve iki ' +
-      'türetilmiş sabit (h4 = h3 + 0.746, h2 = h1 − 0.730, 39 satırda doğrulanmış) elimizde. ' +
-      'Ara bir h3 geçerli bir konfigürasyon DEĞİLDİR; satırlar girilene kadar seçici boştur.',
+      'Yalnız grup aralıkları (A 4.250–9.110, B 6.200–11.510) ve iki türetilmiş sabit ' +
+      '(h4 = h3 + 0.746, h2 = h1 − 0.730, 39 satırda doğrulanmış) elimizde. Ara bir h3 ' +
+      'geçerli bir konfigürasyon DEĞİLDİR; satırlar girilene kadar seçici boştur.',
   },
   {
     scope: 'reach',
@@ -118,14 +111,6 @@ export const KNOWN_GAPS: readonly GapEntry[] = [
     note:
       'Yayınlanmamış. Aile, veri teyit edilene kadar BEKLETİLİR — bir Man-Up aracın kapalı ' +
       "mastını uydurmak, araştırma brief §1'in reddettiği tek şeydir (plan §10 soru 7b).",
-  },
-  {
-    scope: 'tt-1400',
-    figure: 'y (dingil mesafesi)',
-    note:
-      'ÇELİŞKİ: 1.950 birleşik VDI sütunundan atandı; yayınlanmış Wa=2.122 ise y=1.840 ' +
-      'gerektiriyor (tam olarak tt-1200 değeri). 1.950 saklandı, dönüş dairesi yayınlanmış Wa ' +
-      'yarıçapıyla çizilir, çelişki bu notla taşınır (plan §10 soru 6a).',
   },
   {
     scope: 'tt-1600',

@@ -24,14 +24,9 @@ const mm = (value: number) => value / 1000
 
 export type MastType = 'ZT' | 'ZZ' | 'DZ'
 
-export type MastTableId =
-  | 'efg-a'
-  | 'efg-b'
-  | 'reach-a'
-  | 'reach-b'
-  | 'reach-c'
-  | 'ekx-br4'
-  | 'ekx-br5'
+// Kataloglanan filonun sunduğu tablolar. Diğer aileler/seriler (BR4, reach
+// grup C) dokümanda duruyor; modeli eklenmeden tablosu eklenmez.
+export type MastTableId = 'efg-a' | 'efg-b' | 'reach-a' | 'reach-b' | 'ekx-br5'
 
 export type MastTable = {
   id: MastTableId
@@ -71,27 +66,13 @@ export const MAST_TABLES: Record<MastTableId, MastTable> = {
     h3MinM: mm(6200),
     h3MaxM: mm(11510),
   },
-  'reach-c': {
-    id: 'reach-c',
-    label: 'Reach grup C',
-    types: ['DZ'],
-    h3MinM: mm(12020),
-    h3MaxM: mm(13000),
-  },
-  'ekx-br4': {
-    id: 'ekx-br4',
-    label: 'VNA yapı serisi BR4 (48 V)',
-    types: ['ZT', 'DZ'],
-    h3MinM: null,
-    h3MaxM: mm(11500),
-  },
   'ekx-br5': {
     id: 'ekx-br5',
     label: 'VNA yapı serisi BR5 (80 V)',
     types: ['ZT', 'DZ'],
     h3MinM: null,
-    // Tablo düzeyinde tavan yok: BR5'in tavanı MODELE göre değişir
-    // (13.0 / 14.0 / 18.0) ve MAST_H3_CAP_M'de durur.
+    // Tablo düzeyinde tavan yok: BR5'in tavanı modele göre yayınlanmış ve
+    // MAST_H3_CAP_M'de durur.
     h3MaxM: null,
   },
 }
@@ -137,16 +118,12 @@ export const MAST_ROWS: readonly MastRow[] = [
 /**
  * Model bazlı h3 tavanı — tablo aralığının veremediği yerde.
  *
- * Reach'te tavan sunulan tabloların birleşiminden çıkar (`rt-2500-narrow`
- * yalnız A → 9.110); burada tekrar YAZILMAZ. `tt`'de tablo aralıksız, tavan
- * modele göre yayınlanmış — tek kaynağı burası. `tt-1600`'ün 18.0'ı ⚠:
- * 14.5 üzeri satırlar özel konfigürasyondur (gaps).
+ * Reach'te tavan sunulan tabloların birleşiminden çıkar (`rt-1800` A+B →
+ * 11.510); burada tekrar YAZILMAZ. `tt`'de tablo aralıksız, tavan modele göre
+ * yayınlanmış — tek kaynağı burası. `tt-1600`'ün 18.0'ı ⚠: 14.5 üzeri
+ * satırlar özel konfigürasyondur (gaps).
  */
 export const MAST_H3_CAP_M: Partial<Record<TruckModelId, number>> = {
-  'tt-1000': mm(11500),
-  'tt-1200': mm(11500),
-  'tt-1400': mm(13000),
-  'tt-1600-short': mm(14000),
   'tt-1600': mm(18000),
 }
 

@@ -1,5 +1,6 @@
-import { BaseNode, nodeType, objectId } from '@pascal-app/core'
+import { BaseNode, nodeType } from '@pascal-app/core'
 import { z } from 'zod'
+import { migratedObjectId } from '../ids'
 
 /**
  * A curved roller conveyor — **one module**, and the piece that lets a line turn
@@ -28,7 +29,7 @@ import { z } from 'zod'
  * ordered.
  */
 export const ConveyorCurveNode = BaseNode.extend({
-  id: objectId('conveyor_curve'),
+  id: migratedObjectId('conveyor-curve', 'conveyor_curve'),
   type: nodeType('warehouse:conveyor-curve'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

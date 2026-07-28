@@ -1,5 +1,6 @@
-import { BaseNode, nodeType, objectId } from '@pascal-app/core'
+import { BaseNode, nodeType } from '@pascal-app/core'
 import { z } from 'zod'
+import { migratedObjectId } from '../ids'
 
 /**
  * A booster conveyor — **one module**, two ends, and the shortest driven bed in
@@ -31,7 +32,7 @@ import { z } from 'zod'
  * Every dimension is metres.
  */
 export const ConveyorBoosterNode = BaseNode.extend({
-  id: objectId('conveyor_booster'),
+  id: migratedObjectId('conveyor-booster', 'conveyor_booster'),
   type: nodeType('warehouse:conveyor-booster'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

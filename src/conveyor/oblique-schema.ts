@@ -1,5 +1,6 @@
-import { BaseNode, nodeType, objectId } from '@pascal-app/core'
+import { BaseNode, nodeType } from '@pascal-app/core'
 import { z } from 'zod'
+import { migratedObjectId } from '../ids'
 
 /**
  * An oblique box transfer — **one module**, and the piece a dense line branches
@@ -26,7 +27,7 @@ import { z } from 'zod'
  * branch is ordered.
  */
 export const ConveyorObliqueNode = BaseNode.extend({
-  id: objectId('conveyor_oblique'),
+  id: migratedObjectId('conveyor-oblique', 'conveyor_oblique'),
   type: nodeType('warehouse:conveyor-oblique'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

@@ -1,5 +1,6 @@
-import { BaseNode, nodeType, objectId } from '@pascal-app/core'
+import { BaseNode, nodeType } from '@pascal-app/core'
 import { z } from 'zod'
+import { migratedObjectId } from '../ids'
 import { PALLET_PRESET_IDS } from '../pallet/presets'
 
 /**
@@ -22,7 +23,7 @@ import { PALLET_PRESET_IDS } from '../pallet/presets'
  * Every dimension is metres.
  */
 export const PalletRackNode = BaseNode.extend({
-  id: objectId('pallet_rack'),
+  id: migratedObjectId('pallet-rack', 'pallet_rack'),
   type: nodeType('warehouse:pallet-rack'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

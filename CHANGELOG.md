@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`88924fc`](https://github.com/ovurrsl/plugin-warehouse/commit/88924fce7a304be3c37d3ba43234dca5e498caef))
 - The vehicle research, and the architecture it should have been written for ([`d5a9b87`](https://github.com/ovurrsl/plugin-warehouse/commit/d5a9b8730b270698187823548af4158d1a325812))
 - Refresh generated README blocks [skip ci] ([`2b4bf37`](https://github.com/ovurrsl/plugin-warehouse/commit/2b4bf375fb036d104c0994bb8a8f347050064b9c))
 - Refresh generated README blocks [skip ci] ([`c639e36`](https://github.com/ovurrsl/plugin-warehouse/commit/c639e3680401e6a162339b135fa01f478709ee53))
@@ -112,6 +113,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- An empty pallet is a bare deck, and has no height to set ([`6a08bdf`](https://github.com/ovurrsl/plugin-warehouse/commit/6a08bdf5b13808090f576ac394a18c9dc39e4b6c))
 - Their inspector warnings reach the user ([`31cbd03`](https://github.com/ovurrsl/plugin-warehouse/commit/31cbd03b72334667f5b79ebbff0e9a88ccf9be6a))
 - The paint was under the slab, and nothing was registered ([`8fd2e17`](https://github.com/ovurrsl/plugin-warehouse/commit/8fd2e179e9d3a2cdf8757328af4098bdf019e986))
 - Drawing was built on a one-shot tool, and every corner doubled ([`a6e0cc1`](https://github.com/ovurrsl/plugin-warehouse/commit/a6e0cc13085873097adfc33f456b982f9aa4b588))

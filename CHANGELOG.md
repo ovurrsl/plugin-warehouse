@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`04c37d4`](https://github.com/ovurrsl/plugin-warehouse/commit/04c37d4ad908d981beea4e1080bfade61b7cedf3))
 - Refresh generated README blocks [skip ci] ([`b56d575`](https://github.com/ovurrsl/plugin-warehouse/commit/b56d5756206de4727343ecd185d52fa7b55226b6))
 - The handling-vehicle plan, with what it refuses to guess ([`aca7840`](https://github.com/ovurrsl/plugin-warehouse/commit/aca7840c94be3431209eae02a9a74a7c1c25b468))
 - Refresh generated README blocks [skip ci] ([`502f0f2`](https://github.com/ovurrsl/plugin-warehouse/commit/502f0f2a8b5b762d2dcd9bf02cca9ed7353da2f8))
@@ -65,6 +66,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The model catalogue, with its gaps written down ([`f888650`](https://github.com/ovurrsl/plugin-warehouse/commit/f888650b8fdb18654471d03080563534fe8bf756))
 - Freeze the VDI dimension chains, before anything can consume them ([`d04ea75`](https://github.com/ovurrsl/plugin-warehouse/commit/d04ea750105c997ccbe520861687fe372f11bcc5))
 - The far tier stops being a skeleton ([`3f61cb0`](https://github.com/ovurrsl/plugin-warehouse/commit/3f61cb0448e4058e62a78ebbe4133852799e284d))
 - Show the corners that have been placed ([`b56ad61`](https://github.com/ovurrsl/plugin-warehouse/commit/b56ad615aa24ce764530394b0a9878524879bee3))

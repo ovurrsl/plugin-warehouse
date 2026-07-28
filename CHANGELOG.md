@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b192df8`](https://github.com/ovurrsl/plugin-warehouse/commit/b192df8bf36c48888a24f9f58d07a93d25a1855a))
 - Refresh generated README blocks [skip ci] ([`bca0a5d`](https://github.com/ovurrsl/plugin-warehouse/commit/bca0a5d535ca3f0f98b448653537f0f586339e55))
 - Refresh generated README blocks [skip ci] ([`1c37a9d`](https://github.com/ovurrsl/plugin-warehouse/commit/1c37a9d768e3813583d4cb48057fe193e7c01925))
 - Refresh generated README blocks [skip ci] ([`408d7f1`](https://github.com/ovurrsl/plugin-warehouse/commit/408d7f15d2491a31dda7b10609d51daa50cee6f6))
@@ -125,6 +126,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Return to the host id contract — one token before the underscore ([`193ec49`](https://github.com/ovurrsl/plugin-warehouse/commit/193ec490d832460a31b043fdccdd4dabba5472bd))
 - An empty pallet is a bare deck, and has no height to set ([`6a08bdf`](https://github.com/ovurrsl/plugin-warehouse/commit/6a08bdf5b13808090f576ac394a18c9dc39e4b6c))
 - Their inspector warnings reach the user ([`31cbd03`](https://github.com/ovurrsl/plugin-warehouse/commit/31cbd03b72334667f5b79ebbff0e9a88ccf9be6a))
 - The paint was under the slab, and nothing was registered ([`8fd2e17`](https://github.com/ovurrsl/plugin-warehouse/commit/8fd2e179e9d3a2cdf8757328af4098bdf019e986))

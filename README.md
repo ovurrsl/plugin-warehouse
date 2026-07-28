@@ -222,6 +222,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`243eacd`](https://github.com/ovurrsl/plugin-warehouse/commit/243eacdaebd3aa41c6321bdeddea104d7ce667d0))
 - Refresh generated README blocks [skip ci] ([`77c46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/77c46ccc9c8b7ed032ad7cc839479238f22abf36))
 - Refresh generated README blocks [skip ci] ([`e6031d9`](https://github.com/ovurrsl/plugin-warehouse/commit/e6031d915b0f11f9db121e5ceb1a2f1721469b6f))
 - Refresh generated README blocks [skip ci] ([`b192df8`](https://github.com/ovurrsl/plugin-warehouse/commit/b192df8bf36c48888a24f9f58d07a93d25a1855a))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`88924fc`](https://github.com/ovurrsl/plugin-warehouse/commit/88924fce7a304be3c37d3ba43234dca5e498caef))
 - The vehicle research, and the architecture it should have been written for ([`d5a9b87`](https://github.com/ovurrsl/plugin-warehouse/commit/d5a9b8730b270698187823548af4158d1a325812))
 - Refresh generated README blocks [skip ci] ([`2b4bf37`](https://github.com/ovurrsl/plugin-warehouse/commit/2b4bf375fb036d104c0994bb8a8f347050064b9c))
-- Refresh generated README blocks [skip ci] ([`c639e36`](https://github.com/ovurrsl/plugin-warehouse/commit/c639e3680401e6a162339b135fa01f478709ee53))
 
 …
 

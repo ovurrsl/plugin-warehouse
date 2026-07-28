@@ -20,7 +20,15 @@ import {
   REACH_H4_OVER_H3_M,
 } from './masts'
 import { aisleBandForVariant } from './metrics'
-import { envelopeWidthM, modelsOf, TRUCK_MODEL_IDS, TRUCK_MODELS, type TruckModel } from './models'
+import {
+  displayNameOf,
+  envelopeWidthM,
+  modelsOf,
+  TRUCK_MODEL_IDS,
+  TRUCK_MODELS,
+  TRUCK_VARIANT_LABEL,
+  type TruckModel,
+} from './models'
 
 /**
  * `chains.test.ts` doküman literallerini kilitler; bu dosya AYNI zincirleri
@@ -299,6 +307,24 @@ describe('T13 — basis çamaşırhanesi yok: her tahmin ve boşluk gerekçeli',
 
   test('tahmin sarmalayıcısının notu boş değil', () => {
     expect(REACH_REAR_TO_DRIVE_AXLE_M.note.length).toBeGreaterThan(40)
+  })
+})
+
+describe('görünen adlar — kullanıcının seçtiği İngilizce terimler', () => {
+  test('aile adları birebir', () => {
+    expect(TRUCK_VARIANT_LABEL['hand-pallet']).toBe('Hand pallet truck')
+    expect(TRUCK_VARIANT_LABEL['powered-pallet']).toBe('Electric pallet truck')
+    expect(TRUCK_VARIANT_LABEL.forklift).toBe('Electric forklift')
+    expect(TRUCK_VARIANT_LABEL.reach).toBe('Reach truck')
+    expect(TRUCK_VARIANT_LABEL.turret).toBe('Turret truck')
+  })
+
+  test('panel başlığı aile adı + kapasite taşır, üretici kodu taşımaz', () => {
+    expect(displayNameOf(TRUCK_MODELS['forklift-1300'])).toBe('Electric forklift · 1.3 t')
+    expect(displayNameOf(TRUCK_MODELS['tt-1600'])).toBe('Turret truck · 1.6 t')
+    for (const m of ALL) {
+      expect(displayNameOf(m)).not.toMatch(/jungheinrich|efg|etv|etm|ekx|ere/i)
+    }
   })
 })
 

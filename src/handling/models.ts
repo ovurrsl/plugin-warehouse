@@ -349,6 +349,28 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
 
 export const TRUCK_MODEL_IDS = Object.keys(TRUCK_MODELS) as readonly TruckModelId[]
 
+/**
+ * Kullanıcıya görünen aile adları — kullanıcının seçtiği İngilizce terimler.
+ *
+ * Kimlik DEĞİL: kimlik kalıcı sahne verisidir ve kısa kalır (`rt-1800`);
+ * bu harita panelin, kataloğun ve araç ipuçlarının okuduğu addır. Üretici
+ * adı ve ürün kodu buraya giremez — o yalnız `label`/`source` atıflarında.
+ */
+export const TRUCK_VARIANT_LABEL: Record<TruckVariant, string> = {
+  'hand-pallet': 'Hand pallet truck',
+  'powered-pallet': 'Electric pallet truck',
+  forklift: 'Electric forklift',
+  reach: 'Reach truck',
+  turret: 'Turret truck',
+  // Modellenmedi (gaps): sözlükte kalır, katalogda yerleştirilebilir değil.
+  agv: 'AGV',
+}
+
+/** Panel başlığı: aile adı + kapasite — `Electric forklift · 1.3 t`. */
+export function displayNameOf(model: TruckModel): string {
+  return `${TRUCK_VARIANT_LABEL[model.variant]} · ${(model.Q / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })} t`
+}
+
 /** Bir sınıfın satırları, katalog sırasıyla. */
 export function modelsOf(variant: TruckVariant): TruckModel[] {
   return TRUCK_MODEL_IDS.map((id) => TRUCK_MODELS[id]).filter((m) => m.variant === variant)

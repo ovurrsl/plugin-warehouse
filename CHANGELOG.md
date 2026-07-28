@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e6031d9`](https://github.com/ovurrsl/plugin-warehouse/commit/e6031d915b0f11f9db121e5ceb1a2f1721469b6f))
 - Refresh generated README blocks [skip ci] ([`b192df8`](https://github.com/ovurrsl/plugin-warehouse/commit/b192df8bf36c48888a24f9f58d07a93d25a1855a))
 - Refresh generated README blocks [skip ci] ([`bca0a5d`](https://github.com/ovurrsl/plugin-warehouse/commit/bca0a5d535ca3f0f98b448653537f0f586339e55))
 - Refresh generated README blocks [skip ci] ([`1c37a9d`](https://github.com/ovurrsl/plugin-warehouse/commit/1c37a9d768e3813583d4cb48057fe193e7c01925))
@@ -70,6 +71,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- The fleet drives — S6, movement along assigned aisles ([`921a29b`](https://github.com/ovurrsl/plugin-warehouse/commit/921a29b962686905892b202f31d0542a17e8446b))
 - The handling truck, parked, end to end ([`acc7258`](https://github.com/ovurrsl/plugin-warehouse/commit/acc7258f3972eff2c859e4d4bd7fcbf931b071b6))
 - English display names for the truck families ([`c9f8e57`](https://github.com/ovurrsl/plugin-warehouse/commit/c9f8e57b93b7ce077766e1c29265d74741509428))
 - Trim the fleet to the five chosen models, add the model aisle readout ([`4c5ac4f`](https://github.com/ovurrsl/plugin-warehouse/commit/4c5ac4f956d68caf9060e9ec5cd429afe9fc35b7))

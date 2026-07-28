@@ -95,6 +95,13 @@ export const truckDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Filo, sahne başına BİR kez — `def.system` kind başına render edilir,
+   * düğüm başına değil. Konveyörün akış sistemiyle aynı sözleşme; öncelik
+   * onunkinden (5) sonra, ikisi de bağımsız.
+   */
+  system: { module: () => import('./fleet-system'), priority: 6 },
+
   floorplan: buildTruckFloorplan,
 
   tool: () => import('./tool'),

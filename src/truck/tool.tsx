@@ -32,6 +32,7 @@ import {
 import { useWarehouseStore } from '../store'
 import { mastRowOf, modelOf, overallHeightM, planLengthM, planWidthM } from './metrics'
 import TruckPreview from './preview'
+import { claimRoute } from './route-binding'
 import { TruckNode } from './schema'
 
 const ROTATION_STEP = Math.PI / 4
@@ -176,6 +177,11 @@ export default function TruckTool() {
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
+        // Commit'te bir kez: 1.5 m içindeki en yakın araç koridoru talep
+        // edilir ve cevap DÜĞÜME yazılır — "en yakın rota" her karede
+        // yeniden seçilseydi, kaydırılan bir raf aracı sessizce koridor
+        // değiştirtirdi (plan §5.3).
+        routeId: previewNode.routeId ?? claimRoute(nodes, activeLevelId, position[0], position[2]),
       })
 
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)

@@ -67,6 +67,14 @@ type WarehouseStore = {
   flowRunning: boolean
   setFlowRunning: (running: boolean) => void
 
+  /**
+   * Whether the truck fleet is driving. Off by default, `flowRunning`'in
+   * gerekçesiyle: açılışta kendiliğinden hareket eden bir yerleşim aracı
+   * okunamaz. Sahne-genel, çünkü filo da düğüm değil.
+   */
+  fleetRunning: boolean
+  setFleetRunning: (running: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /**
    * Shape of the next placed pallet, held as a partial node for the same reason
@@ -177,6 +185,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   flowRunning: false,
   setFlowRunning: (flowRunning) => set({ flowRunning }),
+
+  fleetRunning: false,
+  setFleetRunning: (fleetRunning) => set({ fleetRunning }),
 
   palletBrush: {
     preset: 'epal-1',

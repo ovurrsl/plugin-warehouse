@@ -82,6 +82,7 @@ function CatalogTab() {
             <p style={tokens.blurb}>{section.blurb}</p>
             {section.id === 'unit-loads' && <LoadBrush />}
             {section.id === 'conveyance' && <FlowSwitch />}
+            {section.id === 'handling' && <FleetSwitch />}
             {items.length > 0 ? (
               <div style={tokens.tileGrid}>
                 {items.map((item) => (
@@ -136,6 +137,43 @@ function FlowSwitch() {
       <span>{running ? 'Stop the boxes' : 'Run the boxes'}</span>
       <span style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }}>
         every line at its own speed
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Runs the fleet. FlowSwitch'in araç karşılığı: sahne-genel, katalogda,
+ * varsayılan kapalı. Yalnız `duty: shuttle` + rotası atanmış araçlar sürer;
+ * tavan 16 — fazlası park kalır ve araç paneli kaçının koştuğunu söyler.
+ */
+function FleetSwitch() {
+  const running = useWarehouseStore((s) => s.fleetRunning)
+  const setRunning = useWarehouseStore((s) => s.setFleetRunning)
+
+  return (
+    <button
+      onClick={() => setRunning(!running)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginBottom: '0.5rem',
+        borderRadius: '0.375rem',
+        border: `1px solid ${running ? 'color-mix(in oklab, #e87722 55%, transparent)' : 'var(--border)'}`,
+        background: running ? 'color-mix(in oklab, #e87722 12%, transparent)' : 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--foreground)',
+        cursor: 'pointer',
+      }}
+      type="button"
+    >
+      <Icon height={13} icon={running ? 'lucide:pause' : 'lucide:play'} width={13} />
+      <span>{running ? 'Stop the fleet' : 'Run the fleet'}</span>
+      <span style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }}>
+        shuttle trucks follow their aisles
       </span>
     </button>
   )

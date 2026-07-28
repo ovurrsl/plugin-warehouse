@@ -5,8 +5,9 @@ import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { gapsFor } from '../handling/gaps'
 import { aisleBandForVariant, aisleFigureForModel } from '../handling/metrics'
-import { TRUCK_MODELS } from '../handling/models'
+import { TRUCK_MODELS, TRUCK_VARIANT_LABEL } from '../handling/models'
 import { IssueList } from '../panels/issue-list'
+import { bindTruck } from './fleet'
 import { truckParametrics } from './parametrics'
 import type { TruckNode } from './schema'
 
@@ -51,8 +52,15 @@ function useInspectedTruck(provided?: TruckNode): TruckNode | null {
   return selected as unknown as TruckNode
 }
 
+/** Rota bağlama durumunun okuduğu sahne — panel seçimle zaten yeniden
+ *  render olur, ayrı bir abonelik maliyeti yok. */
+function useSceneNodes(): Readonly<Record<string, unknown>> {
+  return useScene((s) => s.nodes as Record<string, unknown>)
+}
+
 export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
   const node = useInspectedTruck(provided)
+  const allNodes = useSceneNodes()
   if (!node) return null
 
   const model = TRUCK_MODELS[node.model]
@@ -60,6 +68,24 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
   const figure = aisleFigureForModel(node.model, node.referenceLoad)
   const gaps = gapsFor(model)
   const issues = truckParametrics.invariants?.flatMap((check) => check(node)) ?? []
+
+  // Sahneyi okuyan bulgular BURADA yaşar — invariants tek düğümün saf
+  // fonksiyonudur ve rota başka bir düğümdür (plan §6.3).
+  if (node.duty === 'shuttle' && node.routeId) {
+    const bound = bindTruck(node, allNodes)
+    if ('refusal' in bound) {
+      const why: Record<string, string> = {
+        'route-missing': 'Atanmış rota sahnede yok — araç hareket etmez.',
+        'route-not-vehicle': 'Atanmış rota bir yaya yolu — araç yalnız araç koridorunda sürer.',
+        'different-parent': 'Rota başka bir katta — araç ve rotası aynı kata ait olmalı.',
+        'route-degenerate': 'Rota sıfır uzunlukta — sürülecek yol yok.',
+        'no-drive': `${TRUCK_VARIANT_LABEL[model.variant]} motorsuz — filoda süremez.`,
+        'no-route': '',
+      }
+      const msg = why[bound.refusal]
+      if (msg) issues.push({ field: 'duty', severity: 'warning', msg })
+    }
+  }
 
   return (
     <div style={styles.root}>

@@ -16,6 +16,9 @@ import type { MastRow } from '../handling/masts'
 import type { TruckModel } from '../handling/models'
 import { forkSpreadM } from './metrics'
 import { forkliftParts } from './parts-forklift'
+import { palletTruckParts } from './parts-pallet-truck'
+import { reachParts } from './parts-reach'
+import { turretParts } from './parts-turret'
 
 export type TruckDetail = 'full' | 'simple'
 
@@ -39,14 +42,34 @@ export type TruckPartRole =
  * Hareket eden birimler. Parçalar araç çerçevesinde emit edilir; `stage1` ve
  * `carriage` parçaları DİNLENME pozunda yazılır ve renderer grubu kinematiğin
  * verdiği Y kadar öteler — vertex'ler asla pozu taşımaz (§3.4 kuralı).
+ * `cab` yalnız turret'te: man-up kabin, dilim 8'de mast ile yükselecek.
  */
-export type TruckBody = 'chassis' | 'steer' | 'mast' | 'stage1' | 'carriage'
+export type TruckBody = 'chassis' | 'steer' | 'mast' | 'stage1' | 'carriage' | 'cab'
 
-export type TruckPart = {
-  role: TruckPartRole
-  center: readonly [number, number, number]
-  size: readonly [number, number, number]
-}
+export type TruckPart =
+  | {
+      kind?: 'box'
+      role: TruckPartRole
+      center: readonly [number, number, number]
+      size: readonly [number, number, number]
+    }
+  | {
+      kind: 'cyl'
+      role: TruckPartRole
+      center: readonly [number, number, number]
+      radius: number
+      length: number
+      axis: 'y' | 'z'
+      segments: number
+    }
+  | {
+      kind: 'sloped'
+      role: TruckPartRole
+      center: readonly [number, number, number]
+      size: readonly [number, number, number]
+      face: 'front' | 'back'
+      drop: number
+    }
 
 /**
  * Renk, TOTAL kayıt — ternary zinciri değil: `rack`'te iki rolün tek dala
@@ -74,44 +97,64 @@ export const TRUCK_ROLE_COLORS: Record<TruckPartRole, string> = {
  *  bandının içinde. */
 export const GROUND_CLEARANCE = 0.0005
 
-/** Modelin çizdiği gövdeler. Ayrıntılı emitter'ı olmayan aileler tek gövdeyle
- *  (zarf) çizilir — dilim 8/9 kendi emitter'larını getirdiğinde genişler. */
+/** Modelin çizdiği gövdeler — beş aile, beş farklı makine. */
 export function bodiesOf(model: TruckModel): readonly TruckBody[] {
-  return model.variant === 'forklift'
-    ? ['chassis', 'steer', 'mast', 'stage1', 'carriage']
-    : ['chassis']
+  switch (model.variant) {
+    case 'forklift':
+    case 'reach':
+      return ['chassis', 'steer', 'mast', 'stage1', 'carriage']
+    case 'turret':
+      return ['chassis', 'mast', 'stage1', 'cab', 'carriage']
+    case 'hand-pallet':
+    case 'powered-pallet':
+      return ['chassis', 'steer']
+    default:
+      return ['chassis']
+  }
 }
 
 /**
- * Tek dağıtıcı. `forklift` ayrıntılı gövdesini çizer; kalan aileler dilim
- * 8/9'a kadar yayınlanmış zarflarında TEK kutu olarak durur — uydurma bir
- * gövde yerine doğru ölçülü dürüst bir vekil. İki katman aynı kutuyu üretir,
- * parite bedavaya sağlanır.
+ * Aile gövde rengi — beş makine beş kimlik. Donanım rolleri (mast, çatal,
+ * tekerlek…) ortak paletten kalır; yalnız gövde/kaput/platform aile rengini
+ * giyer. Üretici renkleri kasten değil: markasız, ayırt edilir tonlar.
  */
+const VARIANT_BODY_COLOR: Record<TruckModel['variant'], string> = {
+  'hand-pallet': '#a83a34',
+  'powered-pallet': '#2e6b4f',
+  forklift: '#d98a2b',
+  reach: '#33608c',
+  turret: '#b8892f',
+  agv: '#5b636e',
+}
+
+const BODY_ROLES: ReadonlySet<TruckPartRole> = new Set(['chassis', 'cowl', 'platform'])
+
+/** Bir parçanın nihai rengi: gövde rolleri aile rengini, gerisi rol paletini. */
+export function partColorOf(variant: TruckModel['variant'], role: TruckPartRole): string {
+  return BODY_ROLES.has(role) ? VARIANT_BODY_COLOR[variant] : TRUCK_ROLE_COLORS[role]
+}
+
+/** Tek dağıtıcı — `spec.variant` üzerinden aile emitter'ına. Her aile kendi
+ *  yayınlanmış ölçülerinden çizilir; vekil kutu kalmadı. */
 export function truckParts(
   model: TruckModel,
   mastRow: MastRow | null,
   body: TruckBody,
   detail: TruckDetail,
 ): TruckPart[] {
-  if (model.variant === 'forklift') return forkliftParts(model, mastRow, body, detail)
-  if (body !== 'chassis') return []
-  return placeholderParts(model)
-}
-
-/** Yayınlanmış zarf, tek kutu. `h14` transpalet kolu gibi tepe noktalarını
- *  içerir; yükseklik `overallHeightM`'in okuduğu satırların aynısından gelir. */
-function placeholderParts(model: TruckModel): TruckPart[] {
-  const width = Math.max(model.b1, model.b2 ?? 0)
-  const h14Max = typeof model.h14 === 'number' ? model.h14 : (model.h14?.[1] ?? 0)
-  const height = Math.max(model.h6 ?? 0, model.h12 ?? 0, model.h13 ?? 0, h14Max, 0.3)
-  return [
-    {
-      role: 'chassis',
-      center: [0, GROUND_CLEARANCE + height / 2, 0],
-      size: [model.l1, height, width],
-    },
-  ]
+  switch (model.variant) {
+    case 'forklift':
+      return forkliftParts(model, mastRow, body, detail)
+    case 'reach':
+      return reachParts(model, body, detail)
+    case 'turret':
+      return turretParts(model, body, detail)
+    case 'hand-pallet':
+    case 'powered-pallet':
+      return palletTruckParts(model, body, detail)
+    default:
+      return []
+  }
 }
 
 // ── Paylaşılan alt-emitter'lar ──────────────────────────────────────────────
@@ -170,16 +213,24 @@ export function pushForkPair(
   }
 }
 
-/** Bir lastik — kutu olarak, alt yüzü zemin payında. İki katman AYNI sayıda
- *  ve AYNI konumda tekerlek üretir (§3.2); fark diğer parçalarda. */
+/**
+ * Bir lastik — SİLİNDİR, kutu değil: kutu tekerlek, "kutu kutu çizilmiş"
+ * görünümünün bir numaralı kaynağıydı. İki katman AYNI sayıda ve AYNI
+ * konumda tekerlek üretir; fark yalnız kenar sayısında (§3.2: "aynı sayı,
+ * aynı pozisyon, daha az segment"). Alt yüz tam zemin payında.
+ */
 export function pushWheel(
   parts: TruckPart[],
-  args: { x: number; z: number; diameter: number; width: number },
+  args: { x: number; z: number; diameter: number; width: number; detail: TruckDetail },
 ): void {
   parts.push({
+    kind: 'cyl',
     role: 'wheel',
     center: [args.x, GROUND_CLEARANCE + args.diameter / 2, args.z],
-    size: [args.diameter, args.diameter, args.width],
+    radius: args.diameter / 2,
+    length: args.width,
+    axis: 'z',
+    segments: args.detail === 'full' ? 12 : 8,
   })
 }
 

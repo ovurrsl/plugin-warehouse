@@ -16,7 +16,7 @@
  */
 
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
-import { forkFaceX, forkSpreadM, modelOf, waPivotLocalX } from './metrics'
+import { forkSpreadM, modelOf, visualForkFaceX, waPivotLocalX } from './metrics'
 import type { TruckNode } from './schema'
 
 export function buildTruckFloorplan(
@@ -29,7 +29,7 @@ export function buildTruckFloorplan(
 
   const halfL = model.l1 / 2
   const halfW = Math.max(model.b1, model.b2 ?? 0) / 2
-  const faceX = forkFaceX(model)
+  const faceX = visualForkFaceX(model)
 
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#8a5a13'
   const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#f5deb0'
@@ -37,11 +37,13 @@ export function buildTruckFloorplan(
   const children: FloorplanGeometry[] = [
     // Gövde: arka yüzden çatal sırtına. Çatallar ayrı çizilir ki sembol,
     // makinenin en anlamlı plan bilgisini — çatal düzlemini — kaybetmesin.
+    // Genişlik faceX'ten: turret'te l2 çatal yüzü DEĞİLDİR ve jenerik l2
+    // gövdesi çatalları zarfın 914 mm dışına taşırırdı.
     {
       kind: 'rect',
       x: -halfL,
       y: -halfW,
-      width: model.l2,
+      width: faceX + halfL,
       height: halfW * 2,
       fill,
       stroke,

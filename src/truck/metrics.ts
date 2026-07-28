@@ -54,8 +54,22 @@ export function forkTipX(model: TruckModel): number {
   return model.l1 / 2
 }
 
-/** Çatal sırtının (yük yüzü) yerel X'i: arka yüz + l2. */
+/** Çatal sırtının (yük yüzü) yerel X'i: arka yüz + l2. Turret'te BU DEĞİL
+ *  `visualForkFaceX` kullanılır — o ailede l2 çatal yüzünü ölçmez. */
 export function forkFaceX(model: TruckModel): number {
+  return -model.l1 / 2 + model.l2
+}
+
+/**
+ * Görselin ve plan sembolünün çatal yüzü.
+ *
+ * Dört ailede zincirin yüzü (arka + l2); turret'te ZARFTAN GERİYE çatal
+ * boyu — çünkü EKX'te `l1 − l2 = 0.286` sabittir ve l2 çatal yüzü değildir
+ * (chains.CHAIN_EXEMPT). Jenerik yüz kullanılsaydı plan sembolünün çatalları
+ * zarfı 914 mm aşardı — tam olarak zincir dosyasının kapattığı hata, çizimde.
+ */
+export function visualForkFaceX(model: TruckModel): number {
+  if (model.variant === 'turret') return model.l1 / 2 - model.fork.length
   return -model.l1 / 2 + model.l2
 }
 

@@ -61,27 +61,47 @@ export function forkliftParts(
         center: [(rearAxleX + frontAxleX) / 2, 0.3, 0],
         size: [frontAxleX - rearAxleX + 0.55, 0.24, model.b1 - 0.06],
       })
-      // Karşı ağırlık: arka yüzden başlar, tam b1 genişliğinde. Düşürmek
-      // aracı "tekerlekli mast" yapar — iki katmanda da durur.
+      // Karşı ağırlık: alt blok tam b1, üstü arkaya YUVARLANIR (eğimli
+      // kapak + daralan tepe) — dik kesilmiş kutu, "kutu kutu" görünümünün
+      // gövdedeki kaynağıydı.
       parts.push({
         role: 'counterweight',
-        center: [rearX + 0.275, 0.66, 0],
-        size: [0.55, 0.92, model.b1],
+        center: [rearX + 0.275, 0.5, 0],
+        size: [0.55, 0.6, model.b1],
       })
-      // Ön gövde/kaput, tahrik aksının üstü.
+      parts.push({
+        kind: 'sloped',
+        role: 'counterweight',
+        center: [rearX + 0.25, 0.97, 0],
+        size: [0.5, 0.34, model.b1 - 0.08],
+        face: 'back',
+        drop: 0.22,
+      })
+      // Ön gövde/kaput: buruna doğru eğimli iner — forklift profili.
       parts.push({
         role: 'cowl',
-        center: [frontAxleX - 0.05, 0.68, 0],
-        size: [0.62, 0.52, model.b1 - 0.1],
+        center: [frontAxleX - 0.05, 0.58, 0],
+        size: [0.62, 0.32, model.b1 - 0.1],
+      })
+      parts.push({
+        kind: 'sloped',
+        role: 'cowl',
+        center: [frontAxleX - 0.05, 0.87, 0],
+        size: [0.62, 0.26, model.b1 - 0.14],
+        face: 'front',
+        drop: 0.18,
       })
       if (detail === 'full') {
-        // Orta kaput (batarya bölmesi).
+        // Orta kaput (batarya bölmesi) — koltuğa doğru hafif eğimli.
         parts.push({
+          kind: 'sloped',
           role: 'chassis',
-          center: [(rearX + 0.55 + frontAxleX - 0.36) / 2, 0.64, 0],
-          size: [frontAxleX - 0.36 - (rearX + 0.55), 0.44, model.b1 - 0.12],
+          center: [(rearX + 0.55 + frontAxleX - 0.36) / 2, 0.62, 0],
+          size: [frontAxleX - 0.36 - (rearX + 0.55), 0.4, model.b1 - 0.12],
+          face: 'front',
+          drop: 0.08,
         })
-        // Koltuk minderi + sırtı (h7 = yayınlanmış koltuk kotu).
+        // Koltuk: minder + YATIK sırt (h7 = yayınlanmış koltuk kotu).
         const seatY = model.h7 ?? 0.92
         parts.push({
           role: 'cab',
@@ -89,15 +109,31 @@ export function forkliftParts(
           size: [0.42, 0.06, 0.46],
         })
         parts.push({
+          kind: 'sloped',
           role: 'cab',
-          center: [rearX + 0.61, seatY + 0.24, 0],
-          size: [0.1, 0.48, 0.44],
+          center: [rearX + 0.6, seatY + 0.24, 0],
+          size: [0.14, 0.48, 0.44],
+          face: 'back',
+          drop: 0.1,
         })
-        // Direksiyon sütunu.
+        // Direksiyon: eğik kolon + tekerlek (silindir — kutu direksiyon
+        // olmaz).
         parts.push({
+          kind: 'sloped',
           role: 'cab',
-          center: [frontAxleX - 0.34, 1.08, 0],
-          size: [0.08, 0.3, 0.34],
+          center: [frontAxleX - 0.34, 1.02, 0],
+          size: [0.1, 0.24, 0.3],
+          face: 'back',
+          drop: 0.1,
+        })
+        parts.push({
+          kind: 'cyl',
+          role: 'cab',
+          center: [frontAxleX - 0.33, 1.17, 0],
+          radius: 0.14,
+          length: 0.03,
+          axis: 'y',
+          segments: 10,
         })
       }
       pushOverheadGuard(parts, {
@@ -108,10 +144,10 @@ export function forkliftParts(
         yTop: model.h6 ?? 2.04,
         detail,
       })
-      // Tahrik tekerleri — b10 yayınlanmış ön iz genişliğidir.
+      // Tahrik tekerleri — b10 yayınlanmış ön iz genişliği.
       const trackZ = (model.b10 ?? model.b1 - 0.16) / 2
-      pushWheel(parts, { x: frontAxleX, z: trackZ, ...FRONT_TYRE })
-      pushWheel(parts, { x: frontAxleX, z: -trackZ, ...FRONT_TYRE })
+      pushWheel(parts, { x: frontAxleX, z: trackZ, ...FRONT_TYRE, detail })
+      pushWheel(parts, { x: frontAxleX, z: -trackZ, ...FRONT_TYRE, detail })
       return parts
     }
 
@@ -119,8 +155,8 @@ export function forkliftParts(
       // İkiz arka lastik: b11 = 0.176 yayınlanmış arka iz — iki dar lastik
       // merkeze yakın durur, üç tekerlekli şasinin tanımı.
       const twinZ = ((model.b11 ?? 0.176) + REAR_TYRE.width) / 2
-      pushWheel(parts, { x: rearAxleX, z: twinZ, ...REAR_TYRE })
-      pushWheel(parts, { x: rearAxleX, z: -twinZ, ...REAR_TYRE })
+      pushWheel(parts, { x: rearAxleX, z: twinZ, ...REAR_TYRE, detail })
+      pushWheel(parts, { x: rearAxleX, z: -twinZ, ...REAR_TYRE, detail })
       if (detail === 'full') {
         parts.push({
           role: 'chassis',

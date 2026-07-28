@@ -23,8 +23,9 @@ import type * as THREE from 'three'
 import { emitPart, finish, type Sink, toLinear } from '../conveyor/geometry-builder'
 import type { MastRow } from '../handling/masts'
 import type { TruckModel, TruckModelId } from '../handling/models'
+import { emitCylinder, emitSlopedBox } from './emitters'
 import { forkSpreadM, mastRowOf, modelOf } from './metrics'
-import { TRUCK_ROLE_COLORS, type TruckBody, type TruckDetail, truckParts } from './parts'
+import { partColorOf, type TruckBody, type TruckDetail, truckParts } from './parts'
 
 /**
  * Bir gövde şeklinin kimliği.
@@ -64,7 +65,10 @@ function buildBody(
 ): THREE.BufferGeometry {
   const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
   for (const part of truckParts(model, mastRow, body, detail)) {
-    emitPart(sink, part, toLinear(TRUCK_ROLE_COLORS[part.role]), 0)
+    const color = toLinear(partColorOf(model.variant, part.role))
+    if (part.kind === 'cyl') emitCylinder(sink, part, color)
+    else if (part.kind === 'sloped') emitSlopedBox(sink, part, color)
+    else emitPart(sink, part, color, 0)
   }
   return finish(sink)
 }

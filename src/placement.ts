@@ -60,8 +60,15 @@ const CLICK_TRIGGER_KINDS = [
   // is over the run you are aligning to, and nothing commits.
   'warehouse:pallet-rack',
   // Same reason: a run is built by placing module after module, so the cursor
-  // is nearly always over the conveyor you are extending.
+  // is nearly always over the conveyor you are extending. The five shaped
+  // modules join for the same reason — a bend is placed against the straight
+  // it continues, and its own hit target is what the cursor is over.
   'warehouse:conveyor-roller',
+  'warehouse:conveyor-curve',
+  'warehouse:conveyor-launcher',
+  'warehouse:conveyor-booster',
+  'warehouse:conveyor-transfer',
+  'warehouse:conveyor-oblique',
   // A route is drawn across a hall that already has paint on it, and its own
   // hit target covers the whole corridor — so without this the second route
   // cannot be started anywhere the first one runs.

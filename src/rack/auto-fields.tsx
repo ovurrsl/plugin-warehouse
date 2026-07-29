@@ -8,6 +8,8 @@ import {
   autoPalletsPerLevel,
   autoPickingBoxesAcross,
   autoPickingBoxesDeep,
+  fittedLevelCount,
+  levelClearOpening,
 } from './slots'
 
 /**
@@ -153,5 +155,74 @@ export function PickingBoxesDeepField({ node, onUpdate }: CustomField) {
       onChange={(pickingBoxesDeep) => onUpdate({ pickingBoxesDeep })}
       value={node.pickingBoxesDeep}
     />
+  )
+}
+
+/**
+ * Kat başına açıklık — `levelClears` geçersiz kılmaları.
+ *
+ * Boş kutu = varsayılan (`firstLevelClear` / `levelClear` / picking açıklığı);
+ * sayı = o katın kendi açıklığı. Yalnız gerçekten sığan katlar listelenir —
+ * sığmayan bir kata değer yazdırmak, hiçbir şeyi hareket ettirmeyen bir alan
+ * üretirdi.
+ */
+export function LevelClearsField({
+  node,
+  onUpdate,
+}: {
+  node: PalletRackNode
+  onUpdate: (patch: Partial<PalletRackNode>) => void
+}) {
+  const fitted = fittedLevelCount(node)
+  if (fitted === 0) return null
+  const current = node.levelClears ?? []
+
+  const setLevel = (level: number, raw: string) => {
+    const next: Array<number | null> = Array.from(
+      { length: Math.max(current.length, fitted) },
+      (_, index) => current[index] ?? null,
+    )
+    next[level] = raw === '' ? null : Number(raw)
+    // Hepsi null'a dönerse alan şemadaki "hiç geçersiz kılma yok" hâline
+    // döner — kaydedilmiş sahne, hiç dokunulmamış sahneyle aynı okunur.
+    onUpdate({ levelClears: next.every((v) => v == null) ? null : next })
+  }
+
+  return (
+    <div style={styles.field}>
+      <span style={styles.label}>
+        <span>Kat açıklıkları</span>
+        <span>boş = varsayılan</span>
+      </span>
+      {Array.from({ length: fitted }, (_, index) => {
+        const level = index // 0 = zemin açıklığı
+        const value = current[level]
+        return (
+          <div key={level} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+            <span style={{ fontSize: '0.625rem', color: MUTED, width: '3.5rem' }}>
+              {level === 0 ? 'Zemin' : `Kat ${level}`}
+            </span>
+            <input
+              inputMode="decimal"
+              onChange={(event) => setLevel(level, event.target.value)}
+              placeholder={levelClearOpening({ ...node, levelClears: null }, level).toFixed(2)}
+              step={0.05}
+              style={{
+                flex: 1,
+                padding: '0.25rem 0.375rem',
+                borderRadius: '0.25rem',
+                border: '1px solid var(--border)',
+                background: 'var(--background)',
+                color: 'var(--foreground)',
+                fontSize: '0.6875rem',
+              }}
+              type="number"
+              value={value ?? ''}
+            />
+            <span style={{ fontSize: '0.625rem', color: MUTED }}>m</span>
+          </div>
+        )
+      })}
+    </div>
   )
 }

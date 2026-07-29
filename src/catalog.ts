@@ -40,6 +40,7 @@ export type CatalogItem = {
     | { kind: 'pallet'; cargo: 'none' | 'carton' | 'drum' }
     | { kind: 'route'; role: 'pedestrian' | 'vehicle'; traffic: 'one-way' | 'two-way' }
     | { kind: 'truck'; model: string }
+    | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -114,6 +115,16 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
     icon: 'lucide:rows-3',
+  },
+  {
+    id: 'pallet-rack-low',
+    kind: 'warehouse:pallet-rack',
+    label: 'Low Rack',
+    sectionId: 'storage',
+    description:
+      'Alçak raf şablonu: 2.5 m dikme, iki kat, alt kat toplama rafı. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
+    icon: 'lucide:rows-2',
+    brush: { kind: 'rack', patch: { uprightHeight: 2.5, levels: 2, pickingLevels: 1 } },
   },
   {
     id: 'route-pedestrian',

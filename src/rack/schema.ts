@@ -67,6 +67,18 @@ export const PalletRackNode = BaseNode.extend({
    */
   levels: z.number().int().min(0).max(15).default(3),
 
+  /**
+   * Kat başına açıklık geçersiz kılmaları, metre. İndeks = kat (0 = zemin
+   * açıklığı). `null` eleman o katı varsayılanına bırakır (`firstLevelClear` /
+   * `levelClear` / picking açıklığı); dizinin kendisi `null` iken hiçbir kat
+   * geçersiz kılınmaz — kaydedilmiş her eski sahne o hâldedir.
+   *
+   * Tek okuyucusu `levelClearOpening`: yükseklik hesabına giren TEK kapı
+   * orası olduğu için geometri, yuvalar, hayalet stok ve plan aynı anda ve
+   * kendiliğinden doğru kalır.
+   */
+  levelClears: z.array(z.number().min(0.3).max(6).nullable()).max(16).nullable().default(null),
+
   /** Clear height under the first beam level. */
   firstLevelClear: z.number().min(0.2).max(6).default(1.5),
 

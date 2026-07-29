@@ -41,9 +41,12 @@ export function claimRoute(
   levelId: string | null,
   x: number,
   z: number,
+  /** Yerleştirme 1.5 m'de kalır; panelin AÇIK "bağla" düğmesi daha geniş
+   *  arayabilir — niyet beyan edilmiştir, sessiz bir tahmin değildir. */
+  maxDistanceM: number = ROUTE_CLAIM_M,
 ): string | null {
   let bestId: string | null = null
-  let bestDistance = ROUTE_CLAIM_M
+  let bestDistance = maxDistanceM
   for (const [id, candidate] of Object.entries(nodes)) {
     const route = candidate as RouteNode
     if ((route as { type?: string }).type !== 'warehouse:route') continue

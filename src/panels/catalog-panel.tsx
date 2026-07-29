@@ -17,6 +17,7 @@ import {
   statsReport,
 } from '../stats'
 import { type PanelTab, useWarehouseStore } from '../store'
+import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
 import { checkbox, listRow, tile, tokens } from './styles'
 
 /**
@@ -150,6 +151,10 @@ function FlowSwitch() {
 function FleetSwitch() {
   const running = useWarehouseStore((s) => s.fleetRunning)
   const setRunning = useWarehouseStore((s) => s.setFleetRunning)
+  // Tavan aşımı sessiz kalamaz: hesap zaten fleet kuruluşunun kendisi ve
+  // panel yalnız koşarken sayar — kapalıyken sahne taranmaz.
+  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const fleet = useMemo(() => (running ? buildFleet(nodes) : EMPTY_FLEET), [nodes, running])
 
   return (
     <button
@@ -173,7 +178,11 @@ function FleetSwitch() {
       <Icon height={13} icon={running ? 'lucide:pause' : 'lucide:play'} width={13} />
       <span>{running ? 'Stop the fleet' : 'Run the fleet'}</span>
       <span style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }}>
-        shuttle trucks follow their aisles
+        {running
+          ? fleet.skipped > 0
+            ? `${fleet.trucks.length} sürüyor · ${fleet.skipped} tavan yüzünden park`
+            : `${fleet.trucks.length} sürüyor`
+          : 'shuttle trucks follow their aisles'}
       </span>
     </button>
   )
@@ -308,15 +317,26 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   // panel below then shows.
   const wantsLoad = item.brush?.kind === 'pallet' ? item.brush.cargo !== 'none' : null
   const wantsRole = item.brush?.kind === 'route' ? item.brush.role : null
+  const wantsModel = item.brush?.kind === 'truck' ? item.brush.model : null
+  const truckModel = useWarehouseStore((s) => s.truckBrush.model)
   const arming =
     activeTool === item.kind &&
     (wantsLoad === null || wantsLoad === (cargo !== 'none')) &&
-    (wantsRole === null || wantsRole === routeRole)
+    (wantsRole === null || wantsRole === routeRole) &&
+    (wantsModel === null || wantsModel === truckModel)
 
   const arm = () => {
     if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
     if (item.brush?.kind === 'route') {
       setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
+    }
+    // Beş makine tile'ı beş ayrı model — fırçaya yazılmazsa hepsi
+    // varsayılan forklift'i yerleştirir ve katalog yalan söyler.
+    if (item.brush?.kind === 'truck') {
+      useWarehouseStore.getState().setTruckBrush({ model: item.brush.model as never })
+    }
+    if (item.brush?.kind === 'rack') {
+      useWarehouseStore.getState().setRackBrush(item.brush.patch)
     }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the

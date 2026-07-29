@@ -516,3 +516,24 @@ describe('picking containers', () => {
     expect(front[1]?.directAccess).toBe(false)
   })
 })
+
+describe('kat başına açıklık geçersiz kılmaları', () => {
+  test('override yalnız kendi katını değiştirir ve üstündeki her şeyi taşır', () => {
+    const base = PalletRackNode.parse({ levels: 3 })
+    const raised = PalletRackNode.parse({ levels: 3, levelClears: [2.4] })
+    // Zemin açıklığı (indeks 0) yükseldi: 1. kat yüzeyi tam farkı taşır…
+    expect(levelClearOpening(raised, 0)).toBe(2.4)
+    const delta = levelSurfaceY(raised, 1) - levelSurfaceY(base, 1)
+    expect(delta).toBeCloseTo(2.4 - levelClearOpening(base, 0), 9)
+    // …ve üst katlar aynı farkla birlikte yükselir — birikimli hesabın kanıtı.
+    expect(levelSurfaceY(raised, 3) - levelSurfaceY(base, 3)).toBeCloseTo(delta, 9)
+  })
+
+  test('null eleman varsayılana bırakır; boş dizi hiç dokunulmamışla aynı', () => {
+    const untouched = PalletRackNode.parse({ levels: 3 })
+    const nullish = PalletRackNode.parse({ levels: 3, levelClears: [null, null] })
+    for (const level of [0, 1, 2, 3]) {
+      expect(levelSurfaceY(nullish, level)).toBe(levelSurfaceY(untouched, level))
+    }
+  })
+})

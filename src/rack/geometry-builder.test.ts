@@ -287,6 +287,7 @@ describe('cache key coverage', () => {
     ['depthPositions', 2],
     ['depthGap', 0.12],
     ['levels', 2],
+    ['levelClears', [2.4]],
     ['firstLevelClear', 1.9],
     ['levelClear', 1.7],
     ['groundLevelStorage', false],

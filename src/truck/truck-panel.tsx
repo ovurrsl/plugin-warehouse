@@ -1,6 +1,6 @@
 'use client'
 
-import { type AnyNodeId, useScene } from '@pascal-app/core'
+import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { gapsFor } from '../handling/gaps'
@@ -9,6 +9,7 @@ import { TRUCK_MODELS, TRUCK_VARIANT_LABEL } from '../handling/models'
 import { IssueList } from '../panels/issue-list'
 import { bindTruck } from './fleet'
 import { truckParametrics } from './parametrics'
+import { claimRoute } from './route-binding'
 import type { TruckNode } from './schema'
 
 /**
@@ -23,6 +24,16 @@ import type { TruckNode } from './schema'
 
 const styles = {
   root: { display: 'flex', flexDirection: 'column', gap: '0.5rem' },
+  button: {
+    width: '100%',
+    borderRadius: '0.375rem',
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    padding: '0.375rem 0.5rem',
+    fontSize: '0.6875rem',
+    color: 'var(--foreground)',
+    cursor: 'pointer',
+  },
   card: {
     display: 'flex',
     flexDirection: 'column',
@@ -87,9 +98,47 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
     }
   }
 
+  // Yerleştirme anında 1.5 m içinde koridor yoktu ya da araç sonradan
+  // taşındı: atama görünür ve DÜZENLENEBİLİR olmak zorunda (plan §5.3'ün
+  // "görünmez atama" reddinin öbür yarısı). Arama 6 m — düğmeye basmak açık
+  // bir niyettir, yerleştirmenin sessiz talebi değil.
+  const routeAction = node.routeId ? (
+    <button
+      onClick={() =>
+        useScene.getState().updateNode(node.id as AnyNodeId, { routeId: null } as Partial<AnyNode>)
+      }
+      style={styles.button}
+      type="button"
+    >
+      Rotayı çöz
+    </button>
+  ) : (
+    <button
+      onClick={() => {
+        const found = claimRoute(
+          useScene.getState().nodes as Readonly<Record<string, unknown>>,
+          node.parentId ?? null,
+          node.position?.[0] ?? 0,
+          node.position?.[2] ?? 0,
+          6,
+        )
+        if (found) {
+          useScene
+            .getState()
+            .updateNode(node.id as AnyNodeId, { routeId: found } as Partial<AnyNode>)
+        }
+      }}
+      style={styles.button}
+      type="button"
+    >
+      En yakın araç koridoruna bağla (≤ 6 m)
+    </button>
+  )
+
   return (
     <div style={styles.root}>
       <IssueList issues={issues} />
+      {routeAction}
 
       <div style={styles.card}>
         {figure && (

@@ -184,6 +184,10 @@ export function levelBeamHeight(rack: PalletRackNode, level: number): number {
  * hold, and quietly cost a level's worth of height up the whole frame.
  */
 export function levelClearOpening(rack: PalletRackNode, level: number): number {
+  // Kat başına açık geçersiz kılma her varsayılanı yener — kullanıcı o katı
+  // adıyla ayarladı; tip kuralları kalanlar içindir.
+  const override = rack.levelClears?.[level]
+  if (override != null) return override
   const type = levelTypeOf(rack, level)
   if (type === 'picking') return rack.pickingLevelClear
   return level <= 0 ? rack.firstLevelClear : rack.levelClear

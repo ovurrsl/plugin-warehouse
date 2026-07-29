@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`8a71ae0`](https://github.com/ovurrsl/plugin-warehouse/commit/8a71ae020be3349b2d9f967e678ca04281e7f98c))
 - Refresh generated README blocks [skip ci] ([`243eacd`](https://github.com/ovurrsl/plugin-warehouse/commit/243eacdaebd3aa41c6321bdeddea104d7ce667d0))
 - Refresh generated README blocks [skip ci] ([`77c46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/77c46ccc9c8b7ed032ad7cc839479238f22abf36))
 - Refresh generated README blocks [skip ci] ([`e6031d9`](https://github.com/ovurrsl/plugin-warehouse/commit/e6031d915b0f11f9db121e5ceb1a2f1721469b6f))
@@ -73,6 +74,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Per-level clears, low-rack template, and the queued small fixes ([`6cd44f9`](https://github.com/ovurrsl/plugin-warehouse/commit/6cd44f9338abb1981e674b14ef63c5f969f8507a))
 - Realism pass in 3D, family symbols in plan ([`f78bac5`](https://github.com/ovurrsl/plugin-warehouse/commit/f78bac56f2c55962283514ca10525969690e1211))
 - Five machines, five silhouettes — no more boxes ([`60ef022`](https://github.com/ovurrsl/plugin-warehouse/commit/60ef022064b1b2ba35c91450bdfb2b39107d1425))
 - The fleet drives — S6, movement along assigned aisles ([`921a29b`](https://github.com/ovurrsl/plugin-warehouse/commit/921a29b962686905892b202f31d0542a17e8446b))

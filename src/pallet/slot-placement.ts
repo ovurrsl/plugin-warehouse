@@ -154,6 +154,41 @@ export function resetRackIndex(): void {
   entries = []
 }
 
+/** Bir istasyon adayı: raf, dünya konumu ve plan dönüşü. */
+export type RackNearby = {
+  id: string
+  rack: PalletRackNode
+  parentId: string | null
+  x: number
+  z: number
+  rotationY: number
+}
+
+/**
+ * Verilen noktanın yakınındaki raflar — MEVCUT memoize indeksten.
+ *
+ * Filo istasyon seçimi bunu okur. İkinci bir indeks kurmak bu dosyanın var
+ * oluş gerekçesini bozardı ("bin raf × on bin düğüm" — occupancy'nin doküman
+ * bloğu); aynı `nodes` kimliğine aynı tarama, sahne başına bir kez.
+ */
+export function racksNear(
+  nodes: Readonly<Record<string, unknown>>,
+  x: number,
+  z: number,
+  radiusM: number,
+): RackNearby[] {
+  return rackIndex(nodes)
+    .filter((entry) => Math.hypot(entry.x - x, entry.z - z) <= radiusM + entry.radius)
+    .map(({ id, rack, parentId, x: rx, z: rz, rotationY }) => ({
+      id,
+      rack,
+      parentId,
+      x: rx,
+      z: rz,
+      rotationY,
+    }))
+}
+
 /**
  * The slot the cursor is asking for, or `null` for the floor.
  *

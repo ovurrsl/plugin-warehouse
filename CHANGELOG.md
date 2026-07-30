@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`ef4e993`](https://github.com/ovurrsl/plugin-warehouse/commit/ef4e993eef2e15ea53ce9012b9bc51310bd678bb))
 - Refresh generated README blocks [skip ci] ([`ae1db34`](https://github.com/ovurrsl/plugin-warehouse/commit/ae1db340877f50d043d0fd29b0aca640e4edbfbd))
 - Refresh generated README blocks [skip ci] ([`8a71ae0`](https://github.com/ovurrsl/plugin-warehouse/commit/8a71ae020be3349b2d9f967e678ca04281e7f98c))
 - Refresh generated README blocks [skip ci] ([`243eacd`](https://github.com/ovurrsl/plugin-warehouse/commit/243eacdaebd3aa41c6321bdeddea104d7ce667d0))
@@ -75,6 +76,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Telescopic belt conveyor — the truck-loading boom ([`cad6651`](https://github.com/ovurrsl/plugin-warehouse/commit/cad66515d39cc540c1fc25530a55699c7e67edd1))
 - S8 groundwork — the b4 rule and the station index's doorway ([`1a6befb`](https://github.com/ovurrsl/plugin-warehouse/commit/1a6befb49d6b962aed147d9103f17184fa8e3a23))
 - Per-level clears, low-rack template, and the queued small fixes ([`6cd44f9`](https://github.com/ovurrsl/plugin-warehouse/commit/6cd44f9338abb1981e674b14ef63c5f969f8507a))
 - Realism pass in 3D, family symbols in plan ([`f78bac5`](https://github.com/ovurrsl/plugin-warehouse/commit/f78bac56f2c55962283514ca10525969690e1211))

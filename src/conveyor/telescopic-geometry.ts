@@ -53,6 +53,10 @@ function colorOf(node: ConveyorTelescopicNode, role: TelescopicPart['role']): st
       return '#f2c200'
     case 'lamp-housing':
       return '#3a4048'
+    case 'sensor':
+      return '#20242a'
+    case 'platform':
+      return PALETTE.feetGrey
   }
 }
 

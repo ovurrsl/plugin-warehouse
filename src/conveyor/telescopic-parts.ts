@@ -26,6 +26,8 @@ export type TelescopicPartRole =
   | 'estop'
   | 'hazard'
   | 'lamp-housing'
+  | 'sensor'
+  | 'platform'
 
 export type TelescopicPart = {
   role: TelescopicPartRole
@@ -215,6 +217,43 @@ export function telescopicSectionParts(
       center: [noseX + 0.01, topY - 0.05, 0],
       size: [0.03, 0.12, width - 0.08],
     })
+    // Anti-çarpışma sensörü — gerçek makinede uzamayı engelle 10 cm kala
+    // otomatik durduran fotoelektrik kutunun görsel karşılığı.
+    parts.push({
+      role: 'sensor',
+      center: [noseX + 0.02, topY + 0.08, 0],
+      size: [0.05, 0.05, 0.09],
+    })
+    // Operatör basamağı — konsol tarafında, elle istifleme için tek kişilik
+    // platform + bel hizası korkuluk (Feifer FLEXITRANS'ın burun basamağı).
+    const stepX = noseX - 0.05
+    const stepZ = width / 2 + 0.34
+    const stepY = topY - 0.16
+    parts.push({
+      role: 'platform',
+      center: [stepX, stepY, stepZ],
+      size: [0.7, 0.035, 0.55],
+    })
+    for (const dx of [-0.28, 0.28] as const) {
+      parts.push({
+        role: 'frame',
+        center: [stepX + dx, stepY, width / 2 + 0.19],
+        size: [0.05, 0.05, 0.34],
+      })
+    }
+    const railY = stepY + 0.55
+    parts.push({
+      role: 'rail',
+      center: [stepX, railY, stepZ + 0.26],
+      size: [0.7, 0.05, 0.03],
+    })
+    for (const dx of [-0.35, 0.35] as const) {
+      parts.push({
+        role: 'rail',
+        center: [stepX + dx, (stepY + railY) / 2, stepZ + 0.26],
+        size: [0.03, railY - stepY, 0.03],
+      })
+    }
   }
   return parts
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
@@ -130,6 +131,15 @@ type WarehouseStore = {
    */
   truckBrush: TruckBrush
   setTruckBrush: (patch: Partial<TruckBrush>) => void
+
+  /**
+   * Shape of the next placed telescopic conveyor. `extension` fırçada durur
+   * çünkü `[`/`]` ile yerleştirme SIRASINDA ayarlanıyor ve bir sonraki
+   * makinenin aynı açıklıkta başlaması beklenen davranış — rampanın önüne
+   * arka arkaya iki bom koyan kullanıcı ikisini de aynı boyda ister.
+   */
+  telescopicBrush: TelescopicBrush
+  setTelescopicBrush: (patch: Partial<TelescopicBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -143,6 +153,8 @@ export type RouteBrush = Pick<
 >
 
 export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
+
+export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth' | 'extension'>
 
 export type RackBrush = Pick<
   PalletRackNode,
@@ -264,4 +276,12 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
       }
       return { truckBrush: next }
     }),
+
+  telescopicBrush: {
+    model: 'a4-6+12',
+    beltWidth: '800',
+    extension: 0,
+  },
+  setTelescopicBrush: (patch) =>
+    set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
 }))

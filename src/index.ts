@@ -5,6 +5,7 @@ import { conveyorCurveDefinition } from './conveyor/curve-definition'
 import { conveyorRollerDefinition } from './conveyor/definition'
 import { conveyorLauncherDefinition } from './conveyor/launcher-definition'
 import { conveyorObliqueDefinition } from './conveyor/oblique-definition'
+import { conveyorTelescopicDefinition } from './conveyor/telescopic-definition'
 import { conveyorTransferDefinition } from './conveyor/transfer-definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
@@ -44,6 +45,7 @@ export const warehousePlugin: Plugin = {
     conveyorTransferDefinition as unknown as AnyNodeDefinition,
     conveyorObliqueDefinition as unknown as AnyNodeDefinition,
     routeDefinition as unknown as AnyNodeDefinition,
+    conveyorTelescopicDefinition as unknown as AnyNodeDefinition,
     truckDefinition as unknown as AnyNodeDefinition,
   ],
 }
@@ -75,6 +77,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:conveyor-oblique',
     // Kayıtlı 9. ve 10. kind — `route` liste dışıydı (manifest 9 kaydediyor,
     // liste 8 sayıyordu); araçla birlikte kapatıldı, T17 artık kilitli.
+    'warehouse:conveyor-telescopic',
     'warehouse:route',
     'warehouse:truck',
   ],

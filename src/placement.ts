@@ -69,6 +69,7 @@ const CLICK_TRIGGER_KINDS = [
   'warehouse:conveyor-booster',
   'warehouse:conveyor-transfer',
   'warehouse:conveyor-oblique',
+  'warehouse:conveyor-telescopic',
   // A route is drawn across a hall that already has paint on it, and its own
   // hit target covers the whole corridor — so without this the second route
   // cannot be started anywhere the first one runs.

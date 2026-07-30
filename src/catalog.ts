@@ -41,6 +41,7 @@ export type CatalogItem = {
     | { kind: 'route'; role: 'pedestrian' | 'vehicle'; traffic: 'one-way' | 'two-way' }
     | { kind: 'truck'; model: string }
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
+    | { kind: 'telescopic'; model: string }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -239,6 +240,16 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Crosses a line through ninety degrees without turning the box: belt strips rise between the rollers and carry it off sideways. H flips the discharge side.',
     icon: 'lucide:move-diagonal',
+  },
+  {
+    id: 'conveyor-telescopic',
+    kind: 'warehouse:conveyor-telescopic',
+    label: 'Telescopic Belt Conveyor',
+    sectionId: 'conveyance',
+    description:
+      'Araç/konteyner yükleme bomu: sabit gövdesinden dorsenin içine uzayan bant. On katalog modeli, tam açıkken 14–25 m. [ ve ] ile bomu kısaltıp uzatın.',
+    icon: 'lucide:move-horizontal',
+    brush: { kind: 'telescopic', model: 'a4-6+12' },
   },
   {
     id: 'conveyor-oblique',

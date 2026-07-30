@@ -10,14 +10,14 @@ import {
   resolveColumnProfile,
   resolveTierElevations,
 } from './metrics'
-import { EDGES, edgeGeometry, railingSpans, stairOrigin, tierVoidRects } from './railing'
+import { edgeGeometry, outlineEdgeSpans, outlineEdges, stairOrigin, tierVoidRects } from './railing'
 import type { MezzanineNode } from './schema'
 import { resolveSteps } from './stairs'
 
 /**
  * Plan sembolü — 3B ile AYNI hesaplayıcılardan.
  *
- * `gridColumnPositions`, `railingSpans`, `stairOrigin`, `resolveSteps`,
+ * `gridColumnPositions`, `outlineEdges`, `stairOrigin`, `resolveSteps`,
  * `tierVoidRects`: hepsi `parts.ts`'in okuduğu fonksiyonların ta kendisi.
  * v1.0 raporunun kendi kuralı ("iki görünüm tek kaynaktan türer") ve
  * backlog'daki 2D/3D uyuşmazlığını mezzanine'de tekrarlamamanın tek yolu —
@@ -221,19 +221,34 @@ export function buildMezzanineFloorplan(
   }
 
   // ── Korkuluk: dolu parçalar, açıklıklarda kesik ────────────────────────
+  //
+  // 3B ile AYNI kaynaktan (`outlineEdges` + `outlineEdgeSpans`): plan
+  // dikdörtgen kenarlardan çizilseydi, L şeklinde bir güvertede 2B ile 3B
+  // ayrışırdı ve backlog'daki 2D/3D uyuşmazlığı mezzanine'de tekrarlanırdı.
   if (top) {
-    for (const edge of EDGES) {
-      const geo = edgeGeometry(node, edge)
-      for (const span of railingSpans(node, top, edge)) {
+    const thickness = 0.06
+    for (const edge of outlineEdges(node)) {
+      const ux = (edge.b[0] - edge.a[0]) / edge.lengthM
+      const uz = (edge.b[1] - edge.a[1]) / edge.lengthM
+      for (const span of outlineEdgeSpans(top, edge)) {
         const length = span.toM - span.fromM
         const mid = (span.fromM + span.toM) / 2
-        const thickness = 0.06
+        const cx = edge.a[0] + ux * mid
+        const cz = edge.a[1] + uz * mid
+        const hx = (ux * length) / 2
+        const hz = (uz * length) / 2
+        // Eğik bir kenar dikdörtgenle çizilemez; kalınlık kenarın dik
+        // yönünde açılan dörtgenle veriliyor.
+        const nx = (-uz * thickness) / 2
+        const nz = (ux * thickness) / 2
         children.push({
-          kind: 'rect',
-          x: geo.axis === 'x' ? mid - length / 2 : geo.fixed - thickness / 2,
-          y: geo.axis === 'x' ? geo.fixed - thickness / 2 : mid - length / 2,
-          width: geo.axis === 'x' ? length : thickness,
-          height: geo.axis === 'x' ? thickness : length,
+          kind: 'polygon',
+          points: [
+            [cx - hx + nx, cz - hz + nz],
+            [cx + hx + nx, cz + hz + nz],
+            [cx + hx - nx, cz + hz - nz],
+            [cx - hx - nx, cz - hz - nz],
+          ],
           fill: railStroke,
           stroke: railStroke,
           strokeWidth: 0.008,

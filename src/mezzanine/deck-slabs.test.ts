@@ -20,6 +20,7 @@ import {
   resolveTierElevations,
 } from './metrics'
 import { mezzanineParts } from './parts'
+import { outlineEdges } from './railing'
 import { emptyAccessories, MezzanineNode } from './schema'
 
 const tier = (patch: Record<string, unknown> = {}) => ({
@@ -368,5 +369,56 @@ describe('özel şekil — slab gibi poligon', () => {
         ],
       }),
     ).toThrow()
+  })
+})
+
+describe('korkuluk anahatı takip ediyor', () => {
+  const lShape: [number, number][] = [
+    [-10, -7.5],
+    [0, -7.5],
+    [0, 0],
+    [10, 0],
+    [10, 7.5],
+    [-10, 7.5],
+  ]
+
+  test('dikdörtgende dört kenar, her kardinalin tek temsilcisi', () => {
+    const edges = outlineEdges(mezzanine())
+    expect(edges).toHaveLength(4)
+    expect(edges.every((e) => e.representative)).toBe(true)
+    expect(new Set(edges.map((e) => e.cardinal)).size).toBe(4)
+  })
+
+  test('L şeklinde altı kenar ve korkuluk çentiği dönüyor', () => {
+    const edges = outlineEdges(mezzanine({ polygon: lShape }))
+    expect(edges).toHaveLength(6)
+    // Çentik iki fazla kenar getiriyor; korkuluk artık oraları da sarıyor.
+    const rails = mezzanineParts(mezzanine({ polygon: lShape })).filter((p) => p.role === 'railing')
+    expect(rails.length).toBeGreaterThan(0)
+  })
+
+  test('dış normal poligondan çıkıyor, sarımdan DEĞİL', () => {
+    // Sarımı ters çevirmek normalleri döndürmemeli; yoksa çizim aracının
+    // normalleştirmesi bir gün değişirse korkuluk sessizce içe döner.
+    const forward = outlineEdges(mezzanine({ polygon: lShape }))
+    const reversed = outlineEdges(mezzanine({ polygon: [...lShape].reverse() }))
+    for (const edge of [...forward, ...reversed]) {
+      // Normal boyunca bir adım POLİGONUN DIŞINA düşmeli.
+      const midX = (edge.a[0] + edge.b[0]) / 2 + edge.outward[0] * 0.2
+      const midZ = (edge.a[1] + edge.b[1]) / 2 + edge.outward[1] * 0.2
+      expect(pointInPolygon(midX, midZ, lShape)).toBe(false)
+    }
+  })
+
+  test('aynı kardinale bakan iki kenardan yalnız biri açıklık kesiyor', () => {
+    // `edge: 'north'` diyen bir kapı kuzeye bakan HER kenarda açılamaz —
+    // bir kapı bir yerdedir.
+    const edges = outlineEdges(mezzanine({ polygon: lShape }))
+    const byCardinal = new Map<string, number>()
+    for (const edge of edges) {
+      if (!edge.representative) continue
+      byCardinal.set(edge.cardinal, (byCardinal.get(edge.cardinal) ?? 0) + 1)
+    }
+    for (const count of byCardinal.values()) expect(count).toBe(1)
   })
 })

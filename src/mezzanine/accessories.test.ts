@@ -3,7 +3,7 @@ import { STAIRCASE_GEOMETRY } from './catalog'
 import { mezzanineGeometryKey } from './geometry'
 import { resolveTierElevations } from './metrics'
 import { mezzanineParts } from './parts'
-import { openingsOnEdge, railingSpans, tierVoidRects } from './railing'
+import { openingsOnEdge, outlineEdgeSpans, outlineEdges, tierVoidRects } from './railing'
 import { emptyAccessories, MezzanineNode, type StaircaseSpec } from './schema'
 import { type Rect, rectsOverlap, resolveSteps } from './stairs'
 
@@ -142,18 +142,24 @@ describe('döşeme boşluğu: CSG değil, panel dışlama', () => {
 })
 
 describe('korkuluk: açıklıkların bir FONKSİYONU', () => {
-  test('aksesuarsız çevre kesintisiz — kenar başına tek dolu parça', () => {
-    const node = nodeWith({})
+  /** Üretim yolunun kendisi: anahat kenarı + o kenarın dolu parçaları. */
+  const spansOn = (node: ReturnType<typeof nodeWith>, cardinal: 'north' | 'south') => {
     const tier = node.tiers[0]
     if (!tier) throw new Error('tier yok')
-    expect(railingSpans(node, tier, 'north')).toHaveLength(1)
+    const edge = outlineEdges(node).find((e) => e.cardinal === cardinal)
+    if (!edge) throw new Error(`${cardinal} kenarı yok`)
+    return outlineEdgeSpans(tier, edge)
+  }
+
+  test('aksesuarsız çevre kesintisiz — kenar başına tek dolu parça', () => {
+    expect(spansOn(nodeWith({}), 'north')).toHaveLength(1)
   })
 
   test('kapı korkulukta açıklık açar — kenar ikiye bölünür', () => {
-    const node = nodeWith({ swingGates: [{ edge: 'north', offsetM: 10, widthM: 0.75 }] })
-    const tier = node.tiers[0]
-    if (!tier) throw new Error('tier yok')
-    const spans = railingSpans(node, tier, 'north')
+    const spans = spansOn(
+      nodeWith({ swingGates: [{ edge: 'north', offsetM: 10, widthM: 0.75 }] }),
+      'north',
+    )
     expect(spans).toHaveLength(2)
     // Toplam dolu uzunluk = kenar − kapı genişliği.
     const filled = spans.reduce((sum, s) => sum + (s.toM - s.fromM), 0)

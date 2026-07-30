@@ -97,11 +97,16 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
        * korkuluğun onu takip ettiğini sanardı.
        */
       if (hasCustomOutline(node)) {
-        issues.push({
-          field: 'polygon',
-          severity: 'warning',
-          msg: 'Özel şekilde döşeme, kolonlar ve taşıyıcı yüzey poligonu takip ediyor; korkuluk ve aksesuarlar henüz sınır dikdörtgeninde.',
-        })
+        const edgeAnchored = node.tiers.some((t) =>
+          t.accessories.staircases.some((s) => s.placement.mode === 'edge'),
+        )
+        if (edgeAnchored) {
+          issues.push({
+            field: 'polygon',
+            severity: 'warning',
+            msg: 'Kenara sabitli merdivenler özel şekilde sınır dikdörtgenine oturuyor — serbest konuma (⤢) alarak istediğiniz yere taşıyın.',
+          })
+        }
       }
 
       // Tier indeksleri 0'dan başlayıp ardışık olmalı — sıçrayan bir indeks

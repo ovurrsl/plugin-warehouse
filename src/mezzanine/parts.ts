@@ -25,10 +25,10 @@ import {
   SECONDARY_BEAM_SPACING_M,
 } from './metrics'
 import {
-  EDGES,
   edgeGeometry,
+  outlineEdgeSpans,
+  outlineEdges,
   postSpacingM,
-  railingSpans,
   stairOrigin,
   tierVoidRects,
 } from './railing'
@@ -255,52 +255,65 @@ function pushRailing(
 ): void {
   const spacing = postSpacingM(node)
 
-  for (const edge of EDGES) {
-    const geo = edgeGeometry(node, edge)
-    // Korkuluk kenarın hemen içinde durur — dışa taşan bir küpeşte, taban
-    // izinin dışına çıkar ve komşu bir mezzanine'le çakışırdı.
-    const inset = geo.outward * -(POST_SECTION_M / 2)
-    const fixed = geo.fixed + inset
+  /**
+   * Korkuluk ANAHAT kenarlarını takip ediyor, sınır dikdörtgenini değil.
+   *
+   * Dikdörtgen mezzanine'de dört kenar dört kardinale birebir düşüyor ve
+   * sonuç eski dört-kenar döngüsünün aynısı; L şeklinde ise korkuluk
+   * çentiği de dönüyor. Eskiden döşeme şekli takip ediyor ama korkuluk
+   * dikdörtgen kalıyordu — açık kenar korkuluksuz, olmayan kenar
+   * korkulukluydu.
+   */
+  for (const edge of outlineEdges(node)) {
+    const dx = edge.b[0] - edge.a[0]
+    const dz = edge.b[1] - edge.a[1]
+    const ux = dx / edge.lengthM
+    const uz = dz / edge.lengthM
+    // Kenarın hemen İÇİNDE durur — dışa taşan bir küpeşte taban izinin
+    // dışına çıkar ve komşu bir mezzanine'le çakışırdı.
+    const insetX = -edge.outward[0] * (POST_SECTION_M / 2)
+    const insetZ = -edge.outward[1] * (POST_SECTION_M / 2)
+    // Kenar yönü: eksen hizalı olmayan bir kenar ancak dönüşle çizilebilir.
+    const yaw = Math.atan2(dz, dx)
 
-    for (const span of railingSpans(node, tier, edge)) {
+    /** Kenar parametresinden dünya konumuna. */
+    const at = (value: number, y: number): readonly [number, number, number] => [
+      edge.a[0] + ux * value + insetX,
+      y,
+      edge.a[1] + uz * value + insetZ,
+    ]
+
+    for (const span of outlineEdgeSpans(tier, edge)) {
       const length = span.toM - span.fromM
       const mid = (span.fromM + span.toM) / 2
 
-      const along = (value: number, y: number, size: readonly [number, number, number]) =>
-        geo.axis === 'x'
-          ? { center: [value, y, fixed] as const, size }
-          : { center: [fixed, y, value] as const, size }
-
-      const barSize: readonly [number, number, number] =
-        geo.axis === 'x'
-          ? [length, RAIL_SECTION_M, RAIL_SECTION_M]
-          : [RAIL_SECTION_M, RAIL_SECTION_M, length]
-
       // Üst küpeşte ve ara kayıt.
       for (const y of [deckTopY + HANDRAIL_HEIGHT_M, deckTopY + HANDRAIL_HEIGHT_M / 2]) {
-        const bar = along(mid, y, barSize)
-        parts.push({ role: 'railing', center: bar.center, size: bar.size })
+        parts.push({
+          role: 'railing',
+          center: at(mid, y),
+          size: [length, RAIL_SECTION_M, RAIL_SECTION_M],
+          rotationY: -yaw,
+        })
       }
 
       // Süpürgelik: döşemeden yukarı, düşen bir aletin durduğu yer.
-      const kickSize: readonly [number, number, number] =
-        geo.axis === 'x'
-          ? [length, KICKBOARD_HEIGHT_M, KICKBOARD_THICKNESS_M]
-          : [KICKBOARD_THICKNESS_M, KICKBOARD_HEIGHT_M, length]
-      const kick = along(mid, deckTopY + KICKBOARD_HEIGHT_M / 2, kickSize)
-      parts.push({ role: 'kickboard', center: kick.center, size: kick.size })
+      parts.push({
+        role: 'kickboard',
+        center: at(mid, deckTopY + KICKBOARD_HEIGHT_M / 2),
+        size: [length, KICKBOARD_HEIGHT_M, KICKBOARD_THICKNESS_M],
+        rotationY: -yaw,
+      })
 
       // Dikmeler: aralık kurucu sistemin yayınlanmış üst sınırından, iki uç
       // her zaman dahil.
       const posts = Math.max(1, Math.ceil(length / spacing))
       for (let i = 0; i <= posts; i++) {
-        const value = span.fromM + (i / posts) * length
-        const post = along(value, deckTopY + HANDRAIL_HEIGHT_M / 2, [
-          POST_SECTION_M,
-          HANDRAIL_HEIGHT_M,
-          POST_SECTION_M,
-        ])
-        parts.push({ role: 'railing', center: post.center, size: post.size })
+        parts.push({
+          role: 'railing',
+          center: at(span.fromM + (i / posts) * length, deckTopY + HANDRAIL_HEIGHT_M / 2),
+          size: [POST_SECTION_M, HANDRAIL_HEIGHT_M, POST_SECTION_M],
+        })
       }
     }
   }

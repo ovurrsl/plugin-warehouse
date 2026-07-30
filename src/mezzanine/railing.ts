@@ -11,12 +11,11 @@
  */
 
 import { CONSTRUCTIVE_SYSTEMS } from './catalog'
-import { footprintDepthM, footprintWidthM } from './metrics'
+import { footprintDepthM, footprintWidthM, outlinePolygon, pointInPolygon } from './metrics'
 import type { MezzanineNode, MezzanineTier } from './schema'
 import { type Rect, rectsOverlap, resolveSteps, stairVoidRect } from './stairs'
 
 export type Edge = 'north' | 'south' | 'east' | 'west'
-export const EDGES: readonly Edge[] = ['north', 'south', 'east', 'west']
 
 /**
  * Kenarın dünya çerçevesindeki yeri.
@@ -51,6 +50,99 @@ export function edgeGeometry(node: MezzanineNode, edge: Edge): EdgeGeometry {
     case 'east':
       return { axis: 'z', fixed: width / 2, lengthM: depth, startM: -depth / 2, outward: 1 }
   }
+}
+
+/**
+ * Poligon anahatının bir kenarı.
+ *
+ * Dikdörtgen mezzanine'de dört kenar dört kardinale birebir düşüyor ve
+ * davranış `edgeGeometry`nin aynısı; özel şekilde kenar sayısı serbest.
+ */
+export type OutlineEdge = {
+  /** Kenarın uçları, mezzanine-yerel `[x, z]`. */
+  a: readonly [number, number]
+  b: readonly [number, number]
+  lengthM: number
+  /** Dışa bakan birim normal. */
+  outward: readonly [number, number]
+  /** En yakın kardinal yön — aksesuarlar hâlâ bu adlarla yerleşiyor. */
+  cardinal: Edge
+  /**
+   * Bu kenar, kardinalinin TEMSİLCİSİ mi.
+   *
+   * `edge: 'north'` diyen bir kapı, kuzeye bakan HER kenarda açılamaz —
+   * bir kapı bir yerdedir. Kardinal başına en uzun kenar temsilci seçiliyor
+   * ve açıklıklar yalnız orada kesiliyor. Dikdörtgende her kardinalin tek
+   * kenarı var, yani bu kural bugünkü davranışa birebir iniyor.
+   */
+  representative: boolean
+}
+
+const CARDINAL_NORMALS: ReadonlyArray<readonly [Edge, number, number]> = [
+  ['north', 0, -1],
+  ['south', 0, 1],
+  ['west', -1, 0],
+  ['east', 1, 0],
+]
+
+/**
+ * Anahat kenarları, dış normalleriyle.
+ *
+ * **Dış normal sarımdan DEĞİL poligondan çıkarılıyor:** kenarın ortasından
+ * aday normal boyunca küçük bir adım atılıyor ve `pointInPolygon` ile
+ * dışarıda olup olmadığı soruluyor. Sarım kuralına güvenmek, çizim aracının
+ * normalleştirmesi bir gün değişirse korkuluğu sessizce içe çevirirdi.
+ */
+export function outlineEdges(node: MezzanineNode): OutlineEdge[] {
+  const outline = outlinePolygon(node)
+  const probe = 0.05
+  const edges: Omit<OutlineEdge, 'representative'>[] = []
+
+  for (let i = 0; i < outline.length; i++) {
+    const a = outline[i]
+    const b = outline[(i + 1) % outline.length]
+    if (!a || !b) continue
+    const dx = b[0] - a[0]
+    const dz = b[1] - a[1]
+    const lengthM = Math.hypot(dx, dz)
+    if (lengthM < 1e-6) continue
+
+    const midX = (a[0] + b[0]) / 2
+    const midZ = (a[1] + b[1]) / 2
+    // Kenara dik iki aday; poligonun dışına düşen doğru olan.
+    let nx = -dz / lengthM
+    let nz = dx / lengthM
+    if (pointInPolygon(midX + nx * probe, midZ + nz * probe, outline)) {
+      nx = -nx
+      nz = -nz
+    }
+
+    let cardinal: Edge = 'north'
+    let best = Number.NEGATIVE_INFINITY
+    for (const [name, cx, cz] of CARDINAL_NORMALS) {
+      const dot = nx * cx + nz * cz
+      if (dot > best) {
+        best = dot
+        cardinal = name
+      }
+    }
+
+    edges.push({ a, b, lengthM, outward: [nx, nz], cardinal })
+  }
+
+  // Kardinal başına en uzun kenar temsilci.
+  const longest = new Map<Edge, number>()
+  edges.forEach((edge, index) => {
+    const current = longest.get(edge.cardinal)
+    if (current === undefined || (edges[current]?.lengthM ?? 0) < edge.lengthM) {
+      longest.set(edge.cardinal, index)
+    }
+  })
+
+  return edges.map((edge, index) => ({
+    ...edge,
+    representative: longest.get(edge.cardinal) === index,
+  }))
 }
 
 /** Bir kenar üzerindeki açıklık — `[başlangıç, bitiş]`, kenarın kendi
@@ -110,17 +202,23 @@ function mergeOpenings(openings: readonly Opening[]): Opening[] {
   return merged
 }
 
-/** Korkuluğun DOLU parçaları: kenar eksi açıklıklar, kenar parametresinde. */
-export function railingSpans(node: MezzanineNode, tier: MezzanineTier, edge: Edge): Opening[] {
-  const geo = edgeGeometry(node, edge)
-  const openings = openingsOnEdge(tier, edge)
-  const spans: Opening[] = []
-  let cursor = geo.startM
-  const end = geo.startM + geo.lengthM
+/**
+ * Bir anahat kenarının DOLU parçaları — kenarın kendi parametresinde
+ * (0 → `lengthM`).
+ *
+ * Açıklıklar yalnız kardinalinin temsilcisi olan kenarda kesiliyor; bkz.
+ * `OutlineEdge.representative`. Dikdörtgende her kardinalin tek kenarı
+ * olduğu için sonuç `railingSpans`ın verdiğinin aynısı.
+ */
+export function outlineEdgeSpans(tier: MezzanineTier, edge: OutlineEdge): Opening[] {
+  const end = edge.lengthM
+  if (!edge.representative) return [{ fromM: 0, toM: end }]
 
-  for (const opening of openings) {
-    const from = Math.max(geo.startM, geo.startM + opening.fromM)
-    const to = Math.min(end, geo.startM + opening.toM)
+  const spans: Opening[] = []
+  let cursor = 0
+  for (const opening of openingsOnEdge(tier, edge.cardinal)) {
+    const from = Math.max(0, opening.fromM)
+    const to = Math.min(end, opening.toM)
     if (to <= cursor) continue
     if (from > cursor) spans.push({ fromM: cursor, toM: Math.min(from, end) })
     cursor = Math.max(cursor, to)

@@ -90,6 +90,8 @@ export function telescopicSectionKey(
     detail,
     node.frameColor,
     node.beltColor,
+    node.hasSensor,
+    node.hasPlatform,
   ].join('|')
 }
 

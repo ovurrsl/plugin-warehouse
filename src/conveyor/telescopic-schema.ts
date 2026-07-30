@@ -39,6 +39,12 @@ export const ConveyorTelescopicNode = BaseNode.extend({
   frameColor: z.string().default('#1e56a0'),
   beltColor: z.string().default('#2b2f34'),
 
+  // ── Burun donanımı — üreticiler arası opsiyonel, standart değil. ────────
+  /** Anti-çarpışma sensörü (fotoelektrik) — burun ucunda. */
+  hasSensor: z.boolean().default(true),
+  /** Operatör basamağı + korkuluk — konsol tarafında, burunda. */
+  hasPlatform: z.boolean().default(true),
+
   supportSlabId: z.string().nullable().default(null),
 })
 

@@ -18,6 +18,7 @@ import {
   frameWidthM,
 } from './telescopic-metrics'
 import { conveyorTelescopicParametrics } from './telescopic-parametrics'
+import { telescopicSectionParts } from './telescopic-parts'
 import { ConveyorTelescopicNode } from './telescopic-schema'
 
 const CTX_UNSELECTED = {} as GeometryContext
@@ -130,6 +131,46 @@ describe('uzama: taban izi büyür, geometri anahtarı büyümez', () => {
       expect(current.widthM).toBeLessThan(prev.widthM)
       expect(current.tipX).toBeGreaterThan(prev.tipX)
     }
+  })
+})
+
+describe('burun donanımı: sensör ve platform panelden kapatılabilir', () => {
+  test('varsayılan açık — burun bölümünde sensor ve platform rolleri var', () => {
+    const node = ConveyorTelescopicNode.parse({ model: 'a4-6+12' })
+    const model = { sections: 4 } // a4-6+12: son bölüm indeksi 3
+    const nose = telescopicSectionParts(node, model.sections - 1, 'full')
+    expect(nose.some((part) => part.role === 'sensor')).toBe(true)
+    expect(nose.some((part) => part.role === 'platform')).toBe(true)
+  })
+
+  test('kapatılınca ilgili parçalar hiç üretilmez', () => {
+    const node = ConveyorTelescopicNode.parse({
+      model: 'a4-6+12',
+      hasSensor: false,
+      hasPlatform: false,
+    })
+    const nose = telescopicSectionParts(node, 3, 'full')
+    const on = telescopicSectionParts(ConveyorTelescopicNode.parse({ model: 'a4-6+12' }), 3, 'full')
+    expect(nose.some((part) => part.role === 'sensor')).toBe(false)
+    expect(nose.some((part) => part.role === 'platform')).toBe(false)
+    // Platform kapanınca onu taşıyan braket/korkuluk da gitmeli — yarım
+    // platform (havada asılı braket) fiziksel olarak anlamsız. Bölümün
+    // KENDİ yan korkulukları (`rail`, her bölümde) kalmalı — yalnız
+    // platformun korkuluğu (1 bar + 2 direk = 3 parça) düşer.
+    const railsOn = on.filter((part) => part.role === 'rail').length
+    const railsOff = nose.filter((part) => part.role === 'rail').length
+    expect(railsOn - railsOff).toBe(3)
+    expect(railsOff).toBeGreaterThan(0)
+  })
+
+  test("bayraklar geometri anahtarına girer — kapatmak eski buffer'ı göstermez", () => {
+    const on = ConveyorTelescopicNode.parse({ model: 'a4-6+12' })
+    const off = ConveyorTelescopicNode.parse({
+      model: 'a4-6+12',
+      hasSensor: false,
+      hasPlatform: false,
+    })
+    expect(telescopicSectionKey(on, 3, 'full')).not.toBe(telescopicSectionKey(off, 3, 'full'))
   })
 })
 

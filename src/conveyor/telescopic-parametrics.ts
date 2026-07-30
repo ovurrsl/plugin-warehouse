@@ -42,6 +42,14 @@ export const conveyorTelescopicParametrics: ParametricDescriptor<ConveyorTelesco
       ],
     },
     {
+      label: 'Nose Equipment',
+      fields: [
+        // İkisi de opsiyonel donanım — üreticiler arası standart değil.
+        { key: 'hasSensor', kind: 'boolean' },
+        { key: 'hasPlatform', kind: 'boolean' },
+      ],
+    },
+    {
       label: 'Finish',
       fields: [
         { key: 'frameColor', kind: 'color' },

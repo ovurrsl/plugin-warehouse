@@ -16,6 +16,7 @@ import { liveRackingDefinition } from './definition'
 import { buildLiveRackingFloorplan } from './floorplan'
 import { liveRackingGeometryKey } from './geometry'
 import {
+  assignedSkuCount,
   bayWidthM,
   channelDepthM,
   channelDropM,
@@ -28,6 +29,7 @@ import {
   palletPositions,
   rollerLengthM,
   rollerPitchIsValid,
+  skuOfLevel,
 } from './metrics'
 import { liveRackingParametrics } from './parametrics'
 import { liveRackingParts } from './parts'
@@ -173,6 +175,10 @@ describe('parça listesi', () => {
 })
 
 describe('akış donanımı — Faz 2', () => {
+  const childrenOfPlan = (n: LiveRackingNode, ctx: GeometryContext) => {
+    const plan = buildLiveRackingFloorplan(n, ctx)
+    return plan?.kind === 'group' ? plan.children : []
+  }
   const roles = (n: LiveRackingNode, detail: 'full' | 'simple' = 'full') =>
     new Set(liveRackingParts(n, detail).map((p) => p.role))
   const countOf = (n: LiveRackingNode, role: string, detail: 'full' | 'simple' = 'full') =>
@@ -286,6 +292,29 @@ describe('akış donanımı — Faz 2', () => {
     const beamsPlain = countOf(plain, 'beam')
     const beamsClad = countOf(clad, 'beam')
     expect(beamsClad).toBe(beamsPlain + 2)
+  })
+
+  test('SKU kat başına okunur; kısa dizi boş sayılır', () => {
+    const n = node({ levels: 3, skus: ['ABC-1'] })
+    expect(skuOfLevel(n, 0)).toBe('ABC-1')
+    // Dizi kat sayısıyla senkron olmak zorunda değil — eksik giriş boş.
+    expect(skuOfLevel(n, 2)).toBe('')
+    expect(assignedSkuCount(n)).toBe(1)
+    // Yalnız boşluk yazmak SKU sayılmaz.
+    expect(assignedSkuCount(node({ levels: 2, skus: ['  ', 'X'] }))).toBe(1)
+  })
+
+  test('plan SKU etiketini SEÇİM GEREKMEDEN çizer', () => {
+    const labelled = node({ levels: 2, skus: ['ABC-1', 'ABC-2'] })
+    const texts = childrenOfPlan(labelled, CTX)
+      .filter((c) => c.kind === 'dimension-label')
+      .map((c) => (c as { text: string }).text)
+    // Seçili değil, ama referans planda okunuyor: kanal başına tek SKU
+    // canlı rafın tanımlayıcı kısıtı, yerleşimi okuyan kişi görmeli.
+    expect(texts.some((t) => t.includes('ABC-1') && t.includes('ABC-2'))).toBe(true)
+
+    // SKU yoksa etiket de yok.
+    expect(childrenOfPlan(node(), CTX).filter((c) => c.kind === 'dimension-label')).toHaveLength(0)
   })
 
   test('taban plakaları ankrajlı', () => {
@@ -479,7 +508,14 @@ describe('tanım ve manifest', () => {
 
   test('her şema alanı ya bir grupta ya bilinçli gizli', () => {
     const BASE = ['object', 'id', 'type', 'name', 'parentId', 'visible', 'metadata', 'camera']
-    const HIDDEN = ['supportSlabId']
+    /**
+     * `supportSlabId` yerleştirmede yazılır, kullanıcı alanı değil.
+     * `skus` generic alanla erişilemez — `ParametricField` birleşiminde
+     * metin alanı yok (number/boolean/enum/vec3/color/material/ref) — ama
+     * trailing panelde kat başına düzenlenebiliyor, yani ERİŞİLEBİLİR.
+     * Bu liste "kullanıcıya kapalı" demek değil, "generic alan değil" demek.
+     */
+    const HIDDEN = ['supportSlabId', 'skus']
     const covered = new Set(
       liveRackingParametrics.groups.flatMap((g) => g.fields.map((f) => String(f.key))),
     )

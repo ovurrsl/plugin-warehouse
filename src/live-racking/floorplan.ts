@@ -1,11 +1,13 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { PALETTE } from './catalog'
 import {
+  assignedSkuCount,
   bayWidthM,
   channelDepthM,
   hasBrakeRollers,
   palletRunDepthM,
   rollerLengthM,
+  skuOfLevel,
 } from './metrics'
 import type { LiveRackingNode } from './schema'
 
@@ -139,12 +141,38 @@ export function buildLiveRackingFloorplan(
     strokeWidth: 0.004,
   })
 
+  /**
+   * SKU etiketi — seçime BAĞLI DEĞİL.
+   *
+   * Kanal başına tek referans canlı rafın tanımlayıcı kısıtı; planı okuyan
+   * kişinin sormadan görmesi gereken şey tam olarak hangi kanalda ne
+   * durduğudur. Seçiliyken göstermek, yerleşim kararı için plana bakan
+   * birine hiçbir şey söylememek olurdu.
+   */
+  const skus: string[] = []
+  for (let level = 0; level < node.levels; level++) {
+    const sku = skuOfLevel(node, level)
+    if (sku !== '' && !skus.includes(sku)) skus.push(sku)
+  }
+  if (skus.length > 0) {
+    const shown = skus.slice(0, 3).join(', ')
+    children.push({
+      kind: 'dimension-label',
+      cx: 0,
+      cy: 0,
+      text: skus.length > 3 ? `${shown} +${skus.length - 3}` : shown,
+      angle: 0,
+      screenUpright: true,
+    })
+  }
+
   if (selected) {
+    const assigned = assignedSkuCount(node)
     children.push({
       kind: 'dimension-label',
       cx: 0,
       cy: -halfDepth - 0.6,
-      text: `${node.variant} · ${node.levels}×${node.palletsDeep} palet · E ${(width * 1000).toFixed(0)} mm · X ${depth.toFixed(2)} m`,
+      text: `${node.variant} · ${node.levels}×${node.palletsDeep} palet · E ${(width * 1000).toFixed(0)} mm · X ${depth.toFixed(2)} m · SKU ${assigned}/${node.levels}`,
       angle: 0,
       screenUpright: true,
     })

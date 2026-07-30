@@ -167,3 +167,24 @@ export function exceedsLaneDatum(node: LiveRackingNode): boolean {
 export function palletPositions(node: LiveRackingNode): number {
   return node.levels * node.palletsDeep
 }
+
+/**
+ * Bir katın SKU'su — dizi kısa ya da boşsa boş dize.
+ *
+ * Boşluğu tek yerde soğurmanın sebebi: `skus` kat sayısıyla senkron tutulmak
+ * zorunda değil (kullanıcı kat sayısını SKU doldurmadan değiştirebilir), ve
+ * her okuyucunun bunu ayrı ayrı hatırlaması gereken bir kural olsaydı biri
+ * mutlaka unuturdu.
+ */
+export function skuOfLevel(node: LiveRackingNode, level: number): string {
+  return node.skus[level]?.trim() ?? ''
+}
+
+/** Kanalda tanımlı SKU sayısı — plan etiketinin ve panelin okuması. */
+export function assignedSkuCount(node: LiveRackingNode): number {
+  let count = 0
+  for (let level = 0; level < node.levels; level++) {
+    if (skuOfLevel(node, level) !== '') count++
+  }
+  return count
+}

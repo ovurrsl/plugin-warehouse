@@ -46,6 +46,22 @@ export const LiveRackingNode = BaseNode.extend({
   /** Kat sayısı — her kat bağımsız bir kanal. */
   levels: z.number().int().min(1).max(12).default(4),
 
+  /**
+   * Kat başına SKU — canlı rafta **bir kanal bir referans taşır.**
+   *
+   * Bu, kataloğun tek-SKU kuralının veri karşılığı: paletler kanalda
+   * yerçekimiyle sıraya girer, araya başka bir referans sokulamaz. Kat
+   * sayısıyla aynı uzunlukta olmak ZORUNDA değil — eksik girişler boş
+   * sayılır, çünkü kullanıcı kat sayısını SKU'ları doldurmadan önce
+   * değiştirebilmeli. `skuOfLevel` bu boşluğu tek yerde soğuruyor.
+   *
+   * Dizi `levels` sayısının yanında duruyor, onun İÇİNDE değil: canlı rafta
+   * bütün katlar aynı palet kanalı ve aynı açıklığı paylaşıyor (ilk kat
+   * `firstLevelClear` ile zaten ayrı) — kat başına değişen tek şey referans.
+   * Kat başına nesne dizisine geçmek, tek alan için şema göçü demekti.
+   */
+  skus: z.array(z.string()).default([]),
+
   /** Kanal altındaki serbest yükseklik (ilk kat), metre. */
   firstLevelClear: z.number().min(0.4).max(6).default(1.5),
   /** Katlar arası serbest yükseklik. */

@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react'
 import { IssueList } from '../panels/issue-list'
 import { LIVE_RACKING_UNPUBLISHED_NOTE } from './catalog'
 import {
+  assignedSkuCount,
   bayWidthM,
   channelDepthM,
   channelDropM,
@@ -18,6 +19,7 @@ import {
   palletPositions,
   rollerCount,
   rollerLengthM,
+  skuOfLevel,
 } from './metrics'
 import { liveRackingParametrics } from './parametrics'
 import type { LiveRackingNode } from './schema'
@@ -49,7 +51,34 @@ const styles = {
   },
   figure: { fontVariantNumeric: 'tabular-nums', fontWeight: 600 },
   note: { margin: 0, fontSize: '0.625rem', lineHeight: 1.45, color: 'var(--muted-foreground)' },
+  skuRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.6875rem' },
+  skuLabel: { flex: '0 0 3.5rem', color: 'var(--muted-foreground)' },
+  skuInput: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: '0.25rem',
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--foreground)',
+    padding: '0.125rem 0.375rem',
+    fontSize: '0.6875rem',
+  },
 } satisfies Record<string, CSSProperties>
+
+/**
+ * SKU yazımı — diziyi kat sayısına kadar doldurarak.
+ *
+ * Şema kısa diziye izin veriyor (kullanıcı kat sayısını SKU doldurmadan
+ * değiştirebilmeli), ama YAZARKEN aradaki boşlukları `''` ile doldurmak
+ * zorundayız: seyrek bir dizi JSON'a `null` olarak gider ve şema onu
+ * reddeder.
+ */
+function setSku(node: LiveRackingNode, level: number, value: string): void {
+  const next = Array.from({ length: node.levels }, (_, i) =>
+    i === level ? value : (node.skus[i] ?? ''),
+  )
+  useScene.getState().updateNode(node.id as AnyNodeId, { skus: next } as never)
+}
 
 function useInspected(provided?: LiveRackingNode): LiveRackingNode | null {
   const selectedId = useViewer((s) => s.selection.selectedIds[0])
@@ -164,6 +193,31 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
               : ` → ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)}`}
           </span>
         </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={styles.row}>
+          <span>Kanal referansı · SKU</span>
+          <span style={styles.figure}>
+            {assignedSkuCount(node)}/{node.levels}
+          </span>
+        </div>
+        {Array.from({ length: node.levels }, (_, level) => (
+          <label key={level} style={styles.skuRow}>
+            <span style={styles.skuLabel}>Kat {level + 1}</span>
+            <input
+              type="text"
+              value={skuOfLevel(node, level)}
+              placeholder="—"
+              style={styles.skuInput}
+              onChange={(event) => setSku(node, level, event.target.value)}
+            />
+          </label>
+        ))}
+        <p style={styles.note}>
+          Canlı rafta bir kanal bir referans taşır: paletler yerçekimiyle sıraya girer, araya başka
+          bir SKU sokulamaz. Plan sembolü bunu seçim gerekmeden gösteriyor.
+        </p>
       </div>
 
       <div style={styles.card}>

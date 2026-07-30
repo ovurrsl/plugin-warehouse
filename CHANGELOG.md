@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`8323196`](https://github.com/ovurrsl/plugin-warehouse/commit/83231965d97727e8ffbc200b2deb54b7b7bbf871))
 - Refresh generated README blocks [skip ci] ([`fc3a267`](https://github.com/ovurrsl/plugin-warehouse/commit/fc3a267578a322f415e23df6cd60561c7e6bf127))
 - Refresh generated README blocks [skip ci] ([`abf3d56`](https://github.com/ovurrsl/plugin-warehouse/commit/abf3d567cbfbb76c5b910674487dc885ce037452))
 - Refresh generated README blocks [skip ci] ([`b595de2`](https://github.com/ovurrsl/plugin-warehouse/commit/b595de29c2c53514f99c2b2e3739c875296cdaae))
@@ -148,6 +149,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Position front lamp inside hazard stripe (nose equipment) ([`e959a11`](https://github.com/ovurrsl/plugin-warehouse/commit/e959a11c8199a32e4b6e0f163096586b0805874a))
 - Five real defects from the audit report — and one I shipped today ([`f1f70da`](https://github.com/ovurrsl/plugin-warehouse/commit/f1f70da8e5cf28021c27b5cf0f4a3f3a9d88d74a))
 - A ghost-stocked slot is not an empty target ([`c5230c1`](https://github.com/ovurrsl/plugin-warehouse/commit/c5230c1a885e8febfb9c8774d676fd31c991d4d8))
 - Return to the host id contract — one token before the underscore ([`193ec49`](https://github.com/ovurrsl/plugin-warehouse/commit/193ec490d832460a31b043fdccdd4dabba5472bd))

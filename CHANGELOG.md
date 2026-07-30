@@ -18,6 +18,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`bfb0d05`](https://github.com/ovurrsl/plugin-warehouse/commit/bfb0d055da79bb71bfb4f214faf6238315f84ef3))
 - Refresh generated README blocks [skip ci] ([`4697fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/4697fdd338982d8da5e5d1383c6dc1e8ea4055f6))
 - Refresh generated README blocks [skip ci] ([`b519c72`](https://github.com/ovurrsl/plugin-warehouse/commit/b519c72fc1eeac406433bd454d0cf502c879d08f))
 - Refresh generated README blocks [skip ci] ([`7326461`](https://github.com/ovurrsl/plugin-warehouse/commit/7326461c64866b919c8851e69c19fb7a189f1758))
@@ -176,6 +177,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Alt güverteye yerleştirme — hedef kat açıkça seçiliyor ([`f330fc2`](https://github.com/ovurrsl/plugin-warehouse/commit/f330fc257c1d65211b39de078a3362ccc6c57e77))
 - Panelde durup hiçbir şey yapmayan dört kontrolü gerçekle ([`1c32173`](https://github.com/ovurrsl/plugin-warehouse/commit/1c32173ebf67c1181bb91b626929b95742401241))
 - Position front lamp inside hazard stripe (nose equipment) ([`e959a11`](https://github.com/ovurrsl/plugin-warehouse/commit/e959a11c8199a32e4b6e0f163096586b0805874a))
 - Five real defects from the audit report — and one I shipped today ([`f1f70da`](https://github.com/ovurrsl/plugin-warehouse/commit/f1f70da8e5cf28021c27b5cf0f4a3f3a9d88d74a))

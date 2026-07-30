@@ -29,7 +29,7 @@
  */
 
 import { FLOOR_TYPES } from './catalog'
-import { resolveTierElevations } from './metrics'
+import { outlinePolygon, pointInPolygon, resolveTierElevations } from './metrics'
 import { tierVoidRects } from './railing'
 import type { MezzanineNode } from './schema'
 import type { Rect } from './stairs'
@@ -126,11 +126,12 @@ export function mezzanineContains(node: MezzanineNode, x: number, z: number): bo
   const sin = Math.sin(rotationY)
   const dx = x - px
   const dz = z - pz
+  // `toLevelLocal`in tersi.
   const localX = dx * cos - dz * sin
   const localZ = dx * sin + dz * cos
-  const halfWidth = (node.grid.baysX * node.grid.bayWidthM) / 2
-  const halfDepth = (node.grid.baysY * node.grid.bayDepthM) / 2
-  return Math.abs(localX) <= halfWidth && Math.abs(localZ) <= halfDepth
+  // Güvertenin GERÇEK şekli — L şeklinin çentiğine tıklamak güverteyi
+  // hedeflememeli, orada güverte yok.
+  return pointInPolygon(localX, localZ, outlinePolygon(node))
 }
 
 function rectToPolygon(node: MezzanineNode, rect: Rect): [number, number][] {
@@ -150,15 +151,9 @@ function rectToPolygon(node: MezzanineNode, rect: Rect): [number, number][] {
  * parametre olarak alıyoruz. Düz zeminde 0'dır.
  */
 export function deckSlabSpecs(node: MezzanineNode, baseElevationM: number): DeckSlabSpec[] {
-  const halfWidth = (node.grid.baysX * node.grid.bayWidthM) / 2
-  const halfDepth = (node.grid.baysY * node.grid.bayDepthM) / 2
-
-  const outline: [number, number][] = [
-    toLevelLocal(node, -halfWidth, -halfDepth),
-    toLevelLocal(node, halfWidth, -halfDepth),
-    toLevelLocal(node, halfWidth, halfDepth),
-    toLevelLocal(node, -halfWidth, halfDepth),
-  ]
+  // Güverte slab'ının poligonu güverteNİN kendi şekli. Dikdörtgen varsaymak,
+  // L şeklinde bir mezzanine'in boşluğuna da raf konabilmesi demekti.
+  const outline: [number, number][] = outlinePolygon(node).map(([x, z]) => toLevelLocal(node, x, z))
 
   return resolveTierElevations(node.tiers).map((tier) => {
     const thickness = Math.max(MIN_SLAB_THICKNESS_M, FLOOR_TYPES[tier.floorType].structuralDepthM)

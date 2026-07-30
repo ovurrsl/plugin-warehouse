@@ -10,7 +10,16 @@ import {
   GROUND_SUPPORT_ID,
   mezzanineContains,
 } from './deck-slabs'
-import { resolveTierElevations } from './metrics'
+import {
+  footprintDepthM,
+  footprintWidthM,
+  gridColumnPositions,
+  hasCustomOutline,
+  outlinePolygon,
+  pointInPolygon,
+  resolveTierElevations,
+} from './metrics'
+import { mezzanineParts } from './parts'
 import { emptyAccessories, MezzanineNode } from './schema'
 
 const tier = (patch: Record<string, unknown> = {}) => ({
@@ -281,5 +290,83 @@ describe('hedef güverte seçimi — nişan alarak yapılamıyor', () => {
     // Taban izi 20×15; 90° dönünce dünyada 15×20 olur.
     expect(mezzanineContains(rotated, 0, 9)).toBe(true)
     expect(mezzanineContains(rotated, 9, 0)).toBe(false)
+  })
+})
+
+describe('özel şekil — slab gibi poligon', () => {
+  /** L şekli: 20×15 dikdörtgenin sağ-üst çeyreği kesilmiş. */
+  const lShape: [number, number][] = [
+    [-10, -7.5],
+    [0, -7.5],
+    [0, 0],
+    [10, 0],
+    [10, 7.5],
+    [-10, 7.5],
+  ]
+
+  test('poligon yoksa ızgaradan dikdörtgen çıkar — eski sahneler aynen çalışır', () => {
+    const rect = outlinePolygon(mezzanine())
+    expect(rect).toHaveLength(4)
+    expect(Math.min(...rect.map(([x]) => x))).toBeCloseTo(-10, 9)
+    expect(Math.max(...rect.map(([, z]) => z))).toBeCloseTo(7.5, 9)
+    expect(hasCustomOutline(mezzanine())).toBe(false)
+  })
+
+  test('güverte slab’ı gerçek şekli taşıyor', () => {
+    const spec = deckSlabSpecs(mezzanine({ polygon: lShape }), 0)[0]
+    expect(spec?.polygon).toHaveLength(6)
+  })
+
+  test('çentiğe tıklamak güverteyi hedeflemiyor — orada güverte YOK', () => {
+    const mezz = mezzanine({ polygon: lShape })
+    // Kesilen çeyreğin ortası: sınır kutusunun içinde ama poligonun dışında.
+    expect(mezzanineContains(mezz, 5, -4)).toBe(false)
+    // Dolu tarafın ortası.
+    expect(mezzanineContains(mezz, -5, 4)).toBe(true)
+  })
+
+  test('kolonlar poligonun dışına çıkmıyor', () => {
+    const mezz = mezzanine({ polygon: lShape })
+    const points = gridColumnPositions(mezz)
+    expect(points.length).toBeGreaterThan(0)
+    for (const point of points) {
+      expect(pointInPolygon(point.x, point.z, lShape), `(${point.x}, ${point.z})`).toBe(true)
+    }
+    // Dikdörtgenden AZ kolon: çentik boşaldı.
+    expect(points.length).toBeLessThan(gridColumnPositions(mezzanine()).length)
+  })
+
+  test('döşeme panelleri çentiğe basmıyor', () => {
+    const custom = mezzanineParts(mezzanine({ polygon: lShape })).filter((p) => p.role === 'floor')
+    const full = mezzanineParts(mezzanine()).filter((p) => p.role === 'floor')
+    expect(custom.length).toBeGreaterThan(0)
+    expect(custom.length).toBeLessThan(full.length)
+    for (const panel of custom) {
+      expect(pointInPolygon(panel.center[0], panel.center[2], lShape)).toBe(true)
+    }
+  })
+
+  test('sınır kutusu poligondan okunuyor', () => {
+    const narrow = mezzanine({
+      polygon: [
+        [-2, -3],
+        [2, -3],
+        [2, 3],
+        [-2, 3],
+      ],
+    })
+    expect(footprintWidthM(narrow)).toBeCloseTo(4, 9)
+    expect(footprintDepthM(narrow)).toBeCloseTo(6, 9)
+  })
+
+  test('iki köşeli poligon reddedilir — alan tarif etmiyor', () => {
+    expect(() =>
+      MezzanineNode.parse({
+        polygon: [
+          [0, 0],
+          [1, 1],
+        ],
+      }),
+    ).toThrow()
   })
 })

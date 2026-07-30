@@ -15,6 +15,9 @@ import {
   footprintDepthM,
   footprintWidthM,
   gridColumnPositions,
+  hasCustomOutline,
+  outlinePolygon,
+  pointInPolygon,
   resolveColumnProfile,
   resolveMainBeamProfile,
   resolveSecondaryBeamProfile,
@@ -184,17 +187,34 @@ function pushFloorPanels(
   thicknessM: number,
   voids: readonly Rect[],
 ): void {
-  const { baysX, baysY, bayWidthM, bayDepthM } = node.grid
-  const halfWidth = footprintWidthM(node) / 2
-  const halfDepth = footprintDepthM(node) / 2
+  const { bayWidthM, bayDepthM } = node.grid
   const centerY = deckTopY - thicknessM / 2
+  const outline = outlinePolygon(node)
+  const custom = hasCustomOutline(node)
 
-  for (let ix = 0; ix < baysX; ix++) {
-    for (let iz = 0; iz < baysY; iz++) {
-      const x0 = -halfWidth + ix * bayWidthM
-      const z0 = -halfDepth + iz * bayDepthM
+  // Panel ızgarası kolon aksıyla AYNI hizada olmak zorunda — paneller
+  // kirişlerin arasına oturuyor. Özel şekilde aks orijine sabitli.
+  const xs = outline.map(([x]) => x)
+  const zs = outline.map(([, z]) => z)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minZ = Math.min(...zs)
+  const maxZ = Math.max(...zs)
+  const startIx = custom ? Math.floor(minX / bayWidthM) : -node.grid.baysX / 2
+  const endIx = custom ? Math.ceil(maxX / bayWidthM) : node.grid.baysX / 2
+  const startIz = custom ? Math.floor(minZ / bayDepthM) : -node.grid.baysY / 2
+  const endIz = custom ? Math.ceil(maxZ / bayDepthM) : node.grid.baysY / 2
+
+  for (let ix = startIx; ix < endIx; ix++) {
+    for (let iz = startIz; iz < endIz; iz++) {
+      const x0 = ix * bayWidthM
+      const z0 = iz * bayDepthM
       const cell: Rect = { x0, z0, x1: x0 + bayWidthM, z1: z0 + bayDepthM }
       if (voids.some((rect) => rectsOverlap(cell, rect))) continue
+      // Poligon dışı hücre hiç üretilmiyor — merdiven boşluğuyla aynı
+      // dışlama deseni, CSG yok. Ölçüt hücre MERKEZİ: kenardan taşan yarım
+      // panel çizmek, döşemenin poligonun dışına sarkması demekti.
+      if (custom && !pointInPolygon(x0 + bayWidthM / 2, z0 + bayDepthM / 2, outline)) continue
       parts.push({
         role: 'floor',
         center: [x0 + bayWidthM / 2, centerY, z0 + bayDepthM / 2],

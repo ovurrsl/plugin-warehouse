@@ -172,6 +172,26 @@ export const MezzanineNode = BaseNode.extend({
   columnType: z.enum(['single', 'double']).default('single'),
 
   /**
+   * Güvertenin şekli — mezzanine-yerel `[x, z]` köşeler, merkezi orijinde.
+   *
+   * `null` (varsayılan) → `grid`den çıkan dikdörtgen. Bu, alanın eklenmesinden
+   * ÖNCE kaydedilmiş her sahnenin davranışını birebir koruyor: poligon
+   * yoksa hesap eskisinin aynısı.
+   *
+   * **`grid` ortadan kalkmıyor**, anlamı daralıyor: artık güvertenin
+   * SINIRINI değil KOLON ARALIĞINI tanımlıyor. Kolonlar ızgarada duruyor
+   * ama yalnız poligonun içinde kalanlar çiziliyor — gerçek bir mezzanine de
+   * böyle kurulur, kolonlar keyfî yerlere değil bir aksa oturur.
+   *
+   * En az üç köşe; ikisi bir alan tarif etmiyor.
+   */
+  polygon: z
+    .array(z.tuple([z.number(), z.number()]))
+    .min(3)
+    .nullable()
+    .default(null),
+
+  /**
    * Profil geçersiz kılmaları — `null` kurucu sistemin ailesine göre bir
    * varsayılan profil seçer (`parts.ts` `resolveProfiles`). GL2000 gibi
    * ağır yük örnekleri katalogda açık profil veriyor (IPE300/IPE160/HEA240);

@@ -1,7 +1,7 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { GridField, TiersField } from './auto-fields'
 import { CONSTRUCTIVE_SYSTEMS, RAILING_RULES } from './catalog'
-import { effectiveClearHeightM, resolveTierElevations } from './metrics'
+import { effectiveClearHeightM, hasCustomOutline, resolveTierElevations } from './metrics'
 import type { MezzanineNode } from './schema'
 import { resolveSteps } from './stairs'
 
@@ -84,6 +84,24 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
             msg: `SIGMA kendi profil ailesini kullanıyor — "${value}" yok sayılıyor. Profili sabitlemek için GL2000 ya da MIXED seçin.`,
           })
         }
+      }
+
+      /**
+       * Özel şekil çizilmişse korkuluk ve aksesuarlar HÂLÂ sınır
+       * dikdörtgenini takip ediyor: `railing.ts` dört yönlü kenar modeline
+       * (`north`/`south`/`east`/`west`) dayanıyor ve keyfî bir poligonda o
+       * adların karşılığı yok.
+       *
+       * Sessiz kalmak, bu oturumda temizlenen "yalan söyleyen kontrol"
+       * hatasının aynısı olurdu — kullanıcı L şeklinde bir güverte çizip
+       * korkuluğun onu takip ettiğini sanardı.
+       */
+      if (hasCustomOutline(node)) {
+        issues.push({
+          field: 'polygon',
+          severity: 'warning',
+          msg: 'Özel şekilde döşeme, kolonlar ve taşıyıcı yüzey poligonu takip ediyor; korkuluk ve aksesuarlar henüz sınır dikdörtgeninde.',
+        })
       }
 
       // Tier indeksleri 0'dan başlayıp ardışık olmalı — sıçrayan bir indeks

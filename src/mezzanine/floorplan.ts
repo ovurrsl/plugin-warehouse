@@ -4,6 +4,9 @@ import {
   footprintDepthM,
   footprintWidthM,
   gridColumnPositions,
+  hasCustomOutline,
+  outlinePolygon,
+  pointInPolygon,
   resolveColumnProfile,
   resolveTierElevations,
 } from './metrics'
@@ -50,6 +53,8 @@ function floorHatch(
   width: number,
   depth: number,
   color: string,
+  /** Güverte sınırı — desen dışarı taşmasın. */
+  outline: readonly (readonly [number, number])[],
 ): FloorplanGeometry[] {
   const marks: FloorplanGeometry[] = []
   const inset = 0.25
@@ -95,6 +100,9 @@ function floorHatch(
     // Oluklu sac sıraları kaydırır — düz bir ızgara oluk izlenimi vermez.
     const shift = pattern === 'wave' && row % 2 === 1 ? step / 2 : 0
     for (let x = -usableW / 2 + shift; x <= usableW / 2 + 1e-9; x += step) {
+      // Poligon dışına düşen işaret çizilmiyor — desen döşemenin olduğu
+      // yeri anlatıyor, sınır kutusunu değil.
+      if (!pointInPolygon(x, z, outline)) continue
       if (pattern === 'dots' || pattern === 'perforation') {
         marks.push({
           kind: 'circle',
@@ -143,19 +151,32 @@ export function buildMezzanineFloorplan(
   const resolved = resolveTierElevations(node.tiers)
   const top = resolved[resolved.length - 1]
 
+  const outline = outlinePolygon(node)
   const children: FloorplanGeometry[] = [
-    {
-      kind: 'rect',
-      x: -width / 2,
-      y: -depth / 2,
-      width,
-      height: depth,
-      // 'transparent' değil 'none': `none` boya değil, pointer-events onu
-      // hiç görmez — rack'ın kaydettiği ders.
-      fill,
-      stroke,
-      strokeWidth: 0.03,
-    },
+    // Özel şekil çizilmişse anahat POLİGON. Dikdörtgen çizmek, planı okuyan
+    // kişiye olmayan bir döşeme göstermek olurdu — L şeklinin çentiği dolu
+    // görünürdü.
+    hasCustomOutline(node)
+      ? {
+          kind: 'polygon',
+          // `FloorplanPoint` bir tuple: [x, y]. Plan düzleminde y = dünya z.
+          points: outline.map(([x, z]) => [x, z] as const),
+          // 'transparent' değil 'none': `none` boya değil, pointer-events
+          // onu hiç görmez — rack'ın kaydettiği ders.
+          fill,
+          stroke,
+          strokeWidth: 0.03,
+        }
+      : {
+          kind: 'rect',
+          x: -width / 2,
+          y: -depth / 2,
+          width,
+          height: depth,
+          fill,
+          stroke,
+          strokeWidth: 0.03,
+        },
   ]
 
   // ── Döşeme deseni: hangi döşeme tipi olduğunu plan söylesin ───────────
@@ -164,7 +185,9 @@ export function buildMezzanineFloorplan(
   // sunta döşeme ile sprinkler suyunu geçiren çelik ızgara planda birebir
   // aynı görünüyordu. İkisi arasındaki fark yangın senaryosunu değiştirir.
   if (top) {
-    children.push(...floorHatch(FLOOR_TYPES[top.floorType].hatch2D, width, depth, hatchTint))
+    children.push(
+      ...floorHatch(FLOOR_TYPES[top.floorType].hatch2D, width, depth, hatchTint, outline),
+    )
   }
 
   // ── Döşeme boşlukları: merdivenin döşemede açtığı delik ────────────────

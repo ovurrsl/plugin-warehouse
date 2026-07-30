@@ -86,22 +86,128 @@ export function gridColumnPositions(node: MezzanineNode): GridPoint[] {
   const { baysX, baysY, bayWidthM, bayDepthM } = node.grid
   const halfWidth = (baysX * bayWidthM) / 2
   const halfDepth = (baysY * bayDepthM) / 2
+
+  if (!hasCustomOutline(node)) {
+    const points: GridPoint[] = []
+    for (let ix = 0; ix <= baysX; ix++) {
+      const x = -halfWidth + ix * bayWidthM
+      for (let iz = 0; iz <= baysY; iz++) {
+        points.push({ x, z: -halfDepth + iz * bayDepthM })
+      }
+    }
+    return points
+  }
+
+  /**
+   * Özel şekilde ızgara poligonun SINIR KUTUSUNU tarıyor, `grid`in kendi
+   * dikdörtgenini değil: `grid` artık sınırı değil ADIMI tanımlıyor.
+   * Kullanıcı ızgara dikdörtgeninden büyük bir şekil çizerse kolonsuz
+   * kalmasın diye.
+   *
+   * Aks orijine sabitli — poligon değişince kolonlar yerinden oynamasın.
+   */
+  const outline = outlinePolygon(node)
+  const xs = outline.map(([x]) => x)
+  const zs = outline.map(([, z]) => z)
+  const startIx = Math.floor(Math.min(...xs) / bayWidthM)
+  const endIx = Math.ceil(Math.max(...xs) / bayWidthM)
+  const startIz = Math.floor(Math.min(...zs) / bayDepthM)
+  const endIz = Math.ceil(Math.max(...zs) / bayDepthM)
+
   const points: GridPoint[] = []
-  for (let ix = 0; ix <= baysX; ix++) {
-    const x = -halfWidth + ix * bayWidthM
-    for (let iz = 0; iz <= baysY; iz++) {
-      const z = -halfDepth + iz * bayDepthM
-      points.push({ x, z })
+  for (let ix = startIx; ix <= endIx; ix++) {
+    for (let iz = startIz; iz <= endIz; iz++) {
+      const x = ix * bayWidthM
+      const z = iz * bayDepthM
+      if (pointInPolygon(x, z, outline)) points.push({ x, z })
     }
   }
   return points
 }
 
-/** Yerel taban izi genişlik/derinliği, metre. */
+/**
+ * Güverte sınırı — mezzanine-yerel `[x, z]` köşeler.
+ *
+ * Poligon verilmemişse `grid`den dikdörtgen üretiliyor, yani bu alan
+ * eklenmeden ÖNCE kaydedilmiş her sahne birebir eskisi gibi davranıyor.
+ *
+ * Tek kaynak olması önemli: kolon süzme, döşeme kırpma, güverte-slab
+ * poligonu ve 2D anahat aynı listeyi okuyor — ikinci bir hesap sessizce
+ * ayrışırdı.
+ */
+export function outlinePolygon(node: MezzanineNode): [number, number][] {
+  if (node.polygon && node.polygon.length >= 3) {
+    return node.polygon.map(([x, z]) => [x, z])
+  }
+  const halfWidth = (node.grid.baysX * node.grid.bayWidthM) / 2
+  const halfDepth = (node.grid.baysY * node.grid.bayDepthM) / 2
+  return [
+    [-halfWidth, -halfDepth],
+    [halfWidth, -halfDepth],
+    [halfWidth, halfDepth],
+    [-halfWidth, halfDepth],
+  ]
+}
+
+/** Kullanıcı özel bir şekil çizmiş mi — uyarılar ve 2D bunu soruyor. */
+export function hasCustomOutline(node: MezzanineNode): boolean {
+  return (node.polygon?.length ?? 0) >= 3
+}
+
+/**
+ * Nokta poligonun içinde mi — ışın atma.
+ *
+ * Kenar üstündeki noktalarda karar kararsız ve bu KASITLI: kolon ızgarası
+ * poligon kenarına tam otururken bir kolonun çizilip çizilmemesi görsel bir
+ * ayrıntı, ve kenarı koşulsuz "içeride" saymak dışa taşan kolonlar üretirdi.
+ */
+export function pointInPolygon(
+  px: number,
+  pz: number,
+  polygon: readonly (readonly [number, number])[],
+): boolean {
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i]
+    const b = polygon[j]
+    if (!a || !b) continue
+    const [xi, zi] = a
+    const [xj, zj] = b
+    if (zi > pz !== zj > pz && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) {
+      inside = !inside
+    }
+  }
+  return inside
+}
+
+/**
+ * Taban izi genişlik/derinliği — özel şekilde poligonun SINIR KUTUSU.
+ *
+ * Çarpışma kutusu, sürükleme sınırı ve `floorPlaced` ayak izi bunu okuyor;
+ * eksen hizalı bir kutu istiyorlar ve bir L şeklinin sınır kutusu doğru
+ * cevap. Döşemenin kendisi poligona kırpılıyor, kutu yalnız kabaca yer
+ * kaplamayı tarif ediyor.
+ */
 export function footprintWidthM(node: MezzanineNode): number {
-  return node.grid.baysX * node.grid.bayWidthM
+  if (hasCustomOutline(node)) {
+    const xs = outlinePolygon(node).map(([x]) => x)
+    return Math.max(...xs) - Math.min(...xs)
+  }
+  return legacyFootprintWidthM(node)
 }
 export function footprintDepthM(node: MezzanineNode): number {
+  if (hasCustomOutline(node)) {
+    const zs = outlinePolygon(node).map(([, z]) => z)
+    return Math.max(...zs) - Math.min(...zs)
+  }
+  return legacyFootprintDepthM(node)
+}
+
+/** Izgaranın kendi ölçüsü — kolon aksı buradan, sınır poligondan. */
+function legacyFootprintWidthM(node: MezzanineNode): number {
+  return node.grid.baysX * node.grid.bayWidthM
+}
+function legacyFootprintDepthM(node: MezzanineNode): number {
   return node.grid.baysY * node.grid.bayDepthM
 }
 

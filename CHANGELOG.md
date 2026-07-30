@@ -18,6 +18,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`faf7735`](https://github.com/ovurrsl/plugin-warehouse/commit/faf77351aa1067429b03c6a5c4679f2240290713))
 - Refresh generated README blocks [skip ci] ([`bfb0d05`](https://github.com/ovurrsl/plugin-warehouse/commit/bfb0d055da79bb71bfb4f214faf6238315f84ef3))
 - Refresh generated README blocks [skip ci] ([`4697fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/4697fdd338982d8da5e5d1383c6dc1e8ea4055f6))
 - Refresh generated README blocks [skip ci] ([`b519c72`](https://github.com/ovurrsl/plugin-warehouse/commit/b519c72fc1eeac406433bd454d0cf502c879d08f))
@@ -101,6 +102,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Özel şekil — güverte artık poligon olabiliyor ([`ad93358`](https://github.com/ovurrsl/plugin-warehouse/commit/ad93358760206b43e2b8f67fc5611f5565c14221))
 - Katalog fişleri artık üstüne çıkılabilir platform sevk ediyor ([`d7c07e5`](https://github.com/ovurrsl/plugin-warehouse/commit/d7c07e5c2d31351d59850fceca0429c7b5e8a8ac))
 - Merdiveni tamamla — korkuluk, sahanlık, çok kollu yerleşim ([`b5bce6b`](https://github.com/ovurrsl/plugin-warehouse/commit/b5bce6b8ded7cb56a28c1f8708a6ed3cc9936086))
 - Kanal başına SKU ve seçim gerektirmeyen plan etiketi ([`48a5e01`](https://github.com/ovurrsl/plugin-warehouse/commit/48a5e019e9ad8515bf2ec081d97d1475d2235f65))

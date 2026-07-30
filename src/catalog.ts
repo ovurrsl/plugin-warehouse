@@ -66,6 +66,41 @@ export type CatalogItem = {
             clearHeightM: number
             loadClass: 250 | 350 | 500 | 750 | 1000
             floorType: string
+            /**
+             * Fişin sevk ettiği aksesuarlar. Bu dosya düğüm şemasını
+             * IMPORT ETMİYOR (yukarıdaki rack fırçasının gerekçesiyle
+             * aynı), o yüzden şekil burada tekrar yazılıyor — dar tutuldu,
+             * yalnız fişlerin gerçekten kullandığı alanlar.
+             */
+            accessories?: {
+              staircases: Array<{
+                id: string
+                placement: {
+                  mode: 'edge'
+                  edge: 'north' | 'south' | 'east' | 'west'
+                  offsetM: number
+                }
+                widthM: 0.8 | 1
+                landing: 'continuous' | 'turn90' | 'turn180'
+                railings: 1 | 2
+                steps: 'auto' | number
+              }>
+              swingGates: Array<{
+                edge: 'north' | 'south' | 'east' | 'west'
+                offsetM: number
+                widthM: 0.75 | 1.5
+              }>
+              upAndOverGates: Array<{
+                edge: 'north' | 'south' | 'east' | 'west'
+                offsetM: number
+                widthM: number
+              }>
+              safetyZones: Array<{
+                edge: 'north' | 'south' | 'east' | 'west'
+                offsetM: number
+                widthM: number
+              }>
+            }
           }>
         }
       }
@@ -339,6 +374,30 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
             clearHeightM: 3,
             loadClass: 500,
             floorType: 'WOOD_CHIPBOARD_30',
+            /**
+             * Merdiven ve palet kapısı fişin PARÇASI.
+             *
+             * Aksesuarsız bir fiş, kullanıcıya üstüne çıkamayacağı ve yük
+             * çıkaramayacağı bir platform veriyordu — katalogdan gelen bir
+             * ürünün eksik teslim edilmesi. Basamak sayısı `'auto'`:
+             * gerçek kot farkından çıkıyor, sabit bir sayı yazmak fişi
+             * kendi uyarısıyla göndermek olurdu.
+             */
+            accessories: {
+              staircases: [
+                {
+                  id: 'sigma-stair-s',
+                  placement: { mode: 'edge', edge: 'south', offsetM: 8 },
+                  widthM: 1,
+                  landing: 'turn90',
+                  railings: 2,
+                  steps: 'auto',
+                },
+              ],
+              swingGates: [],
+              upAndOverGates: [{ edge: 'north', offsetM: 10, widthM: 1.5 }],
+              safetyZones: [],
+            },
           },
         ],
       },
@@ -365,6 +424,21 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
             clearHeightM: 3.5,
             loadClass: 1000,
             floorType: 'METAL_GRID',
+            accessories: {
+              staircases: [
+                {
+                  id: 'gl2000-stair-w0',
+                  placement: { mode: 'edge', edge: 'west', offsetM: 8 },
+                  widthM: 1,
+                  landing: 'turn180',
+                  railings: 2,
+                  steps: 'auto',
+                },
+              ],
+              swingGates: [],
+              upAndOverGates: [{ edge: 'east', offsetM: 12, widthM: 1.5 }],
+              safetyZones: [],
+            },
           },
           {
             index: 1,
@@ -372,6 +446,67 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
             clearHeightM: 3.5,
             loadClass: 750,
             floorType: 'METAL_GRID',
+            // Üst kata da kendi merdiveni: alt kata çıkıp orada kalmak
+            // iki katlı bir yapının yarısını erişilmez bırakırdı.
+            accessories: {
+              staircases: [
+                {
+                  id: 'gl2000-stair-w1',
+                  placement: { mode: 'edge', edge: 'west', offsetM: 16 },
+                  widthM: 1,
+                  landing: 'turn180',
+                  railings: 2,
+                  steps: 'auto',
+                },
+              ],
+              swingGates: [],
+              upAndOverGates: [{ edge: 'east', offsetM: 12, widthM: 1.5 }],
+              safetyZones: [],
+            },
+          },
+        ],
+      },
+    },
+  },
+  {
+    id: 'mezzanine-mixed',
+    kind: 'warehouse:mezzanine',
+    label: 'Mixed Mezzanine (Large Span)',
+    sectionId: 'mezzanine',
+    description:
+      'Sigma dikme + IPE kiriş karması, büyük açıklık. 3×3 göz × 8 m, sunta döşeme, 350 kg/m².',
+    icon: 'lucide:layers',
+    brush: {
+      kind: 'mezzanine',
+      patch: {
+        // MIXED, katalogdan sahneye giden yolu olmayan tek sistemdi:
+        // tanımlıydı ve yerleştirme sonrası seçilebiliyordu ama hiçbir fiş
+        // onu üretmiyordu.
+        constructiveSystem: 'MIXED',
+        columnType: 'double',
+        grid: { baysX: 3, baysY: 3, bayWidthM: 8, bayDepthM: 8 },
+        tiers: [
+          {
+            index: 0,
+            elevationM: 'auto',
+            clearHeightM: 4,
+            loadClass: 350,
+            floorType: 'WOOD_GALV_SHEET_1_5',
+            accessories: {
+              staircases: [
+                {
+                  id: 'mixed-stair-e',
+                  placement: { mode: 'edge', edge: 'east', offsetM: 12 },
+                  widthM: 1,
+                  landing: 'turn180',
+                  railings: 2,
+                  steps: 'auto',
+                },
+              ],
+              swingGates: [{ edge: 'north', offsetM: 12, widthM: 0.75 }],
+              upAndOverGates: [{ edge: 'west', offsetM: 12, widthM: 1.5 }],
+              safetyZones: [],
+            },
           },
         ],
       },

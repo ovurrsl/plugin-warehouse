@@ -276,13 +276,54 @@ describe('kurucu sistemler', () => {
   })
 })
 
+/** Mezzanine fişleri, `[id, patch]` olarak — birleşim daraltması bir yerde. */
+function mezzanineTiles() {
+  const pairs: Array<
+    [
+      string,
+      Extract<NonNullable<(typeof CATALOG_ITEMS)[number]['brush']>, { kind: 'mezzanine' }>['patch'],
+    ]
+  > = []
+  for (const item of CATALOG_ITEMS) {
+    if (item.kind !== 'warehouse:mezzanine') continue
+    const brush = item.brush
+    if (brush?.kind !== 'mezzanine') continue
+    pairs.push([item.id, brush.patch])
+  }
+  return pairs
+}
+
 describe('tanım ve manifest', () => {
-  test('kayıtlı, panelde listeli, katalogda iki fiş var', () => {
+  test('kayıtlı ve panelde listeli', () => {
     const registered = new Set(warehousePlugin.nodes?.map((def) => def.kind))
     expect(registered.has('warehouse:mezzanine')).toBe(true)
     expect([...registered].sort()).toEqual([...(warehouseCatalogPanel.kinds ?? [])].sort())
-    const tiles = CATALOG_ITEMS.filter((item) => item.kind === 'warehouse:mezzanine')
-    expect(tiles.length).toBe(2)
+  })
+
+  test('HER kurucu sistemin kataloğa bir yolu var', () => {
+    // Sayı sabiti yerine gerçek değişmez. Önceki hâli `toBe(2)` idi ve
+    // MIXED'in kataloğa hiç yolu olmamasını yakalayamıyordu: sistem
+    // tanımlıydı, yerleştirme sonrası seçilebiliyordu, ama hiçbir fiş onu
+    // sahneye koyamıyordu.
+    const systems = new Set(mezzanineTiles().map(([, patch]) => patch.constructiveSystem))
+    for (const system of Object.keys(CONSTRUCTIVE_SYSTEMS)) {
+      expect(systems.has(system as never), `${system} için fiş yok`).toBe(true)
+    }
+  })
+
+  test('her fiş üstüne çıkılabilir bir platform sevk eder', () => {
+    // Aksesuarsız bir fiş, kullanıcıya merdiveni olmayan bir platform
+    // veriyordu — katalogdan gelen bir ürünün eksik teslim edilmesi.
+    const tiles = mezzanineTiles()
+    expect(tiles.length).toBeGreaterThan(0)
+    for (const [id, patch] of tiles) {
+      for (const tier of patch.tiers) {
+        expect(
+          tier.accessories?.staircases.length ?? 0,
+          `${id} tier ${tier.index}`,
+        ).toBeGreaterThan(0)
+      }
+    }
   })
 
   test('rack HER ZAMAN registered — kolektif instancing sistemini mount eden tek kind', () => {

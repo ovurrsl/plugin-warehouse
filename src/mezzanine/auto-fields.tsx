@@ -1,7 +1,7 @@
 'use client'
 
 import type { CSSProperties } from 'react'
-import { FLOOR_TYPES, LOAD_CLASSES } from './catalog'
+import { FLOOR_TYPES, LOAD_CLASSES, STAIRCASE_STEP_COUNTS } from './catalog'
 import { emptyAccessories, type MezzanineNode, type MezzanineTier } from './schema'
 
 /**
@@ -164,6 +164,30 @@ function AccessoryEditor({
     />
   )
 
+  /**
+   * Basamak sayısı — `'auto'` ya da katalogun hazır serisi.
+   *
+   * Seçim doğrulamayı ATLAMAZ: kot farkı tutmuyorsa `resolveSteps`
+   * `step-count-mismatch` üretir ve panel söyler. "Katalog satırı kutsal ama
+   * fizik daha kutsal" ayrımı — sayı reddedilmiyor, uyarılıyor.
+   */
+  const stepsSelect = (value: 'auto' | number, onChange: (next: 'auto' | number) => void) => (
+    <select
+      onChange={(event) =>
+        onChange(event.target.value === 'auto' ? 'auto' : Number(event.target.value))
+      }
+      style={styles.input}
+      value={String(value)}
+    >
+      <option value="auto">auto</option>
+      {STAIRCASE_STEP_COUNTS.map((count) => (
+        <option key={count} value={count}>
+          {count}
+        </option>
+      ))}
+    </select>
+  )
+
   return (
     <div style={{ ...styles.field, gap: '0.25rem', marginTop: '0.25rem' }}>
       <span style={{ ...styles.label, fontSize: '0.625rem' }}>
@@ -198,6 +222,11 @@ function AccessoryEditor({
             <span style={{ fontSize: '0.625rem', color: MUTED, flex: 1 }}>
               interior ({stair.placement.xM.toFixed(1)}, {stair.placement.zM.toFixed(1)})
             </span>
+          )}
+          {stepsSelect(stair.steps, (steps) =>
+            patch({
+              staircases: accessories.staircases.map((s, j) => (j === i ? { ...s, steps } : s)),
+            }),
           )}
           <button
             onClick={() => patch({ staircases: accessories.staircases.filter((_, j) => j !== i) })}
@@ -261,6 +290,31 @@ function AccessoryEditor({
         </div>
       ))}
 
+      {accessories.safetyZones.map((zone, i) => (
+        <div key={`zone-${zone.edge}-${zone.offsetM}`} style={styles.row}>
+          <span style={{ fontSize: '0.625rem', color: MUTED, flex: '0 0 2.5rem' }}>zone</span>
+          {edgeSelect(zone.edge, (edge) =>
+            patch({
+              safetyZones: accessories.safetyZones.map((z, j) => (j === i ? { ...z, edge } : z)),
+            }),
+          )}
+          {offsetInput(zone.offsetM, (offsetM) =>
+            patch({
+              safetyZones: accessories.safetyZones.map((z, j) => (j === i ? { ...z, offsetM } : z)),
+            }),
+          )}
+          <button
+            onClick={() =>
+              patch({ safetyZones: accessories.safetyZones.filter((_, j) => j !== i) })
+            }
+            style={styles.button}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
       <div style={{ ...styles.row, gap: '0.25rem' }}>
         <button
           onClick={() =>
@@ -310,6 +364,17 @@ function AccessoryEditor({
           type="button"
         >
           + Pallet gate
+        </button>
+        <button
+          onClick={() =>
+            patch({
+              safetyZones: [...accessories.safetyZones, { edge: 'east', offsetM: 5, widthM: 1.5 }],
+            })
+          }
+          style={styles.button}
+          type="button"
+        >
+          + Safety zone
         </button>
       </div>
     </div>

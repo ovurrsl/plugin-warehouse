@@ -264,6 +264,30 @@ describe('akış donanımı — Faz 2', () => {
     expect(parts[0]!.rotationY).toBe(-parts[1]!.rotationY!)
   })
 
+  test('zemin seviyesi transpalet katı: ilk kanal zemine oturur', () => {
+    const raised = node()
+    const floorSet = node({ floorSetPalletTruckLevel: true })
+    expect(levelExitYM(floorSet, 0)).toBeLessThan(levelExitYM(raised, 0))
+    // Yalnız kanalın kendi yapısı kadar yukarıda — altında açıklık yok.
+    expect(levelExitYM(floorSet, 0)).toBeLessThan(0.4)
+    // Açıklık alanı gizleniyor ve H ≥ 400 mm kuralı ateşlenmiyor: burada
+    // açıklığın olmaması ihlal değil, konfigürasyonun tanımı.
+    const issues = liveRackingParametrics.invariants?.flatMap((c) =>
+      c(node({ floorSetPalletTruckLevel: true, firstLevelClear: 0.4 })),
+    )
+    expect(issues?.some((i) => i.field === 'firstLevelClear')).toBe(false)
+  })
+
+  test('giydirme raf: dikme uzar ve tepede başlık kirişi çıkar', () => {
+    const plain = node()
+    const clad = node({ cladRack: true })
+    expect(frameHeightM(clad)).toBeGreaterThan(frameHeightM(plain))
+    // Başlık kirişi iki çerçevede de var.
+    const beamsPlain = countOf(plain, 'beam')
+    const beamsClad = countOf(clad, 'beam')
+    expect(beamsClad).toBe(beamsPlain + 2)
+  })
+
   test('taban plakaları ankrajlı', () => {
     const n = node()
     expect(countOf(n, 'anchor')).toBe(countOf(n, 'footplate') * 2)

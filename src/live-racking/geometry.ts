@@ -91,6 +91,8 @@ export function liveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackin
     // kanal için iki ayrı mesh üretirdi.
     hasIntermediateRetainers(node),
     node.hingedChannels,
+    node.floorSetPalletTruckLevel,
+    node.cladRack,
     detail,
     node.uprightColor,
     node.beamColor,

@@ -55,7 +55,17 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
       label: 'Levels',
       fields: [
         { key: 'levels', kind: 'number', min: 1, max: 12, step: 1 },
-        { key: 'firstLevelClear', kind: 'number', unit: 'm', min: 0.4, max: 6, step: 0.05 },
+        {
+          key: 'firstLevelClear',
+          kind: 'number',
+          unit: 'm',
+          min: 0.4,
+          max: 6,
+          step: 0.05,
+          // Zemin seviyesi katında ilk kanal zemine oturuyor; altında
+          // ayarlanacak bir açıklık yok, alanı göstermek yalan olurdu.
+          visibleIf: (node) => !node.floorSetPalletTruckLevel,
+        },
         {
           key: 'levelClear',
           kind: 'number',
@@ -85,6 +95,8 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
           visibleIf: (node) => node.palletsDeep > 10,
         },
         { key: 'hingedChannels', kind: 'boolean' },
+        { key: 'floorSetPalletTruckLevel', kind: 'boolean' },
+        { key: 'cladRack', kind: 'boolean' },
       ],
     },
     {
@@ -120,8 +132,10 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         })
       }
 
-      // Katalog: kanal altındaki serbest yükseklik H ≥ 400 mm.
-      if (node.firstLevelClear < MIN_CLEAR_HEIGHT_M) {
+      // Katalog: kanal altındaki serbest yükseklik H ≥ 400 mm. Zemin
+      // seviyesi transpalet katında böyle bir açıklık YOK ve olmaması
+      // kuralın ihlali değil, konfigürasyonun tanımı — kanal zemine oturuyor.
+      if (!node.floorSetPalletTruckLevel && node.firstLevelClear < MIN_CLEAR_HEIGHT_M) {
         issues.push({
           field: 'firstLevelClear',
           severity: 'error',

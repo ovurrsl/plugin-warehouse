@@ -142,6 +142,20 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
           </span>
         </div>
         <div style={styles.row}>
+          <span>Alt kat</span>
+          <span style={styles.figure}>
+            {node.floorSetPalletTruckLevel
+              ? 'zemin seviyesi · transpalet'
+              : `${(node.firstLevelClear * 1000).toFixed(0)} mm açıklık`}
+          </span>
+        </div>
+        <div style={styles.row}>
+          <span>Yapı</span>
+          <span style={styles.figure}>
+            {node.cladRack ? 'giydirme raf · çatıyı taşır' : 'serbest duran'}
+          </span>
+        </div>
+        <div style={styles.row}>
           <span>Çerçeve yüksekliği</span>
           <span style={styles.figure}>
             {(frameHeightM(node) * 1000).toFixed(0)} mm

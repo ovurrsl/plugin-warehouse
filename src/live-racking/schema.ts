@@ -68,6 +68,21 @@ export const LiveRackingNode = BaseNode.extend({
   intermediateRetainers: z.boolean().default(false),
   /** Menteşeli kanal — zemin katta bakım erişimi. */
   hingedChannels: z.boolean().default(false),
+  /**
+   * Zemin seviyesi transpalet katı — en alt kanal doğrudan zemine oturur,
+   * altında serbest yükseklik bırakılmaz. Transpalet paleti yerden alır.
+   *
+   * Açıkken `firstLevelClear` okunmaz: kot zinciri zeminden başlar.
+   */
+  floorSetPalletTruckLevel: z.boolean().default(false),
+  /**
+   * Giydirme raf (clad-rack) — raf yapısı binanın kendisini taşır.
+   *
+   * Dikmeler en üst kanalın üstünde çatı bağlantısı için uzar ve tepede bir
+   * başlık kirişi taşır. Bu, rafın bir depoya KONMASI ile depo OLMASI
+   * arasındaki fark.
+   */
+  cladRack: z.boolean().default(false),
 
   // ── Finish ────────────────────────────────────────────────────────────
   uprightColor: z.string().default(PALETTE.upright),

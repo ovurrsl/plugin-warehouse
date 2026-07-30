@@ -145,6 +145,12 @@ export const RETAINER_PEDAL_THICKNESS_M = mm(14)
 export const SPLIT_ROLLER_GAP_M = mm(200)
 /** Menteşeli kanalın zemin katındaki menteşe boğumu (ASSUMPTION). */
 export const HINGE_KNUCKLE_M = mm(70)
+/**
+ * Giydirme rafta dikmenin en üst kanalın üstünde çatı bağlantısı için
+ * uzadığı pay ve tepedeki başlık kirişinin kesiti (ASSUMPTION).
+ */
+export const CLAD_RACK_HEADROOM_M = mm(600)
+export const CLAD_RACK_HEADER_M = mm(140)
 /** Taban plakası kalınlığı (ASSUMPTION). */
 export const LEVELLING_PLATE_THICKNESS_M = mm(6)
 /** Taban plakasını zemine bağlayan ankraj cıvatası (ASSUMPTION). */

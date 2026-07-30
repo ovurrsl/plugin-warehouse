@@ -24,6 +24,7 @@ import {
   CENTRALISING_STRIP_THICKNESS_M,
   CHANNEL_PROFILE_HEIGHT_M,
   CHANNEL_PROFILE_WIDTH_M,
+  CLAD_RACK_HEADER_M,
   DIAGONAL_THICKNESS_M,
   DYNAMIC_BEAM_HEIGHT_M,
   DYNAMIC_BEAM_THICKNESS_M,
@@ -125,6 +126,17 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
         role: 'diagonal',
         center: [0, (i / (ties + 1)) * height, z],
         size: [halfWidth * 2 - UPRIGHT_WIDTH_M, DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M],
+      })
+    }
+
+    // Giydirme rafta dikmeler çatıyı taşıyor: tepede onları bağlayan başlık
+    // kirişi olmadan yük aktaracak bir yol yok, ve raf gözle de bir bina
+    // gibi okunmaz.
+    if (node.cladRack) {
+      parts.push({
+        role: 'beam',
+        center: [0, height - CLAD_RACK_HEADER_M / 2, z],
+        size: [halfWidth * 2, CLAD_RACK_HEADER_M, CLAD_RACK_HEADER_M],
       })
     }
   }

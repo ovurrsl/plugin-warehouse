@@ -10,6 +10,7 @@ import {
   BAY_SIDE_CLEARANCE_M,
   BRAKE_ROLLER_MIN_DEPTH,
   CHANNEL_PROFILE_HEIGHT_M,
+  CLAD_RACK_HEADROOM_M,
   DYNAMIC_BEAM_HEIGHT_M,
   FRAME_HEIGHT_STEP_M,
   INTERMEDIATE_RETAINER_MIN_DEPTH,
@@ -80,7 +81,9 @@ export function channelDropM(node: LiveRackingNode): number {
 export function levelExitYM(node: LiveRackingNode, level: number): number {
   const structure = DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
   const drop = channelDropM(node)
-  let y = node.firstLevelClear
+  // Zemin seviyesi transpalet katında ilk kanal doğrudan zemine oturur:
+  // altında serbest yükseklik yok, yalnız kanalın kendi yapısı var.
+  let y = node.floorSetPalletTruckLevel ? structure : node.firstLevelClear
   for (let i = 0; i < level; i++) {
     y += drop + structure + node.levelClear
   }
@@ -92,10 +95,17 @@ export function levelEntryYM(node: LiveRackingNode, level: number): number {
   return levelExitYM(node, level) + channelDropM(node)
 }
 
-/** Çerçevenin toplam yüksekliği — en üst katın giriş ucu + yapı payı. */
+/**
+ * Çerçevenin toplam yüksekliği — en üst katın giriş ucu + yapı payı.
+ *
+ * Giydirme rafta dikme burada bitmez: çatı bağlantısı için
+ * `CLAD_RACK_HEADROOM_M` kadar daha uzar. Raf o zaman bir depoya konmuş
+ * olmaz, deponun kendisi olur.
+ */
 export function frameHeightM(node: LiveRackingNode): number {
   const top = levelEntryYM(node, node.levels - 1)
-  return top + DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
+  const structural = top + DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
+  return node.cladRack ? structural + CLAD_RACK_HEADROOM_M : structural
 }
 
 /** Makara aralığı 75 mm'nin katı mı — panel bunu uyarı olarak söyler. */

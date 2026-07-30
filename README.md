@@ -220,8 +220,13 @@ bunx git-cliff --output CHANGELOG.md
 - Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
 - CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
 
+### Chores
+
+- Obsidian kasasını ve yerel notları gitignore'a al ([`c54aaf5`](https://github.com/ovurrsl/plugin-warehouse/commit/c54aaf59ed19ee8e3cd7c8bcac055090ba0e6b98))
+
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7326461`](https://github.com/ovurrsl/plugin-warehouse/commit/7326461c64866b919c8851e69c19fb7a189f1758))
 - Refresh generated README blocks [skip ci] ([`a70a3bd`](https://github.com/ovurrsl/plugin-warehouse/commit/a70a3bd66b5a07461767f37a8c3ca5df117f7809))
 - Refresh generated README blocks [skip ci] ([`f857537`](https://github.com/ovurrsl/plugin-warehouse/commit/f8575371ad1af416cfc44b7985a33e87cea546d9))
 - Refresh generated README blocks [skip ci] ([`10ef45e`](https://github.com/ovurrsl/plugin-warehouse/commit/10ef45efb900c1ef013139a9f0df4f8ceaf25126))
@@ -231,11 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`7a47326`](https://github.com/ovurrsl/plugin-warehouse/commit/7a473264a8d5d8615c947f17aed23e5cdbfe0055))
 - Refresh generated README blocks [skip ci] ([`e543e9b`](https://github.com/ovurrsl/plugin-warehouse/commit/e543e9be7c23c4964f4a508e8ab4861767dca9be))
 - Refresh generated README blocks [skip ci] ([`8323196`](https://github.com/ovurrsl/plugin-warehouse/commit/83231965d97727e8ffbc200b2deb54b7b7bbf871))
-- Refresh generated README blocks [skip ci] ([`fc3a267`](https://github.com/ovurrsl/plugin-warehouse/commit/fc3a267578a322f415e23df6cd60561c7e6bf127))
-- Refresh generated README blocks [skip ci] ([`abf3d56`](https://github.com/ovurrsl/plugin-warehouse/commit/abf3d567cbfbb76c5b910674487dc885ce037452))
-- Refresh generated README blocks [skip ci] ([`b595de2`](https://github.com/ovurrsl/plugin-warehouse/commit/b595de29c2c53514f99c2b2e3739c875296cdaae))
-- Refresh generated README blocks [skip ci] ([`4867da5`](https://github.com/ovurrsl/plugin-warehouse/commit/4867da5e192ff80b0fc962bbdbf62eb2f11899ef))
-- Refresh generated README blocks [skip ci] ([`1e10130`](https://github.com/ovurrsl/plugin-warehouse/commit/1e101305827a5c10992d70b09acf24f974086389))
 
 …
 

@@ -11,10 +11,12 @@ import {
   BRAKE_ROLLER_MIN_DEPTH,
   CHANNEL_PROFILE_HEIGHT_M,
   DYNAMIC_BEAM_HEIGHT_M,
+  FRAME_HEIGHT_STEP_M,
+  INTERMEDIATE_RETAINER_MIN_DEPTH,
+  LANE_LENGTH_DATUM_M,
   RETAINER_GAP_M,
   ROLLER_OVER_PALLET_M,
   ROLLER_PITCH_STEP_M,
-  ROLLER_TO_BRAKE_M,
 } from './catalog'
 import type { LiveRackingNode } from './schema'
 
@@ -107,13 +109,49 @@ export function hasBrakeRollers(node: LiveRackingNode): boolean {
   return node.palletsDeep > BRAKE_ROLLER_MIN_DEPTH
 }
 
+/**
+ * Ara tutucu takılır mı.
+ *
+ * Bayrak tek başına yetmiyor: kısa bir kanalda ara tutucunun tutacağı bir
+ * palet treni yok. Eşiğin altında işaretli bırakmak sessizce etkisiz kalmak
+ * olurdu, o yüzden panel de aynı koşulu uyarı olarak söylüyor.
+ */
+export function hasIntermediateRetainers(node: LiveRackingNode): boolean {
+  return node.intermediateRetainers && node.palletsDeep >= INTERMEDIATE_RETAINER_MIN_DEPTH
+}
+
 /** Bir kanaldaki makara sayısı. */
 export function rollerCount(node: LiveRackingNode): number {
   return Math.max(2, Math.floor(channelDepthM(node) / node.rollerPitch))
 }
 
-/** Fren makarasının sıradan makaradan Z ofseti (katalog ölçüsü Z). */
-export const BRAKE_OFFSET_Z_M = ROLLER_TO_BRAKE_M
+/**
+ * Çerçeve yüksekliği 50 mm'nin katı mı — katalog kısıtı.
+ *
+ * Dikme delikleri 50 mm adımla açılıyor, yani ara bir yükseklik sipariş
+ * edilemez. Yükseklik serbest bir toplam olduğu için (serbest yükseklikler +
+ * yapı payı + düşüş) kullanıcının bunu tutturması tesadüfe kalıyor; panel
+ * en yakın geçerli değeri de söylüyor.
+ */
+export function frameHeightIsValid(node: LiveRackingNode): boolean {
+  const ratio = frameHeightM(node) / FRAME_HEIGHT_STEP_M
+  return Math.abs(ratio - Math.round(ratio)) < 1e-6
+}
+
+/** 50 mm adımına oturan en yakın çerçeve yüksekliği. */
+export function nearestValidFrameHeightM(node: LiveRackingNode): number {
+  return Math.round(frameHeightM(node) / FRAME_HEIGHT_STEP_M) * FRAME_HEIGHT_STEP_M
+}
+
+/**
+ * Kanal katalogun 20 m koridor datumunu aşıyor mu.
+ *
+ * Sert sınır DEĞİL — katalog daha uzununun kurulabildiğini söylüyor. 30 palet
+ * × 1200 mm kanal 36 m'yi buluyor; kullanıcı bunu bilerek yapmalı.
+ */
+export function exceedsLaneDatum(node: LiveRackingNode): boolean {
+  return channelDepthM(node) > LANE_LENGTH_DATUM_M
+}
 
 /** Kanalın tuttuğu palet sayısı — kapasite okumasının girdisi. */
 export function palletPositions(node: LiveRackingNode): number {

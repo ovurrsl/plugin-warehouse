@@ -9,7 +9,11 @@ import {
   bayWidthM,
   channelDepthM,
   channelDropM,
+  frameHeightIsValid,
+  frameHeightM,
   hasBrakeRollers,
+  hasIntermediateRetainers,
+  nearestValidFrameHeightM,
   palletFaceWidthM,
   palletPositions,
   rollerCount,
@@ -104,13 +108,46 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
           <span style={styles.figure}>{rollerCount(node)}</span>
         </div>
         <div style={styles.row}>
-          <span>Fren makarası</span>
-          <span style={styles.figure}>{hasBrakeRollers(node) ? 'var' : 'yok'}</span>
-        </div>
-        <div style={styles.row}>
           <span>Akış</span>
           <span style={styles.figure}>
             {node.variant === 'FIFO' ? 'FIFO · iki koridor' : 'LIFO push-back · tek koridor'}
+          </span>
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={styles.row}>
+          <span>Fren makarası</span>
+          <span style={styles.figure}>
+            {hasBrakeRollers(node) ? `${node.palletsDeep} adet · palet başına 1` : 'yok'}
+          </span>
+        </div>
+        <div style={styles.row}>
+          <span>Kanal dip ucu</span>
+          <span style={styles.figure}>
+            {node.variant === 'FIFO' ? 'çıkış kirişi + tampon' : 'son durdurucu'}
+          </span>
+        </div>
+        <div style={styles.row}>
+          <span>Palet tutucu</span>
+          <span style={styles.figure}>
+            {node.withRetainers ? 'çıkışta' : 'yok'}
+            {hasIntermediateRetainers(node) ? ' + 2 ara' : ''}
+          </span>
+        </div>
+        <div style={styles.row}>
+          <span>Makara</span>
+          <span style={styles.figure}>
+            {node.splitRollers ? 'bölünmüş · sert mastlı araç' : 'tam boy'}
+          </span>
+        </div>
+        <div style={styles.row}>
+          <span>Çerçeve yüksekliği</span>
+          <span style={styles.figure}>
+            {(frameHeightM(node) * 1000).toFixed(0)} mm
+            {frameHeightIsValid(node)
+              ? ''
+              : ` → ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)}`}
           </span>
         </div>
       </div>

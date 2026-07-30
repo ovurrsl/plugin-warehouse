@@ -7,18 +7,38 @@
  * yapmaz. Makaranın eğimi konumundan gelir — art arda gelen her makara bir
  * öncekinden `pitch · gradient` kadar alçakta durur.
  *
- * Faz 1 kapsamı: çerçeve, dinamik kirişler, kanal profilleri, makaralar.
- * Fren makarası, tutucu, ortalayıcı, çıkış kirişi ve son durdurucu Faz 2.
+ * Akış donanımı (fren makarası + tamburu, ortalayıcı, tutucu, çıkış kirişi,
+ * son durdurucu) bu dosyada; kanalın FIFO mu LIFO mu olduğu gerçek bir şekil
+ * farkı üretir — `pushChannelEnd` ikisini ayırır.
  */
 
 import {
+  ANCHOR_BOLT_HEIGHT_M,
+  ANCHOR_BOLT_M,
+  BRAKE_DRUM_DIAMETER_M,
+  BRAKE_DRUM_WIDTH_M,
+  BRAKE_ROLLER_RAISE_M,
+  CENTRALISING_STRIP_ANGLE_RAD,
+  CENTRALISING_STRIP_HEIGHT_M,
+  CENTRALISING_STRIP_LENGTH_M,
+  CENTRALISING_STRIP_THICKNESS_M,
   CHANNEL_PROFILE_HEIGHT_M,
   CHANNEL_PROFILE_WIDTH_M,
   DIAGONAL_THICKNESS_M,
   DYNAMIC_BEAM_HEIGHT_M,
   DYNAMIC_BEAM_THICKNESS_M,
+  END_STOP_HEIGHT_M,
+  EXIT_BEAM_BUMPER_M,
+  EXIT_BEAM_HEIGHT_M,
+  HINGE_KNUCKLE_M,
   LEVELLING_PLATE_THICKNESS_M,
+  RETAINER_BODY_HEIGHT_M,
+  RETAINER_BODY_THICKNESS_M,
+  RETAINER_PEDAL_LENGTH_M,
+  RETAINER_PEDAL_THICKNESS_M,
   ROLLER_DIAMETER_M,
+  ROLLER_TO_BRAKE_M,
+  SPLIT_ROLLER_GAP_M,
   UPRIGHT_DEPTH_M,
   UPRIGHT_WIDTH_M,
 } from './catalog'
@@ -27,6 +47,8 @@ import {
   channelDepthM,
   channelDropM,
   frameHeightM,
+  hasBrakeRollers,
+  hasIntermediateRetainers,
   levelExitYM,
   rollerLengthM,
 } from './metrics'
@@ -36,23 +58,33 @@ export type LiveRackingPartRole =
   | 'upright'
   | 'diagonal'
   | 'footplate'
+  | 'anchor'
   | 'beam'
   | 'channel'
   | 'roller'
+  | 'brake-roller'
+  | 'brake-drum'
+  | 'centraliser'
+  | 'retainer'
+  | 'exit-beam'
+  | 'end-stop'
+  | 'hinge'
 
 export type LiveRackingPart = {
   role: LiveRackingPartRole
   center: readonly [number, number, number]
   size: readonly [number, number, number]
-  /** ZY düzleminde eğim — yalnız kanal profili kullanır. */
+  /** ZY düzleminde eğim — kanal profili ve `simple` makara şeridi kullanır. */
   tiltX?: number
+  /** Plan düzleminde dönüş — yalnız ortalayıcı şeritler kullanır. */
+  rotationY?: number
 }
 
 /** Uzak katman: makaralar teker teker çizilmez, kanal tek bir şerit olur. */
 export type LiveRackingDetail = 'full' | 'simple'
 
 /**
- * Dört dikme + çaprazlar + taban plakaları.
+ * Dört dikme + çaprazlar + taban plakaları + ankrajlar.
  *
  * Kanal derinliği boyunca iki çerçeve: giriş (+Z) ve çıkış (−Z) uçlarında.
  * Gerçek bir kanal daha fazla ara çerçeve taşır ama görsel olarak uçlar
@@ -76,6 +108,15 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
         center: [x, LEVELLING_PLATE_THICKNESS_M / 2, z],
         size: [UPRIGHT_WIDTH_M * 1.6, LEVELLING_PLATE_THICKNESS_M, UPRIGHT_DEPTH_M * 1.6],
       })
+      // Ankraj: plakanın iki ucundan zemine. Silindir değil kutu — bu
+      // paketin bütün geometrisi kutu-listesi ve emitter silindir üretmiyor.
+      for (const bolt of [-1, 1] as const) {
+        parts.push({
+          role: 'anchor',
+          center: [x, ANCHOR_BOLT_HEIGHT_M / 2, z + bolt * UPRIGHT_DEPTH_M * 0.6],
+          size: [ANCHOR_BOLT_M, ANCHOR_BOLT_HEIGHT_M, ANCHOR_BOLT_M],
+        })
+      }
     }
     // Çerçeve içi yatay bağlar — kafesi okunur kılan asgari kadar.
     const ties = Math.max(2, Math.round(height / 1.2))
@@ -142,6 +183,41 @@ function pushChannelProfiles(parts: LiveRackingPart[], node: LiveRackingNode, le
 }
 
 /**
+ * Tek bir makara — bölünmüşse iki yarım.
+ *
+ * `splitRollers` sert mastlı araçlar (istif, turret, transtoker) içindir:
+ * çatal kanalın ORTASINDAN geçer, o yüzden makara ikiye bölünür ve arada
+ * `SPLIT_ROLLER_GAP_M` boşluk kalır. Bu, seçeneğin gerçek geometrik
+ * karşılığı — bayrağın panelde durup hiçbir şey yapmadığı hâli değil.
+ */
+function pushRollerAt(
+  parts: LiveRackingPart[],
+  node: LiveRackingNode,
+  role: 'roller' | 'brake-roller',
+  y: number,
+  z: number,
+  diameter: number,
+): void {
+  const length = rollerLengthM(node)
+  if (!node.splitRollers) {
+    parts.push({ role, center: [0, y, z], size: [length, diameter, diameter] })
+    return
+  }
+  const halfLength = (length - SPLIT_ROLLER_GAP_M) / 2
+  if (halfLength <= 0) {
+    parts.push({ role, center: [0, y, z], size: [length, diameter, diameter] })
+    return
+  }
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      role,
+      center: [side * (SPLIT_ROLLER_GAP_M / 2 + halfLength / 2), y, z],
+      size: [halfLength, diameter, diameter],
+    })
+  }
+}
+
+/**
  * Bir katın makaraları.
  *
  * Kutu olarak çizilir, silindir olarak değil: bir kanalda yüzlerce makara
@@ -161,7 +237,6 @@ function pushRollers(
   const depth = channelDepthM(node)
   const drop = channelDropM(node)
   const exitY = levelExitYM(node, level)
-  const length = rollerLengthM(node)
   const halfDepth = depth / 2
 
   if (detail === 'simple') {
@@ -169,7 +244,7 @@ function pushRollers(
     parts.push({
       role: 'roller',
       center: [0, exitY + drop / 2 - ROLLER_DIAMETER_M / 2, 0],
-      size: [length, ROLLER_DIAMETER_M, depth / Math.cos(tilt)],
+      size: [rollerLengthM(node), ROLLER_DIAMETER_M, depth / Math.cos(tilt)],
       tiltX: -tilt,
     })
     return
@@ -181,10 +256,200 @@ function pushRollers(
     const z = -halfDepth + t * depth
     // Çıkış (−Z) alçak, giriş (+Z) yüksek.
     const y = exitY + t * drop
+    pushRollerAt(parts, node, 'roller', y - ROLLER_DIAMETER_M / 2, z, ROLLER_DIAMETER_M)
+  }
+}
+
+/**
+ * Fren makaraları ve hız regülatörü tamburları.
+ *
+ * Katalog kuralı: yalnız İKİDEN derin kanalda (`hasBrakeRollers`). İki palet
+ * derinlikte yerçekimi zaten kontrollü; üçüncüden itibaren paletin hızı
+ * regüle edilmezse çıkışta çarpar.
+ *
+ * Palet başına bir fren makarası — her palet pozisyonu kendi hız
+ * regülasyonunu görür. Sıradan makaradan `ROLLER_TO_BRAKE_M` (katalog ölçüsü
+ * Z) kadar ötede ve `BRAKE_ROLLER_RAISE_M` kadar YUKARIDA durur: yükseklik
+ * farkı paletin ağırlığını frene bindiren şeydir.
+ *
+ * Tambur makaranın ucuna takılır ve kanal profilinin dışında kalır — gerçek
+ * üründe de öyle, regülatör kanalın yan yüzünden erişilebilir olmak zorunda.
+ */
+function pushBrakeRollers(parts: LiveRackingPart[], node: LiveRackingNode, level: number): void {
+  if (!hasBrakeRollers(node)) return
+
+  const depth = channelDepthM(node)
+  const drop = channelDropM(node)
+  const exitY = levelExitYM(node, level)
+  const halfDepth = depth / 2
+  const step = depth / node.palletsDeep
+  const drumX = rollerLengthM(node) / 2 + BRAKE_DRUM_WIDTH_M / 2
+
+  for (let i = 0; i < node.palletsDeep; i++) {
+    // Palet pozisyonunun ortası, sonra katalogun Z ofseti kadar öteye.
+    const z = -halfDepth + (i + 0.5) * step + ROLLER_TO_BRAKE_M
+    if (z > halfDepth) continue
+    const t = (z + halfDepth) / depth
+    const y = exitY + t * drop - ROLLER_DIAMETER_M / 2 + BRAKE_ROLLER_RAISE_M
+
+    pushRollerAt(parts, node, 'brake-roller', y, z, ROLLER_DIAMETER_M)
     parts.push({
-      role: 'roller',
-      center: [0, y - ROLLER_DIAMETER_M / 2, z],
-      size: [length, ROLLER_DIAMETER_M, ROLLER_DIAMETER_M],
+      role: 'brake-drum',
+      center: [drumX, y, z],
+      size: [BRAKE_DRUM_WIDTH_M, BRAKE_DRUM_DIAMETER_M, BRAKE_DRUM_DIAMETER_M],
+    })
+  }
+}
+
+/**
+ * Giriş ağzındaki ortalama şeritleri.
+ *
+ * Palet kanala girerken tam ortalanmamışsa bu iki eğik şerit onu ortalar.
+ * Ağız dışa doğru genişler: şeritler akış eksenine `±angle` ile durur, yani
+ * +Z ucunda birbirinden uzak, kanala doğru yaklaşırlar.
+ */
+function pushCentralisers(parts: LiveRackingPart[], node: LiveRackingNode, level: number): void {
+  const halfDepth = channelDepthM(node) / 2
+  const entryY = levelExitYM(node, level) + channelDropM(node)
+  const halfSpan = rollerLengthM(node) / 2
+  const zCenter = halfDepth - CENTRALISING_STRIP_LENGTH_M / 2
+
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      role: 'centraliser',
+      center: [
+        side * (halfSpan + CENTRALISING_STRIP_THICKNESS_M / 2),
+        entryY + CENTRALISING_STRIP_HEIGHT_M / 2,
+        zCenter,
+      ],
+      size: [
+        CENTRALISING_STRIP_THICKNESS_M,
+        CENTRALISING_STRIP_HEIGHT_M,
+        CENTRALISING_STRIP_LENGTH_M,
+      ],
+      // Ağız +Z'de geniş: şerit içeri doğru kapanır.
+      rotationY: side * CENTRALISING_STRIP_ANGLE_RAD,
+    })
+  }
+}
+
+/**
+ * Bir tutucu: gövde + ağırlıkla çalışan pedal.
+ *
+ * Katalog mekanizması: ilk paletin ağırlığı pedala biner, pedal da ikinci
+ * paleti tutan çubukları kaldırır. Pedal bu yüzden makara hattının hemen
+ * ÜSTÜNDE ve gövdenin akış yönünde önünde duruyor.
+ */
+function pushRetainer(parts: LiveRackingPart[], node: LiveRackingNode, y: number, z: number): void {
+  const halfSpan = rollerLengthM(node) / 2
+
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      role: 'retainer',
+      center: [
+        side * (halfSpan + RETAINER_BODY_THICKNESS_M / 2),
+        y + RETAINER_BODY_HEIGHT_M / 2,
+        z,
+      ],
+      size: [RETAINER_BODY_THICKNESS_M, RETAINER_BODY_HEIGHT_M, RETAINER_BODY_THICKNESS_M],
+    })
+  }
+  parts.push({
+    role: 'retainer',
+    center: [0, y + RETAINER_PEDAL_THICKNESS_M / 2, z + RETAINER_PEDAL_LENGTH_M / 2],
+    size: [halfSpan * 2, RETAINER_PEDAL_THICKNESS_M, RETAINER_PEDAL_LENGTH_M],
+  })
+}
+
+/**
+ * Tutucular: çıkışta bir tane, uzun kanalda ara tutucular.
+ *
+ * `withRetainers` kanal DERİNLİĞİNİ de uzatıyor (`channelDepthM`, katalogun
+ * 300 mm palet arası boşluğu) — yani seçenek zaten ölçüyü değiştiriyordu;
+ * eksik olan görünür parçaydı.
+ */
+function pushRetainers(parts: LiveRackingPart[], node: LiveRackingNode, level: number): void {
+  const depth = channelDepthM(node)
+  const drop = channelDropM(node)
+  const exitY = levelExitYM(node, level)
+  const halfDepth = depth / 2
+
+  const atDepthFraction = (t: number) => ({
+    y: exitY + t * drop,
+    z: -halfDepth + t * depth,
+  })
+
+  if (node.withRetainers) {
+    // Çıkış ucunun hemen gerisinde: ilk paleti bırakırken ikinciyi tutar.
+    const spot = atDepthFraction(Math.min(1, (0.3 + halfDepth) / depth))
+    pushRetainer(parts, node, spot.y, spot.z)
+  }
+
+  if (hasIntermediateRetainers(node)) {
+    // Kanalı üçe bölen iki nokta — uzun dizide palet trenini parçalar.
+    for (const t of [1 / 3, 2 / 3] as const) {
+      const spot = atDepthFraction(t)
+      pushRetainer(parts, node, spot.y, spot.z)
+    }
+  }
+}
+
+/**
+ * Kanalın çıkış ucu — **FIFO ile LIFO'nun tek gerçek geometrik farkı.**
+ *
+ * FIFO: −Z ucu gerçek bir çıkıştır, orada palet operatöre sunulur. Çıkış
+ * kirişi paleti durdurur ve üstündeki tampon darbeyi alır.
+ *
+ * LIFO (push-back): −Z ucunda çıkış YOKTUR — palet aynı uçtan yüklenip aynı
+ * uçtan alınır, dolayısıyla kanalın dip ucuna paletin dışarı düşmesini
+ * engelleyen bir son durdurucu konur. Şema bunu zaten böyle tanımlıyordu;
+ * eksik olan `parts.ts`'in `variant`'a bakmasıydı.
+ */
+function pushChannelEnd(parts: LiveRackingPart[], node: LiveRackingNode, level: number): void {
+  const halfDepth = channelDepthM(node) / 2
+  const exitY = levelExitYM(node, level)
+  const width = rollerLengthM(node)
+
+  if (node.variant === 'LIFO') {
+    parts.push({
+      role: 'end-stop',
+      center: [0, exitY + END_STOP_HEIGHT_M / 2, -halfDepth],
+      size: [width, END_STOP_HEIGHT_M, EXIT_BEAM_BUMPER_M],
+    })
+    return
+  }
+
+  parts.push({
+    role: 'exit-beam',
+    center: [0, exitY + EXIT_BEAM_HEIGHT_M / 2, -halfDepth],
+    size: [width, EXIT_BEAM_HEIGHT_M, EXIT_BEAM_BUMPER_M],
+  })
+  // Tampon: kirişin akış tarafındaki yüzünde, darbeyi alan yumuşak şerit.
+  parts.push({
+    role: 'end-stop',
+    center: [0, exitY + EXIT_BEAM_HEIGHT_M, -halfDepth + EXIT_BEAM_BUMPER_M],
+    size: [width, EXIT_BEAM_BUMPER_M, EXIT_BEAM_BUMPER_M],
+  })
+}
+
+/**
+ * Menteşeli kanal — zemin katında bakım erişimi.
+ *
+ * Kanal çıkış ucundan yukarı kaldırılabilsin diye menteşelenir; altındaki
+ * makara hattı ve fren donanımı böyle temizlenir. Görünür karşılığı, giriş
+ * ucundaki menteşe boğumu: kanalın etrafında döndüğü eksen orası.
+ */
+function pushHinges(parts: LiveRackingPart[], node: LiveRackingNode): void {
+  if (!node.hingedChannels) return
+  const halfDepth = channelDepthM(node) / 2
+  const entryY = levelExitYM(node, 0) + channelDropM(node)
+  const halfSpan = rollerLengthM(node) / 2
+
+  for (const side of [-1, 1] as const) {
+    parts.push({
+      role: 'hinge',
+      center: [side * halfSpan, entryY - CHANNEL_PROFILE_HEIGHT_M / 2, halfDepth],
+      size: [HINGE_KNUCKLE_M, HINGE_KNUCKLE_M, HINGE_KNUCKLE_M],
     })
   }
 }
@@ -196,10 +461,20 @@ export function liveRackingParts(
 ): LiveRackingPart[] {
   const parts: LiveRackingPart[] = []
   pushFrames(parts, node)
+  pushHinges(parts, node)
   for (let level = 0; level < node.levels; level++) {
     pushLevelBeams(parts, node, level)
     pushChannelProfiles(parts, node, level)
     pushRollers(parts, node, level, detail)
+    pushChannelEnd(parts, node, level)
+    // Akış donanımının tamamı yakın katmanda: uzaktan bir kanal tek şerit
+    // olarak okunuyor ve fren makarası, tutucu, ortalayıcı orada yalnız
+    // üçgen maliyeti olurdu.
+    if (detail === 'full') {
+      pushBrakeRollers(parts, node, level)
+      pushCentralisers(parts, node, level)
+      pushRetainers(parts, node, level)
+    }
   }
   return parts
 }

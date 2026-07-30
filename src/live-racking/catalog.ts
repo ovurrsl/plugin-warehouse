@@ -75,6 +75,19 @@ export const BRAKE_ROLLER_MIN_DEPTH = 2
 export const MAX_PALLETS_DEEP = 30
 /** Palet tutucu takılıysa iki palet arasında bırakılan boşluk. */
 export const RETAINER_GAP_M = mm(300)
+/**
+ * Katalogun yayınladığı koridor boyu datumu: 20 m.
+ *
+ * Sert bir sınır DEĞİL — katalog "20 m'den uzun koridorlar da kurulabilir"
+ * diyor. Bu yüzden reddetmiyoruz, yalnız uyarıyoruz: 30 palet × 1200 mm
+ * kanal 36 m'yi buluyor ve kullanıcının bunu bilerek yapması gerekir.
+ */
+export const LANE_LENGTH_DATUM_M = 20
+/**
+ * Ara tutucular bu derinlikten sonra anlamlı — uzun kanalda palet dizisi
+ * tek çıkış tutucusuyla kontrol edilemiyor.
+ */
+export const INTERMEDIATE_RETAINER_MIN_DEPTH = 15
 
 // ── Varsayılan makara aralığı ─────────────────────────────────────────────
 
@@ -102,16 +115,41 @@ export const CHANNEL_PROFILE_HEIGHT_M = mm(100)
 export const ROLLER_DIAMETER_M = mm(50)
 /** Fren makarası makara hattının bu kadar üstünde durur (ASSUMPTION). */
 export const BRAKE_ROLLER_RAISE_M = mm(8)
+/** Fren tamburu / hız regülatörü — makaranın ucuna takılan gövde (ASSUMPTION). */
+export const BRAKE_DRUM_DIAMETER_M = mm(40)
+export const BRAKE_DRUM_WIDTH_M = mm(35)
 /** Ortalama şeridi — palet kanala girerken ortalayan eğik parça (ASSUMPTION). */
 export const CENTRALISING_STRIP_LENGTH_M = mm(400)
 export const CENTRALISING_STRIP_HEIGHT_M = mm(80)
+export const CENTRALISING_STRIP_THICKNESS_M = mm(20)
+/** Şeridin akış eksenine göre açısı — palet ağzı daralarak ortalanır
+ *  (ASSUMPTION; katalog sadece "centralising strip" adını veriyor). */
+export const CENTRALISING_STRIP_ANGLE_RAD = Math.PI / 12
 /** Çıkış kirişi ve tampon (ASSUMPTION). */
 export const EXIT_BEAM_HEIGHT_M = mm(120)
 export const EXIT_BEAM_BUMPER_M = mm(40)
 /** Son durdurucu (ASSUMPTION). */
 export const END_STOP_HEIGHT_M = mm(150)
+/** Palet tutucu gövdesi ve ağırlıkla çalışan pedalı (ASSUMPTION). */
+export const RETAINER_BODY_HEIGHT_M = mm(140)
+export const RETAINER_BODY_THICKNESS_M = mm(45)
+export const RETAINER_PEDAL_LENGTH_M = mm(180)
+export const RETAINER_PEDAL_THICKNESS_M = mm(14)
+/**
+ * Bölünmüş makarada ortada bırakılan boşluk (ASSUMPTION).
+ *
+ * Sert mastlı araçlar (istif, turret, transtoker) çatalını kanalın ortasından
+ * geçirir; makara bu yüzden ikiye bölünür. Boşluk çatal kalınlığından geniş
+ * olmalı.
+ */
+export const SPLIT_ROLLER_GAP_M = mm(200)
+/** Menteşeli kanalın zemin katındaki menteşe boğumu (ASSUMPTION). */
+export const HINGE_KNUCKLE_M = mm(70)
 /** Taban plakası kalınlığı (ASSUMPTION). */
 export const LEVELLING_PLATE_THICKNESS_M = mm(6)
+/** Taban plakasını zemine bağlayan ankraj cıvatası (ASSUMPTION). */
+export const ANCHOR_BOLT_M = mm(24)
+export const ANCHOR_BOLT_HEIGHT_M = mm(30)
 
 // ── Renk anahtarları ──────────────────────────────────────────────────────
 //

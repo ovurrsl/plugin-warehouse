@@ -19,6 +19,8 @@ import {
   bayWidthM,
   channelDepthM,
   channelDropM,
+  exceedsLaneDatum,
+  frameHeightIsValid,
   frameHeightM,
   hasBrakeRollers,
   levelEntryYM,
@@ -170,6 +172,144 @@ describe('parça listesi', () => {
   })
 })
 
+describe('akış donanımı — Faz 2', () => {
+  const roles = (n: LiveRackingNode, detail: 'full' | 'simple' = 'full') =>
+    new Set(liveRackingParts(n, detail).map((p) => p.role))
+  const countOf = (n: LiveRackingNode, role: string, detail: 'full' | 'simple' = 'full') =>
+    liveRackingParts(n, detail).filter((p) => p.role === role).length
+
+  test('FIFO çıkış kirişi üretir, LIFO son durdurucu — variant artık ŞEKLİ değiştiriyor', () => {
+    // Faz 1'de `parts.ts` `variant`'a hiç bakmıyordu: iki varyant birebir
+    // aynı mesh'i üretiyordu, halbuki şema LIFO'yu "çıkış ucu yok, son
+    // durdurucu var" diye tanımlıyor.
+    const fifo = roles(node({ variant: 'FIFO' }))
+    const lifo = roles(node({ variant: 'LIFO' }))
+
+    expect(fifo.has('exit-beam')).toBe(true)
+    expect(lifo.has('exit-beam')).toBe(false)
+    expect(lifo.has('end-stop')).toBe(true)
+  })
+
+  test('fren makarası ve tamburu YALNIZ ikiden derin kanalda', () => {
+    expect(countOf(node({ palletsDeep: 2 }), 'brake-roller')).toBe(0)
+    expect(countOf(node({ palletsDeep: 2 }), 'brake-drum')).toBe(0)
+
+    const deep = node({ palletsDeep: 6 })
+    expect(hasBrakeRollers(deep)).toBe(true)
+    expect(countOf(deep, 'brake-roller')).toBeGreaterThan(0)
+    // Her fren makarasının bir regülatör tamburu var.
+    expect(countOf(deep, 'brake-drum')).toBeGreaterThan(0)
+  })
+
+  test('fren makarası sıradan makaranın ÜSTÜNDE durur — yükü frene bindiren şey bu', () => {
+    const n = node({ palletsDeep: 6 })
+    const parts = liveRackingParts(n, 'full')
+    const brake = parts.find((p) => p.role === 'brake-roller')
+    expect(brake).toBeDefined()
+    // Aynı Z'ye en yakın sıradan makarayı bul ve kotları kıyasla.
+    const nearest = parts
+      .filter((p) => p.role === 'roller')
+      .sort(
+        (a, b) =>
+          Math.abs(a.center[2] - brake!.center[2]) - Math.abs(b.center[2] - brake!.center[2]),
+      )[0]
+    expect(brake!.center[1]).toBeGreaterThan(nearest!.center[1])
+  })
+
+  test('bölünmüş makara ikiye ayrılır ve ortada boşluk bırakır', () => {
+    const solid = node()
+    const split = node({ splitRollers: true })
+    // İkiye bölündüğü için sayı artıyor.
+    expect(countOf(split, 'roller')).toBe(countOf(solid, 'roller') * 2)
+    // Hiçbir yarım merkezde değil — çatal ortadan geçecek.
+    for (const part of liveRackingParts(split, 'full')) {
+      if (part.role !== 'roller') continue
+      expect(Math.abs(part.center[0])).toBeGreaterThan(0)
+    }
+  })
+
+  test('tutucu seçeneği görünür parça üretir — Faz 1’de yalnız derinliği uzatıyordu', () => {
+    expect(roles(node({ withRetainers: false })).has('retainer')).toBe(false)
+    expect(roles(node({ withRetainers: true })).has('retainer')).toBe(true)
+  })
+
+  test('ara tutucu eşiğin altında hiçbir şey üretmez, üstünde üretir', () => {
+    expect(countOf(node({ palletsDeep: 8, intermediateRetainers: true }), 'retainer')).toBe(0)
+    expect(
+      countOf(node({ palletsDeep: 18, intermediateRetainers: true }), 'retainer'),
+    ).toBeGreaterThan(0)
+  })
+
+  test('menteşeli kanal menteşe boğumu üretir', () => {
+    expect(roles(node({ hingedChannels: false })).has('hinge')).toBe(false)
+    expect(roles(node({ hingedChannels: true })).has('hinge')).toBe(true)
+  })
+
+  test('ortalayıcı şeritler kat başına bir ÇİFT, GİRİŞ ucunda ve plan düzleminde açılı', () => {
+    // Her katın kendi ağzı var — dört katlı kanalda dört çift.
+    expect(countOf(node({ levels: 4 }), 'centraliser')).toBe(8)
+
+    const single = node({ levels: 1 })
+    const parts = liveRackingParts(single, 'full').filter((p) => p.role === 'centraliser')
+    expect(parts.length).toBe(2)
+    const halfDepth = channelDepthM(single) / 2
+    for (const part of parts) {
+      // Giriş +Z ucu.
+      expect(part.center[2]).toBeGreaterThan(0)
+      expect(part.center[2]).toBeLessThanOrEqual(halfDepth)
+      expect(part.rotationY).toBeDefined()
+      expect(part.rotationY).not.toBe(0)
+    }
+    // İki şerit birbirinin aynası.
+    expect(parts[0]!.rotationY).toBe(-parts[1]!.rotationY!)
+  })
+
+  test('taban plakaları ankrajlı', () => {
+    const n = node()
+    expect(countOf(n, 'anchor')).toBe(countOf(n, 'footplate') * 2)
+  })
+
+  test('uzak katman akış donanımını ÇİZMEZ — orada yalnız üçgen maliyeti olurdu', () => {
+    const n = node({ palletsDeep: 6, withRetainers: true })
+    const far = roles(n, 'simple')
+    expect(far.has('brake-roller')).toBe(false)
+    expect(far.has('centraliser')).toBe(false)
+    expect(far.has('retainer')).toBe(false)
+    // Uç donanımı uzakta da kalır: kanalın hangi ucu çıkış, uzaktan da okunmalı.
+    expect(far.has('exit-beam')).toBe(true)
+  })
+})
+
+describe('katalog doğrulamaları — Faz 2', () => {
+  const issuesFor = (patch: Record<string, unknown>) =>
+    liveRackingParametrics.invariants?.flatMap((c) => c(node(patch))) ?? []
+
+  test('çerçeve yüksekliği 50 mm katı değilse uyarı, ve uyarı ALAN bildirmez', () => {
+    const tall = node({ firstLevelClear: 1.53 })
+    expect(frameHeightIsValid(tall)).toBe(false)
+    const issue = issuesFor({ firstLevelClear: 1.53 }).find((i) => i.msg.includes('Çerçeve'))
+    expect(issue).toBeDefined()
+    // Yüksekliğin tek sahibi yok; bir alana iliştirmek yanlış yeri gösterirdi.
+    expect(issue?.field).toBeUndefined()
+  })
+
+  test('20 m koridor datumu aşılınca uyarı — ret DEĞİL', () => {
+    const long = node({ palletsDeep: 20, palletPreset: 'euro-1200x1200' })
+    expect(exceedsLaneDatum(long)).toBe(true)
+    const issue = issuesFor({ palletsDeep: 20, palletPreset: 'euro-1200x1200' }).find((i) =>
+      i.msg.includes('koridor datumunu'),
+    )
+    expect(issue?.severity).toBe('warning')
+  })
+
+  test('eşiğin altında işaretli ara tutucu, etkisiz olduğunu söyler', () => {
+    const issue = issuesFor({ palletsDeep: 8, intermediateRetainers: true }).find((i) =>
+      i.msg.includes('hiçbir parça üretmiyor'),
+    )
+    expect(issue).toBeDefined()
+  })
+})
+
 describe('geometri anahtarı', () => {
   test('şekli değiştiren her girdi anahtarda', () => {
     const base = node()
@@ -180,12 +320,31 @@ describe('geometri anahtarı', () => {
       { rollerPitch: 0.15 },
       { palletPreset: 'euro-1200x1200' },
       { withRetainers: true },
+      { variant: 'LIFO' },
+      { splitRollers: true },
+      { hingedChannels: true },
       { uprightColor: '#ff0000' },
     ]) {
       expect(liveRackingGeometryKey(node(patch), 'full'), JSON.stringify(patch)).not.toBe(
         liveRackingGeometryKey(base, 'full'),
       )
     }
+  })
+
+  test('ara tutucu anahtara ETKİN değeriyle girer', () => {
+    // Eşiğin altında hiçbir parça üretmiyor → geometri aynı → anahtar aynı.
+    // Ham bayrağı anahtara koymak, farkı olmayan iki kanal için iki mesh
+    // üretirdi.
+    const shallow = { palletsDeep: 8 }
+    expect(liveRackingGeometryKey(node({ ...shallow, intermediateRetainers: true }), 'full')).toBe(
+      liveRackingGeometryKey(node(shallow), 'full'),
+    )
+
+    // Eşiğin üstünde parça üretiyor → anahtar ayrılmak ZORUNDA.
+    const deep = { palletsDeep: 18 }
+    expect(liveRackingGeometryKey(node({ ...deep, intermediateRetainers: true }), 'full')).not.toBe(
+      liveRackingGeometryKey(node(deep), 'full'),
+    )
   })
 
   test('katman anahtarda — iki katman iki buffer', () => {

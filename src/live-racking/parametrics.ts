@@ -1,17 +1,23 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
 import {
+  FRAME_HEIGHT_STEP_M,
   GRADIENT_RANGE,
+  INTERMEDIATE_RETAINER_MIN_DEPTH,
+  LANE_LENGTH_DATUM_M,
   MAX_PALLETS_DEEP,
   MIN_CLEAR_HEIGHT_M,
   ROLLER_PITCH_STEP_M,
 } from './catalog'
 import {
-  bayWidthM,
   channelDepthM,
   channelDropM,
+  exceedsLaneDatum,
+  frameHeightIsValid,
+  frameHeightM,
   hasBrakeRollers,
-  rollerLengthM,
+  hasIntermediateRetainers,
+  nearestValidFrameHeightM,
   rollerPitchIsValid,
 } from './metrics'
 import type { LiveRackingNode } from './schema'
@@ -70,7 +76,12 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         {
           key: 'intermediateRetainers',
           kind: 'boolean',
-          // Ara tutucu uzun kanalın çözümü; kısa kanalda hiçbir şey yapmaz.
+          /**
+           * Eşiğin (15) biraz ALTINDAN görünür olması bilerek: eşikte
+           * gizleseydik, sığ bir kanalda işaretli kalmış bir bayrağı
+           * kullanıcı geri alamazdı. Görünür ama etkisiz olduğu aralıkta
+           * invariant bunu açıkça söylüyor.
+           */
           visibleIf: (node) => node.palletsDeep > 10,
         },
         { key: 'hingedChannels', kind: 'boolean' },
@@ -130,11 +141,45 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
       }
 
       // Uzun kanalda ara tutucu olmadan paletler sonuna kadar serbest akar.
-      if (node.palletsDeep > 15 && !node.intermediateRetainers) {
+      if (node.palletsDeep >= INTERMEDIATE_RETAINER_MIN_DEPTH && !node.intermediateRetainers) {
         issues.push({
           field: 'intermediateRetainers',
           severity: 'warning',
           msg: `${node.palletsDeep} palet derinlikte katalog ara tutucu öneriyor.`,
+        })
+      }
+
+      // İşaretli ama eşiğin altında: hiçbir tutucu üretilmiyor. Sessiz
+      // kalmak, kullanıcıya taktığı bir donanımı taktırmış gibi göstermek
+      // olurdu — kutunun işaretli olması tek başına bir söz.
+      if (node.intermediateRetainers && !hasIntermediateRetainers(node)) {
+        issues.push({
+          field: 'intermediateRetainers',
+          severity: 'warning',
+          msg: `Ara tutucu ${INTERMEDIATE_RETAINER_MIN_DEPTH} paletten sığ kanalda takılmıyor — bu kanalda hiçbir parça üretmiyor.`,
+        })
+      }
+
+      // Katalog: çerçeve yüksekliği 50 mm'nin katı (dikme delik adımı).
+      // Yükseklik serbest bir toplam olduğu için tutturmak tesadüfe kalıyor.
+      //
+      // Alan bildirmiyor ÇÜNKÜ tek bir sahibi yok: yükseklik
+      // `firstLevelClear + (levels−1)·levelClear + yapı + düşüş`. Birine
+      // iliştirmek, kullanıcıyı düzeltmesi gereken alanın o olduğuna
+      // inandırırdı — dördünden herhangi biri olabilir.
+      if (!frameHeightIsValid(node)) {
+        issues.push({
+          severity: 'warning',
+          msg: `Çerçeve yüksekliği ${(frameHeightM(node) * 1000).toFixed(0)} mm — katalog ${(FRAME_HEIGHT_STEP_M * 1000).toFixed(0)} mm'nin katını istiyor; en yakını ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)} mm.`,
+        })
+      }
+
+      // Katalog datumu 20 m; daha uzunu kurulabiliyor ama bilerek olmalı.
+      if (exceedsLaneDatum(node)) {
+        issues.push({
+          field: 'palletsDeep',
+          severity: 'warning',
+          msg: `Kanal ${channelDepthM(node).toFixed(1)} m — katalogun ${LANE_LENGTH_DATUM_M} m koridor datumunu aşıyor (kurulabilir, ama standart dışı).`,
         })
       }
 
@@ -154,6 +199,3 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
     },
   ],
 }
-
-/** Panelin okuduğu türetilmiş ölçüler — ikinci bir formül kopyası olmasın. */
-export const derivedFigures = { bayWidthM, rollerLengthM, channelDepthM, channelDropM }

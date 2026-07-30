@@ -323,3 +323,35 @@ describe('merdiven ve kapı parçaları', () => {
     expect(mezzanineParts(node).filter((p) => p.role === 'gate')).toHaveLength(0)
   })
 })
+
+describe('merdiven istenen yere konabiliyor', () => {
+  test('serbest yerleşim kenardan bağımsız — konum ve dönüş kullanıcının', () => {
+    // Şema ve `stairOrigin` bunu baştan destekliyordu; eksik olan yalnız
+    // arayüzdü, yani merdiven "istenen yere" konamıyordu çünkü UI sormuyordu.
+    const free = stair({
+      placement: { mode: 'xz', xM: 3.5, zM: -2, rotationDeg: 45 },
+    })
+    const parts = mezzanineParts(nodeWith({ staircases: [free] }))
+    const treads = parts.filter((p) => p.role === 'stair-tread')
+    expect(treads.length).toBeGreaterThan(0)
+    // Dönüş parçalara geçiyor: 45° eksen hizalı bir kutuyla ifade edilemez.
+    expect(treads.every((p) => (p.rotationY ?? 0) !== 0)).toBe(true)
+  })
+
+  test('serbest merdiven döşeme boşluğunu KENDİ yerinde açar', () => {
+    const here = nodeWith({
+      staircases: [stair({ placement: { mode: 'xz', xM: -6, zM: 4, rotationDeg: 0 } })],
+    })
+    const there = nodeWith({
+      staircases: [stair({ placement: { mode: 'xz', xM: 6, zM: -4, rotationDeg: 0 } })],
+    })
+    const centres = (n: ReturnType<typeof nodeWith>) =>
+      mezzanineParts(n)
+        .filter((p) => p.role === 'floor')
+        .map((p) => `${p.center[0].toFixed(2)},${p.center[2].toFixed(2)}`)
+        .sort()
+        .join('|')
+    // İki farklı konum iki farklı panel kümesi siliyor.
+    expect(centres(here)).not.toBe(centres(there))
+  })
+})

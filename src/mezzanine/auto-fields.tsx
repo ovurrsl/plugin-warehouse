@@ -164,6 +164,17 @@ function AccessoryEditor({
     />
   )
 
+  /** Serbest yerleşimin x / z / dönüş alanları — adım çağırana ait. */
+  const numberInput = (value: number, onSet: (next: number) => void, step = 0.5) => (
+    <input
+      onChange={(e) => onSet(Number(e.target.value))}
+      step={step}
+      style={styles.input}
+      type="number"
+      value={value}
+    />
+  )
+
   /**
    * Basamak sayısı — `'auto'` ya da katalogun hazır serisi.
    *
@@ -219,10 +230,69 @@ function AccessoryEditor({
               )}
             </>
           ) : (
-            <span style={{ fontSize: '0.625rem', color: MUTED, flex: 1 }}>
-              interior ({stair.placement.xM.toFixed(1)}, {stair.placement.zM.toFixed(1)})
-            </span>
+            <>
+              {numberInput(stair.placement.xM, (xM) =>
+                patch({
+                  staircases: accessories.staircases.map((s, j) =>
+                    j === i && s.placement.mode === 'xz'
+                      ? { ...s, placement: { ...s.placement, xM } }
+                      : s,
+                  ),
+                }),
+              )}
+              {numberInput(stair.placement.zM, (zM) =>
+                patch({
+                  staircases: accessories.staircases.map((s, j) =>
+                    j === i && s.placement.mode === 'xz'
+                      ? { ...s, placement: { ...s.placement, zM } }
+                      : s,
+                  ),
+                }),
+              )}
+              {numberInput(
+                stair.placement.rotationDeg,
+                (rotationDeg) =>
+                  patch({
+                    staircases: accessories.staircases.map((s, j) =>
+                      j === i && s.placement.mode === 'xz'
+                        ? { ...s, placement: { ...s.placement, rotationDeg } }
+                        : s,
+                    ),
+                  }),
+                15,
+              )}
+            </>
           )}
+          {/**
+           * Kenar ↔ serbest geçişi.
+           *
+           * Şema ve `stairOrigin` serbest yerleşimi (`mode: 'xz'`, dönüşle)
+           * BAŞINDAN BERİ destekliyordu; eksik olan yalnız buraya bir
+           * düğmeydi, yani merdiven "istenen yere" konamıyordu çünkü UI
+           * sormuyordu.
+           */}
+          <button
+            onClick={() =>
+              patch({
+                staircases: accessories.staircases.map((s, j) =>
+                  j !== i
+                    ? s
+                    : {
+                        ...s,
+                        placement:
+                          s.placement.mode === 'edge'
+                            ? { mode: 'xz' as const, xM: 0, zM: 0, rotationDeg: 0 }
+                            : { mode: 'edge' as const, edge: 'west' as const, offsetM: 2 },
+                      },
+                ),
+              })
+            }
+            style={styles.button}
+            title={stair.placement.mode === 'edge' ? 'Serbest konuma geç' : 'Kenara sabitle'}
+            type="button"
+          >
+            {stair.placement.mode === 'edge' ? '⤢' : '⊞'}
+          </button>
           {stepsSelect(stair.steps, (steps) =>
             patch({
               staircases: accessories.staircases.map((s, j) => (j === i ? { ...s, steps } : s)),

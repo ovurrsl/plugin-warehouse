@@ -17,6 +17,7 @@ const stair = (patch: Partial<StaircaseSpec> = {}): StaircaseSpec => ({
   placement: { mode: 'edge', edge: 'west', offsetM: 3 },
   widthM: 1,
   landing: 'turn180',
+  railings: 2,
   steps: 'auto',
   ...patch,
 })

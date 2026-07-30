@@ -35,6 +35,7 @@ function colorOf(node: MezzanineNode, role: MezzaninePart['role']): string {
     // planda, 3B'de floorType'a göre renk ayrımı yok.
     case 'floor':
     case 'stair-tread':
+    case 'stair-landing':
       return '#c7ccd1'
     // Korkuluk ve süpürgelik galvaniz — gövde mavisiyle aynı boyada
     // olsaydı, açık kenar uzaktan yapının bir parçası gibi okunurdu.
@@ -58,7 +59,14 @@ function colorOf(node: MezzanineNode, role: MezzaninePart['role']): string {
 function buildParts(node: MezzanineNode, parts: readonly MezzaninePart[]): THREE.BufferGeometry {
   const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
   for (const part of parts) {
-    emitPart(sink, part, toLinear(colorOf(node, part.role)), 0)
+    emitPart(
+      sink,
+      part,
+      toLinear(colorOf(node, part.role)),
+      0,
+      part.rotationY ?? 0,
+      part.tiltX ?? 0,
+    )
   }
   return finish(sink)
 }

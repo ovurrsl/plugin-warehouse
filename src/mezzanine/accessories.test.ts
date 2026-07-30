@@ -12,6 +12,7 @@ const stair = (patch: Partial<StaircaseSpec> = {}): StaircaseSpec => ({
   placement: { mode: 'edge', edge: 'west', offsetM: 3 },
   widthM: 1,
   landing: 'turn180',
+  railings: 2,
   steps: 'auto',
   ...patch,
 })
@@ -59,11 +60,32 @@ describe('EN ISO 14122-3 merdiven matematiği', () => {
     expect(issues.map((i) => i.code)).toContain('riser-too-tall')
   })
 
-  test('3 m üstü tırmanış sahanlıksız olamaz', () => {
-    const withoutLanding = resolveSteps(stair({ landing: 'continuous' }), 3.56)
-    expect(withoutLanding.issues.map((i) => i.code)).toContain('landing-required')
-    const withLanding = resolveSteps(stair({ landing: 'turn180' }), 3.56)
+  test('tek DÜZ kolun istisnası: 3 m değil 4 m', () => {
+    // Standart kol başına 3000 mm veriyor ama kesintisiz düz bir kola
+    // 4000 mm'ye kadar izin veriyor. Önceki sürüm istisnayı okumuyordu,
+    // dolayısıyla meşru bir 3.5 m düz kol gereksiz yere uyarı alıyordu.
+    const legal = resolveSteps(stair({ landing: 'continuous' }), 3.56)
+    expect(legal.issues.map((i) => i.code)).not.toContain('landing-required')
+
+    const tooTall = resolveSteps(stair({ landing: 'continuous' }), 4.4)
+    expect(tooTall.issues.map((i) => i.code)).toContain('landing-required')
+
+    const withLanding = resolveSteps(stair({ landing: 'turn180' }), 4.4)
     expect(withLanding.issues.map((i) => i.code)).not.toContain('landing-required')
+  })
+
+  test('15 basamaktan uzun merdiven otomatik kollara bölünür', () => {
+    // Katalog hazır merdivenleri 15 basamağa kadar yayınlıyor; daha uzunu
+    // ara sahanlıklarla bölünüyor. Kullanıcı "kesintisiz" dese bile.
+    const long = resolveSteps(stair({ landing: 'continuous' }), 3.8)
+    expect(long.geometry.steps).toBeGreaterThan(15)
+    expect(long.geometry.flights).toBeGreaterThan(1)
+    expect(long.geometry.autoSplit).toBe(true)
+    expect(long.geometry.stepsPerFlight).toBeLessThanOrEqual(15)
+
+    const short = resolveSteps(stair({ landing: 'continuous' }), 2.0)
+    expect(short.geometry.flights).toBe(1)
+    expect(short.geometry.autoSplit).toBe(false)
   })
 
   test('sahanlık merdiveni iki kola böler ve yatay uzanımı kısaltır', () => {
@@ -193,7 +215,7 @@ describe('aksesuarlar geometri anahtarında', () => {
 })
 
 describe('merdiven ve kapı parçaları', () => {
-  test('merdiven basamak sayısı kadar basamak + iki limon üretir', () => {
+  test('merdiven basamak sayısı kadar basamak + KOL BAŞINA iki limon üretir', () => {
     const node = nodeWith({ staircases: [stair()] })
     const parts = mezzanineParts(node)
     const resolved = resolveTierElevations(node.tiers)
@@ -201,7 +223,46 @@ describe('merdiven ve kapı parçaları', () => {
     if (!tier) throw new Error('tier yok')
     const { geometry } = resolveSteps(stair(), tier.deckTopM - tier.resolvedElevationM)
     expect(parts.filter((p) => p.role === 'stair-tread')).toHaveLength(geometry.steps)
-    expect(parts.filter((p) => p.role === 'stair-stringer')).toHaveLength(2)
+    // Her kol kendi iki limonunu taşır — sahanlıklı merdivende dört.
+    expect(parts.filter((p) => p.role === 'stair-stringer')).toHaveLength(2 * geometry.flights)
+  })
+
+  test('merdiven kolu KORKULUKSUZ bırakılmaz', () => {
+    // Faz 3'e kadar `pushStaircase` yalnız basamak ve limon çiziyordu:
+    // 3B'de açık kenarlı bir kol duruyordu, yayınlanabilir bir çıktı değil.
+    const two = mezzanineParts(nodeWith({ staircases: [stair({ railings: 2 })] }))
+    const one = mezzanineParts(nodeWith({ staircases: [stair({ railings: 1 })] }))
+    const railCount = (parts: ReturnType<typeof mezzanineParts>) =>
+      parts.filter((p) => p.role === 'railing').length
+
+    expect(railCount(two)).toBeGreaterThan(railCount(one))
+    // Tek korkuluklu kolda bile korkuluk VAR — 0 seçeneği yok.
+    const bare = mezzanineParts(nodeWith({}))
+    expect(railCount(one)).toBeGreaterThan(railCount(bare))
+  })
+
+  test('sahanlıklı merdiven gerçek bir platform çizer', () => {
+    // `turn90`/`turn180` yalnız `flights = 2` deyip hiçbir platform
+    // çizmiyordu: kullanıcı iki kol arasında boşluğa basıyordu.
+    const withLanding = mezzanineParts(nodeWith({ staircases: [stair({ landing: 'turn180' })] }))
+    const straight = mezzanineParts(nodeWith({ staircases: [stair({ landing: 'continuous' })] }))
+
+    // Sahanlığın kendi rolü var: döşeme paneliyle aynı role konsaydı panel
+    // sayısına karışır ve "boşluk kaç panel siliyor" cevaplanamazdı.
+    expect(withLanding.filter((p) => p.role === 'stair-landing').length).toBeGreaterThan(0)
+    // Tek düz kolda sahanlık yok — 15 basamağı aşmadığı sürece.
+    const straightLandings = straight.filter((p) => p.role === 'stair-landing').length
+    expect(straightLandings).toBeLessThan(
+      withLanding.filter((p) => p.role === 'stair-landing').length + 1,
+    )
+  })
+
+  test('limon kirişi ve küpeşte artık gerçekten EĞİK', () => {
+    const parts = mezzanineParts(nodeWith({ staircases: [stair()] }))
+    const stringers = parts.filter((p) => p.role === 'stair-stringer')
+    expect(stringers.length).toBeGreaterThan(0)
+    // Eğim olmadan limon kirişi basamakları takip etmez, dikey bir kutu olur.
+    expect(stringers.every((p) => (p.tiltX ?? 0) !== 0)).toBe(true)
   })
 
   test('iki kapı tipi FARKLI geometri üretir', () => {
@@ -241,7 +302,9 @@ describe('merdiven ve kapı parçaları', () => {
     // İkisi de iki kollu ve derinlikleri aynı; ayrıldıkları yer ikinci
     // kolun nereye gittiği. Önceki sürümde ikisi de aynı dikdörtgeni
     // açıyordu, yani sahanlık tipi seçimi hiçbir şeyi değiştirmiyordu.
-    const delta = 3.2
+    // 15 basamağın ALTINDA kalan bir kot farkı: yoksa kesintisiz kol da
+    // otomatik bölünür ve üçü de aynı derinliğe iner (o kural ayrı test).
+    const delta = 2.0
     const continuous = resolveSteps(stair({ landing: 'continuous' }), delta).geometry
     const turn90 = resolveSteps(stair({ landing: 'turn90' }), delta).geometry
     const turn180 = resolveSteps(stair({ landing: 'turn180' }), delta).geometry

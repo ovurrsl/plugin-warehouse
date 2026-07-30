@@ -275,6 +275,7 @@ function AccessoryEditor({
                   placement: { mode: 'edge', edge: 'west', offsetM: 2 },
                   widthM: 1,
                   landing: 'turn180',
+                  railings: 2,
                   steps: 'auto',
                 },
               ],

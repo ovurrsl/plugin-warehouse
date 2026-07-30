@@ -9,7 +9,7 @@
  * Ölçüler metre; standardın kendisi mm yayınlıyor ve `catalog.ts` çeviriyor.
  */
 
-import { RAILING_RULES, STAIRCASE_GEOMETRY } from './catalog'
+import { RAILING_RULES, STAIRCASE_GEOMETRY, STAIRCASE_STEP_COUNTS } from './catalog'
 import type { StaircaseSpec } from './schema'
 
 /**
@@ -22,6 +22,15 @@ export const RISER_TARGET_M = 0.1875
 /** `going + 2·rise` bandının ortası — going çözümünün hedefi. */
 const GOING_FORMULA_TARGET_M = (0.6 + 0.66) / 2
 
+/**
+ * Bir koldaki en fazla basamak — katalogun hazır merdiven serisinin üst ucu.
+ *
+ * Katalog 8/10/12/15 basamaklı hazır merdiven yayınlıyor; daha uzunu ara
+ * sahanlıklarla kollara bölünüyor. Sayı `STAIRCASE_STEP_COUNTS`'un son
+ * elemanından türetiliyor ki iki yerde ayrı yaşamasınlar.
+ */
+const MAX_STEPS_PER_FLIGHT = STAIRCASE_STEP_COUNTS[STAIRCASE_STEP_COUNTS.length - 1] ?? 15
+
 export type StepGeometry = {
   steps: number
   /** Rıht yüksekliği, metre. */
@@ -32,8 +41,14 @@ export type StepGeometry = {
   treadDepthM: number
   /** Kaç kollu: sahanlıklı merdiven iki kola bölünür. */
   flights: number
+  /** Bir koldaki basamak sayısı — son kol daha az taşıyabilir. */
+  stepsPerFlight: number
+  /** Kol sayısı kullanıcının seçtiğinden fazla mı (15 basamak kuralı). */
+  autoSplit: boolean
   /** Merdivenin YATAY uzanımı, sahanlık dahil — döşeme boşluğunun derinliği. */
   runM: number
+  /** Tek bir kolun yatay uzanımı, sahanlık hariç. */
+  flightRunM: number
   /**
    * Merdivenin YANAL uzanımı — `runM`'e dik eksende kapladığı genişlik.
    *
@@ -116,10 +131,20 @@ export function resolveSteps(
       msg: `going + 2·rise = ${(band * 1000).toFixed(0)} mm, standardın 600–660 mm bandının dışında.`,
     })
   }
-  if (elevationDeltaM > STAIRCASE_GEOMETRY.flightClimbHeightMaxM && spec.landing === 'continuous') {
+  /**
+   * Tek DÜZ kolun istisnası: standart kol başına 3000 mm veriyor ama
+   * kesintisiz düz bir kola 4000 mm'ye kadar izin veriyor.
+   * `singleFlightClimbHeightMaxM` buraya kadar hiç okunmuyordu, dolayısıyla
+   * meşru bir 3.5 m düz kol gereksiz yere uyarı alıyordu.
+   */
+  const continuousLimit =
+    spec.landing === 'continuous'
+      ? STAIRCASE_GEOMETRY.singleFlightClimbHeightMaxM
+      : STAIRCASE_GEOMETRY.flightClimbHeightMaxM
+  if (elevationDeltaM > continuousLimit && spec.landing === 'continuous') {
     issues.push({
       code: 'landing-required',
-      msg: `${elevationDeltaM.toFixed(2)} m tırmanış tek kolda çıkılamaz (en fazla ${STAIRCASE_GEOMETRY.flightClimbHeightMaxM.toFixed(1)} m); bir sahanlık gerekiyor.`,
+      msg: `${elevationDeltaM.toFixed(2)} m tırmanış tek düz kolda çıkılamaz (en fazla ${continuousLimit.toFixed(1)} m); bir sahanlık gerekiyor.`,
     })
   }
   if (spec.steps !== 'auto' && spec.steps !== autoSteps) {
@@ -129,12 +154,22 @@ export function resolveSteps(
     })
   }
 
-  const flights = spec.landing === 'continuous' ? 1 : 2
+  /**
+   * Katalog hazır merdivenleri 8/10/12/15 basamak yayınlıyor ve 15'ten
+   * uzun bir merdiven ara sahanlıklarla kollara BÖLÜNÜYOR. Kullanıcının
+   * seçtiği sahanlık tipi ne olursa olsun bu bölünme zorunlu: 3 m'nin
+   * altında kalan 20 basamaklı kesintisiz bir kol sessizce tek kol
+   * kalıyordu.
+   */
+  const requested = spec.landing === 'continuous' ? 1 : 2
+  const flights = Math.max(requested, Math.ceil(steps / MAX_STEPS_PER_FLIGHT))
+  const autoSplit = flights > requested
   // Sahanlık kolları böler: N basamak iki kola bölününce yatay uzanım
   // yarıya iner ama sahanlığın kendi boyu eklenir.
   const stepsPerFlight = Math.ceil(steps / flights)
   const flightRunM = stepsPerFlight * goingM
-  const runM = flightRunM + (flights > 1 ? STAIRCASE_GEOMETRY.landingLengthMinM : 0)
+  const landingCount = flights - 1
+  const runM = flightRunM + landingCount * STAIRCASE_GEOMETRY.landingLengthMinM
 
   // İki sahanlık tipi DERİNLİKTE aynı, YANAL uzanımda ayrılıyor: turn180
   // ikinci kolu birincinin yanına geri katlar, turn90 onu dik eksende
@@ -148,7 +183,18 @@ export function resolveSteps(
         : spec.widthM
 
   return {
-    geometry: { steps, riseM, goingM, treadDepthM, flights, runM, lateralM },
+    geometry: {
+      steps,
+      riseM,
+      goingM,
+      treadDepthM,
+      flights,
+      stepsPerFlight,
+      autoSplit,
+      runM,
+      flightRunM,
+      lateralM,
+    },
     issues,
   }
 }

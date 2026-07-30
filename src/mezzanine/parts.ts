@@ -10,7 +10,7 @@
  * altında, ana kirişler onların da altında, kolonlar tepeye kadar tek parça.
  */
 
-import { FLOOR_TYPES, GATE_SPECS, type IBeamProfile } from './catalog'
+import { FLOOR_TYPES, GATE_SPECS, type IBeamProfile, STAIRCASE_GEOMETRY } from './catalog'
 import {
   footprintDepthM,
   footprintWidthM,
@@ -47,6 +47,10 @@ export type MezzaninePartRole =
   | 'kickboard'
   | 'stair-tread'
   | 'stair-stringer'
+  /** Kollar arasındaki sahanlık. `floor` DEĞİL: döşeme paneliyle aynı role
+   *  konsaydı panel sayısına karışır ve "boşluk kaç panel siliyor" sorusu
+   *  cevaplanamaz hâle gelirdi. */
+  | 'stair-landing'
   | 'gate'
   | 'gate-post'
   | 'gate-pivot'
@@ -55,6 +59,14 @@ export type MezzaninePart = {
   role: MezzaninePartRole
   center: readonly [number, number, number]
   size: readonly [number, number, number]
+  /**
+   * Plan düzleminde dönüş. Merdiven kolları için: bir kol yalnız kendi
+   * yönünde uzanır ve kolun yönü sahanlık tipine göre değişir, o yüzden
+   * eksen hizalı bir kutuyla ifade edilemez.
+   */
+  rotationY?: number
+  /** ZY düzleminde eğim — merdiven küpeştesi ve limon kirişi kullanır. */
+  tiltX?: number
 }
 
 /**
@@ -281,6 +293,96 @@ function pushRailing(
  * `stairOrigin`'den. Sahanlıklı merdivende ikinci kol geri katlanır —
  * basamaklar tek kolda çizilir ve sahanlık düz bir platform olarak eklenir.
  */
+const STAIR_TREAD_THICKNESS_M = 0.03
+const STRINGER_THICKNESS_M = 0.05
+/** Kol boyunca korkuluk dikmesi aralığı — küpeşte sarkmasın. */
+const STAIR_POST_SPACING_M = 1.2
+
+/**
+ * Bir merdiven kolunun yerel çerçevesi.
+ *
+ * Kol kendi yönünde uzanır ve yön sahanlık tipine göre değişir; bu yüzden
+ * her kol kendi YAW'ıyla taşınıyor ve parçalar `rotationY` ile emit
+ * ediliyor. Eksen hizalı kutu yaklaşıklığı ile çizilseydi, geri katlanan
+ * ya da yana dönen bir kol yanlış yerde durur.
+ */
+type FlightFrame = {
+  /** Kolun başlangıcı, merdiven-yerel (x, z). */
+  ox: number
+  oz: number
+  /** Kolun yönü, birim vektör (merdiven-yerel). */
+  dx: number
+  dz: number
+  /** Kolun kendi yaw'ı — yerel +Z'yi kol yönüne çeviren dönüş. */
+  yaw: number
+  steps: number
+  /** Kolun ilk basamağının altındaki kot. */
+  baseY: number
+}
+
+/**
+ * Kolların yerleşimi — sahanlık tipinin geometriye döküldüğü yer.
+ *
+ *   - `continuous` (ve 15 basamak kuralıyla otomatik bölünen): kollar aynı
+ *     doğrultuda devam eder, aralarına sahanlık girer.
+ *   - `turn180` (dog-leg): ikinci kol GERİ katlanır ve birincinin yanına
+ *     gelir — bu yüzden `lateralM` iki kol genişliği.
+ *   - `turn90`: ikinci kol yana döner.
+ */
+function flightFrames(
+  stair: MezzanineNode['tiers'][number]['accessories']['staircases'][number],
+  geometry: ReturnType<typeof resolveSteps>['geometry'],
+  fromY: number,
+): FlightFrame[] {
+  const { flights, stepsPerFlight, steps, riseM, flightRunM } = geometry
+  const landing = STAIRCASE_GEOMETRY.landingLengthMinM
+  const frames: FlightFrame[] = []
+
+  for (let f = 0; f < flights; f++) {
+    const stepsHere = Math.min(stepsPerFlight, steps - f * stepsPerFlight)
+    if (stepsHere <= 0) break
+    const baseY = fromY + riseM * stepsPerFlight * f
+
+    if (stair.landing === 'turn180' && f % 2 === 1) {
+      // Geri katlanır: yanına kayar ve ters yöne iner.
+      frames.push({
+        ox: stair.widthM,
+        oz: flightRunM,
+        dx: 0,
+        dz: -1,
+        yaw: Math.PI,
+        steps: stepsHere,
+        baseY,
+      })
+      continue
+    }
+    if (stair.landing === 'turn90' && f % 2 === 1) {
+      // Yana döner: sahanlıktan +X yönünde devam eder.
+      frames.push({
+        ox: stair.widthM / 2 + landing / 2,
+        oz: flightRunM + landing / 2,
+        dx: 1,
+        dz: 0,
+        yaw: -Math.PI / 2,
+        steps: stepsHere,
+        baseY,
+      })
+      continue
+    }
+    // Düz devam: her kol bir önceki kolun ve sahanlığın ötesinde başlar.
+    frames.push({
+      ox: 0,
+      oz: f * (flightRunM + landing),
+      dx: 0,
+      dz: 1,
+      yaw: 0,
+      steps: stepsHere,
+      baseY,
+    })
+  }
+  return frames
+}
+
 function pushStaircase(
   parts: MezzaninePart[],
   node: MezzanineNode,
@@ -293,47 +395,110 @@ function pushStaircase(
   const cos = Math.cos(origin.rotationRad)
   const sin = Math.sin(origin.rotationRad)
 
-  // Yerel çerçeve: genişlik X'te, iniş +Z'de. Dünyaya döndürülür.
+  // Merdiven-yerel → dünya. Yerel çerçeve: genişlik X'te, tırmanış +Z'de.
   const place = (localX: number, localZ: number): [number, number] => [
     origin.x + localX * cos - localZ * sin,
     origin.z + localX * sin + localZ * cos,
   ]
 
-  const treadThickness = 0.03
-  for (let step = 1; step <= geometry.steps; step++) {
-    const y = fromY + geometry.riseM * step
-    const localZ = geometry.goingM * (step - 0.5)
-    const [x, z] = place(0, localZ)
-    parts.push({
-      role: 'stair-tread',
-      center: [x, y - treadThickness / 2, z],
-      // Döndürülmüş bir basamağı eksen hizalı kutuyla çizmek 90°'nin
-      // katları dışında yaklaşıklıktır; merdivenler kenara oturduğunda
-      // (baskın durum) dönüş tam olarak 0/±90/180°.
-      size: [
-        Math.abs(stair.widthM * cos) + Math.abs(geometry.treadDepthM * sin),
-        treadThickness,
-        Math.abs(stair.widthM * sin) + Math.abs(geometry.treadDepthM * cos),
-      ],
-    })
-  }
+  const slope = Math.atan2(geometry.riseM, geometry.goingM)
+  const landing = STAIRCASE_GEOMETRY.landingLengthMinM
+  const frames = flightFrames(stair, geometry, fromY)
 
-  // Limon kirişleri: iki yanda, tırmanışı boyunca eğik — eksen hizalı
-  // kutuyla eğim çizilemediği için basamak altını dolduran düz bir kiriş
-  // olarak çizilir (rack'ın çaprazları için `tiltX` var, mezzanine'in
-  // parça tipinde dönüş alanı yok ve bunun için açmaya değmez).
-  const runZ = geometry.goingM * geometry.steps
-  for (const side of [-1, 1] as const) {
-    const [x, z] = place((side * stair.widthM) / 2, runZ / 2)
-    parts.push({
-      role: 'stair-stringer',
-      center: [x, (fromY + toY) / 2, z],
-      size: [
-        Math.abs(0.05 * cos) + Math.abs(runZ * sin),
-        toY - fromY,
-        Math.abs(0.05 * sin) + Math.abs(runZ * cos),
-      ],
-    })
+  for (const [index, frame] of frames.entries()) {
+    const yaw = origin.rotationRad + frame.yaw
+    /** Kol-yerel (yanal, boyuna) → dünya (x, z). */
+    const atFlight = (lateral: number, along: number): [number, number] =>
+      place(
+        frame.ox + frame.dx * along - frame.dz * lateral,
+        frame.oz + frame.dz * along + frame.dx * lateral,
+      )
+
+    // ── Basamaklar ────────────────────────────────────────────────────
+    for (let step = 1; step <= frame.steps; step++) {
+      const y = frame.baseY + geometry.riseM * step
+      const [x, z] = atFlight(0, geometry.goingM * (step - 0.5))
+      parts.push({
+        role: 'stair-tread',
+        center: [x, y - STAIR_TREAD_THICKNESS_M / 2, z],
+        size: [stair.widthM, STAIR_TREAD_THICKNESS_M, geometry.treadDepthM],
+        rotationY: yaw,
+      })
+    }
+
+    const flightRun = geometry.goingM * frame.steps
+    const flightRise = geometry.riseM * frame.steps
+    // Eğik elemanın gerçek boyu — düz boy verilse uçlarda kısa kalırdı.
+    const slopedLength = Math.hypot(flightRun, flightRise)
+    const midY = frame.baseY + flightRise / 2
+
+    // ── Limon kirişleri: artık gerçekten EĞİK ─────────────────────────
+    for (const side of [-1, 1] as const) {
+      const [x, z] = atFlight((side * stair.widthM) / 2, flightRun / 2)
+      parts.push({
+        role: 'stair-stringer',
+        center: [x, midY, z],
+        size: [STRINGER_THICKNESS_M, STRINGER_THICKNESS_M * 4, slopedLength],
+        rotationY: yaw,
+        // +Z ucu YÜKSEK: tırmanış yönü.
+        tiltX: -slope,
+      })
+    }
+
+    // ── Korkuluk: kolun açık kenarları ────────────────────────────────
+    //
+    // Korkuluksuz bir merdiven kolu yayınlanabilir bir çıktı değil — bu
+    // kind'ın korkuluk kuralı döşeme çevresinde zaten zorunlu, merdiven
+    // kolunda da öyle olmak zorunda. `railings` katalog seçeneği: bir
+    // yanda (duvara dayalı) ya da iki yanda.
+    const railSides: readonly (-1 | 1)[] = stair.railings === 1 ? [1] : [-1, 1]
+    for (const side of railSides) {
+      const lateral = (side * stair.widthM) / 2
+      for (const height of [HANDRAIL_HEIGHT_M, HANDRAIL_HEIGHT_M / 2] as const) {
+        const [x, z] = atFlight(lateral, flightRun / 2)
+        parts.push({
+          role: 'railing',
+          center: [x, midY + height, z],
+          size: [RAIL_SECTION_M, RAIL_SECTION_M, slopedLength],
+          rotationY: yaw,
+          tiltX: -slope,
+        })
+      }
+      // Dikmeler: küpeşteyi taşıyan düşey elemanlar.
+      const postCount = Math.max(2, Math.round(flightRun / STAIR_POST_SPACING_M))
+      for (let i = 0; i <= postCount; i++) {
+        const along = (i / postCount) * flightRun
+        const [x, z] = atFlight(lateral, along)
+        const railY = frame.baseY + (along / Math.max(flightRun, 1e-6)) * flightRise
+        parts.push({
+          role: 'railing',
+          center: [x, railY + HANDRAIL_HEIGHT_M / 2, z],
+          size: [POST_SECTION_M, HANDRAIL_HEIGHT_M, POST_SECTION_M],
+          rotationY: yaw,
+        })
+      }
+    }
+
+    // ── Sahanlık platformu ────────────────────────────────────────────
+    //
+    // Kollar arasında gerçek bir düzlem: `turn90`/`turn180` yalnız
+    // `flights = 2` deyip hiçbir platform çizmiyordu, yani kullanıcı iki
+    // kol arasında boşluğa basıyordu.
+    if (index < frames.length - 1) {
+      const topY = frame.baseY + flightRise
+      const [x, z] = atFlight(0, flightRun + landing / 2)
+      const spansTwoFlights = stair.landing === 'turn180'
+      parts.push({
+        role: 'stair-landing',
+        center: [
+          spansTwoFlights ? x + (stair.widthM / 2) * cos : x,
+          topY - STAIR_TREAD_THICKNESS_M / 2,
+          spansTwoFlights ? z + (stair.widthM / 2) * sin : z,
+        ],
+        size: [spansTwoFlights ? stair.widthM * 2 : stair.widthM, STAIR_TREAD_THICKNESS_M, landing],
+        rotationY: yaw,
+      })
+    }
   }
 }
 

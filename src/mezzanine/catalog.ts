@@ -235,6 +235,16 @@ export const GATE_SPECS = {
   },
 }
 
+/**
+ * Katalogun hazır (ön-montajlı) merdiven serisi — CATALOG.
+ *
+ * Kullanıcı bunlardan birini seçebilir ama seçim AYNI doğrulamadan geçer:
+ * kot farkı tutmuyorsa `step-count-mismatch` çıkar. Listenin son elemanı
+ * ayrıca kol başına üst sınırı belirliyor (`MAX_STEPS_PER_FLIGHT`) — iki
+ * yerde ayrı yaşamasınlar.
+ */
+export const STAIRCASE_STEP_COUNTS = [8, 10, 12, 15] as const
+
 /** EN ISO 14122-3:2016 §5.1–5.4 — RESEARCHED. */
 export const STAIRCASE_GEOMETRY = {
   goingRangeM: { min: mm(210), max: mm(310) },

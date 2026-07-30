@@ -39,6 +39,12 @@ const StaircaseSpec = z.object({
   /** EN ISO 14122-3: 800 tek kullanıcı, 1000 çok kullanıcı. */
   widthM: z.union([z.literal(0.8), z.literal(1)]).default(1),
   landing: z.enum(['continuous', 'turn90', 'turn180']).default('turn180'),
+  /**
+   * Korkuluk sayısı — katalog "bir ya da iki korkuluk" veriyor. Duvara
+   * dayalı kolda tek korkuluk yeter; serbest duran kolda iki. Kolun AÇIK
+   * kenarı korkuluksuz bırakılamaz, o yüzden 0 seçeneği yok.
+   */
+  railings: z.union([z.literal(1), z.literal(2)]).default(2),
   /** `'auto'` → gerçek kot farkından hesaplanır (`resolveSteps`). Hazır bir
    *  katalog ürünü (8/10/12/15 basamak) seçilebilir ama AYNI doğrulamadan
    *  geçer — uymuyorsa panel söyler. */

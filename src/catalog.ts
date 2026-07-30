@@ -42,6 +42,15 @@ export type CatalogItem = {
     | { kind: 'truck'; model: string }
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
+    | {
+        kind: 'live-racking'
+        patch: {
+          variant: 'FIFO' | 'LIFO'
+          palletsDeep: number
+          levels: number
+          withRetainers: boolean
+        }
+      }
     // Inlined rather than importing `MezzanineBrush` from the store — the
     // same reason `rack`'s patch shape above is inlined rather than
     // `RackBrush`: this file stays free of any node-schema import.
@@ -283,6 +292,31 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
     icon: 'lucide:split',
+  },
+  {
+    id: 'live-racking-fifo',
+    kind: 'warehouse:live-racking',
+    label: 'Live Racking (FIFO)',
+    sectionId: 'storage',
+    description:
+      'Yerçekimi akışlı kanal: palet yüksek uçtan yüklenir, %4 eğimle çıkışa akar. İki koridor, kanal başına tek SKU. [ ve ] ile derinliği ayarlayın.',
+    icon: 'lucide:chevrons-down',
+    brush: {
+      kind: 'live-racking',
+      patch: { variant: 'FIFO', palletsDeep: 8, levels: 4, withRetainers: false },
+    },
+  },
+  {
+    id: 'live-racking-lifo',
+    kind: 'warehouse:live-racking',
+    label: 'Live Racking (LIFO Push-back)',
+    sectionId: 'storage',
+    description: 'Tek koridorlu push-back: aynı uçtan yükle ve al. Sığ kanallar için, tutuculu.',
+    icon: 'lucide:chevrons-up',
+    brush: {
+      kind: 'live-racking',
+      patch: { variant: 'LIFO', palletsDeep: 4, levels: 4, withRetainers: true },
+    },
   },
   {
     id: 'mezzanine-sigma',

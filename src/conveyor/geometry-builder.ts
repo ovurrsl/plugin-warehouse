@@ -127,6 +127,13 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
  * the outer edge stands square to the arc rather than to the node. At zero the
  * factors are exactly 1 and 0, so a straight's vertices are bit-identical to
  * what this emitted before the parameter existed.
+ *
+ * `tiltX` leans the box in the ZY plane, and live racking is why it exists: a
+ * gravity channel descends along its own depth, so its rails are the one part
+ * in this package that is neither level nor vertical. Applied *before* the
+ * yaw, so a tilted part in a rotated node leans along its own depth rather
+ * than the world's. Zero is the same no-op `rotationY` zero is — every
+ * existing caller emits identical vertices.
  */
 export function emitPart(
   sink: Sink,
@@ -144,11 +151,14 @@ export function emitPart(
   color: readonly [number, number, number],
   stripeSpan: number,
   rotationY = 0,
+  tiltX = 0,
 ): void {
   const [cx, cy, cz] = part.center
   const [hx, hy, hz] = [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
   const cos = Math.cos(rotationY)
   const sin = Math.sin(rotationY)
+  const cosT = Math.cos(tiltX)
+  const sinT = Math.sin(tiltX)
 
   for (const face of FACES) {
     const base = sink.positions.length / 3
@@ -158,13 +168,13 @@ export function emitPart(
 
     for (const corner of face.c) {
       const ox = corner[0] * hx
-      const oz = corner[2] * hz
-      sink.positions.push(cx + ox * cos - oz * sin, cy + corner[1] * hy, cz + ox * sin + oz * cos)
-      sink.normals.push(
-        face.n[0] * cos - face.n[2] * sin,
-        face.n[1],
-        face.n[0] * sin + face.n[2] * cos,
-      )
+      // Tilt first, in the part's own ZY plane, then yaw the result.
+      const ty = corner[1] * hy * cosT - corner[2] * hz * sinT
+      const tz = corner[1] * hy * sinT + corner[2] * hz * cosT
+      sink.positions.push(cx + ox * cos - tz * sin, cy + ty, cz + ox * sin + tz * cos)
+      const ny = face.n[1] * cosT - face.n[2] * sinT
+      const nz = face.n[1] * sinT + face.n[2] * cosT
+      sink.normals.push(face.n[0] * cos - nz * sin, ny, face.n[0] * sin + nz * cos)
       sink.colors.push(color[0], color[1], color[2])
 
       if (part.pattern === 'rollers' && horizontal) {

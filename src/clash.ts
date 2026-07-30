@@ -26,6 +26,8 @@ import type { ConveyorObliqueNode } from './conveyor/oblique-schema'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { localBoundsM as transferBoundsM } from './conveyor/transfer-metrics'
 import type { ConveyorTransferNode } from './conveyor/transfer-schema'
+import { liveRackingParts } from './live-racking/parts'
+import type { LiveRackingNode } from './live-racking/schema'
 import { mezzanineParts } from './mezzanine/parts'
 import type { MezzanineNode } from './mezzanine/schema'
 import { unitLoadHeightOf } from './pallet/cargo-types'
@@ -216,6 +218,18 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // surface, and nothing passes through a surface.
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
+    )
+  }
+
+  if (placement.type === 'warehouse:live-racking') {
+    // The rack's reasoning: a gravity channel is mostly air, and the air
+    // under its lowest level is a walkway. The `full` tier is used so the
+    // rollers are present — a pallet resting on a channel is resting on
+    // something, and the `simple` tier's single strip would swallow the
+    // whole lane depth as solid.
+    const live = node as LiveRackingNode
+    return liveRackingParts(live, 'full').map((part) =>
+      toWorldBox(part.center, part.size, live.position, placement.rotationY),
     )
   }
 

@@ -8,6 +8,8 @@ import {
   slabArea,
   walkSubtree,
 } from './host-adapter'
+import { palletPositions as liveRackingPositions } from './live-racking/metrics'
+import type { LiveRackingNode } from './live-racking/schema'
 import { KIND_PREFIX } from './plugin-id'
 import { PalletRackNode } from './rack/schema'
 import {
@@ -389,6 +391,25 @@ function levelFigures(
     }
 
     if (!record.type.startsWith(KIND_PREFIX)) return
+
+    /**
+     * Canlı raf da depolamadır ve aynı sayaca katılır.
+     *
+     * `directPositions`'a kat başına YALNIZ BİR katılır, derinliği kadar
+     * değil: bir kanalda doğrudan alınabilen tek palet çıkış ucundakidir,
+     * arkasındakiler önce onun çıkmasını bekler. İki figürün farkı tam
+     * olarak bu raf tipinin neden seçildiğini anlatıyor — derinlik depolama
+     * kazandırır, erişim kazandırmaz.
+     */
+    if (record.type === 'warehouse:live-racking') {
+      rackCount += 1
+      rackIds.add(id)
+      if (record.visible === false) hiddenNodes += 1
+      const live = node as LiveRackingNode
+      palletPositions += liveRackingPositions(live)
+      directPositions += live.levels
+      return
+    }
 
     if (record.type === 'warehouse:pallet-rack') {
       rackCount += 1

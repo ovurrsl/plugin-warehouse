@@ -384,6 +384,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'mezzanine') {
       useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
     }
+    if (item.brush?.kind === 'live-racking') {
+      useWarehouseStore.getState().setLiveRackingBrush(item.brush.patch)
+    }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the
     // path a catalog panel is expected to use.

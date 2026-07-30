@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
+import type { LiveRackingNode } from './live-racking/schema'
 import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
@@ -160,6 +161,14 @@ type WarehouseStore = {
    */
   mezzanineBrush: MezzanineBrush
   setMezzanineBrush: (patch: Partial<MezzanineBrush>) => void
+
+  /**
+   * Shape of the next placed live-racking channel. `palletsDeep` fırçada
+   * durur çünkü `[`/`]` ile yerleştirme SIRASINDA ayarlanıyor ve arka arkaya
+   * iki kanal koyan kullanıcı ikisini de aynı derinlikte ister.
+   */
+  liveRackingBrush: LiveRackingBrush
+  setLiveRackingBrush: (patch: Partial<LiveRackingBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -175,6 +184,11 @@ export type RouteBrush = Pick<
 export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
 
 export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth' | 'extension'>
+
+export type LiveRackingBrush = Pick<
+  LiveRackingNode,
+  'variant' | 'palletPreset' | 'palletsDeep' | 'levels' | 'withRetainers'
+>
 
 export type MezzanineBrush = Pick<
   MezzanineNode,
@@ -330,4 +344,14 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setMezzanineBrush: (patch) =>
     set((state) => ({ mezzanineBrush: { ...state.mezzanineBrush, ...patch } })),
+
+  liveRackingBrush: {
+    variant: 'FIFO',
+    palletPreset: 'epal-1',
+    palletsDeep: 8,
+    levels: 4,
+    withRetainers: false,
+  },
+  setLiveRackingBrush: (patch) =>
+    set((state) => ({ liveRackingBrush: { ...state.liveRackingBrush, ...patch } })),
 }))

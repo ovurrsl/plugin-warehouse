@@ -200,15 +200,16 @@ export function telescopicSectionParts(
       size: [0.08, 0.06, 0.08],
     })
     // Çalışma lambası: gövde + mercek. Mercek kendi materyalini alır
-    // (yayıcı) — makinenin karanlık dorse içini aydınlatan parçası.
+    // (yayıcı) — makinenin karanlık dorse içini aydınlatan parçası. Ön
+    // aydınlatması hazard bandının içerisinde, konsol tarafında.
     parts.push({
       role: 'frame',
-      center: [noseX - 0.16, topY + 0.42, -width / 2 - 0.04],
+      center: [noseX - 0.16, topY + 0.42, width / 2 - 0.08],
       size: [0.05, 0.3, 0.05],
     })
     parts.push({
       role: 'lamp-housing',
-      center: [noseX - 0.16, topY + 0.58, -width / 2 - 0.04],
+      center: [noseX - 0.16, topY + 0.58, width / 2 - 0.08],
       size: [0.14, 0.12, 0.14],
     })
     // Burun ikaz bandı — çarpma riski en yüksek nokta.

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`a70a3bd`](https://github.com/ovurrsl/plugin-warehouse/commit/a70a3bd66b5a07461767f37a8c3ca5df117f7809))
 - Refresh generated README blocks [skip ci] ([`f857537`](https://github.com/ovurrsl/plugin-warehouse/commit/f8575371ad1af416cfc44b7985a33e87cea546d9))
 - Refresh generated README blocks [skip ci] ([`10ef45e`](https://github.com/ovurrsl/plugin-warehouse/commit/10ef45efb900c1ef013139a9f0df4f8ceaf25126))
 - Refresh generated README blocks [skip ci] ([`668a334`](https://github.com/ovurrsl/plugin-warehouse/commit/668a3345eabaec3e8a906aedd2daa6fa1b479ac7))
@@ -91,6 +92,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Merdiveni tamamla — korkuluk, sahanlık, çok kollu yerleşim ([`b5bce6b`](https://github.com/ovurrsl/plugin-warehouse/commit/b5bce6b8ded7cb56a28c1f8708a6ed3cc9936086))
 - Kanal başına SKU ve seçim gerektirmeyen plan etiketi ([`48a5e01`](https://github.com/ovurrsl/plugin-warehouse/commit/48a5e019e9ad8515bf2ec081d97d1475d2235f65))
 - Zemin seviyesi transpalet katı ve giydirme raf ([`e58c4fe`](https://github.com/ovurrsl/plugin-warehouse/commit/e58c4fe6a8c91d5038b272a3b46b0c5c8cffa8e2))
 - Faz 2 akış donanımı — variant artık şekli değiştiriyor ([`4052e66`](https://github.com/ovurrsl/plugin-warehouse/commit/4052e6644113c0316c1668493ca3fc6caeacde54))

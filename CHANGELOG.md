@@ -18,6 +18,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e7f62bc`](https://github.com/ovurrsl/plugin-warehouse/commit/e7f62bc61907114a61706d946321fbc4af501705))
 - Refresh generated README blocks [skip ci] ([`cb05e0a`](https://github.com/ovurrsl/plugin-warehouse/commit/cb05e0ae7d8f0c325d898dcfde8db5ba852b6302))
 - Refresh generated README blocks [skip ci] ([`faf7735`](https://github.com/ovurrsl/plugin-warehouse/commit/faf77351aa1067429b03c6a5c4679f2240290713))
 - Refresh generated README blocks [skip ci] ([`bfb0d05`](https://github.com/ovurrsl/plugin-warehouse/commit/bfb0d055da79bb71bfb4f214faf6238315f84ef3))
@@ -103,6 +104,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Şekil çizim aracı — mezzanine artık elle çiziliyor ([`39514e0`](https://github.com/ovurrsl/plugin-warehouse/commit/39514e0013e0e29f208aaf0a1a66d3984214d069))
 - Merdiven istenen yere konabiliyor — serbest yerleşim UI'ı ([`be68812`](https://github.com/ovurrsl/plugin-warehouse/commit/be68812e99632396910f1648ed872dda4000839c))
 - Özel şekil — güverte artık poligon olabiliyor ([`ad93358`](https://github.com/ovurrsl/plugin-warehouse/commit/ad93358760206b43e2b8f67fc5611f5565c14221))
 - Katalog fişleri artık üstüne çıkılabilir platform sevk ediyor ([`d7c07e5`](https://github.com/ovurrsl/plugin-warehouse/commit/d7c07e5c2d31351d59850fceca0429c7b5e8a8ac))

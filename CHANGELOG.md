@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e543e9b`](https://github.com/ovurrsl/plugin-warehouse/commit/e543e9be7c23c4964f4a508e8ab4861767dca9be))
 - Refresh generated README blocks [skip ci] ([`8323196`](https://github.com/ovurrsl/plugin-warehouse/commit/83231965d97727e8ffbc200b2deb54b7b7bbf871))
 - Refresh generated README blocks [skip ci] ([`fc3a267`](https://github.com/ovurrsl/plugin-warehouse/commit/fc3a267578a322f415e23df6cd60561c7e6bf127))
 - Refresh generated README blocks [skip ci] ([`abf3d56`](https://github.com/ovurrsl/plugin-warehouse/commit/abf3d567cbfbb76c5b910674487dc885ce037452))
@@ -84,6 +85,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Add warehouse:mezzanine kind — Phase 1 structural skeleton ([`2c54178`](https://github.com/ovurrsl/plugin-warehouse/commit/2c5417876ec6b04865f04ea9bc04341438817e09))
 - Make nose sensor and platform toggleable from the panel ([`0927769`](https://github.com/ovurrsl/plugin-warehouse/commit/0927769a12efd35ef8c3a57283d5d276c0b82db5))
 - Add nose anti-collision sensor and operator step platform ([`20bffb3`](https://github.com/ovurrsl/plugin-warehouse/commit/20bffb3dc97a181431d2f2932a4a2369bf35b1d8))
 - Slice 8 — the fleet picks pallets up and puts them down ([`34840a0`](https://github.com/ovurrsl/plugin-warehouse/commit/34840a0ae2f4415257461331cdb8903e84cbcf2c))

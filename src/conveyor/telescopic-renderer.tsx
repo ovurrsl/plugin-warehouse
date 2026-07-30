@@ -10,6 +10,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { colliderProps } from '../collider'
 import { useStaticTransform } from '../static-transform'
 import { useWarehouseStore } from '../store'
 import { FLOW_BOX_M } from './flow-simulation'
@@ -218,10 +219,8 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
             position[2] - Math.sin(rotation[1]) * footprintCenterX(node),
           ]}
           rotation={rotation}
-        >
-          <boxGeometry args={[currentLengthM(node), height, width]} />
-          <meshBasicMaterial colorWrite={false} depthWrite={false} />
-        </mesh>
+          {...colliderProps([currentLengthM(node), height, width])}
+        />
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>

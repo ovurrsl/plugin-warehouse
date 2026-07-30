@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { colliderProps } from '../collider'
 import { useStaticTransform } from '../static-transform'
 import { getTruckGeometry, releaseTruckGeometry, retainTruckGeometry } from './geometry'
 import { mastPose } from './kinematics'
@@ -143,10 +144,11 @@ export default function TruckRenderer({ node }: { node: TruckNode }) {
       {/* Seçim kolideri: gövdeler arasında boşluk çok (mast rayları, çatal
           araları) — kullanıcının nişan aldığı şey zarfın kendisi. */}
       {!isExporting && (
-        <mesh position={[position[0], position[1] + height / 2, position[2]]} rotation={rotation}>
-          <boxGeometry args={[length, height, width]} />
-          <meshBasicMaterial colorWrite={false} depthWrite={false} />
-        </mesh>
+        <mesh
+          {...colliderProps([length, height, width])}
+          position={[position[0], position[1] + height / 2, position[2]]}
+          rotation={rotation}
+        />
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>

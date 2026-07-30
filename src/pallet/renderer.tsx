@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { colliderProps } from '../collider'
 import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
@@ -182,12 +183,10 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
           group so the selection outline traces the true silhouette. */}
       {!isExporting && (
         <mesh
+          {...colliderProps([spec.length, totalHeight, spec.width])}
           position={[position[0], position[1] + totalHeight / 2, position[2]]}
           rotation={rotation}
-        >
-          <boxGeometry args={[spec.length, totalHeight, spec.width]} />
-          <meshBasicMaterial colorWrite={false} depthWrite={false} />
-        </mesh>
+        />
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>

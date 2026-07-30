@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`08d5027`](https://github.com/ovurrsl/plugin-warehouse/commit/08d5027d04197315f5bb51e7092e8271c751b7d0))
 - Refresh generated README blocks [skip ci] ([`36d56a5`](https://github.com/ovurrsl/plugin-warehouse/commit/36d56a5fc6916a53de73f2b79bcd6d960eaafce1))
 - Refresh generated README blocks [skip ci] ([`ef4e993`](https://github.com/ovurrsl/plugin-warehouse/commit/ef4e993eef2e15ea53ce9012b9bc51310bd678bb))
 - Refresh generated README blocks [skip ci] ([`ae1db34`](https://github.com/ovurrsl/plugin-warehouse/commit/ae1db340877f50d043d0fd29b0aca640e4edbfbd))
@@ -176,6 +177,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Collective instancing — 10,300 draw calls measured down to ~11 ([`336d7e6`](https://github.com/ovurrsl/plugin-warehouse/commit/336d7e6e2aa9a4941d6f29d57f0cb0f16c1c9dc5))
 - The collider fix the rack already had, applied to the other three ([`77f3393`](https://github.com/ovurrsl/plugin-warehouse/commit/77f3393380d4a0ca773021e8f570996f2759c128))
 - Stop recomposing static nodes' matrices every frame ([`8044114`](https://github.com/ovurrsl/plugin-warehouse/commit/80441140b17d3b1c06d35080c2ed4e680b06752f))
 - The deck gets a far tier — measured against a real scene ([`653a590`](https://github.com/ovurrsl/plugin-warehouse/commit/653a5907c942958ebbfc756366a35e4407d12785))

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1e10130`](https://github.com/ovurrsl/plugin-warehouse/commit/1e101305827a5c10992d70b09acf24f974086389))
 - Refresh generated README blocks [skip ci] ([`08d5027`](https://github.com/ovurrsl/plugin-warehouse/commit/08d5027d04197315f5bb51e7092e8271c751b7d0))
 - Refresh generated README blocks [skip ci] ([`36d56a5`](https://github.com/ovurrsl/plugin-warehouse/commit/36d56a5fc6916a53de73f2b79bcd6d960eaafce1))
 - Refresh generated README blocks [skip ci] ([`ef4e993`](https://github.com/ovurrsl/plugin-warehouse/commit/ef4e993eef2e15ea53ce9012b9bc51310bd678bb))
@@ -78,6 +79,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Slice 8 — the fleet picks pallets up and puts them down ([`34840a0`](https://github.com/ovurrsl/plugin-warehouse/commit/34840a0ae2f4415257461331cdb8903e84cbcf2c))
 - Telescopic belt conveyor — the truck-loading boom ([`cad6651`](https://github.com/ovurrsl/plugin-warehouse/commit/cad66515d39cc540c1fc25530a55699c7e67edd1))
 - S8 groundwork — the b4 rule and the station index's doorway ([`1a6befb`](https://github.com/ovurrsl/plugin-warehouse/commit/1a6befb49d6b962aed147d9103f17184fa8e3a23))
 - Per-level clears, low-rack template, and the queued small fixes ([`6cd44f9`](https://github.com/ovurrsl/plugin-warehouse/commit/6cd44f9338abb1981e674b14ef63c5f969f8507a))

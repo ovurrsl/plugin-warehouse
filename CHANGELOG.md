@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`668a334`](https://github.com/ovurrsl/plugin-warehouse/commit/668a3345eabaec3e8a906aedd2daa6fa1b479ac7))
 - Refresh generated README blocks [skip ci] ([`b0fa4ff`](https://github.com/ovurrsl/plugin-warehouse/commit/b0fa4ffa123b2a2ba40b20a4c2be98a3e768c5ee))
 - Refresh generated README blocks [skip ci] ([`0d5298b`](https://github.com/ovurrsl/plugin-warehouse/commit/0d5298b25fae2839a68f89deb217e35515c89286))
 - Refresh generated README blocks [skip ci] ([`7a47326`](https://github.com/ovurrsl/plugin-warehouse/commit/7a473264a8d5d8615c947f17aed23e5cdbfe0055))
@@ -88,6 +89,8 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Zemin seviyesi transpalet katı ve giydirme raf ([`e58c4fe`](https://github.com/ovurrsl/plugin-warehouse/commit/e58c4fe6a8c91d5038b272a3b46b0c5c8cffa8e2))
+- Faz 2 akış donanımı — variant artık şekli değiştiriyor ([`4052e66`](https://github.com/ovurrsl/plugin-warehouse/commit/4052e6644113c0316c1668493ca3fc6caeacde54))
 - Host slab olarak güverte yayınla — üstüne raf konabilsin ([`948da25`](https://github.com/ovurrsl/plugin-warehouse/commit/948da25fa88579af3f2a42e41b2ad1d6b783af24))
 - Add warehouse:live-racking — Mecalux gravity-flow channel ([`ee29014`](https://github.com/ovurrsl/plugin-warehouse/commit/ee290143dfb1d7c33e2d06f9807bded320e345fc))
 - Phase 4 — racks on a mezzanine, load class, 3D clash ([`fe05208`](https://github.com/ovurrsl/plugin-warehouse/commit/fe05208e1fd7edf5c0461114d8896f0b5f9a112f))

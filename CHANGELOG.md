@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`10ef45e`](https://github.com/ovurrsl/plugin-warehouse/commit/10ef45efb900c1ef013139a9f0df4f8ceaf25126))
 - Refresh generated README blocks [skip ci] ([`668a334`](https://github.com/ovurrsl/plugin-warehouse/commit/668a3345eabaec3e8a906aedd2daa6fa1b479ac7))
 - Refresh generated README blocks [skip ci] ([`b0fa4ff`](https://github.com/ovurrsl/plugin-warehouse/commit/b0fa4ffa123b2a2ba40b20a4c2be98a3e768c5ee))
 - Refresh generated README blocks [skip ci] ([`0d5298b`](https://github.com/ovurrsl/plugin-warehouse/commit/0d5298b25fae2839a68f89deb217e35515c89286))
@@ -89,6 +90,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Kanal başına SKU ve seçim gerektirmeyen plan etiketi ([`48a5e01`](https://github.com/ovurrsl/plugin-warehouse/commit/48a5e019e9ad8515bf2ec081d97d1475d2235f65))
 - Zemin seviyesi transpalet katı ve giydirme raf ([`e58c4fe`](https://github.com/ovurrsl/plugin-warehouse/commit/e58c4fe6a8c91d5038b272a3b46b0c5c8cffa8e2))
 - Faz 2 akış donanımı — variant artık şekli değiştiriyor ([`4052e66`](https://github.com/ovurrsl/plugin-warehouse/commit/4052e6644113c0316c1668493ca3fc6caeacde54))
 - Host slab olarak güverte yayınla — üstüne raf konabilsin ([`948da25`](https://github.com/ovurrsl/plugin-warehouse/commit/948da25fa88579af3f2a42e41b2ad1d6b783af24))

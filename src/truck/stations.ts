@@ -18,7 +18,7 @@
 
 import type { TruckModel } from '../handling/models'
 import { racksNear } from '../pallet/slot-placement'
-import { occupiedSlots } from '../rack/occupancy'
+import { occupiedSlots, slotDraw } from '../rack/occupancy'
 import type { PalletRackNode } from '../rack/schema'
 import { palletSlotsOf, type Slot } from '../rack/slots'
 import { type SlotReading, truckSlotReading } from './reach-rules'
@@ -35,8 +35,17 @@ export type Station = {
   rackZ: number
   rackRotationY: number
   slot: Slot
-  /** Yuva doluysa kaynak, boşsa hedeftir. */
+  /** Gerçek bir palet düğümü duruyor mu — kaynak olabilmenin şartı. */
   occupied: boolean
+  /**
+   * Yuva HAYALET stok gösteriyor mu.
+   *
+   * Hayalet gerçek bir düğüm değildir (taşınamaz), ama ekranda dolu bir
+   * yuvadır — hedef seçilirse araç gerçek paleti hayaletin üstüne bırakır
+   * ve kullanıcı tek yuvada iki palet görür. Bu yüzden hayaletli yuva ne
+   * kaynaktır (taşınacak düğüm yok) ne hedeftir (yeri dolu görünüyor).
+   */
+  ghosted: boolean
   /** Aracın bu yuvaya park edeceği yay parametresi, metre. */
   s: number
   reading: SlotReading
@@ -137,13 +146,17 @@ function collectRack(
     // tavanının üstündeyse o yuvaya hizmet edilemez. Transpaletin 0.12 m
     // stroku hiçbir raf katına yetmez ve bu bir hüküm değil, ölçüdür.
     if (!reading.reachable) continue
+    const isOccupied = occupied.has(slot.id)
     out.push({
       rackId: near.id,
       rackX: near.x,
       rackZ: near.z,
       rackRotationY: near.rotationY,
       slot,
-      occupied: occupied.has(slot.id),
+      occupied: isOccupied,
+      // `GhostStock`'un kendi kuralının AYNISI — iki yerde iki eşik olsaydı
+      // ekranda hayalet görünen bir yuva burada boş sayılırdı.
+      ghosted: !isOccupied && slotDraw(near.id, slot.id) < near.rack.ghostFill,
       s,
       reading,
     })
@@ -164,7 +177,9 @@ export type Assignment = {
  */
 export function assignmentFor(truckId: string, stations: readonly Station[]): Assignment | null {
   const sources = stations.filter((station) => station.occupied)
-  const targets = stations.filter((station) => !station.occupied)
+  // Hayaletli yuva hedef DEĞİL: ekranda dolu görünüyor ve oraya gerçek bir
+  // palet bırakmak, tek yuvada iki palet demek.
+  const targets = stations.filter((station) => !station.occupied && !station.ghosted)
   if (sources.length === 0 || targets.length === 0) return null
   const seed = hash(truckId)
   const source = sources[seed % sources.length]

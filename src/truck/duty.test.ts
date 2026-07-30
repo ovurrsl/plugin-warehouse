@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { TRUCK_MODELS } from '../handling/models'
 import { PalletNode } from '../pallet/schema'
 import { resetRackIndex } from '../pallet/slot-placement'
-import { resetOccupancyIndex } from '../rack/occupancy'
+import { resetOccupancyIndex, slotDraw } from '../rack/occupancy'
 import { PalletRackNode } from '../rack/schema'
 import { palletSlotsOf } from '../rack/slots'
 import { RouteNode } from '../route/schema'
@@ -287,5 +287,88 @@ describe('T33 — taahhüt: hayalet palet üretilemez', () => {
     for (const key of ['pallet-missing', 'target-occupied', 'source-mismatch'] as const) {
       expect(COMMIT_REFUSAL_TEXT[key].length).toBeGreaterThan(20)
     }
+  })
+})
+
+describe('hayalet stok ile çakışma — ekranda dolu yuvaya gerçek palet bırakılmaz', () => {
+  /** Yarı hayaletli bir raf: yuvaların yaklaşık yarısı stoklu görünür. */
+  function ghostedRack(id: string, x: number) {
+    return PalletRackNode.parse({
+      id,
+      parentId: LEVEL,
+      position: [x, 0, 2],
+      levels: 3,
+      ghostFill: 0.5,
+    })
+  }
+
+  test('hayaletli yuva istasyonda İŞARETLİ ve GhostStock ile aynı eşikten', () => {
+    const r = ghostedRack('pallet-rack_g', 5)
+    const stations = stationsAlong(scene(r), track(), FORKLIFT)
+    expect(stations.length).toBeGreaterThan(0)
+    let ghosted = 0
+    for (const station of stations) {
+      // Panelin/istasyonun kuralı, `GhostStock`'un kuralının birebir aynısı
+      // olmak zorunda: iki eşik, ekranda görünenle hesabın ayrışmasıdır.
+      const expected = !station.occupied && slotDraw(r.id, station.slot.id) < 0.5
+      expect(station.ghosted, station.slot.id).toBe(expected)
+      if (station.ghosted) ghosted++
+    }
+    expect(ghosted).toBeGreaterThan(0) // fikstür gerçekten hayalet üretiyor
+  })
+
+  test('hedef ASLA hayaletli yuva olmaz — iki palet üst üste gelmez', () => {
+    const r = ghostedRack('pallet-rack_g', 5)
+    const slots = palletSlotsOf(r)
+    // Birkaç gerçek palet koy ki kaynak bulunsun.
+    const pallets = slots.slice(0, 2).map((slot, index) =>
+      PalletNode.parse({
+        id: `pallet_${index}`,
+        parentId: LEVEL,
+        slotRackId: r.id,
+        slotAddress: slot.id,
+      }),
+    )
+    const stations = stationsAlong(scene(r, ...pallets), track(), FORKLIFT)
+    for (const id of ['truck_a', 'truck_b', 'truck_c', 'truck_d', 'truck_e']) {
+      const assignment = assignmentFor(id, stations)
+      if (!assignment) continue
+      expect(assignment.target.ghosted, `${id} hayaletli yuvayı hedef seçti`).toBe(false)
+      expect(assignment.target.occupied).toBe(false)
+    }
+  })
+
+  test('hayaletli yuva kaynak da olamaz — taşınacak gerçek düğüm yok', () => {
+    const r = ghostedRack('pallet-rack_g', 5)
+    const stations = stationsAlong(scene(r), track(), FORKLIFT)
+    // Hiç gerçek palet yok: hayaletler dolu görünse de kaynak üretmez.
+    expect(stations.some((s) => s.occupied)).toBe(false)
+    expect(assignmentFor('truck_a', stations)).toBeNull()
+  })
+
+  test('taşıma sırasında kaynak yuvada hayalet BELİRMEZ — simülasyon sahneye yazmıyor', () => {
+    const r = ghostedRack('pallet-rack_g', 5)
+    const slots = palletSlotsOf(r)
+    const first = slots[0]
+    if (!first) throw new Error('yuva yok')
+    const pallet = PalletNode.parse({
+      id: 'pallet_x',
+      parentId: LEVEL,
+      slotRackId: r.id,
+      slotAddress: first.id,
+    })
+    const nodes = scene(r, pallet)
+    // Araç paleti taşırken düğümün `slotAddress`'i DEĞİŞMEZ, dolayısıyla
+    // yuva hâlâ dolu sayılır ve GhostStock oraya hayalet koymaz. Boşluk
+    // ancak taahhütten sonra oluşur — ki o da özelliğin kendisidir.
+    const stations = stationsAlong(nodes, track(), FORKLIFT)
+    const source = stations.find((s) => s.slot.id === first.id)
+    expect(source?.occupied).toBe(true)
+    expect(source?.ghosted).toBe(false)
+  })
+
+  test('hayaletsiz rafta hiçbir istasyon hayaletli değil — özellik kapalıyken kural yok', () => {
+    const stations = stationsAlong(scene(rack('pallet-rack_a', 5)), track(), FORKLIFT)
+    expect(stations.every((s) => !s.ghosted)).toBe(true)
   })
 })

@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7a47326`](https://github.com/ovurrsl/plugin-warehouse/commit/7a473264a8d5d8615c947f17aed23e5cdbfe0055))
 - Refresh generated README blocks [skip ci] ([`e543e9b`](https://github.com/ovurrsl/plugin-warehouse/commit/e543e9be7c23c4964f4a508e8ab4861767dca9be))
 - Refresh generated README blocks [skip ci] ([`8323196`](https://github.com/ovurrsl/plugin-warehouse/commit/83231965d97727e8ffbc200b2deb54b7b7bbf871))
 - Refresh generated README blocks [skip ci] ([`fc3a267`](https://github.com/ovurrsl/plugin-warehouse/commit/fc3a267578a322f415e23df6cd60561c7e6bf127))
@@ -85,6 +86,9 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Phase 4 — racks on a mezzanine, load class, 3D clash ([`fe05208`](https://github.com/ovurrsl/plugin-warehouse/commit/fe05208e1fd7edf5c0461114d8896f0b5f9a112f))
+- Phase 3 — plan symbols for stairs, gates, railings, voids ([`389e6c1`](https://github.com/ovurrsl/plugin-warehouse/commit/389e6c1fc4c649bd27361ef4ff592d197f96cc8b))
+- Phase 2 — staircases, railings, gates, floor voids ([`36816cd`](https://github.com/ovurrsl/plugin-warehouse/commit/36816cdf367cbce9192ad762dcd6e19c1f651ee4))
 - Add warehouse:mezzanine kind — Phase 1 structural skeleton ([`2c54178`](https://github.com/ovurrsl/plugin-warehouse/commit/2c5417876ec6b04865f04ea9bc04341438817e09))
 - Make nose sensor and platform toggleable from the panel ([`0927769`](https://github.com/ovurrsl/plugin-warehouse/commit/0927769a12efd35ef8c3a57283d5d276c0b82db5))
 - Add nose anti-collision sensor and operator step platform ([`20bffb3`](https://github.com/ovurrsl/plugin-warehouse/commit/20bffb3dc97a181431d2f2932a4a2369bf35b1d8))

@@ -70,25 +70,38 @@ export default function TelescopicTool() {
   const previousSnapRef = useRef<string | null>(null)
   const [placementSerial, setPlacementSerial] = useState(0)
 
+  /**
+   * Kimlik taşıyan düğüm — uzama BURADA DEĞİL.
+   *
+   * Uzama `previewNode`'un kimliğine girseydi `[`/`]` her basışta abonelik
+   * efektini yeniden kurar, `lastPositionRef` sıfırlanır ve hayalet fare
+   * kıpırdayana kadar kaybolurdu. Paletin `ghostNode` deseni: kimlik sabit,
+   * görünüm ayrı.
+   */
   const previewNode = useMemo(
     () =>
       ConveyorTelescopicNode.parse({
         ...brush,
-        extension,
+        extension: 0,
         position: [0, 0, 0],
         rotation: [0, 0, 0],
       }),
-    [brush, extension, placementSerial],
+    [brush, placementSerial],
   )
+
+  /** Hayaletin ve commit'in gördüğü düğüm: kimlik + anlık uzama. */
+  const ghostNode = useMemo(() => ({ ...previewNode, extension }), [previewNode, extension])
+  const ghostNodeRef = useRef(ghostNode)
+  ghostNodeRef.current = ghostNode
 
   const model = telescopicModelOf(previewNode.model)
   const boxDimensions = useMemo(
     (): [number, number, number] => [
-      currentLengthM(previewNode),
+      currentLengthM(ghostNode),
       model.heightM + 0.12,
-      frameWidthM(previewNode),
+      frameWidthM(ghostNode),
     ],
-    [previewNode, model.heightM],
+    [ghostNode, model.heightM],
   )
 
   useEffect(() => {
@@ -113,15 +126,16 @@ export default function TelescopicTool() {
         setValid(true)
         return
       }
+      const live = ghostNodeRef.current
       const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
         activeLevelId,
         visual,
-        boxDimensions,
+        [currentLengthM(live), telescopicModelOf(live.model).heightM + 0.12, frameWidthM(live)],
         [0, rotationRef.current, 0],
         [],
       )
       const clear = isClearAt({
-        node: { ...previewNode, position: visual, rotation: [0, rotationRef.current, 0] },
+        node: { ...ghostNodeRef.current, position: visual, rotation: [0, rotationRef.current, 0] },
         position: visual,
         rotationY: rotationRef.current,
         nodes: useScene.getState().nodes as Readonly<Record<string, unknown>>,
@@ -178,7 +192,7 @@ export default function TelescopicTool() {
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const committed = ConveyorTelescopicNode.parse({
-        ...previewNode,
+        ...ghostNodeRef.current,
         id: previewNode.id,
         name: `Telescopic ${TELESCOPIC_MODELS[previewNode.model].label}`,
         position,
@@ -221,6 +235,10 @@ export default function TelescopicTool() {
         setExtension(next)
         useWarehouseStore.getState().setTelescopicBrush({ extension: next })
         triggerSFX('sfx:item-rotate')
+        // Bom uzayınca taban izi büyür: geçerlilik ESKİ boya ait kalamaz
+        // (konveyörün `[`/`]` hatasının aynısı, aynı düzeltme).
+        const position = lastPositionRef.current
+        if (position) applyCursor(position)
         return
       }
 
@@ -253,13 +271,16 @@ export default function TelescopicTool() {
       window.removeEventListener('keyup', onKeyUp)
       useAlignmentGuides.getState().clear()
     }
-  }, [activeLevelId, previewNode, boxDimensions])
+    // `boxDimensions` KASTEN bağımlılık değil: uzamayla her basışta değişir
+    // ve efekti yeniden kurmak hayaleti kaybettirirdi. Geçerlilik hesabı onu
+    // `ghostNodeRef` üzerinden taze okuyor.
+  }, [activeLevelId, previewNode])
 
   if (!activeLevelId) return null
 
   // Kutu, uzamayla ÖNE kayan taban izini gösterir — kullanıcı bomun nereye
   // uzanacağını yerleştirmeden önce görür.
-  const offset = footprintCenterX(previewNode)
+  const offset = footprintCenterX(ghostNode)
   const boxPosition: [number, number, number] = [
     cursorPosition[0] + Math.cos(cursorRotationY) * offset,
     cursorPosition[1],
@@ -269,7 +290,7 @@ export default function TelescopicTool() {
   return (
     <>
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
-        <TelescopicPreview node={previewNode} />
+        <TelescopicPreview node={ghostNode} />
       </group>
       {cursorVisible && (
         <PlacementBox

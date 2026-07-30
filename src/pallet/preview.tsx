@@ -1,9 +1,9 @@
 'use client'
 
 import { EDITOR_LAYER } from '@pascal-app/editor'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
-import { getCargoGeometry } from './cargo-geometry'
+import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { cargoInputOf } from './cargo-parts'
 import { getFilmGeometry } from './film'
 import { getPalletGeometry } from './geometry-builder'
@@ -42,6 +42,21 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
     const input = cargoInputOf(node, 'full')
     if (!input) return null
     return { geometry: getCargoGeometry(input), film: node.wrapped ? getFilmGeometry(input) : null }
+  }, [node])
+
+  /**
+   * Hayaletin tuttuğu kargo tamponunu CACHE'E BİLDİR.
+   *
+   * Yerleştirilmiş paletler kendi girişlerini tutuyordu, hayalet tutmuyordu:
+   * altmış dört farklı kargo şekli inşa edildikten sonra tahliye adayı tam
+   * da hayaletin çizdiği giriş oluyordu — ve WebGPU'da hâlâ referans edilen
+   * bir tamponu dispose etmek, bütün karenin komut tamponunu düşüren sınıf.
+   */
+  useEffect(() => {
+    const input = cargoInputOf(node, 'full')
+    if (!input) return
+    const key = retainCargoGeometry(input)
+    return () => releaseCargoGeometry(key)
   }, [node])
 
   // The overlay layer keeps the ghost out of export and snapshot passes.

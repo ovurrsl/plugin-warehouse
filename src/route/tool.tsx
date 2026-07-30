@@ -231,7 +231,17 @@ export default function RouteTool() {
     }
   }, [activeLevelId])
 
-  const draft: Point[] = cursor ? [...vertices, cursor] : vertices
+  /**
+   * Taslak = köşeler + imleç, ŞEMA SINIRINDA kırpılmış.
+   *
+   * Köşe sayısı tam `MAX_VERTICES`'e ulaşabiliyor (guard 64'te kesiyor) ve
+   * imleç bir tane daha ekliyordu: 65 nokta, `RouteNode.parse` sınırı 64.
+   * Önizleme o parse'ı RENDER İÇİNDE çağırdığı için hata bir olay
+   * işleyicisinden değil ağacın kendisinden fırlıyor ve tüm editör beyaz
+   * ekrana düşüyordu. Araç zaten commit yolunu bu yüzden "fırlatmak yerine
+   * reddet" diye yazmış; önizleme yolu atlanmış.
+   */
+  const draft: Point[] = (cursor ? [...vertices, cursor] : vertices).slice(0, MAX_VERTICES)
 
   return (
     <>

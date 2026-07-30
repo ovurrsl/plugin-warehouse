@@ -330,6 +330,15 @@ function GhostStock({ node }: { node: PalletRackNode }) {
   const [alongRun, intoDepth] = orientedPalletFootprint(node)
   const turned = Math.abs(alongRun - spec.length) > 1e-9
 
+  /**
+   * Tampon tavanı: rafın TÜM palet yuvaları.
+   *
+   * `ghostFill` 0→1 gezinirken yerleşim sayısı değişir ama tavan değişmez,
+   * dolayısıyla mesh bir kez kurulur ve kaydırıcı boyunca aynı kalır.
+   * Yalnız rafın şekli değişince (yuva sayısı) yeniden kurulur.
+   */
+  const capacity = useMemo(() => Math.max(1, palletSlotsOf(node).length), [node])
+
   const placements = useMemo(() => {
     const result: Array<{ position: [number, number, number]; load: number }> = []
     for (const slot of palletSlotsOf(node)) {
@@ -372,22 +381,33 @@ function GhostStock({ node }: { node: PalletRackNode }) {
 
   return (
     <>
+      {/*
+        Kapasite SABİT, çizilen sayı `count` ile ayarlanır.
+        
+        Önceki hâl `key`'i sayıya bağlayıp her değişimde mesh'i yeniden
+        mount ediyordu — ve `dispose={null}` (paylaşılan geometri/materyal
+        atılmasın diye, ki o kısmı doğru) eski mesh'in KENDİ sahip olduğu
+        `instanceMatrix` tamponunu da GPU'da bırakıyordu. ghostFill
+        kaydırıcısını bir uçtan öbürüne sürüklemek, raf başına onlarca
+        yetim tampon demekti.
+        
+        Sabit kapasite ikisini birden çözüyor: yeniden mount yok, dolayısıyla
+        yetim tampon da yok — ve `count` yanlış sayıda palet çizilmesini
+        `key`'in yaptığı gibi ama bedelsiz engelliyor.
+      */}
       <instancedMesh
-        args={[geometry, material, placements.length]}
+        args={[geometry, material, capacity]}
         castShadow
+        count={placements.length}
         dispose={null}
-        // Remounted when the count changes: an InstancedMesh fixes its buffer
-        // size at construction, so reusing one across a different count would
-        // silently draw the wrong number of pallets.
-        key={`pallets-${placements.length}`}
         raycast={NO_RAYCAST}
         ref={palletRef}
       />
       <instancedMesh
-        args={[UNIT_BOX, LOAD_MATERIAL, placements.length]}
+        args={[UNIT_BOX, LOAD_MATERIAL, capacity]}
         castShadow
+        count={placements.length}
         dispose={null}
-        key={`loads-${placements.length}`}
         raycast={NO_RAYCAST}
         ref={loadRef}
       />

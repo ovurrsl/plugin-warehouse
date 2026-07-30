@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { LINE_WIDTHS } from './constants'
+import { LINE_WIDTHS, MAX_VERTICES } from './constants'
 import { buildRouteGeometry, markingGates, routeGeometryKey } from './geometry'
 import { RouteNode } from './schema'
-import { outerHalfWidthM } from './stripes'
+import { outerHalfWidthM, type Point } from './stripes'
 
 const route = (patch: Record<string, unknown> = {}) => RouteNode.parse({ id: 'route_1', ...patch })
 
@@ -136,6 +136,40 @@ describe('what gets built is paint, and only paint', () => {
     }
   })
 
+  test('and every triangle is WOUND to face up — the normal attribute cannot say this', () => {
+    /**
+     * The winding, not the normal, decides what `side: THREE.FrontSide` culls.
+     * The normal attribute above is written by hand as (0,1,0) on every vertex
+     * and would keep passing while half the paint was invisible — which is
+     * exactly what happened: mirroring the offset for the second stripe
+     * mirrored its handedness too, so one ribbon of every route was a back
+     * face and was never drawn.
+     */
+    for (const points of [
+      STRAIGHT,
+      [
+        [0, 0],
+        [10, 0],
+        [16, 6],
+      ] as Point[],
+    ]) {
+      const geometry = buildRouteGeometry(route({ points, traffic: 'one-way' }))
+      const position = geometry.getAttribute('position')
+      const index = geometry.getIndex()
+      if (!index) throw new Error('indexed geometry expected')
+      for (let t = 0; t < index.count; t += 3) {
+        const [a, b, c] = [index.getX(t), index.getX(t + 1), index.getX(t + 2)]
+        // Y of (b−a) × (c−a): positive means the face looks up.
+        const abx = position.getX(b) - position.getX(a)
+        const abz = position.getZ(b) - position.getZ(a)
+        const acx = position.getX(c) - position.getX(a)
+        const acz = position.getZ(c) - position.getZ(a)
+        const normalY = abz * acx - abx * acz
+        expect(normalY, `triangle ${t / 3} faces down`).toBeGreaterThan(0)
+      }
+    }
+  })
+
   test('the paint stays inside the route’s own outer edge', () => {
     const node = route({ points: STRAIGHT, width: 3.2, lineWidth: 'wide', traffic: 'one-way' })
     const geometry = buildRouteGeometry(node)
@@ -202,5 +236,23 @@ describe('what gets built is paint, and only paint', () => {
     const dashed = triangles(route({ points: STRAIGHT, role: 'vehicle', traffic: 'two-way' }))
     // 12 m at a 2 m period is six dashes, two triangles each.
     expect(dashed - solidish).toBe(12)
+  })
+})
+
+describe('taslak şema sınırını aşamaz — beyaz ekran çökmesi', () => {
+  test('MAX_VERTICES köşe + imleç parse edilebilir kalır', () => {
+    /**
+     * Araç köşe sayısını tam `MAX_VERTICES`'e kadar kabul ediyor, önizleme
+     * ise imleci ekleyip parse ediyordu: 65 nokta, sınır 64. Parse RENDER
+     * İÇİNDE çağrıldığı için hata olay işleyicisinden değil ağacın
+     * kendisinden fırlıyor ve editör beyaz ekrana düşüyordu.
+     */
+    const full: Point[] = Array.from({ length: MAX_VERTICES }, (_, i) => [i, 0])
+    const withCursor = [...full, [999, 0] as Point]
+    // Aracın kırptığı hâl:
+    const clamped = withCursor.slice(0, MAX_VERTICES)
+    expect(() => RouteNode.parse({ points: clamped })).not.toThrow()
+    // Kırpılmamış hâl gerçekten fırlatıyor — testin kendisi de kanıt.
+    expect(() => RouteNode.parse({ points: withCursor })).toThrow()
   })
 })

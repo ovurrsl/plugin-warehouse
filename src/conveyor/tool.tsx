@@ -248,7 +248,21 @@ export default function ConveyorRollerTool() {
 
       if (event.key === '[' || event.key === ']') {
         event.preventDefault()
-        setModules((count) => Math.max(1, Math.min(60, count + (event.key === ']' ? 1 : -1))))
+        const next = Math.max(1, Math.min(60, modulesRef.current + (event.key === ']' ? 1 : -1)))
+        if (next === modulesRef.current) return
+        modulesRef.current = next
+        setModules(next)
+        /**
+         * Geçerlilik YENİDEN hesaplanır.
+         *
+         * `recomputeValidity` `modulesRef`'i okuyor ama yalnız `applyCursor`
+         * çağırıyordu — ve `applyCursor` fare hareketine bağlıydı. Fare
+         * durduğu yerde `]` ile koşuyu uzatmak, kutuyu ESKİ modül sayısının
+         * yeşiline bırakıyor ve tıklama duvarın içine geçerli sayılıp
+         * inşa ediyordu.
+         */
+        const position = lastPositionRef.current
+        if (position) applyCursor(position)
         return
       }
 

@@ -209,12 +209,22 @@ export function buildRouteGeometry(route: RouteNode): THREE.BufferGeometry {
   const half = LINE_WIDTHS[route.lineWidth] / 2
 
   for (const side of [1, -1]) {
-    emitRibbon(
-      sink,
-      groups.stripe,
-      offsetCentreline(points, side * (centre - half)),
-      offsetCentreline(points, side * (centre + half)),
-    )
+    const near = offsetCentreline(points, side * (centre - half))
+    const far = offsetCentreline(points, side * (centre + half))
+    /**
+     * Aynalanan tarafta kenarlar TAKAS EDİLİR.
+     *
+     * `pushQuad` sabit bir sarım yazar ve o sarımın yukarı bakması, iki
+     * kenarın hangi elle sıralandığına bağlıdır. `side` işareti ofseti
+     * aynaladığı için elleri de aynalar: takas olmadan sol şerit saat
+     * yönünde sarılır, `side: FrontSide` onu arka yüz sayar ve **her
+     * rotanın iki şeridinden biri hiç görünmez.**
+     *
+     * Normal attribute'u bunu yakalayamaz — o elle `(0,1,0)` yazılıyor ve
+     * culling kararı sarımdan verilir, normalden değil. `geometry.test.ts`
+     * artık sarımı ayrıca ölçüyor.
+     */
+    emitRibbon(sink, groups.stripe, side === 1 ? far : near, side === 1 ? near : far)
   }
 
   const gates = markingGates(route)

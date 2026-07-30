@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b0fa4ff`](https://github.com/ovurrsl/plugin-warehouse/commit/b0fa4ffa123b2a2ba40b20a4c2be98a3e768c5ee))
 - Refresh generated README blocks [skip ci] ([`0d5298b`](https://github.com/ovurrsl/plugin-warehouse/commit/0d5298b25fae2839a68f89deb217e35515c89286))
 - Refresh generated README blocks [skip ci] ([`7a47326`](https://github.com/ovurrsl/plugin-warehouse/commit/7a473264a8d5d8615c947f17aed23e5cdbfe0055))
 - Refresh generated README blocks [skip ci] ([`e543e9b`](https://github.com/ovurrsl/plugin-warehouse/commit/e543e9be7c23c4964f4a508e8ab4861767dca9be))
@@ -87,6 +88,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Host slab olarak güverte yayınla — üstüne raf konabilsin ([`948da25`](https://github.com/ovurrsl/plugin-warehouse/commit/948da25fa88579af3f2a42e41b2ad1d6b783af24))
 - Add warehouse:live-racking — Mecalux gravity-flow channel ([`ee29014`](https://github.com/ovurrsl/plugin-warehouse/commit/ee290143dfb1d7c33e2d06f9807bded320e345fc))
 - Phase 4 — racks on a mezzanine, load class, 3D clash ([`fe05208`](https://github.com/ovurrsl/plugin-warehouse/commit/fe05208e1fd7edf5c0461114d8896f0b5f9a112f))
 - Phase 3 — plan symbols for stairs, gates, railings, voids ([`389e6c1`](https://github.com/ovurrsl/plugin-warehouse/commit/389e6c1fc4c649bd27361ef4ff592d197f96cc8b))

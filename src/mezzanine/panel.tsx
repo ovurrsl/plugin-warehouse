@@ -7,6 +7,7 @@ import { IssueList } from '../panels/issue-list'
 import { CONSTRUCTIVE_SYSTEMS } from './catalog'
 import { effectiveClearHeightM, resolveTierElevations, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
+import { overloadedRacks, overloadText, racksOnMezzanine, tierLoadSummary } from './rack-support'
 import type { MezzanineNode } from './schema'
 import { resolveSteps } from './stairs'
 
@@ -48,11 +49,16 @@ function useInspected(provided?: MezzanineNode): MezzanineNode | null {
 
 export default function MezzaninePanel({ node: provided }: { node?: MezzanineNode }) {
   const node = useInspected(provided)
+  // Raf yükü sahnenin bir fonksiyonu, düğümün değil — bu yüzden burada
+  // okunuyor, invariants'ta değil (invariants yalnız düğümü görür).
+  const nodes = useScene((s) => s.nodes)
   if (!node) return null
 
   const system = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem]
   const issues = mezzanineParametrics.invariants?.flatMap((check) => check(node)) ?? []
   const resolved = resolveTierElevations(node.tiers)
+  const supported = racksOnMezzanine(nodes as Readonly<Record<string, unknown>>, node)
+  const overloaded = overloadedRacks(supported)
 
   return (
     <div style={styles.root}>
@@ -107,6 +113,34 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
           <p style={styles.note}>
             Basamak sayısı ve basış GERÇEK kot farkından; EN ISO 14122-3'e karşı doğrulanır (rıht ≤
             220 mm, basamak ≥ 245 mm, 600 ≤ going+2·rise ≤ 660).
+          </p>
+        </div>
+      )}
+
+      {supported.length > 0 && (
+        <div style={styles.card}>
+          {resolved.map((tier) => {
+            const summary = tierLoadSummary(supported, tier.index)
+            if (summary.count === 0) return null
+            return (
+              <div key={tier.index} style={styles.row}>
+                <span>
+                  Tier {tier.index} · {summary.count} raf
+                </span>
+                <span style={styles.figure}>
+                  {summary.declaredKg.toFixed(0)} / {summary.allowanceKg.toFixed(0)} kg
+                </span>
+              </div>
+            )
+          })}
+          {overloaded.map((entry) => (
+            <p key={entry.rackId} style={{ ...styles.note, color: 'var(--destructive)' }}>
+              {overloadText(entry)}
+            </p>
+          ))}
+          <p style={styles.note}>
+            Yayılı yük oranı (kg/m² × taban izi) — FEM DEĞİL. Kolon reaksiyonu, kiriş açıklığı ve
+            nokta yükü hesaba girmiyor; aşım bir ret değil, yapısal inceleme çağrısıdır.
           </p>
         </div>
       )}

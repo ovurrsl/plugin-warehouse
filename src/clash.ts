@@ -26,6 +26,8 @@ import type { ConveyorObliqueNode } from './conveyor/oblique-schema'
 import type { ConveyorRollerNode } from './conveyor/schema'
 import { localBoundsM as transferBoundsM } from './conveyor/transfer-metrics'
 import type { ConveyorTransferNode } from './conveyor/transfer-schema'
+import { mezzanineParts } from './mezzanine/parts'
+import type { MezzanineNode } from './mezzanine/schema'
 import { unitLoadHeightOf } from './pallet/cargo-types'
 import { specOf } from './pallet/presets'
 import type { PalletNode } from './pallet/schema'
@@ -214,6 +216,21 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     // surface, and nothing passes through a surface.
     return rackParts(rack, 'full').map((part) =>
       toWorldBox(part.center, part.size, rack.position, placement.rotationY),
+    )
+  }
+
+  if (placement.type === 'warehouse:mezzanine') {
+    // The rack's reasoning, only sharper: a mezzanine is almost entirely
+    // AIR, and that air is precisely the usable volume — the space *under*
+    // one is open to racking, conveyor and trucks, which is why it gets
+    // built at all. A single box would refuse every placement beneath it.
+    //
+    // The part list gives columns, beams, deck panels and railing; because
+    // no panel is emitted inside a stair void, that hole stays a hole here
+    // too — one definition of the void, not two.
+    const mezzanine = node as MezzanineNode
+    return mezzanineParts(mezzanine).map((part) =>
+      toWorldBox(part.center, part.size, mezzanine.position, placement.rotationY),
     )
   }
 

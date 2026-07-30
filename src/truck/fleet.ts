@@ -10,8 +10,10 @@
 
 import { TRUCK_MODELS, type TruckModelId } from '../handling/models'
 import type { RouteNode } from '../route/schema'
+import { buildCycle, carriesPallet, cycleSeconds, type PhaseStep, stepAt } from './duty'
 import { buildTrack, type RouteTrack, sampleTrack } from './route-index'
 import type { TruckNode } from './schema'
+import { type Assignment, assignmentFor, stationsAlong } from './stations'
 
 /**
  * Aynı anda hareket eden araç tavanı.
@@ -47,6 +49,26 @@ export type FleetTruck = {
   dir: 1 | -1
   dwellRemaining: number
   speedMps: number
+  /**
+   * Alma–bırakma çevrimi, ya da `null` (mekik: rotayı boyunca sürer).
+   *
+   * Çevrim varsa araç `s`'i kendi hızıyla değil BETİKTEN alır: faz süreleri
+   * yayınlanmış oranlardan hesaplandığı için "çevrim 47 s" ölçülebilir bir
+   * sayıdır ve serbest sürüşle karışmaz.
+   */
+  cycle: {
+    assignment: Assignment
+    steps: PhaseStep[]
+    totalS: number
+    t: number
+    /** Kaynak yuvadaki paletin düğüm kimliği — çevrimin taşıdığı şey. */
+    palletId: string
+  } | null
+  /** Park hâlindeki çatal kotu — çevrim bunu sürer. */
+  forkY: number
+  /** Taşınan paletin DÜĞÜM kimliği, ya da null. Sahneye YAZILMAZ —
+   *  yalnız canlı transform kanalına yazılır. */
+  carryingPalletId: string | null
 }
 
 export type Fleet = {
@@ -56,6 +78,20 @@ export type Fleet = {
 }
 
 export const EMPTY_FLEET: Fleet = { trucks: [], skipped: 0 }
+
+/** Verilen yuvada duran paletin düğüm kimliği. */
+function palletInSlot(
+  nodes: Readonly<Record<string, unknown>>,
+  rackId: string,
+  address: string,
+): string | null {
+  for (const [id, value] of Object.entries(nodes)) {
+    const pallet = value as { type?: string; slotRackId?: string; slotAddress?: string }
+    if (pallet?.type !== 'warehouse:pallet') continue
+    if (pallet.slotRackId === rackId && pallet.slotAddress === address) return id
+  }
+  return null
+}
 
 /** Yüklü hız esas; paket hızları yalnız yüklü yoksa. Hepsi null (mpt: motor
  *  yok) → araç filoya giremez, sessiz 0 km/h asla üretilmez. */
@@ -124,9 +160,35 @@ export function buildFleet(nodes: Readonly<Record<string, unknown>>): Fleet {
       dir: 1,
       dwellRemaining: 0,
       speedMps: bound.speedMps,
+      cycle: null,
+      forkY: node.forkHeight,
+      carryingPalletId: null,
     })
   }
   const trucks = candidates.slice(0, FLEET_LIMIT)
+
+  /**
+   * Çevrim ataması — filo kurulurken BİR kez, deterministik.
+   *
+   * Kare döngüsünde yapılsaydı her karede sahne taranırdı; burada yapılınca
+   * yalnız sahne değiştiğinde yenilenir ve `assignmentFor` araç kimliğinden
+   * türediği için aynı sahne aynı çevrimi verir (T34).
+   */
+  for (const truck of trucks) {
+    const model = TRUCK_MODELS[truck.modelId]
+    const stations = stationsAlong(nodes, truck.track, model)
+    const assignment = assignmentFor(truck.id, stations)
+    if (!assignment) continue
+    const steps = buildCycle(model, assignment.source, assignment.target, truck.s)
+    if (steps.length === 0) continue
+    // Kaynak yuvadaki paletin kimliği: çevrimin taşıyacağı düğüm. Yoksa
+    // çevrim kurulmaz — hayalet bir palet taşımak, olmayan stoku hareket
+    // ettirmektir.
+    const palletId = palletInSlot(nodes, assignment.source.rackId, assignment.source.slot.id)
+    if (!palletId) continue
+    truck.cycle = { assignment, steps, totalS: cycleSeconds(steps), t: 0, palletId }
+  }
+
   return { trucks, skipped: candidates.length - trucks.length }
 }
 
@@ -140,6 +202,26 @@ export function buildFleet(nodes: Readonly<Record<string, unknown>>): Fleet {
 export function stepFleet(fleet: Fleet, dt: number): void {
   const clamped = Math.min(dt, MAX_STEP_S)
   for (const truck of fleet.trucks) {
+    // ── Görev çevrimi: betik sürüşü devralır ──
+    if (truck.cycle) {
+      const cycle = truck.cycle
+      cycle.t = (cycle.t + clamped) % cycle.totalS
+      const at = stepAt(cycle.steps, cycle.t)
+      if (at) {
+        // Faz içinde doğrusal ilerleme: `s` bir önceki fazın hedefinden
+        // bu fazınkine, çatal kotu da öyle. Fazın kendi süresi mesafeden
+        // türediği için sonuç yayınlanmış hızda hareket eder.
+        const previous = cycle.steps[at.index - 1]
+        const fromS = previous?.s ?? truck.s
+        const toS = at.step.s ?? fromS
+        truck.s = fromS + (toS - fromS) * at.progress
+        const fromY = previous?.forkY ?? truck.forkY
+        truck.forkY = fromY + (at.step.forkY - fromY) * at.progress
+        truck.carryingPalletId = carriesPallet(at.step.phase) ? cycle.palletId : null
+      }
+      continue
+    }
+
     if (truck.dwellRemaining > 0) {
       truck.dwellRemaining -= clamped
       if (truck.dwellRemaining > 0) continue
@@ -165,6 +247,12 @@ export function stepFleet(fleet: Fleet, dt: number): void {
       }
     }
   }
+}
+
+/** Aracın aktif fazı — panelin okuduğu tek yer. */
+export function phaseOf(truck: FleetTruck): string | null {
+  if (!truck.cycle) return null
+  return stepAt(truck.cycle.steps, truck.cycle.t)?.step.phase ?? null
 }
 
 /** Aracın şu anki pozu, level-yerel. `useLiveTransforms`'un sözlüğünde. */

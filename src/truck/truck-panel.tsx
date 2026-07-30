@@ -2,12 +2,14 @@
 
 import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
-import type { CSSProperties } from 'react'
+import { type CSSProperties, useState } from 'react'
 import { gapsFor } from '../handling/gaps'
 import { aisleBandForVariant, aisleFigureForModel } from '../handling/metrics'
 import { TRUCK_MODELS, TRUCK_VARIANT_LABEL } from '../handling/models'
 import { IssueList } from '../panels/issue-list'
-import { bindTruck } from './fleet'
+import { COMMIT_REFUSAL_TEXT, planCommit } from './commit-move'
+import { ALIGN_BASIS_NOTE, cycleSeconds } from './duty'
+import { bindTruck, buildFleet } from './fleet'
 import { truckParametrics } from './parametrics'
 import { claimRoute } from './route-binding'
 import type { TruckNode } from './schema'
@@ -72,6 +74,7 @@ function useSceneNodes(): Readonly<Record<string, unknown>> {
 export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
   const node = useInspectedTruck(provided)
   const allNodes = useSceneNodes()
+  const [commitNote, setCommitNote] = useState<string | null>(null)
   if (!node) return null
 
   const model = TRUCK_MODELS[node.model]
@@ -135,10 +138,71 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
     </button>
   )
 
+  /**
+   * Görev çevrimi okuması ve TEK taahhüt kapısı.
+   *
+   * Simülasyon sahneye hiç yazmaz; stok hareketi ancak bu düğmeyle, tek
+   * history adımı olarak taahhüt edilir. Otomatik taahhüt reddedildi:
+   * her bırakma bir geri-alma adımı olurdu ve kullanıcı kendi çizdiği
+   * sahneyi Ctrl+Z ile geri alamaz hâle gelirdi.
+   */
+  const fleetTruck = buildFleet(allNodes).trucks.find((t) => t.id === node.id)
+  const cycle = fleetTruck?.cycle ?? null
+
+  const commit = () => {
+    if (!cycle) return
+    const scene = useScene.getState()
+    const result = planCommit(
+      scene.nodes as Readonly<Record<string, unknown>>,
+      cycle.palletId,
+      cycle.assignment.source,
+      cycle.assignment.target,
+    )
+    if ('refusal' in result) {
+      setCommitNote(COMMIT_REFUSAL_TEXT[result.refusal])
+      return
+    }
+    scene.updateNode(result.palletId as AnyNodeId, result.patch as unknown as Partial<AnyNode>)
+    setCommitNote('Palet hedef yuvaya taşındı — tek geri-alma adımı.')
+  }
+
   return (
     <div style={styles.root}>
       <IssueList issues={issues} />
       {routeAction}
+
+      {cycle && (
+        <div style={styles.card}>
+          <div style={styles.row}>
+            <span>Çevrim</span>
+            <span style={styles.figure}>{cycleSeconds(cycle.steps).toFixed(1)} s</span>
+          </div>
+          <div style={styles.row}>
+            <span>Kaynak → hedef</span>
+            <span style={styles.figure}>
+              {cycle.assignment.source.slot.id} → {cycle.assignment.target.slot.id}
+            </span>
+          </div>
+          <div style={styles.row}>
+            <span>Palet alma</span>
+            <span style={styles.figure}>
+              {cycle.assignment.target.reading.strideMode === 'straddle'
+                ? 'ayaklar arasına'
+                : 'ayak üzerinden'}
+            </span>
+          </div>
+          {cycle.assignment.target.reading.capacityBasis === 'unpublished' && (
+            <p style={styles.note}>
+              Rezidüel kapasite eğrisi yayınlanmamış — yüksek kotta nominal yük taahhüt edilemez.
+            </p>
+          )}
+          <p style={styles.note}>{ALIGN_BASIS_NOTE}</p>
+          <button onClick={commit} style={styles.button} type="button">
+            Bu taşımayı sahneye işle
+          </button>
+          {commitNote && <p style={styles.note}>{commitNote}</p>}
+        </div>
+      )}
 
       <div style={styles.card}>
         {figure && (

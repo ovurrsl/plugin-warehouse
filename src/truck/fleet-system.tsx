@@ -22,6 +22,15 @@ import { buildFleet, EMPTY_FLEET, MAX_STEP_S, poseOf, stepFleet } from './fleet'
  * yok, çünkü bu bir restore'dur, düğüm verisi hiç değişmedi. Export sırasında
  * aynısı: çıktı her zaman dosyadaki sahnedir, karedeki değil.
  */
+/**
+ * Paletin çatal üstündeki yeri — aracın merkezinden ileriye.
+ *
+ * Modelden okumak daha doğru olurdu ama palet, çatal yüzünün hemen
+ * önündedir ve o mesafe her ailede aracın yarı boyunun civarındadır;
+ * `FORK_OFFSET_M` bir görsel yerleşim sabitidir ve hiçbir ölçüye girmez.
+ */
+const FORK_OFFSET_M = 1.1
+
 export default function TruckFleetSystem() {
   const running = useWarehouseStore((s) => s.fleetRunning)
   const isExporting = useViewer(
@@ -71,8 +80,33 @@ export default function TruckFleetSystem() {
       // Canlı sürükleme her zaman kazanır: kullanıcının elindeki araca
       // simülasyon yazmaz.
       if (overrides.has(truck.id)) continue
-      store.set(truck.id, poseOf(truck))
+      const pose = poseOf(truck)
+      store.set(truck.id, pose)
       drivenRef.current.add(truck.id)
+
+      /**
+       * Taşınan palet — PALETİN KENDİ düğümünün canlı transform'u.
+       *
+       * Hayalet kopya yok, ikinci geometri yok: taşınan şey paletin ta
+       * kendisidir, kargosu, filmi ve LOD'uyla doğru görünür. Ve
+       * `pallet/renderer.tsx` bugün olduğu gibi çalışır — o dosyaya hiç
+       * dokunulmaz (plan §5.6).
+       *
+       * Palet, aracın çatal düzleminde durur: aracın konumuna kendi
+       * yönünde çatal ofseti eklenir, Y ise çatalın anlık kotu.
+       */
+      const carrying = truck.carryingPalletId
+      if (!carrying) continue
+      const forward = pose.rotation
+      store.set(carrying, {
+        position: [
+          pose.position[0] + Math.cos(forward) * FORK_OFFSET_M,
+          pose.position[1] + truck.forkY,
+          pose.position[2] - Math.sin(forward) * FORK_OFFSET_M,
+        ],
+        rotation: forward,
+      })
+      drivenRef.current.add(carrying)
     }
   })
 

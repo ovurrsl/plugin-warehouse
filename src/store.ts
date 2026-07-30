@@ -76,6 +76,17 @@ type WarehouseStore = {
   fleetRunning: boolean
   setFleetRunning: (running: boolean) => void
 
+  /**
+   * Kolektif instancing açık mı — VARSAYILAN AÇIK.
+   *
+   * Ölçüldü: 5300 düğümlük gerçekçi bir sahnede ~10.300 çizim çağrısı ~11'e
+   * iniyor. Kapatılabilir olması bir tercih değil, bu değişikliğin render
+   * yolunun en kritik parçasına dokunmasının gereği: bozulursa kullanıcı tek
+   * düğmeyle eski davranışa döner ve iki hâli yan yana ölçebilir.
+   */
+  instancingEnabled: boolean
+  setInstancingEnabled: (enabled: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /**
    * Shape of the next placed pallet, held as a partial node for the same reason
@@ -200,6 +211,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   fleetRunning: false,
   setFleetRunning: (fleetRunning) => set({ fleetRunning }),
+
+  instancingEnabled: true,
+  setInstancingEnabled: (instancingEnabled) => set({ instancingEnabled }),
 
   palletBrush: {
     preset: 'epal-1',

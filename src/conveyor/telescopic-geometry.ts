@@ -41,6 +41,18 @@ function colorOf(node: ConveyorTelescopicNode, role: TelescopicPart['role']): st
       return PALETTE.feetGrey
     case 'motor':
       return PALETTE.boxWhite
+    case 'rail':
+      return PALETTE.profileGrey
+    case 'console':
+      return PALETTE.boxWhite
+    // Endüstriyel kırmızı ve sarı — güvenlik donanımının rengi keyfî
+    // değildir, standardın kendisidir.
+    case 'estop':
+      return '#c62828'
+    case 'hazard':
+      return '#f2c200'
+    case 'lamp-housing':
+      return '#3a4048'
   }
 }
 

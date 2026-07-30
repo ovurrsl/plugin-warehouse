@@ -96,7 +96,47 @@ function CatalogTab() {
           </section>
         )
       })}
+      <InstancingSwitch />
     </div>
+  )
+}
+
+/**
+ * Kolektif instancing anahtarı.
+ *
+ * Ölçüm: 5300 düğümlük gerçekçi bir sahnede ~10.300 çizim çağrısı ~11'e
+ * iniyor. Kapatılabilir, çünkü bu değişiklik render yolunun en kritik
+ * parçasına dokunuyor — bozulursa tek tıkla eski davranış geri gelir ve iki
+ * hâl yan yana ölçülebilir.
+ */
+function InstancingSwitch() {
+  const enabled = useWarehouseStore((s) => s.instancingEnabled)
+  const setEnabled = useWarehouseStore((s) => s.setInstancingEnabled)
+
+  return (
+    <button
+      onClick={() => setEnabled(!enabled)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginTop: '0.25rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--muted-foreground)',
+        cursor: 'pointer',
+      }}
+      title="Aynı şekildeki rafları ve paletleri tek çizim çağrısında toplar. Kapatmak eski davranışa döner."
+      type="button"
+    >
+      <Icon height={13} icon={enabled ? 'lucide:zap' : 'lucide:zap-off'} width={13} />
+      <span>Toplu çizim {enabled ? 'açık' : 'kapalı'}</span>
+      <span style={{ marginLeft: 'auto' }}>{enabled ? 'hızlı' : 'nesne başına'}</span>
+    </button>
   )
 }
 

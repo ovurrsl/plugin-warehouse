@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { colliderProps } from '../collider'
+import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
@@ -124,6 +125,32 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   const material = getPalletMaterial()
 
   /**
+   * Güverte kolektif çiziciye girer — sahnedeki en kalabalık mesh bu.
+   *
+   * Yalnız GÜVERTE: yük ve film düğüm başına farklı (fill, renk, tip) ve
+   * kendi cache'leri var; onları da havuza almak, anahtar başına birer
+   * örneklik havuzlar üretip hiçbir şey kazandırmazdı.
+   *
+   * Uzak katman materyali FARKLI (`getPalletFarMaterial`) — bu yüzden
+   * materyal anahtarı katmanla değişir ve havuz ikiye ayrılır; ikisi
+   * karışırsa uzak paletler ahşap dokusunu kaybeder.
+   */
+  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const drawsSelf = useCollective({
+    nodeId: node.id,
+    objectRef: registeredRef,
+    geometryFor: (tier) =>
+      tier === 'full' ? getPalletGeometry(node.preset) : getPalletFarGeometry(node.preset),
+    keyFor: (tier) => `pallet-deck:${node.preset}:${tier}`,
+    material,
+    materialKey: 'pallet-deck',
+    castShadowWhenFull: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded: selected || live !== undefined || override !== undefined || isExporting,
+  })
+
+  /**
    * The deck's own LOD, in the same hysteresis band the cargo uses.
    *
    * The deck was the one mesh in the package drawn at full detail at every
@@ -190,16 +217,21 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
-        <mesh
-          castShadow
-          // Never dispose: shared across every pallet of this preset.
-          dispose={null}
-          geometry={geometry}
-          material={material}
-          raycast={NO_RAYCAST}
-          ref={deckRef}
-          receiveShadow
-        />
+        {/* Kolektif kapalıyken ya da bu palet seçili/sürükleniyorken kendi
+            güvertesini çizer; açıkken tek `InstancedMesh` preset başına
+            hepsini birden çizer. */}
+        {drawsSelf && (
+          <mesh
+            castShadow
+            // Never dispose: shared across every pallet of this preset.
+            dispose={null}
+            geometry={geometry}
+            material={material}
+            raycast={NO_RAYCAST}
+            ref={deckRef}
+            receiveShadow
+          />
+        )}
         {/* Cargo or nothing. There is no third branch: the plain block that
             used to be drawn when `cargo` was `'none'` and a typed height was
             non-zero is gone, and with it the empty pallets that carried what

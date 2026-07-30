@@ -135,6 +135,17 @@ export const palletRackDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Kolektif instancing çizicisi — sahne başına BİR, ve raf kind'ına asılı
+   * olması keyfîdir (konveyör ailesinin akış sistemi düz modüle asılı, aynı
+   * gerekçeyle açıkça yazılmış). Rafsız bir tesiste de mount edilir:
+   * `RegisteredSystems` kayıtlı her kind'ın sistemini kurar.
+   *
+   * Öncelik 3: `FloorElevationSystem` (1) ve geometri sistemleri (2)
+   * matrisleri yazdıktan SONRA, ama akış/filo (5/6) sürmeden önce toplar.
+   */
+  system: { module: () => import('../instancing/collective-system'), priority: 3 },
+
   floorplan: buildPalletRackFloorplan,
 
   tool: () => import('./tool'),

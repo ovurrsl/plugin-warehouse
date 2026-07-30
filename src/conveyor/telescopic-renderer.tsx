@@ -59,9 +59,26 @@ const BOX_MATERIAL = new THREE.MeshStandardMaterial({
   roughness: 0.85,
 })
 
+/**
+ * Çalışma lambasının merceği — TEK yayıcı materyal, tüm sahne.
+ *
+ * Ayrı materyal, ayrı çizim çağrısı: makinenin vertex-renkli tek materyali
+ * yayıcı olamaz (bütün gövde parlardı). Düğüm başına bir ek çizim, yalnız
+ * yakın katmanda — bir tesiste iki üç bom olur, bedeli budur ve yazılıdır.
+ */
+const LAMP_LENS_GEOMETRY = new THREE.BoxGeometry(0.11, 0.07, 0.02)
+const LAMP_LENS_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#fff6d8',
+  emissive: new THREE.Color('#ffe9a8'),
+  emissiveIntensity: 1.6,
+  roughness: 0.4,
+})
+
 /** Aynı anda bantta görünen en fazla kutu — C=25 m'de ~2 m arayla yeter. */
 const MAX_BOXES = 14
 const BOX_GAP_M = 2.1
+
+const boxMatrix = new THREE.Matrix4()
 
 /**
  * Teleskopik bant konveyör. Sabit gövde + uzamayla +X'e kayan bölümler;
@@ -129,8 +146,10 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
   const frameRef = useRef(0)
   const phase = useMemo(() => hashPhase(node.id), [node.id])
 
-  // Kutu havuzu: sabit sayıda mesh, kare döngüsü konumlar.
-  const boxesRef = useRef<THREE.Group>(null)
+  // Kutu havuzu: TEK InstancedMesh — on dört ayrı mesh, on dört çizim
+  // çağrısıydı (ailenin `flow-system`'i bunu altı yüz kutu için zaten
+  // çözmüştü; bu onun tek makinelik hâli).
+  const boxesRef = useRef<THREE.InstancedMesh>(null)
   const travelRef = useRef(0)
 
   useFrame(({ camera }, delta) => {
@@ -171,10 +190,11 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
     const boxes = boxesRef.current
     if (!boxes) return
     if (!flowRunning || isExporting) {
-      boxes.visible = false
+      // `count = 0` çizim çağrısını tamamen kaldırır; `visible=false` de
+      // kaldırırdı ama sayaç sıfırlamak buffer'ı da boşta bırakır.
+      boxes.count = 0
       return
     }
-    boxes.visible = true
     travelRef.current += TELESCOPIC_BELT_SPEED_EST_MS * Math.min(delta, 0.1)
     const length = currentLengthM(node)
     const startX = -model.fixedM / 2 + 0.4
@@ -183,13 +203,7 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
     const count = Math.min(MAX_BOXES, Math.max(1, Math.floor(span / BOX_GAP_M)))
     const topY = model.heightM + FLOW_BOX_M[1] / 2
 
-    let index = 0
-    for (const child of boxes.children) {
-      if (index >= count) {
-        child.visible = false
-        index++
-        continue
-      }
+    for (let index = 0; index < count; index++) {
       const offset = (travelRef.current + index * BOX_GAP_M) % span
       const x = startX + offset
       // Bom bölümleri kademeli alçalır — kutu üzerinde durduğu bandın kotunu izler.
@@ -197,16 +211,30 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
       for (const section of sections) {
         if (x > section.centerX - section.lengthM / 2) y = topY - section.dropM
       }
-      child.position.set(x, y, 0)
-      child.visible = true
-      child.updateMatrix()
-      index++
+      boxMatrix.makeTranslation(x, y, 0)
+      boxes.setMatrixAt(index, boxMatrix)
     }
+    boxes.count = count
+    boxes.instanceMatrix.needsUpdate = true
     void length
   })
 
   const height = model.heightM + 0.12
   const width = frameWidthM(node)
+
+  /**
+   * Merceğin yeri: en uçtaki bölümün burnu. Parça listesindeki lamba
+   * gövdesiyle AYNI aritmetikten çıkar — iki yerde iki formül olsaydı,
+   * bom uzayınca mercek gövdesinden ayrılırdı.
+   */
+  const nose = sections[sections.length - 1]
+  const noseLens: [number, number, number] | null = nose
+    ? [
+        nose.centerX + nose.lengthM / 2 - 0.16,
+        model.heightM - nose.dropM + 0.58,
+        -nose.widthM / 2 - 0.055,
+      ]
+    : null
 
   return (
     <group visible={node.visible !== false} {...handlers}>
@@ -249,20 +277,25 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
             }}
           />
         ))}
-        {/* Kutu havuzu — matrisleri kare döngüsü yazar. */}
-        <group ref={boxesRef} visible={false}>
-          {Array.from({ length: MAX_BOXES }, (_, index) => (
-            <mesh
-              dispose={null}
-              geometry={BOX_GEOMETRY}
-              key={index}
-              material={BOX_MATERIAL}
-              matrixAutoUpdate={false}
-              raycast={NO_RAYCAST}
-              visible={false}
-            />
-          ))}
-        </group>
+        {/* Kutu havuzu — tek çizim çağrısı, matrisleri kare döngüsü yazar. */}
+        <instancedMesh
+          args={[BOX_GEOMETRY, BOX_MATERIAL, MAX_BOXES]}
+          count={0}
+          dispose={null}
+          raycast={NO_RAYCAST}
+          ref={boxesRef}
+        />
+        {/* Çalışma lambasının merceği — burun bölümünün ucunda, o bölümün
+            uzamasıyla birlikte gider. */}
+        {noseLens && (
+          <mesh
+            dispose={null}
+            geometry={LAMP_LENS_GEOMETRY}
+            material={LAMP_LENS_MATERIAL}
+            position={noseLens}
+            raycast={NO_RAYCAST}
+          />
+        )}
       </group>
     </group>
   )

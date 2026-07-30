@@ -11,6 +11,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useCollective } from '../instancing/use-collective'
 import { getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
@@ -18,6 +19,7 @@ import { useStaticTransform } from '../static-transform'
 import {
   getRackGeometry,
   type RackDetail,
+  rackGeometryKey,
   releaseRackGeometry,
   retainRackGeometry,
 } from './geometry-builder'
@@ -153,6 +155,28 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
   const material = getRackMaterial()
 
   /**
+   * Kolektif çizici — bu düğümü havuza kaydeder ve kendi mesh'ini çizip
+   * çizmeyeceğini söyler.
+   *
+   * Seçili ya da sürükleniyorsa kendi çizer: ana hat geçişi yalnız GÖRÜNÜR
+   * mesh'leri tarıyor, ve sürüklenen bir düğümün matrisi her kare değişiyor
+   * (havuzu her kare yeniden kurmak, kurtardığından pahalıya gelir).
+   */
+  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const drawsSelf = useCollective({
+    nodeId: node.id,
+    objectRef: registeredRef,
+    geometryFor: (tier) => getRackGeometry(node, tier, abutted),
+    keyFor: (tier) => rackGeometryKey(node, tier, abutted),
+    material,
+    materialKey: 'rack',
+    castShadowWhenFull: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded: selected || live !== undefined || override !== undefined || isExporting,
+  })
+
+  /**
    * Tell the cache this shape is on screen.
    *
    * The cache is bounded now — a slider scrub mints a geometry per step and
@@ -232,19 +256,24 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
-        <mesh
-          // Derived from the same tier as the geometry, for the same reason: a
-          // hardcoded `castShadow` re-promoted a demoted rack to a caster on the
-          // next re-render, and every caster is a second draw in the shadow pass.
-          castShadow={isExporting || detailRef.current === 'full'}
-          // Never dispose: shared by every rack of this shape.
-          dispose={null}
-          geometry={geometry}
-          material={material}
-          raycast={NO_RAYCAST}
-          ref={steelRef}
-          receiveShadow
-        />
+        {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken
+            kendi mesh'ini çizer; açıkken tek `InstancedMesh` onun yerine
+            çizer ve bu boş kalır. İkisi birden çizerse z-savaşı olur. */}
+        {drawsSelf && (
+          <mesh
+            // Derived from the same tier as the geometry, for the same reason: a
+            // hardcoded `castShadow` re-promoted a demoted rack to a caster on the
+            // next re-render, and every caster is a second draw in the shadow pass.
+            castShadow={isExporting || detailRef.current === 'full'}
+            // Never dispose: shared by every rack of this shape.
+            dispose={null}
+            geometry={geometry}
+            material={material}
+            raycast={NO_RAYCAST}
+            ref={steelRef}
+            receiveShadow
+          />
+        )}
         {node.ghostFill > 0 && <GhostStock node={node} />}
       </group>
     </group>

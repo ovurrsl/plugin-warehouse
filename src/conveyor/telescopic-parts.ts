@@ -14,7 +14,18 @@ import type { ConveyorDetail } from './parts'
 import { beltWidthM, boomSections, frameWidthM, telescopicModelOf } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
-export type TelescopicPartRole = 'frame' | 'deck' | 'leg' | 'footplate' | 'guide' | 'motor'
+export type TelescopicPartRole =
+  | 'frame'
+  | 'deck'
+  | 'leg'
+  | 'footplate'
+  | 'guide'
+  | 'motor'
+  | 'rail'
+  | 'console'
+  | 'estop'
+  | 'hazard'
+  | 'lamp-housing'
 
 export type TelescopicPart = {
   role: TelescopicPartRole
@@ -71,6 +82,18 @@ export function telescopicBaseParts(
       role: 'frame',
       center: [-halfA + 0.06, topY - 0.09, 0],
       size: [0.12, 0.2, frame],
+    })
+    // Kuyruk ucunda acil stop mantarı — operatörün besleme tarafındaki eli.
+    parts.push({
+      role: 'estop',
+      center: [-halfA + 0.14, topY + 0.16, frame / 2 - 0.06],
+      size: [0.1, 0.1, 0.08],
+    })
+    // Kuyruk ikaz bandı: sarı-siyah şeridin gövde ucundaki karşılığı.
+    parts.push({
+      role: 'hazard',
+      center: [-halfA + 0.02, topY - beamDepth / 2, 0],
+      size: [0.04, beamDepth * 0.7, frame - 0.06],
     })
   }
   // Bacaklar: iki uçta çift + uzun modellerde orta destek. Taban plakaları.
@@ -140,6 +163,57 @@ export function telescopicSectionParts(
       role: 'frame',
       center: [0, topY - 0.14, 0],
       size: [length - 0.1, 0.03, width - 0.2],
+    })
+    // Kayma önleyici yan korkuluklar — her bölümde, bölüm boyunca.
+    for (const side of [-1, 1] as const) {
+      parts.push({
+        role: 'rail',
+        center: [0, topY + 0.07, side * (width / 2 - 0.02)],
+        size: [length - 0.06, 0.09, 0.025],
+      })
+    }
+  }
+
+  // ── Burun donanımı: YALNIZ en uçtaki bölümde ────────────────────────────
+  // Operatör bu uçta durur; kumanda, lamba ve acil stop oradadır. Her
+  // bölüme koymak makineyi beş kumandalı bir şeye çevirirdi.
+  const isNose = sectionIndex === model.sections - 1
+  if (isNose && detail === 'full') {
+    const noseX = length / 2
+    // Kumanda konsolu — yan tarafta, bel hizasında bir kutu + kol.
+    parts.push({
+      role: 'console',
+      center: [noseX - 0.3, topY + 0.24, width / 2 + 0.06],
+      size: [0.26, 0.2, 0.1],
+    })
+    parts.push({
+      role: 'frame',
+      center: [noseX - 0.3, topY + 0.08, width / 2 + 0.05],
+      size: [0.05, 0.24, 0.05],
+    })
+    // Acil stop mantarı, konsolun üstünde.
+    parts.push({
+      role: 'estop',
+      center: [noseX - 0.3, topY + 0.36, width / 2 + 0.06],
+      size: [0.08, 0.06, 0.08],
+    })
+    // Çalışma lambası: gövde + mercek. Mercek kendi materyalini alır
+    // (yayıcı) — makinenin karanlık dorse içini aydınlatan parçası.
+    parts.push({
+      role: 'frame',
+      center: [noseX - 0.16, topY + 0.42, -width / 2 - 0.04],
+      size: [0.05, 0.3, 0.05],
+    })
+    parts.push({
+      role: 'lamp-housing',
+      center: [noseX - 0.16, topY + 0.58, -width / 2 - 0.04],
+      size: [0.14, 0.12, 0.14],
+    })
+    // Burun ikaz bandı — çarpma riski en yüksek nokta.
+    parts.push({
+      role: 'hazard',
+      center: [noseX + 0.01, topY - 0.05, 0],
+      size: [0.03, 0.12, width - 0.08],
     })
   }
   return parts

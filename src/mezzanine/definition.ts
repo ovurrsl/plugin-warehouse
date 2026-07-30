@@ -84,8 +84,10 @@ export const mezzanineDefinition = {
   toolHints: [
     { key: 'Left click', label: 'Place mezzanine' },
     { key: 'R / T', label: 'Rotate 45°' },
+    { key: 'D', label: 'Draw custom outline' },
+    { key: 'Enter', label: 'Finish outline' },
+    { key: 'Esc', label: 'Undo corner / cancel' },
     { key: 'Alt', label: 'Force place' },
-    { key: 'Esc', label: 'Cancel' },
   ],
 
   presentation: {

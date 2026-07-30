@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react'
 import { FLOOR_TYPES, LOAD_CLASSES } from './catalog'
-import type { MezzanineNode, MezzanineTier } from './schema'
+import { emptyAccessories, type MezzanineNode, type MezzanineTier } from './schema'
 
 /**
  * `grid` ve `tiers` — iç içe nesne / dizi-of-nesne, jenerik field kind'ları
@@ -117,6 +117,204 @@ export function GridField({ node, onUpdate }: CustomField) {
 
 const FLOOR_TYPE_IDS = Object.keys(FLOOR_TYPES) as Array<MezzanineTier['floorType']>
 
+const EDGE_IDS = ['north', 'south', 'east', 'west'] as const
+type EdgeId = (typeof EDGE_IDS)[number]
+
+/**
+ * Bir tier'in aksesuarları: merdiven, kapılar, güvenlik bölgeleri.
+ *
+ * Korkuluk BURADA YOK ve olmamalı — açık çevrede zorunludur (katalog), yani
+ * bir alan değil bir kural; `railing.ts` onu bu listelerden türetiyor. Bir
+ * "korkuluk ekle" düğmesi, kullanıcıya kapatılabilir sanılan bir güvenlik
+ * donanımı sunardı.
+ */
+function AccessoryEditor({
+  accessories,
+  onChange,
+  tierIndex,
+}: {
+  accessories: MezzanineTier['accessories']
+  onChange: (next: MezzanineTier['accessories']) => void
+  tierIndex: number
+}) {
+  const patch = (part: Partial<MezzanineTier['accessories']>) =>
+    onChange({ ...accessories, ...part })
+
+  const edgeSelect = (value: EdgeId, onPick: (edge: EdgeId) => void) => (
+    <select
+      onChange={(e) => onPick(e.target.value as EdgeId)}
+      style={{ ...styles.select, flex: '0 0 5rem' }}
+      value={value}
+    >
+      {EDGE_IDS.map((edge) => (
+        <option key={edge} value={edge}>
+          {edge}
+        </option>
+      ))}
+    </select>
+  )
+
+  const offsetInput = (value: number, onSet: (offsetM: number) => void) => (
+    <input
+      onChange={(e) => onSet(Number(e.target.value))}
+      step={0.5}
+      style={styles.input}
+      type="number"
+      value={value}
+    />
+  )
+
+  return (
+    <div style={{ ...styles.field, gap: '0.25rem', marginTop: '0.25rem' }}>
+      <span style={{ ...styles.label, fontSize: '0.625rem' }}>
+        <span>Accessories</span>
+      </span>
+
+      {accessories.staircases.map((stair, i) => (
+        <div key={stair.id} style={styles.row}>
+          <span style={{ fontSize: '0.625rem', color: MUTED, flex: '0 0 2.5rem' }}>stair</span>
+          {stair.placement.mode === 'edge' ? (
+            <>
+              {edgeSelect(stair.placement.edge, (edge) =>
+                patch({
+                  staircases: accessories.staircases.map((s, j) =>
+                    j === i && s.placement.mode === 'edge'
+                      ? { ...s, placement: { ...s.placement, edge } }
+                      : s,
+                  ),
+                }),
+              )}
+              {offsetInput(stair.placement.offsetM, (offsetM) =>
+                patch({
+                  staircases: accessories.staircases.map((s, j) =>
+                    j === i && s.placement.mode === 'edge'
+                      ? { ...s, placement: { ...s.placement, offsetM } }
+                      : s,
+                  ),
+                }),
+              )}
+            </>
+          ) : (
+            <span style={{ fontSize: '0.625rem', color: MUTED, flex: 1 }}>
+              interior ({stair.placement.xM.toFixed(1)}, {stair.placement.zM.toFixed(1)})
+            </span>
+          )}
+          <button
+            onClick={() => patch({ staircases: accessories.staircases.filter((_, j) => j !== i) })}
+            style={styles.button}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      {accessories.swingGates.map((gate, i) => (
+        <div key={`swing-${gate.edge}-${gate.offsetM}`} style={styles.row}>
+          <span style={{ fontSize: '0.625rem', color: MUTED, flex: '0 0 2.5rem' }}>gate</span>
+          {edgeSelect(gate.edge, (edge) =>
+            patch({
+              swingGates: accessories.swingGates.map((g, j) => (j === i ? { ...g, edge } : g)),
+            }),
+          )}
+          {offsetInput(gate.offsetM, (offsetM) =>
+            patch({
+              swingGates: accessories.swingGates.map((g, j) => (j === i ? { ...g, offsetM } : g)),
+            }),
+          )}
+          <button
+            onClick={() => patch({ swingGates: accessories.swingGates.filter((_, j) => j !== i) })}
+            style={styles.button}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      {accessories.upAndOverGates.map((gate, i) => (
+        <div key={`upover-${gate.edge}-${gate.offsetM}`} style={styles.row}>
+          <span style={{ fontSize: '0.625rem', color: MUTED, flex: '0 0 2.5rem' }}>pallet</span>
+          {edgeSelect(gate.edge, (edge) =>
+            patch({
+              upAndOverGates: accessories.upAndOverGates.map((g, j) =>
+                j === i ? { ...g, edge } : g,
+              ),
+            }),
+          )}
+          {offsetInput(gate.offsetM, (offsetM) =>
+            patch({
+              upAndOverGates: accessories.upAndOverGates.map((g, j) =>
+                j === i ? { ...g, offsetM } : g,
+              ),
+            }),
+          )}
+          <button
+            onClick={() =>
+              patch({ upAndOverGates: accessories.upAndOverGates.filter((_, j) => j !== i) })
+            }
+            style={styles.button}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+
+      <div style={{ ...styles.row, gap: '0.25rem' }}>
+        <button
+          onClick={() =>
+            patch({
+              staircases: [
+                ...accessories.staircases,
+                {
+                  // Tier indeksi kimliğe girer: iki tier'in merdivenleri
+                  // aynı id'yi taşırsa panel okuması ikisini tek satırda
+                  // birleştirirdi.
+                  id: `stair-${tierIndex}-${accessories.staircases.length + 1}`,
+                  placement: { mode: 'edge', edge: 'west', offsetM: 2 },
+                  widthM: 1,
+                  landing: 'turn180',
+                  steps: 'auto',
+                },
+              ],
+            })
+          }
+          style={styles.button}
+          type="button"
+        >
+          + Stair
+        </button>
+        <button
+          onClick={() =>
+            patch({
+              swingGates: [...accessories.swingGates, { edge: 'north', offsetM: 2, widthM: 0.75 }],
+            })
+          }
+          style={styles.button}
+          type="button"
+        >
+          + Gate
+        </button>
+        <button
+          onClick={() =>
+            patch({
+              upAndOverGates: [
+                ...accessories.upAndOverGates,
+                { edge: 'north', offsetM: 5, widthM: 1.5 },
+              ],
+            })
+          }
+          style={styles.button}
+          type="button"
+        >
+          + Pallet gate
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function TiersField({ node, onUpdate }: CustomField) {
   const setTier = (index: number, patch: Partial<MezzanineTier>) => {
     const next = node.tiers.map((tier, i) => (i === index ? { ...tier, ...patch } : tier))
@@ -135,6 +333,9 @@ export function TiersField({ node, onUpdate }: CustomField) {
           clearHeightM: last?.clearHeightM ?? 3,
           loadClass: last?.loadClass ?? 500,
           floorType: last?.floorType ?? 'WOOD_CHIPBOARD_30',
+          // Yeni tier BOŞ aksesuarla gelir — bir öncekinin merdivenini
+          // kopyalamak, aynı yere ikinci bir merdiven koymak demekti.
+          accessories: emptyAccessories(),
         },
       ],
     })
@@ -208,6 +409,12 @@ export function TiersField({ node, onUpdate }: CustomField) {
               </option>
             ))}
           </select>
+
+          <AccessoryEditor
+            accessories={tier.accessories}
+            onChange={(accessories) => setTier(index, { accessories })}
+            tierIndex={index}
+          />
         </div>
       ))}
       <button onClick={addTier} style={styles.button} type="button">

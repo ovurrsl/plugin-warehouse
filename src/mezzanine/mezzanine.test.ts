@@ -7,7 +7,7 @@ import { mezzanineGeometryKey } from './geometry'
 import { gridColumnPositions, resolveTierElevations, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
 import { mezzanineParts } from './parts'
-import { MezzanineNode } from './schema'
+import { emptyAccessories, MezzanineNode } from './schema'
 
 describe('şema: tiers[], host Level ile karıştırılmaz', () => {
   test('parse({}) başarılı, gidiş-dönüş kayıpsız', () => {
@@ -61,13 +61,21 @@ describe('tier elevation zinciri', () => {
         clearHeightM: 3,
         loadClass: 500,
         floorType: 'WOOD_CHIPBOARD_30',
+        accessories: emptyAccessories(),
       },
-      { index: 1, elevationM: 5, clearHeightM: 3, loadClass: 500, floorType: 'WOOD_CHIPBOARD_30' },
+      {
+        index: 1,
+        elevationM: 5,
+        clearHeightM: 3,
+        loadClass: 500,
+        floorType: 'WOOD_CHIPBOARD_30',
+        accessories: emptyAccessories(),
+      },
     ])
     expect(resolved[1]?.resolvedElevationM).toBe(5)
   })
 
-  test('totalHeightM = son tier kotu + kendi tavan boşluğu', () => {
+  test('totalHeightM = en üst yürüme yüzeyi + korkuluk', () => {
     const node = MezzanineNode.parse({
       tiers: [
         {
@@ -79,7 +87,33 @@ describe('tier elevation zinciri', () => {
         },
       ],
     })
-    expect(totalHeightM(node)).toBeCloseTo(3, 9)
+    // 3 (tavan boşluğu) + 0.03 (yonga levha) + 1.1 (küpeşte). Korkuluk
+    // DAHİL: kolider bunu okuyor ve korkuluksuz bir kutu, mezzanine'in
+    // üstünden geçen seçim ışınını kaçırırdı.
+    expect(totalHeightM(node)).toBeCloseTo(4.13, 9)
+  })
+
+  test("deckTopM bir sonraki tier'in elevation'ıyla AYNI — zincir kapanıyor", () => {
+    const node = MezzanineNode.parse({
+      tiers: [
+        {
+          index: 0,
+          elevationM: 'auto',
+          clearHeightM: 3.5,
+          loadClass: 1000,
+          floorType: 'METAL_GRID',
+        },
+        {
+          index: 1,
+          elevationM: 'auto',
+          clearHeightM: 3.5,
+          loadClass: 750,
+          floorType: 'METAL_GRID',
+        },
+      ],
+    })
+    const resolved = resolveTierElevations(node.tiers)
+    expect(resolved[0]?.deckTopM).toBeCloseTo(resolved[1]?.resolvedElevationM ?? -1, 9)
   })
 
   test('döşeme kalınlığı katalogdan — yazım hatası burada yakalanır', () => {
@@ -159,7 +193,7 @@ describe('geometri anahtarı', () => {
 })
 
 describe('kutu-listesi parçaları', () => {
-  test('her tier bir döşeme paneli üretir', () => {
+  test('döşeme göz başına panel — tier başına baysX×baysY', () => {
     const node = MezzanineNode.parse({
       tiers: [
         {
@@ -179,7 +213,9 @@ describe('kutu-listesi parçaları', () => {
       ],
     })
     const parts = mezzanineParts(node)
-    expect(parts.filter((p) => p.role === 'floor').length).toBe(2)
+    // Varsayılan grid 4×3 = 12 panel, iki tier = 24. Tek kutu DEĞİL: bir
+    // merdiven boşluğu ancak panel dışlamayla açılabilir (CSG yasak).
+    expect(parts.filter((p) => p.role === 'floor').length).toBe(24)
   })
 
   test('kolonlar grid nokta sayısı × 3 (I-profil: gövde + 2 flanş) — tek kat', () => {

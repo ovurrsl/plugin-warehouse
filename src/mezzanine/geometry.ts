@@ -29,11 +29,22 @@ function colorOf(node: MezzanineNode, role: MezzaninePart['role']): string {
     case 'column':
     case 'main-beam':
     case 'secondary-beam':
+    case 'stair-stringer':
       return node.frameColor
-    // Döşeme kendi rengini taşımıyor — Faz 1'de tek bir nötr ton; hatch2D
-    // yalnız 2D planda (Faz 3), 3B'de floorType'a göre renk ayrımı yok.
+    // Döşeme kendi rengini taşımıyor — tek bir nötr ton; hatch2D yalnız 2D
+    // planda, 3B'de floorType'a göre renk ayrımı yok.
     case 'floor':
+    case 'stair-tread':
       return '#c7ccd1'
+    // Korkuluk ve süpürgelik galvaniz — gövde mavisiyle aynı boyada
+    // olsaydı, açık kenar uzaktan yapının bir parçası gibi okunurdu.
+    case 'railing':
+    case 'kickboard':
+      return '#b9bfc6'
+    // Kapı sarısı: güvenlik donanımının rengi keyfî değil, standardın
+    // kendisi (teleskopik konveyörün `hazard` rolüyle aynı gerekçe).
+    case 'gate':
+      return '#f2c200'
   }
 }
 
@@ -48,10 +59,29 @@ function buildParts(node: MezzanineNode, parts: readonly MezzaninePart[]): THREE
 /**
  * Şekli GERÇEKTEN belirleyen her girdi — `loadClass` hariç: yalnız kapasite
  * metadata'sı, geometriye hiç girmez (kapı testiyle aynı ayrım).
+ *
+ * Aksesuarlar anahtara TAM olarak girer: bir kapının yeri korkulukta bir
+ * açıklık, bir merdivenin yeri döşemede bir boşluk demek — ikisi de şekil.
+ * Bunu unutmak, `hasGroundBeam`'in bir kez düştüğü hata sınıfı (bir alan
+ * geometriyi değiştirir ama anahtarda yoktur, ve ekranda eski mesh kalır).
  */
 export function mezzanineGeometryKey(node: MezzanineNode): string {
   const tierKey = node.tiers
-    .map((t) => `${t.index}:${t.elevationM}:${t.clearHeightM}:${t.floorType}`)
+    .map((t) => {
+      const stairs = t.accessories.staircases
+        .map((s) =>
+          s.placement.mode === 'edge'
+            ? `E${s.placement.edge}${s.placement.offsetM}w${s.widthM}l${s.landing}s${s.steps}`
+            : `X${s.placement.xM},${s.placement.zM},${s.placement.rotationDeg}w${s.widthM}l${s.landing}s${s.steps}`,
+        )
+        .join(';')
+      const gates = [
+        ...t.accessories.swingGates.map((g) => `S${g.edge}${g.offsetM}w${g.widthM}`),
+        ...t.accessories.upAndOverGates.map((g) => `U${g.edge}${g.offsetM}w${g.widthM}`),
+        ...t.accessories.safetyZones.map((z) => `Z${z.edge}${z.offsetM}w${z.widthM}`),
+      ].join(';')
+      return `${t.index}:${t.elevationM}:${t.clearHeightM}:${t.floorType}:${stairs}:${gates}`
+    })
     .join(',')
   return [
     'mezz',

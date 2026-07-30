@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
-import type { MezzanineNode } from './mezzanine/schema'
+import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
@@ -324,6 +324,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
         clearHeightM: 3,
         loadClass: 500,
         floorType: 'WOOD_CHIPBOARD_30',
+        accessories: emptyAccessories(),
       },
     ],
   },

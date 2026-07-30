@@ -1,7 +1,9 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { GridField, TiersField } from './auto-fields'
-import { CONSTRUCTIVE_SYSTEMS } from './catalog'
+import { CONSTRUCTIVE_SYSTEMS, RAILING_RULES } from './catalog'
+import { effectiveClearHeightM, resolveTierElevations } from './metrics'
 import type { MezzanineNode } from './schema'
+import { resolveSteps } from './stairs'
 
 /**
  * Müfettiş alanları — ailenin deseni: `customPanel` yok, alanlar bildirilir
@@ -72,6 +74,53 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
           })
         }
       })
+
+      const resolved = resolveTierElevations(node.tiers)
+
+      for (const tier of resolved) {
+        // Kirişler döşemenin altına sarkıyor: `clearHeightM` kullanıcının
+        // yazdığı, `effective` yapının verdiği. Sessizce düzeltmek, yazılan
+        // sayıyı yalana çevirirdi (bkz. `metrics.resolveTierElevations`).
+        const effective = effectiveClearHeightM(node, tier)
+        if (effective < tier.clearHeightM - 0.005) {
+          issues.push({
+            field: 'tiers',
+            severity: 'warning',
+            msg: `Tier ${tier.index}: kirişler döşemenin altına sarkıyor, fiili tavan boşluğu ${effective.toFixed(2)} m (yazılan ${tier.clearHeightM.toFixed(2)} m).`,
+          })
+        }
+
+        // Merdivenler GERÇEK kot farkına karşı denetlenir — katalog ürünü
+        // seçilmiş olsa bile.
+        const delta = tier.deckTopM - tier.resolvedElevationM
+        for (const stair of tier.accessories.staircases) {
+          for (const issue of resolveSteps(stair, delta).issues) {
+            issues.push({
+              field: 'tiers',
+              // Rıht ve basamak derinliği SERT eşikler: uymuyorsa merdiven
+              // inşa edilemez. Ötekiler uyarı.
+              severity:
+                issue.code === 'riser-too-tall' || issue.code === 'tread-too-shallow'
+                  ? 'error'
+                  : 'warning',
+              msg: `Tier ${tier.index} · ${stair.id}: ${issue.msg}`,
+            })
+          }
+        }
+
+        // Açıklığı korkuluksuz bırakan bir güvenlik bölgesi, OSHA'nın
+        // 1.2 m kuralının tam olarak konusudur — zincir bir korkuluk
+        // değildir ve panel bunu adıyla söyler.
+        for (const zone of tier.accessories.safetyZones) {
+          if (zone.widthM > RAILING_RULES.openingProtectionM) {
+            issues.push({
+              field: 'tiers',
+              severity: 'warning',
+              msg: `Tier ${tier.index}: ${zone.widthM.toFixed(2)} m'lik güvenlik bölgesi ${RAILING_RULES.openingProtectionM.toFixed(1)} m eşiğini aşıyor — zincir yerine düşme koruması gerekir.`,
+            })
+          }
+        }
+      }
 
       return issues
     },

@@ -13,6 +13,65 @@ import { CONSTRUCTIVE_SYSTEM_IDS, STEEL_FRAME_COLOR } from './catalog'
  * düzeltmesi).
  */
 
+/**
+ * Merdiven — İKİ tier'i (ya da zemini bir tier'e) bağlar.
+ *
+ * `placement` ayrık birleşim: çevre kenarına oturan bir merdiven
+ * (`edge`+`offset`) ile iç mekânda duran bir merdiven (`xz`) aynı alanlarla
+ * tarif edilemez; addendum'un kendi notu: "interior stair … NOT on the
+ * building perimeter, so edge+offset does not apply".
+ */
+const StaircaseSpec = z.object({
+  id: z.string(),
+  placement: z.discriminatedUnion('mode', [
+    z.object({
+      mode: z.literal('edge'),
+      edge: z.enum(['north', 'south', 'east', 'west']),
+      offsetM: z.number(),
+    }),
+    z.object({
+      mode: z.literal('xz'),
+      xM: z.number(),
+      zM: z.number(),
+      rotationDeg: z.number(),
+    }),
+  ]),
+  /** EN ISO 14122-3: 800 tek kullanıcı, 1000 çok kullanıcı. */
+  widthM: z.union([z.literal(0.8), z.literal(1)]).default(1),
+  landing: z.enum(['continuous', 'turn90', 'turn180']).default('turn180'),
+  /** `'auto'` → gerçek kot farkından hesaplanır (`resolveSteps`). Hazır bir
+   *  katalog ürünü (8/10/12/15 basamak) seçilebilir ama AYNI doğrulamadan
+   *  geçer — uymuyorsa panel söyler. */
+  steps: z.union([z.literal('auto'), z.number().int().positive()]).default('auto'),
+})
+export type StaircaseSpec = z.infer<typeof StaircaseSpec>
+
+/** Menteşeli kapı — korkulukta bir açıklık açar, içeri doğru açılır. */
+const SwingGateSpec = z.object({
+  edge: z.enum(['north', 'south', 'east', 'west']),
+  offsetM: z.number(),
+  /** Katalog: tek 750 mm, çift 1500 mm. */
+  widthM: z.union([z.literal(0.75), z.literal(1.5)]).default(0.75),
+})
+export type SwingGateSpec = z.infer<typeof SwingGateSpec>
+
+/** Devrilir (karşı ağırlıklı) palet kapısı — kenar hiçbir zaman açıkta
+ *  kalmaz; forklift paleti buradan bırakır. */
+const UpAndOverGateSpec = z.object({
+  edge: z.enum(['north', 'south', 'east', 'west']),
+  offsetM: z.number(),
+  widthM: z.number().min(1).max(3).default(1.5),
+})
+export type UpAndOverGateSpec = z.infer<typeof UpAndOverGateSpec>
+
+/** Zincirle korunan güvenlik bölgesi — korkulukta açıklık, kapı değil. */
+const SafetyZoneSpec = z.object({
+  edge: z.enum(['north', 'south', 'east', 'west']),
+  offsetM: z.number(),
+  widthM: z.number().min(0.5).max(4).default(1.5),
+})
+export type SafetyZoneSpec = z.infer<typeof SafetyZoneSpec>
+
 const TierSchema = z.object({
   /** 0-tabanlı, zeminden yukarı. */
   index: z.number().int().min(0),
@@ -39,11 +98,51 @@ const TierSchema = z.object({
     'METAL_PERFORATED',
     'METAL_GRID',
   ]),
+
+  /**
+   * Bu tier'in aksesuarları. Merdiven bu tier'e ÇIKAR (altındakinden ya da
+   * zeminden); kapılar ve güvenlik bölgeleri bu tier'in korkuluğunu deler.
+   *
+   * Korkuluğun kendisi bir aksesuar DEĞİL: açık çevrede zorunludur
+   * (katalog), yani bir alan değil bir kuraldır — `railing.ts` onu
+   * açıklıklardan türetir.
+   */
+  accessories: z
+    .object({
+      staircases: z.array(StaircaseSpec).default([]),
+      swingGates: z.array(SwingGateSpec).default([]),
+      upAndOverGates: z.array(UpAndOverGateSpec).default([]),
+      safetyZones: z.array(SafetyZoneSpec).default([]),
+    })
+    .default({ staircases: [], swingGates: [], upAndOverGates: [], safetyZones: [] }),
 })
 export type MezzanineTier = z.infer<typeof TierSchema>
 
+/**
+ * Aksesuarsız bir tier'in `accessories`'i.
+ *
+ * Zod'un `.default()`'ü GİRDİDE alanı isteğe bağlı yapar ama ÇIKTIDA
+ * zorunludur, yani elle bir tier nesnesi yazan her yer (katalog fişleri,
+ * panel "tier ekle", testler) bunu taşımak zorunda. Tek bir kaynak: dört
+ * boş dizinin dört ayrı kopyası, birine yeni bir aksesuar türü eklendiğinde
+ * ötekilerin sessizce geride kalması demekti.
+ *
+ * Fonksiyon, sabit değil: paylaşılan bir nesne döndürmek, bir çağıranın
+ * kendi dizisine push etmesiyle ötekini de değiştirirdi.
+ */
+export function emptyAccessories(): MezzanineTier['accessories'] {
+  return { staircases: [], swingGates: [], upAndOverGates: [], safetyZones: [] }
+}
+
 const DEFAULT_TIERS: MezzanineTier[] = [
-  { index: 0, elevationM: 'auto', clearHeightM: 3, loadClass: 500, floorType: 'WOOD_CHIPBOARD_30' },
+  {
+    index: 0,
+    elevationM: 'auto',
+    clearHeightM: 3,
+    loadClass: 500,
+    floorType: 'WOOD_CHIPBOARD_30',
+    accessories: emptyAccessories(),
+  },
 ]
 
 export const MezzanineNode = BaseNode.extend({

@@ -5,9 +5,10 @@ import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { IssueList } from '../panels/issue-list'
 import { CONSTRUCTIVE_SYSTEMS } from './catalog'
-import { resolveTierElevations, totalHeightM } from './metrics'
+import { effectiveClearHeightM, resolveTierElevations, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
 import type { MezzanineNode } from './schema'
+import { resolveSteps } from './stairs'
 
 /**
  * Mezzanine'in okuma paneli — çözülmüş tier kotları (`resolveTierElevations`
@@ -72,15 +73,43 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
         </div>
         {resolved.map((tier) => (
           <div key={tier.index} style={styles.row}>
-            <span>Tier {tier.index} elevation</span>
-            <span style={styles.figure}>{tier.resolvedElevationM.toFixed(2)} m</span>
+            <span>Tier {tier.index} deck</span>
+            <span style={styles.figure}>
+              {tier.deckTopM.toFixed(2)} m · boşluk {effectiveClearHeightM(node, tier).toFixed(2)} m
+            </span>
           </div>
         ))}
         <p style={styles.note}>
-          Kaynak: Mecalux MK-049439-11/23 + EN 10365 (IPE/HEA, RESEARCHED). Merdiven, kapı ve
-          korkuluk henüz modellenmedi (Faz 2).
+          Kaynak: Mecalux MK-049439-11/23 + EN 10365 (IPE/HEA, RESEARCHED). "Boşluk" fiili tavan
+          yüksekliği — kirişler döşemenin altına sarktığı için yazılan değerden küçüktür.
         </p>
       </div>
+
+      {resolved.some((tier) => tier.accessories.staircases.length > 0) && (
+        <div style={styles.card}>
+          {resolved.flatMap((tier) =>
+            tier.accessories.staircases.map((stair) => {
+              const delta = tier.deckTopM - tier.resolvedElevationM
+              const { geometry } = resolveSteps(stair, delta)
+              return (
+                <div key={`${tier.index}-${stair.id}`} style={styles.row}>
+                  <span>
+                    {stair.id} · tier {tier.index}
+                  </span>
+                  <span style={styles.figure}>
+                    {geometry.steps}×{(geometry.riseM * 1000).toFixed(0)}/
+                    {(geometry.goingM * 1000).toFixed(0)} mm
+                  </span>
+                </div>
+              )
+            }),
+          )}
+          <p style={styles.note}>
+            Basamak sayısı ve basış GERÇEK kot farkından; EN ISO 14122-3'e karşı doğrulanır (rıht ≤
+            220 mm, basamak ≥ 245 mm, 600 ≤ going+2·rise ≤ 660).
+          </p>
+        </div>
+      )}
     </div>
   )
 }

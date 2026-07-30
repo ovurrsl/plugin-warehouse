@@ -9,6 +9,7 @@ import {
   HEA_PROFILES,
   type IBeamProfile,
   IPE_PROFILES,
+  RAILING_RULES,
   SECONDARY_BEAM_SPACING_M,
   SIGMA_DEFAULT_HEIGHT_M,
   SIGMA_DEFAULT_WIDTH_M,
@@ -16,7 +17,14 @@ import {
 } from './catalog'
 import type { MezzanineNode, MezzanineTier } from './schema'
 
-export type ResolvedTier = MezzanineTier & { resolvedElevationM: number }
+export type ResolvedTier = MezzanineTier & {
+  /** Bu tier'in ALTINDAKİ zeminin kotu (tier 0 için 0). */
+  resolvedElevationM: number
+  /** Bu tier'in YÜRÜME yüzeyi: `elevation + clearHeight + döşeme kalınlığı`.
+   *  Bir sonraki tier'in `elevation`'ı da tam olarak budur — zincir buradan
+   *  kapanıyor. */
+  deckTopM: number
+}
 
 /**
  * Tier'lerin dikey konumu.
@@ -24,24 +32,48 @@ export type ResolvedTier = MezzanineTier & { resolvedElevationM: number }
  * `'auto'` → önceki tier'ların `(clearHeightM + floorType.structuralDepthM)`
  * toplamı, kümülatif (addendum §C formülü). Açık bir sayı verilmişse
  * doğrudan kullanılır — kasıtlı boşluk gibi kenar durumlar için.
+ *
+ * **Formülün bilinen sadeleştirmesi:** yalnız DÖŞEME PANELİNİ sayıyor,
+ * altındaki kirişleri değil. Gerçek kirişler (IPE300 = 0.30 m) 30–60 mm'lik
+ * panel kalınlığına sığmaz ve döşemenin altına sarkar, yani fiili tavan
+ * boşluğu `clearHeightM`'den küçüktür. Formül kullanıcının verdiği
+ * spesifikasyondan geldiği için DEĞİŞTİRİLMEDİ; fark
+ * `effectiveClearHeightM` ile ölçülüyor ve panel bir uyarı olarak söylüyor
+ * — sessizce düzeltmek, kullanıcının yazdığı sayıyı yalana çevirirdi.
  */
 export function resolveTierElevations(tiers: readonly MezzanineTier[]): ResolvedTier[] {
   let cumulative = 0
   const resolved: ResolvedTier[] = []
   for (const tier of tiers) {
     const elevation = tier.elevationM === 'auto' ? cumulative : tier.elevationM
-    resolved.push({ ...tier, resolvedElevationM: elevation })
-    cumulative = elevation + tier.clearHeightM + FLOOR_TYPES[tier.floorType].structuralDepthM
+    const deckTop = elevation + tier.clearHeightM + FLOOR_TYPES[tier.floorType].structuralDepthM
+    resolved.push({ ...tier, resolvedElevationM: elevation, deckTopM: deckTop })
+    cumulative = deckTop
   }
   return resolved
 }
 
-/** Yapının toplam yüksekliği: son tier'in kotu + kendi tavan boşluğu (üstünde
- *  başka bir tier yok, dolayısıyla o tier'in kendi döşemesi eklenmez). */
+/**
+ * Kirişler döşemenin altına sarktıktan sonra gerçekte kalan tavan boşluğu.
+ *
+ * `clearHeightM` yayınlanmış girdi, bu ise ÖLÇÜ — ikisi ayrı adlarla
+ * duruyor, çünkü biri kullanıcının yazdığı, öteki yapının verdiği.
+ */
+export function effectiveClearHeightM(node: MezzanineNode, tier: MezzanineTier): number {
+  const structure =
+    resolveMainBeamProfile(node).h +
+    resolveSecondaryBeamProfile(node).h +
+    FLOOR_TYPES[tier.floorType].structuralDepthM
+  return tier.clearHeightM + FLOOR_TYPES[tier.floorType].structuralDepthM - structure
+}
+
+/** Yapının toplam yüksekliği: en üst yürüme yüzeyi + korkuluk. Kolider ve
+ *  taban izi bunu okur — korkuluksuz bir kutu, mezzanine'in üstünden geçen
+ *  bir seçim ışınını kaçırırdı. */
 export function totalHeightM(node: MezzanineNode): number {
   const resolved = resolveTierElevations(node.tiers)
   const last = resolved[resolved.length - 1]
-  return last ? last.resolvedElevationM + last.clearHeightM : 0
+  return last ? last.deckTopM + RAILING_RULES.handrailHeightM : 0
 }
 
 export type GridPoint = { x: number; z: number }

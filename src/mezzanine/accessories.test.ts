@@ -204,12 +204,55 @@ describe('merdiven ve kapı parçaları', () => {
     expect(parts.filter((p) => p.role === 'stair-stringer')).toHaveLength(2)
   })
 
-  test('her kapı bir kanat üretir', () => {
+  test('iki kapı tipi FARKLI geometri üretir', () => {
+    // Önceki sürümde ikisi bayt-bayt aynı kutuydu: kullanıcı "kapı" ile
+    // "palet kapısı" arasında seçim yapıyor ama model hiç değişmiyordu.
+    const swing = mezzanineParts(
+      nodeWith({ swingGates: [{ edge: 'north', offsetM: 5, widthM: 0.75 }] }),
+    )
+    // Yukarı-devrilir en az 1 m: palet kapısı, personel kapısı değil.
+    const upOver = mezzanineParts(
+      nodeWith({ upAndOverGates: [{ edge: 'north', offsetM: 5, widthM: 1.5 }] }),
+    )
+
+    // Kanat kapı: tek kanat + menteşe/kilit dikmesi + tampon.
+    expect(swing.filter((p) => p.role === 'gate')).toHaveLength(1)
+    expect(swing.filter((p) => p.role === 'gate-post').length).toBeGreaterThan(0)
+    expect(swing.filter((p) => p.role === 'gate-pivot')).toHaveLength(0)
+
+    // Yukarı-devrilir: iki kanat (dikey + palet üstü yatay) + sallanma mili.
+    expect(upOver.filter((p) => p.role === 'gate')).toHaveLength(2)
+    expect(upOver.filter((p) => p.role === 'gate-pivot')).toHaveLength(1)
+    expect(upOver.filter((p) => p.role === 'gate-post')).toHaveLength(0)
+  })
+
+  test('yukarı-devrilir kapının yatay kanadı palet üstü açıklığı okur', () => {
     const node = nodeWith({
-      swingGates: [{ edge: 'north', offsetM: 5, widthM: 0.75 }],
-      upAndOverGates: [{ edge: 'south', offsetM: 8, widthM: 1.5 }],
+      upAndOverGates: [{ edge: 'north', offsetM: 5, widthM: 1.5 }],
     })
-    expect(mezzanineParts(node).filter((p) => p.role === 'gate')).toHaveLength(2)
+    const gates = mezzanineParts(node).filter((p) => p.role === 'gate')
+    const heights = gates.map((p) => p.center[1]).sort((a, b) => a - b)
+    // Yatay kanat dikey kanadın belirgin biçimde üstünde — `GATE_SPECS`in
+    // palet üstü 300 mm serbest yüksekliği artık okunuyor.
+    expect(heights[1]! - heights[0]!).toBeGreaterThan(0.3)
+  })
+
+  test('turn90 ile turn180 FARKLI döşeme boşluğu açar', () => {
+    // İkisi de iki kollu ve derinlikleri aynı; ayrıldıkları yer ikinci
+    // kolun nereye gittiği. Önceki sürümde ikisi de aynı dikdörtgeni
+    // açıyordu, yani sahanlık tipi seçimi hiçbir şeyi değiştirmiyordu.
+    const delta = 3.2
+    const continuous = resolveSteps(stair({ landing: 'continuous' }), delta).geometry
+    const turn90 = resolveSteps(stair({ landing: 'turn90' }), delta).geometry
+    const turn180 = resolveSteps(stair({ landing: 'turn180' }), delta).geometry
+
+    // Derinlik: sahanlıklı olanlar birbirinin aynısı, tek kol daha uzun.
+    expect(turn90.runM).toBeCloseTo(turn180.runM, 9)
+    expect(continuous.runM).toBeGreaterThan(turn90.runM)
+
+    // Yanal uzanım: üçü de ayrı.
+    expect(turn180.lateralM).toBeGreaterThan(continuous.lateralM)
+    expect(turn90.lateralM).toBeGreaterThan(turn180.lateralM)
   })
 
   test('güvenlik bölgesi kanat üretmez — zincir, kapı değil', () => {

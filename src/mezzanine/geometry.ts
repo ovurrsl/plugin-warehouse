@@ -45,6 +45,13 @@ function colorOf(node: MezzanineNode, role: MezzaninePart['role']): string {
     // kendisi (teleskopik konveyörün `hazard` rolüyle aynı gerekçe).
     case 'gate':
       return '#f2c200'
+    // Mekanizma parçaları (menteşe/kilit dikmesi, tampon, sallanma mili)
+    // kanattan KOYU ayrılıyor: sarı yüzey "buradan geçilmez" der, mekanizma
+    // ise "burası döner" — ikisi aynı renkte olsaydı kapının hangi uçtan
+    // açıldığı okunmazdı.
+    case 'gate-post':
+    case 'gate-pivot':
+      return '#5a5f66'
   }
 }
 

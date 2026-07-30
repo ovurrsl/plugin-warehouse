@@ -10,7 +10,7 @@
  * altında, ana kirişler onların da altında, kolonlar tepeye kadar tek parça.
  */
 
-import { FLOOR_TYPES, type IBeamProfile } from './catalog'
+import { FLOOR_TYPES, GATE_SPECS, type IBeamProfile } from './catalog'
 import {
   footprintDepthM,
   footprintWidthM,
@@ -48,6 +48,8 @@ export type MezzaninePartRole =
   | 'stair-tread'
   | 'stair-stringer'
   | 'gate'
+  | 'gate-post'
+  | 'gate-pivot'
 
 export type MezzaninePart = {
   role: MezzaninePartRole
@@ -192,6 +194,16 @@ function pushFloorPanels(
 
 /** Korkuluk profil kesitleri — görsel sabitler, katalog yayınlamıyor. */
 const RAIL_SECTION_M = 0.04
+
+/** Kanat kapının içeri açılırken dayandığı tamponun kenardan ofseti. */
+const GATE_BUMPER_OFFSET_M = 0.12
+/**
+ * Yukarı-devrilir kapının yatay kanadının üstünde durduğu varsayılan palet
+ * yığını yüksekliği — katalogun "palet üstü 300 mm serbest" ölçüsü bir
+ * palete GÖRE veriliyor, o yüzden bir referans yüksekliği gerekiyor
+ * (ASSUMPTION: EPAL + tipik yük).
+ */
+const PALLET_STACK_REFERENCE_M = 1.2
 const POST_SECTION_M = 0.05
 const KICKBOARD_THICKNESS_M = 0.015
 
@@ -336,18 +348,85 @@ function pushGates(
     ...tier.accessories.swingGates.map((gate) => ({ ...gate, kind: 'swing' as const })),
     ...tier.accessories.upAndOverGates.map((gate) => ({ ...gate, kind: 'up-and-over' as const })),
   ]
+
+  /** Kenar eksenine göre (boyuna, dikey, enine) → (x, y, z). */
+  const place = (
+    geo: ReturnType<typeof edgeGeometry>,
+    along: number,
+    y: number,
+    across: number,
+  ): readonly [number, number, number] =>
+    geo.axis === 'x' ? [along, y, geo.fixed + across] : [geo.fixed + across, y, along]
+  const span = (
+    geo: ReturnType<typeof edgeGeometry>,
+    lengthAlong: number,
+    height: number,
+    depthAcross: number,
+  ): readonly [number, number, number] =>
+    geo.axis === 'x' ? [lengthAlong, height, depthAcross] : [depthAcross, height, lengthAlong]
+
   for (const gate of gates) {
     const geo = edgeGeometry(node, gate.edge)
     const along = geo.startM + gate.offsetM
-    const size: readonly [number, number, number] =
-      geo.axis === 'x'
-        ? [gate.widthM, HANDRAIL_HEIGHT_M, RAIL_SECTION_M]
-        : [RAIL_SECTION_M, HANDRAIL_HEIGHT_M, gate.widthM]
-    const center: readonly [number, number, number] =
-      geo.axis === 'x'
-        ? [along, deckTopY + HANDRAIL_HEIGHT_M / 2, geo.fixed]
-        : [geo.fixed, deckTopY + HANDRAIL_HEIGHT_M / 2, along]
-    parts.push({ role: 'gate', center, size })
+
+    if (gate.kind === 'swing') {
+      /**
+       * Kanat kapı: korkuluk hattındaki menteşeli bir kanat. Kapalı hâlde
+       * çizilir (istirahat konumu), ama menteşe ve kilit dikmeleri hangi
+       * uçtan döndüğünü söyler — kapı bir korkuluk boşluğu değil, bir
+       * mekanizma.
+       */
+      parts.push({
+        role: 'gate',
+        center: place(geo, along, deckTopY + HANDRAIL_HEIGHT_M / 2, 0),
+        size: span(geo, gate.widthM, HANDRAIL_HEIGHT_M, RAIL_SECTION_M),
+      })
+      for (const end of [-1, 1] as const) {
+        parts.push({
+          role: 'gate-post',
+          center: place(geo, along + end * (gate.widthM / 2), deckTopY + HANDRAIL_HEIGHT_M / 2, 0),
+          size: span(geo, RAIL_SECTION_M * 1.6, HANDRAIL_HEIGHT_M, RAIL_SECTION_M * 1.6),
+        })
+      }
+      // Tampon: kanadın içeri açılırken dayandığı blok. `opensInward`
+      // katalog verisi — kanat DAİMA içeri açılır, dışarı açılan bir kapı
+      // operatörü boşluğa iter.
+      parts.push({
+        role: 'gate-post',
+        center: place(geo, along, deckTopY + RAIL_SECTION_M, -geo.outward * GATE_BUMPER_OFFSET_M),
+        size: span(geo, gate.widthM * 0.25, RAIL_SECTION_M * 2, RAIL_SECTION_M),
+      })
+      continue
+    }
+
+    /**
+     * Yukarı-devrilir kapı: dengelenmiş sallanan tip. Kanatlardan biri
+     * daima kapalıdır — palet alınırken dış kanat kalkar, iç kanat iner ve
+     * açık kenar HİÇBİR ZAMAN oluşmaz. Bu yüzden iki kanat çiziliyor:
+     * biri korkuluk hattında dikey, öteki paletin üstünde yatay.
+     *
+     * Yatay kanadın kotu `GATE_SPECS.upAndOver.clearHeightAbovePalletM` —
+     * katalogun palet üstü serbest yüksekliği. Bu sabit buraya kadar hiç
+     * okunmuyordu.
+     */
+    const clearY =
+      deckTopY + PALLET_STACK_REFERENCE_M + GATE_SPECS.upAndOver.clearHeightAbovePalletM
+    parts.push({
+      role: 'gate',
+      center: place(geo, along, deckTopY + HANDRAIL_HEIGHT_M / 2, 0),
+      size: span(geo, gate.widthM, HANDRAIL_HEIGHT_M, RAIL_SECTION_M),
+    })
+    parts.push({
+      role: 'gate',
+      center: place(geo, along, clearY, -geo.outward * (gate.widthM / 4)),
+      size: span(geo, gate.widthM, RAIL_SECTION_M, gate.widthM / 2),
+    })
+    // Sallanma ekseni: iki kanadı birleştiren mil.
+    parts.push({
+      role: 'gate-pivot',
+      center: place(geo, along, deckTopY + HANDRAIL_HEIGHT_M, 0),
+      size: span(geo, gate.widthM * 1.05, RAIL_SECTION_M, RAIL_SECTION_M),
+    })
   }
 }
 

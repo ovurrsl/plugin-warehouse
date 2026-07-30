@@ -157,3 +157,60 @@ describe('plan sembolü okunabilir kalıyor', () => {
     expect(gate).toBeUndefined()
   })
 })
+
+describe('döşeme deseni — hatch2D artık okunuyor', () => {
+  const withFloor = (
+    floorType: string,
+    grid = { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 5 },
+  ) =>
+    MezzanineNode.parse({
+      grid,
+      tiers: [
+        {
+          index: 0,
+          elevationM: 'auto',
+          clearHeightM: 3,
+          loadClass: 500,
+          floorType,
+          accessories: emptyAccessories(),
+        },
+      ],
+    })
+
+  /** Zemin dikdörtgeni ve kolon kayıtları dışındaki desen işaretleri. */
+  const markCount = (floorType: string, grid?: Parameters<typeof withFloor>[1]) =>
+    childrenOf(withFloor(floorType, grid), CTX_UNSELECTED).filter(
+      (c) => c.kind === 'circle' || (c.kind === 'rect' && (c as { opacity?: number }).opacity),
+    ).length
+
+  test('sunta ile çelik ızgara planda AYNI görünmüyor', () => {
+    // Bu ikisinin ayırt edilememesi bir yangın senaryosunu görünmez
+    // kılıyordu: ızgara sprinkler suyunu geçirir, sunta geçirmez.
+    const chipboard = childrenOf(withFloor('WOOD_CHIPBOARD_30'), CTX_UNSELECTED)
+    const grid = childrenOf(withFloor('METAL_GRID'), CTX_UNSELECTED)
+
+    // Sunta noktalı: daire üretir. Izgara çizgili: daire üretmez.
+    expect(chipboard.some((c) => c.kind === 'circle')).toBe(true)
+    expect(grid.some((c) => c.kind === 'circle')).toBe(false)
+  })
+
+  test('beş desenin hepsi işaret üretiyor', () => {
+    for (const floorType of [
+      'WOOD_CHIPBOARD_30',
+      'METAL_CORRUGATED',
+      'METAL_SLOTTED',
+      'METAL_PERFORATED',
+      'METAL_GRID',
+    ]) {
+      expect(markCount(floorType), floorType).toBeGreaterThan(0)
+    }
+  })
+
+  test('işaret sayısı sınırlı — büyük güvertede plan çizimi ölmemeli', () => {
+    // Aralık alanla büyüyor: desen seyreliyor ama yok olmuyor.
+    const huge = { baysX: 12, baysY: 10, bayWidthM: 6, bayDepthM: 6 }
+    const count = markCount('METAL_PERFORATED', huge)
+    expect(count).toBeGreaterThan(0)
+    expect(count).toBeLessThan(400)
+  })
+})

@@ -34,6 +34,23 @@ export type StepGeometry = {
   flights: number
   /** Merdivenin YATAY uzanımı, sahanlık dahil — döşeme boşluğunun derinliği. */
   runM: number
+  /**
+   * Merdivenin YANAL uzanımı — `runM`'e dik eksende kapladığı genişlik.
+   *
+   * `turn90` ile `turn180` arasındaki tek gerçek geometrik fark burada.
+   * İkisi de iki kollu (`flights = 2`) ve ikisinin de derinliği aynı —
+   * ayrıldıkları yer ikinci kolun NEREYE gittiği:
+   *
+   *   - `continuous`: tek kol, yanal uzanım merdiven genişliği kadar.
+   *   - `turn180` (dog-leg): ikinci kol geri katlanır ve birincinin YANINA
+   *     gelir → yanal uzanım iki kol genişliği.
+   *   - `turn90`: ikinci kol yana döner ve o eksende basamak boyunca uzar →
+   *     yanal uzanım genişlik + ikinci kolun uzanımı.
+   *
+   * Bu ayrım olmadan iki sahanlık tipi aynı döşeme boşluğunu açıyordu, yani
+   * kullanıcının seçimi hiçbir şeyi değiştirmiyordu.
+   */
+  lateralM: number
 }
 
 export type StairIssue = {
@@ -116,15 +133,22 @@ export function resolveSteps(
   // Sahanlık kolları böler: N basamak iki kola bölününce yatay uzanım
   // yarıya iner ama sahanlığın kendi boyu eklenir.
   const stepsPerFlight = Math.ceil(steps / flights)
-  const runM =
-    stepsPerFlight * goingM +
-    (flights > 1 ? STAIRCASE_GEOMETRY.landingLengthMinM : 0) +
-    // turn180 ikinci kolu geri katlar, yatay uzanım artmaz; turn90 yana
-    // döner ve o da bu eksende uzamaz. Tek kolda ekleme yok.
-    0
+  const flightRunM = stepsPerFlight * goingM
+  const runM = flightRunM + (flights > 1 ? STAIRCASE_GEOMETRY.landingLengthMinM : 0)
+
+  // İki sahanlık tipi DERİNLİKTE aynı, YANAL uzanımda ayrılıyor: turn180
+  // ikinci kolu birincinin yanına geri katlar, turn90 onu dik eksende
+  // basamak boyunca uzatır. Bu ayrım olmadan kullanıcının seçimi hiçbir
+  // şeyi değiştirmiyordu.
+  const lateralM =
+    spec.landing === 'turn180'
+      ? spec.widthM * 2
+      : spec.landing === 'turn90'
+        ? spec.widthM + flightRunM
+        : spec.widthM
 
   return {
-    geometry: { steps, riseM, goingM, treadDepthM, flights, runM },
+    geometry: { steps, riseM, goingM, treadDepthM, flights, runM, lateralM },
     issues,
   }
 }
@@ -140,12 +164,13 @@ export type Rect = { x0: number; z0: number; x1: number; z1: number }
  * kesim kabul edilemez).
  */
 export function stairVoidRect(
-  spec: StaircaseSpec,
   geometry: StepGeometry,
   origin: { x: number; z: number; rotationRad: number },
 ): Rect {
   const clearance = 0.08 // katalog açıklık diyagramı: her yanda 80 mm
-  const halfWidth = spec.widthM / 2 + clearance
+  // Genişlik merdivenin YANAL uzanımından — sahanlık tipi burada okunuyor.
+  // `spec.widthM` kullanmak, dönen kolun döşemenin içinden çıkması demekti.
+  const halfWidth = geometry.lateralM / 2 + clearance
   const depth = geometry.runM + clearance * 2
 
   // Yerel çerçevede: genişlik X'te, uzanım Z'de. Dünya çerçevesine

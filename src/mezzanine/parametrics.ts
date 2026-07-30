@@ -61,6 +61,31 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
         issues.push({ field: 'tiers', severity: 'warning', msg: system.multiTierWarning })
       }
 
+      /**
+       * SIGMA soğuk şekillendirilmiş bir aile ve kendi profil tablosu var;
+       * `resolveIBeam` bu aile için IPE/HEA kimliğini ilk satırda ATIYOR.
+       * Onurlandırmak yanlış olurdu (SIGMA elemanına IPE300 kesiti vermek
+       * gerçek bir ürünü tarif etmiyor), ama sessizce atmak daha da kötü:
+       * kullanıcı yazdığı profilin uygulandığını sanıyor. Söylüyoruz.
+       */
+      if (node.constructiveSystem === 'SIGMA') {
+        const ignored = (
+          [
+            ['mainBeamProfile', node.mainBeamProfile],
+            ['secondaryBeamProfile', node.secondaryBeamProfile],
+            ['columnProfile', node.columnProfile],
+          ] as const
+        ).filter(([, value]) => value !== null)
+
+        for (const [field, value] of ignored) {
+          issues.push({
+            field,
+            severity: 'warning',
+            msg: `SIGMA kendi profil ailesini kullanıyor — "${value}" yok sayılıyor. Profili sabitlemek için GL2000 ya da MIXED seçin.`,
+          })
+        }
+      }
+
       // Tier indeksleri 0'dan başlayıp ardışık olmalı — sıçrayan bir indeks
       // `resolveTierElevations`'ın kümülatif zincirini sessizce bozar
       // (zincir indekse değil DİZİ SIRASINA göre işler; kullanıcı elle

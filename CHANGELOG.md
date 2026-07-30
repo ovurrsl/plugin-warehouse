@@ -13,6 +13,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4867da5`](https://github.com/ovurrsl/plugin-warehouse/commit/4867da5e192ff80b0fc962bbdbf62eb2f11899ef))
 - Refresh generated README blocks [skip ci] ([`1e10130`](https://github.com/ovurrsl/plugin-warehouse/commit/1e101305827a5c10992d70b09acf24f974086389))
 - Refresh generated README blocks [skip ci] ([`08d5027`](https://github.com/ovurrsl/plugin-warehouse/commit/08d5027d04197315f5bb51e7092e8271c751b7d0))
 - Refresh generated README blocks [skip ci] ([`36d56a5`](https://github.com/ovurrsl/plugin-warehouse/commit/36d56a5fc6916a53de73f2b79bcd6d960eaafce1))
@@ -142,6 +143,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- A ghost-stocked slot is not an empty target ([`c5230c1`](https://github.com/ovurrsl/plugin-warehouse/commit/c5230c1a885e8febfb9c8774d676fd31c991d4d8))
 - Return to the host id contract — one token before the underscore ([`193ec49`](https://github.com/ovurrsl/plugin-warehouse/commit/193ec490d832460a31b043fdccdd4dabba5472bd))
 - An empty pallet is a bare deck, and has no height to set ([`6a08bdf`](https://github.com/ovurrsl/plugin-warehouse/commit/6a08bdf5b13808090f576ac394a18c9dc39e4b6c))
 - Their inspector warnings reach the user ([`31cbd03`](https://github.com/ovurrsl/plugin-warehouse/commit/31cbd03b72334667f5b79ebbff0e9a88ccf9be6a))

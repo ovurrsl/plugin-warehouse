@@ -42,6 +42,24 @@ export type CatalogItem = {
     | { kind: 'truck'; model: string }
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
+    // Inlined rather than importing `MezzanineBrush` from the store — the
+    // same reason `rack`'s patch shape above is inlined rather than
+    // `RackBrush`: this file stays free of any node-schema import.
+    | {
+        kind: 'mezzanine'
+        patch: {
+          constructiveSystem: 'SIGMA' | 'GL2000' | 'MIXED'
+          columnType: 'single' | 'double'
+          grid: { baysX: number; baysY: number; bayWidthM: number; bayDepthM: number }
+          tiers: Array<{
+            index: number
+            elevationM: 'auto' | number
+            clearHeightM: number
+            loadClass: 250 | 350 | 500 | 750 | 1000
+            floorType: string
+          }>
+        }
+      }
 }
 
 export const CATALOG_SECTIONS: readonly CatalogSection[] = [
@@ -74,6 +92,12 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
     label: 'Stations',
     icon: 'lucide:table-2',
     blurb: 'Packing, dispatch, and processing benches.',
+  },
+  {
+    id: 'mezzanine',
+    label: 'Mezzanine',
+    icon: 'lucide:layers-3',
+    blurb: 'Multi-tier structural steel platforms — Sigma, GL2000, or Mixed construction.',
   },
   {
     id: 'layout',
@@ -259,6 +283,65 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
     icon: 'lucide:split',
+  },
+  {
+    id: 'mezzanine-sigma',
+    kind: 'warehouse:mezzanine',
+    label: 'Sigma Mezzanine',
+    sectionId: 'mezzanine',
+    description:
+      'Soğuk şekillendirilmiş Sigma profil, tek kat. 4×3 göz, 3 m tavan boşluğu, 500 kg/m².',
+    icon: 'lucide:layers-2',
+    brush: {
+      kind: 'mezzanine',
+      patch: {
+        constructiveSystem: 'SIGMA',
+        columnType: 'single',
+        grid: { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 5 },
+        tiers: [
+          {
+            index: 0,
+            elevationM: 'auto',
+            clearHeightM: 3,
+            loadClass: 500,
+            floorType: 'WOOD_CHIPBOARD_30',
+          },
+        ],
+      },
+    },
+  },
+  {
+    id: 'mezzanine-gl2000',
+    kind: 'warehouse:mezzanine',
+    label: 'GL2000 Mezzanine (2 Tiers)',
+    sectionId: 'mezzanine',
+    description:
+      'Sıcak haddelenmiş IPE/HEA, ağır yük, iki kat. 5×4 göz, çelik ızgara döşeme, 1000 kg/m².',
+    icon: 'lucide:layers-3',
+    brush: {
+      kind: 'mezzanine',
+      patch: {
+        constructiveSystem: 'GL2000',
+        columnType: 'single',
+        grid: { baysX: 5, baysY: 4, bayWidthM: 6, bayDepthM: 6 },
+        tiers: [
+          {
+            index: 0,
+            elevationM: 'auto',
+            clearHeightM: 3.5,
+            loadClass: 1000,
+            floorType: 'METAL_GRID',
+          },
+          {
+            index: 1,
+            elevationM: 'auto',
+            clearHeightM: 3.5,
+            loadClass: 750,
+            floorType: 'METAL_GRID',
+          },
+        ],
+      },
+    },
   },
 ] as const
 

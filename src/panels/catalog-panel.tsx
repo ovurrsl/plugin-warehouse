@@ -381,6 +381,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'telescopic') {
       useWarehouseStore.getState().setTelescopicBrush({ model: item.brush.model as never })
     }
+    if (item.brush?.kind === 'mezzanine') {
+      useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
+    }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the
     // path a catalog panel is expected to use.

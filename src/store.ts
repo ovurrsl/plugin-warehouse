@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
+import type { MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
@@ -151,6 +152,14 @@ type WarehouseStore = {
    */
   telescopicBrush: TelescopicBrush
   setTelescopicBrush: (patch: Partial<TelescopicBrush>) => void
+
+  /**
+   * Shape of the next placed mezzanine. `grid`/`tiers` fırçada duruyor —
+   * katalog fişleri (1 katlı SIGMA / 2 katlı GL2000) farklı `tiers.length`
+   * taşır, `rackBrush`'ın kendi ölçülerini taşıması gibi.
+   */
+  mezzanineBrush: MezzanineBrush
+  setMezzanineBrush: (patch: Partial<MezzanineBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -166,6 +175,11 @@ export type RouteBrush = Pick<
 export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
 
 export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth' | 'extension'>
+
+export type MezzanineBrush = Pick<
+  MezzanineNode,
+  'constructiveSystem' | 'grid' | 'columnType' | 'tiers'
+>
 
 export type RackBrush = Pick<
   PalletRackNode,
@@ -298,4 +312,21 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setTelescopicBrush: (patch) =>
     set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
+
+  mezzanineBrush: {
+    constructiveSystem: 'SIGMA',
+    grid: { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 5 },
+    columnType: 'single',
+    tiers: [
+      {
+        index: 0,
+        elevationM: 'auto',
+        clearHeightM: 3,
+        loadClass: 500,
+        floorType: 'WOOD_CHIPBOARD_30',
+      },
+    ],
+  },
+  setMezzanineBrush: (patch) =>
+    set((state) => ({ mezzanineBrush: { ...state.mezzanineBrush, ...patch } })),
 }))

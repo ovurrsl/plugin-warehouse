@@ -19,6 +19,9 @@ import {
 } from '@pascal-app/editor'
 import { Vector3 } from 'three'
 import { asSlab, type SlabLike, slabAt } from './host-adapter'
+import { deckSlabId, mezzanineContains } from './mezzanine/deck-slabs'
+import type { MezzanineNode } from './mezzanine/schema'
+import { useWarehouseStore } from './store'
 
 /**
  * Placement plumbing, re-derived rather than imported.
@@ -286,6 +289,28 @@ export function electSupportSlab(
   x: number,
   z: number,
 ): string | null {
+  /**
+   * Açıkça seçilmiş bir mezzanine güvertesi her şeyin ÖNÜNDE gelir.
+   *
+   * Nişan alarak seçilemiyor: `getPointedSupportSurface` ışının kestiği en
+   * küçük pozitif t'yi alıyor, yukarıdan bakan bir kamerada bu her zaman en
+   * üstteki güverte. Üst üste iki güverte varsa alttakine hiçbir açıdan
+   * nişan alınamaz. Bu yüzden hedef kat açıkça seçiliyor.
+   *
+   * Kapsama şartı olmadan, binanın öbür ucuna konan bir palet de güverteye
+   * uçardı — seçim yalnız o mezzanine'in taban izinde geçerli.
+   */
+  const active = useWarehouseStore.getState().activeDeck
+  if (active) {
+    const owner = nodes[active.mezzanineId] as MezzanineNode | undefined
+    if (
+      (owner as { type?: string } | undefined)?.type === 'warehouse:mezzanine' &&
+      mezzanineContains(owner as MezzanineNode, x, z)
+    ) {
+      return deckSlabId(active.mezzanineId, active.tierIndex)
+    }
+  }
+
   return slabAt(collectSlabs(nodes, levelId), x, z)?.id ?? null
 }
 

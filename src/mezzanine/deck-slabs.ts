@@ -111,6 +111,28 @@ function toLevelLocal(node: MezzanineNode, localX: number, localZ: number): [num
   return [px + localX * cos + localZ * sin, pz - localX * sin + localZ * cos]
 }
 
+/**
+ * Kat-yerel bir nokta bu mezzanine'in taban izinin içinde mi.
+ *
+ * `toLevelLocal`in tersi. Yerleştirme yolu bunu kullanıyor: kullanıcı bir
+ * güverteyi hedef seçtiğinde, tıklama o mezzanine'in üstünde değilse hedef
+ * yok sayılmalı — yoksa binanın öbür ucuna konan bir palet de güverteye
+ * uçardı.
+ */
+export function mezzanineContains(node: MezzanineNode, x: number, z: number): boolean {
+  const [px, , pz] = node.position ?? [0, 0, 0]
+  const rotationY = node.rotation?.[1] ?? 0
+  const cos = Math.cos(rotationY)
+  const sin = Math.sin(rotationY)
+  const dx = x - px
+  const dz = z - pz
+  const localX = dx * cos - dz * sin
+  const localZ = dx * sin + dz * cos
+  const halfWidth = (node.grid.baysX * node.grid.bayWidthM) / 2
+  const halfDepth = (node.grid.baysY * node.grid.bayDepthM) / 2
+  return Math.abs(localX) <= halfWidth && Math.abs(localZ) <= halfDepth
+}
+
 function rectToPolygon(node: MezzanineNode, rect: Rect): [number, number][] {
   return [
     toLevelLocal(node, rect.x0, rect.z0),

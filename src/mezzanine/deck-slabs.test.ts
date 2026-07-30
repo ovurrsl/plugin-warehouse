@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { electSupportSlab } from '../placement'
+import { useWarehouseStore } from '../store'
 import { planDeckSlabs } from './deck-slab-system'
 import {
   DECK_OWNER_KEY,
@@ -6,6 +8,7 @@ import {
   deckSlabId,
   deckSlabSpecs,
   GROUND_SUPPORT_ID,
+  mezzanineContains,
 } from './deck-slabs'
 import { resolveTierElevations } from './metrics'
 import { emptyAccessories, MezzanineNode } from './schema'
@@ -230,5 +233,53 @@ describe('mezzanine KENDİ güvertesine tırmanamaz', () => {
 
     const plan = planDeckSlabs(stacked)
     expect(plan.updates.find((entry) => entry.id === mine.id)).toBeUndefined()
+  })
+})
+
+describe('hedef güverte seçimi — nişan alarak yapılamıyor', () => {
+  test('seçili güverte taban izi İÇİNDE taşıyıcı olur', () => {
+    const mezz = mezzanine()
+    useWarehouseStore.getState().setActiveDeck({ mezzanineId: mezz.id, tierIndex: 0 })
+    const scene = { level_1: { id: 'level_1', type: 'level' }, [mezz.id]: mezz }
+
+    expect(electSupportSlab(scene, 'level_1', 0, 0)).toBe(deckSlabId(mezz.id, 0))
+    useWarehouseStore.getState().setActiveDeck(null)
+  })
+
+  test('taban izinin DIŞINDA seçim yok sayılır', () => {
+    // Aksi hâlde binanın öbür ucuna konan bir palet de güverteye uçardı.
+    const mezz = mezzanine()
+    useWarehouseStore.getState().setActiveDeck({ mezzanineId: mezz.id, tierIndex: 0 })
+    const scene = { level_1: { id: 'level_1', type: 'level' }, [mezz.id]: mezz }
+
+    expect(electSupportSlab(scene, 'level_1', 200, 200)).not.toBe(deckSlabId(mezz.id, 0))
+    useWarehouseStore.getState().setActiveDeck(null)
+  })
+
+  test('seçim yokken zemin davranışı değişmez', () => {
+    const mezz = mezzanine()
+    const scene = { level_1: { id: 'level_1', type: 'level' }, [mezz.id]: mezz }
+    expect(electSupportSlab(scene, 'level_1', 0, 0)).toBeNull()
+  })
+
+  test('ALT tier de seçilebiliyor — hatanın kendisi buydu', () => {
+    // İki katlı mezzanine'de üstteki güverte ışını her zaman önce kesiyor,
+    // yani alttakine nişan alınamıyordu. Açık seçim bunu aşıyor.
+    const mezz = mezzanine({ tiers: [tier(), tier({ index: 1 })] })
+    const scene = { level_1: { id: 'level_1', type: 'level' }, [mezz.id]: mezz }
+
+    useWarehouseStore.getState().setActiveDeck({ mezzanineId: mezz.id, tierIndex: 0 })
+    expect(electSupportSlab(scene, 'level_1', 0, 0)).toBe(deckSlabId(mezz.id, 0))
+
+    useWarehouseStore.getState().setActiveDeck({ mezzanineId: mezz.id, tierIndex: 1 })
+    expect(electSupportSlab(scene, 'level_1', 0, 0)).toBe(deckSlabId(mezz.id, 1))
+    useWarehouseStore.getState().setActiveDeck(null)
+  })
+
+  test('kapsama testi dönüşü hesaba katıyor', () => {
+    const rotated = mezzanine({ rotation: [0, Math.PI / 2, 0] })
+    // Taban izi 20×15; 90° dönünce dünyada 15×20 olur.
+    expect(mezzanineContains(rotated, 0, 9)).toBe(true)
+    expect(mezzanineContains(rotated, 9, 0)).toBe(false)
   })
 })

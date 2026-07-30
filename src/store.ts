@@ -163,6 +163,20 @@ type WarehouseStore = {
   setMezzanineBrush: (patch: Partial<MezzanineBrush>) => void
 
   /**
+   * Yerleştirmenin hedeflediği mezzanine güvertesi — `null` ise zemin.
+   *
+   * **Neden açık bir seçim:** host'un imleç-yüzey seçimi ışının kestiği EN
+   * YAKIN slab düzlemini alıyor (`getPointedSupportSurface`, en küçük
+   * pozitif t). Yukarıdan bakan bir kamerada bu HER ZAMAN en üstteki
+   * güverte — üst üste duran mezzanine katlarında alt kata nişan almak
+   * fiziksel olarak mümkün değil. Kat bu yüzden nişan alarak değil açıkça
+   * seçiliyor; `electSupportSlab` seçimi okuyor ve 11 yerleştirme aracının
+   * hepsi tek noktadan düzeliyor.
+   */
+  activeDeck: { mezzanineId: string; tierIndex: number } | null
+  setActiveDeck: (deck: { mezzanineId: string; tierIndex: number } | null) => void
+
+  /**
    * Shape of the next placed live-racking channel. `palletsDeep` fırçada
    * durur çünkü `[`/`]` ile yerleştirme SIRASINDA ayarlanıyor ve arka arkaya
    * iki kanal koyan kullanıcı ikisini de aynı derinlikte ister.
@@ -326,6 +340,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setTelescopicBrush: (patch) =>
     set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
+
+  activeDeck: null,
+  setActiveDeck: (activeDeck) => set({ activeDeck }),
 
   mezzanineBrush: {
     constructiveSystem: 'SIGMA',

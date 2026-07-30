@@ -285,10 +285,19 @@ describe('tanım ve manifest', () => {
     expect(tiles.length).toBe(2)
   })
 
-  test("rack HER ZAMAN registered — kolektif instancing sistemini mount eden tek kind, mezzanine kendi system'ini bildirmiyor", () => {
+  test('rack HER ZAMAN registered — kolektif instancing sistemini mount eden tek kind', () => {
     const registered = new Set(warehousePlugin.nodes?.map((def) => def.kind))
     expect(registered.has('warehouse:pallet-rack')).toBe(true)
-    expect('system' in mezzanineDefinition).toBe(false)
+  })
+
+  test('mezzanine kendi sistemini bildirir ama kolektif havuzu İKİNCİ kez mount etmez', () => {
+    // Mezzanine güverte-slab uzlaştırıcısını mount etmek ZORUNDA (güvertenin
+    // üstüne raf konabilmesinin tek yolu). Yasak olan şey ayrı: rack'ın
+    // asılı olduğu kolektif instancing modülünü ikinci kez mount etmek —
+    // `RegisteredSystems` her kaydın sistemini ayrı ayrı kurar, ve o modül
+    // sahne başına BİR havuz varsayar.
+    expect(mezzanineDefinition.system).toBeDefined()
+    expect(String(mezzanineDefinition.system.module)).not.toContain('collective-system')
   })
 
   test('trailingSection tanımlı, invariants var', () => {

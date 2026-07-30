@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { electSupportSlab, subscribeGridMove, subscribePlacementClicks } from '../placement'
 import { useWarehouseStore } from '../store'
+import { GROUND_SUPPORT_ID } from './deck-slabs'
 import { footprintDepthM, footprintWidthM, totalHeightM } from './metrics'
 import MezzaninePreview from './preview'
 import { MezzanineNode } from './schema'
@@ -127,7 +128,15 @@ export default function MezzanineTool() {
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,
-        supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
+        // Zemine ya da gerçek bir slab'a ÇİVİLENİR — asla boş bırakılmaz.
+        // Boş bırakılsaydı `getFloorPlacedElevation` her karede seçim
+        // yapardı ve adaylar arasında mezzanine'in KENDİ güverte slab'ları
+        // da olurdu: mezzanine kendi üstüne çıkar, güverte bir üst kota
+        // taşınır, sonraki karede yine... Düz zeminde bu kenar durum değil
+        // varsayılan durumdur, çünkü `resolveSupportSlabPatch` tek slablı
+        // katta hiçbir şey kalıcılaştırmaz.
+        supportSlabId:
+          electSupportSlab(nodes, activeLevelId, position[0], position[2]) ?? GROUND_SUPPORT_ID,
       })
 
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)

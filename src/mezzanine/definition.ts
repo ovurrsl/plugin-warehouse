@@ -68,12 +68,14 @@ export const mezzanineDefinition = {
     module: () => import('./renderer'),
   },
 
-  // `system` alanı YOK — kolektif instancing sistemi rack'ın kind'ına asılı
-  // ve sahne başına BİR mount edilir, kind'a göre filtrelenmez
-  // (`collective-system.tsx`'in kendi yorumu). Rack `warehousePlugin.nodes`
-  // listesinde sabit olduğu için mezzanine'in kendi `system` girdisini
-  // bildirmesi gereksiz — hatta yanlış: ikinci bir sistem ikinci bir havuz
-  // mount'u demek olurdu.
+  // Güverteleri host `slab` düğümleriyle uzlaştıran sistem — mezzanine'in
+  // üstüne raf/palet/konveyör konabilmesinin tek yolu (gerekçe:
+  // `deck-slabs.ts`). Kolektif instancing sistemiyle çakışmaz: o rack'ın
+  // kind'ına asılı ayrı bir modül, bu ayrı bir modül, ve `RegisteredSystems`
+  // her kaydın sistemini kendi başına mount eder.
+  system: {
+    module: () => import('./deck-slab-system'),
+  },
 
   floorplan: buildMezzanineFloorplan,
 

@@ -17,11 +17,9 @@
 
 import type { PalletRackNode } from '../rack/schema'
 import { bayPitch, storageLevelsPresent, totalDepth } from '../rack/slots'
+import { deckSlabId } from './deck-slabs'
 import { resolveTierElevations } from './metrics'
 import type { MezzanineNode } from './schema'
-
-/** Bir düğümün mezzanine üstünde sayılması için kot toleransı, metre. */
-const DECK_TOLERANCE_M = 0.15
 
 export type SupportedRack = {
   rackId: string
@@ -49,39 +47,41 @@ export function rackFootprintM2(rack: PalletRackNode): number {
 /**
  * Bu mezzanine'in üstünde duran raflar.
  *
- * "Üstünde durmak" iki şart: rafın taban izi merkezi mezzanine'in taban
- * izinin İÇİNDE, ve rafın Y kotu bir tier'in yürüme yüzeyine yakın. İkinci
- * şart olmadan mezzanine'in ALTINDA duran raflar da sayılırdı — ve
- * altındaki hacim tam olarak rafa açık olan yerdir.
+ * **Ölçüt rafın taşıyıcı slab'ıdır, kotu değil.** Önceki sürüm rafın taban
+ * izini mezzanine'e karşı döndürüp `|rafY − deckTop| ≤ 0.15` arıyordu. O
+ * ölçüt hiçbir zaman tutmadı ve tutamazdı: host bir rafı güverteye
+ * oturttuğunda rafın MESH'inin Y'sini yazar, `position[1]` veride 0 kalır.
+ * Yani kontrol doğru yazılmıştı ama ölçtüğü şey her zaman 0'dı — asla
+ * ateşlenemeyen bir uyarıydı.
+ *
+ * Güverteler artık gerçek slab olduğu için (`deck-slabs.ts`) rafın
+ * `supportSlabId`'si hangi tier'in üstünde durduğunu KESİN söylüyor:
+ * toleranssız, döndürme matematiği olmadan, mezzanine'in altında duran raf
+ * karışma ihtimali olmadan.
+ *
+ * **Bilinen sınır:** host taşıyıcıyı yalnız adaylar farklı kotlar taşıyorsa
+ * kalıcılaştırır (`resolveSupportSlabPatch`, `candidateElevations.size >= 2`).
+ * Katta hiç zemin döşemesi yoksa güverte tek adaydır, kalıcılaşmaz ve o raf
+ * burada görünmez — görüntüde yine doğru yerde durur, yalnız yük sayımına
+ * girmez. Zemin döşemesi olan her sahnede (yani pratikte hepsinde) sorun yok.
  */
 export function racksOnMezzanine(
   nodes: Readonly<Record<string, unknown>>,
   mezzanine: MezzanineNode,
 ): SupportedRack[] {
-  const resolved = resolveTierElevations(mezzanine.tiers)
-  const [mx, , mz] = mezzanine.position ?? [0, 0, 0]
-  const rotationY = mezzanine.rotation?.[1] ?? 0
-  const halfWidth = (mezzanine.grid.baysX * mezzanine.grid.bayWidthM) / 2
-  const halfDepth = (mezzanine.grid.baysY * mezzanine.grid.bayDepthM) / 2
+  const byDeckId = new Map(
+    resolveTierElevations(mezzanine.tiers).map((tier) => [
+      deckSlabId(mezzanine.id, tier.index),
+      tier,
+    ]),
+  )
 
   const found: SupportedRack[] = []
 
   for (const [id, candidate] of Object.entries(nodes)) {
     if ((candidate as { type?: string })?.type !== 'warehouse:pallet-rack') continue
     const rack = candidate as PalletRackNode
-    const [rx, ry, rz] = rack.position ?? [0, 0, 0]
-
-    // Mezzanine'in yerel çerçevesine döndür — döndürülmüş bir mezzanine'in
-    // üstündeki raf, dünya eksenlerinde kutusunun dışında görünürdü.
-    const dx = rx - mx
-    const dz = rz - mz
-    const cos = Math.cos(-rotationY)
-    const sin = Math.sin(-rotationY)
-    const localX = dx * cos + dz * sin
-    const localZ = -dx * sin + dz * cos
-    if (Math.abs(localX) > halfWidth || Math.abs(localZ) > halfDepth) continue
-
-    const tier = resolved.find((t) => Math.abs(ry - t.deckTopM) <= DECK_TOLERANCE_M)
+    const tier = rack.supportSlabId ? byDeckId.get(rack.supportSlabId) : undefined
     if (!tier) continue
 
     const footprintM2 = rackFootprintM2(rack)

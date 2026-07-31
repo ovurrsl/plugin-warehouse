@@ -19,7 +19,7 @@ import {
   pointInPolygon,
 } from './metrics'
 import type { MezzanineNode, MezzanineTier } from './schema'
-import { type Rect, rectsOverlap, resolveSteps, stairVoidRect } from './stairs'
+import { type Rect, resolveSteps, stairVoidRect } from './stairs'
 
 export type Edge = 'north' | 'south' | 'east' | 'west'
 

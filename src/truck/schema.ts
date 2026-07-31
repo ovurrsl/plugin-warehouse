@@ -8,8 +8,6 @@ const tuple3 = z.tuple([z.number(), z.number(), z.number()])
 /** Raf yuvası adresi: hangi raf, hangi `Bx-Ly-Pz`. Dilim 8'in palet
  *  alma/bırakması bunu doldurur; bugünden şemada, ki o gün kayıtlı sahne
  *  migrasyonu gerektirmesin. */
-const SlotRef = z.object({ rackId: z.string(), address: z.string() })
-
 /**
  * Bir iş makinesi. Ölçü YOK: her figür `model` üzerinden katalogdan okunur,
  * düğüm yalnız seçimleri taşır. Bir katalog düzeltmesi böylece kaydedilmiş
@@ -60,8 +58,6 @@ export const TruckNode = BaseNode.extend({
   routeId: z.string().nullable().default(null),
   routeAnchor: z.number().min(0).max(1).default(0),
   duty: z.enum(['parked', 'shuttle']).default('parked'),
-  pickSlot: SlotRef.nullable().default(null),
-  dropSlot: SlotRef.nullable().default(null),
   carryingPalletId: z.string().nullable().default(null),
 
   /** Üzerinde durduğu slab, yerleştirmede seçilir — istatistik panelinin

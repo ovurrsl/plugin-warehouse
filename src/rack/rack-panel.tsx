@@ -11,7 +11,13 @@ import { multiplyRack, pendingPlacements } from './multiply-command'
 import { occupiedSlots } from './occupancy'
 import { palletRackParametrics } from './parametrics'
 import type { PalletRackNode } from './schema'
-import { directAccessSlotCount, fittedLevelCount, palletSlotCount, pickingSlotCount } from './slots'
+import {
+  directAccessSlotCount,
+  fittedLevelCount,
+  levelTypeOf,
+  palletSlotCount,
+  pickingSlotCount,
+} from './slots'
 
 /**
  * Turning one bay into a run.
@@ -310,6 +316,8 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
 
       <Capacity node={node} nodes={nodes} />
 
+      <LevelTypes node={node} />
+
       <span style={styles.title}>
         <Icon height={13} icon="lucide:copy-plus" width={13} />
         Multiply
@@ -441,6 +449,64 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
  * "positions" number hides: on a double-deep bay half the positions cannot be
  * reached until the pallet in front of them is moved.
  */
+/**
+ * Kat tipleri — `levelTypes` kaçış kapısının editörü.
+ *
+ * Alan şemada başından beri vardı ve `slots.ts` geometride TÜKETİYORDU ama
+ * hiçbir panel yazamıyordu: sırasız karma bir raf (ör. 2. kat toplama,
+ * altı-üstü palet) ancak elle JSON düzenleyerek kurulabilirdi.
+ *
+ * "Auto", `pickingLevels` sayısından türeyen varsayılan düzene döner.
+ * Şemanın kendi uyarısı geçerli: açık liste rafın geometrisini benzersiz
+ * yapar, elli rafın paylaştığı mesh elli mesh olur — bu yüzden segmentli
+ * kontrol açık listeyi ancak kullanıcı bir katı değiştirince yazıyor.
+ */
+function LevelTypes({ node }: { node: PalletRackNode }) {
+  const levels = fittedLevelCount(node)
+  const explicit = node.levelTypes
+
+  const write = (level: number, type: 'pallet' | 'picking') => {
+    const next = Array.from({ length: levels }, (_, i) =>
+      i === level ? type : (explicit?.[i] ?? levelTypeOf(node, i)),
+    )
+    useScene.getState().updateNode(node.id as AnyNodeId, { levelTypes: next } as never)
+  }
+
+  return (
+    <div style={styles.field}>
+      <span style={styles.title}>
+        <Icon height={13} icon="lucide:rows-3" width={13} />
+        Level types
+        {explicit && (
+          <button
+            onClick={() =>
+              useScene.getState().updateNode(node.id as AnyNodeId, { levelTypes: null } as never)
+            }
+            style={{ ...styles.step, marginLeft: 'auto' }}
+            title="pickingLevels sayısından türeyen düzene dön"
+            type="button"
+          >
+            auto
+          </button>
+        )}
+      </span>
+      {Array.from({ length: levels }, (_, level) => (
+        <div key={level} style={styles.label}>
+          <span>Level {level}</span>
+          <SegmentedControl
+            onChange={(value: string) => write(level, value as 'pallet' | 'picking')}
+            options={[
+              { label: 'Pallet', value: 'pallet' },
+              { label: 'Picking', value: 'picking' },
+            ]}
+            value={levelTypeOf(node, level)}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Capacity({ node, nodes }: { node: PalletRackNode; nodes: Record<string, unknown> }) {
   const positions = palletSlotCount(node)
   const direct = directAccessSlotCount(node)

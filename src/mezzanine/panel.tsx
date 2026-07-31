@@ -5,7 +5,7 @@ import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { IssueList } from '../panels/issue-list'
 import { useWarehouseStore } from '../store'
-import { CONSTRUCTIVE_SYSTEMS } from './catalog'
+import { CONSTRUCTIVE_SYSTEMS, HEA_PROFILES, IPE_PROFILES } from './catalog'
 import { effectiveClearHeightM, resolveTierElevations, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
 import { overloadedRacks, overloadText, racksOnMezzanine, tierLoadSummary } from './rack-support'
@@ -57,6 +57,20 @@ const styles = {
     fontSize: '0.625rem',
     fontWeight: 600,
     cursor: 'pointer',
+  },
+  // Live-racking panelinin satır/etiket/girdi üçlüsüyle aynı ölçüler —
+  // eklenti panelleri tek tasarım dili konuşsun.
+  skuRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.6875rem' },
+  skuLabel: { flex: '0 0 5rem', color: 'var(--muted-foreground)' },
+  skuInput: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: '0.25rem',
+    border: '1px solid var(--border)',
+    background: 'transparent',
+    color: 'var(--foreground)',
+    padding: '0.125rem 0.375rem',
+    fontSize: '0.6875rem',
   },
 } satisfies Record<string, CSSProperties>
 
@@ -126,6 +140,53 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
           taşıyıcısı olur. Taban izinin dışına tıklamak seçimi yok sayar.
         </p>
       </div>
+
+      {/**
+       * Profil geçersiz kılmaları — şemada başından beri vardı, `resolveIBeam`
+       * GL2000/MIXED'de okuyordu ama HİÇBİR panel yazamıyordu: alan var,
+       * geometri tüketiyor, kullanıcıya kapalı. Generic `enum` alanı `null`u
+       * ("otomatik") ifade edemediği için burada, trailing panelde.
+       * SIGMA'da gizli — o aile profil kimliğini zaten yok sayıyor ve bunu
+       * göstermek "değiştir ama hiçbir şey olmasın" alanı olurdu.
+       */}
+      {node.constructiveSystem !== 'SIGMA' && (
+        <div style={styles.card}>
+          {(
+            [
+              ['Ana kiriş', 'mainBeamProfile', Object.keys(IPE_PROFILES)],
+              ['İkincil kiriş', 'secondaryBeamProfile', Object.keys(IPE_PROFILES)],
+              ['Kolon', 'columnProfile', Object.keys(HEA_PROFILES)],
+            ] as const
+          ).map(([label, key, options]) => (
+            <label key={key} style={styles.skuRow}>
+              <span style={styles.skuLabel}>{label}</span>
+              <select
+                onChange={(event) =>
+                  useScene.getState().updateNode(
+                    node.id as AnyNodeId,
+                    {
+                      [key]: event.target.value === 'auto' ? null : event.target.value,
+                    } as never,
+                  )
+                }
+                style={styles.skuInput}
+                value={node[key] ?? 'auto'}
+              >
+                <option value="auto">otomatik</option>
+                {options.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <p style={styles.note}>
+            Otomatik: kurucu sistemin varsayılan profili. Açık bir profil seçmek geometriyi EN 10365
+            kesitiyle yeniden kurar.
+          </p>
+        </div>
+      )}
 
       <div style={styles.card}>
         <div style={styles.row}>

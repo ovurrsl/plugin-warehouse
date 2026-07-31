@@ -50,8 +50,6 @@ export const truckDefinition = {
           routeId: null,
           routeAnchor: 0,
           duty: 'parked',
-          pickSlot: null,
-          dropSlot: null,
           carryingPalletId: null,
         } as unknown as AnyNode,
       }),

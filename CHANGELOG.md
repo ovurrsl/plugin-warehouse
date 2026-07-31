@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1d773a4`](https://github.com/ovurrsl/plugin-warehouse/commit/1d773a485f065b5b054a0a5e5775c558a271bf7d))
 - Refresh generated README blocks [skip ci] ([`5a447ef`](https://github.com/ovurrsl/plugin-warehouse/commit/5a447ef0a39cebcffbd5980456fc47464498c19e))
 - Refresh generated README blocks [skip ci] ([`4cd5ee7`](https://github.com/ovurrsl/plugin-warehouse/commit/4cd5ee7cdc606802d510a7cd983e99ab8c7fc59a))
 - Refresh generated README blocks [skip ci] ([`ba72a58`](https://github.com/ovurrsl/plugin-warehouse/commit/ba72a58458f3c67b150f955da39fe7e2322cb8be))
@@ -197,6 +198,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Kat tablosu tek yerde — üç ölçülmüş hata düzeldi ([`9e1b525`](https://github.com/ovurrsl/plugin-warehouse/commit/9e1b525b54f3a604f72d805b12b27d7f3949fae0))
 - Alt güverteye yerleştirme — hedef kat açıkça seçiliyor ([`f330fc2`](https://github.com/ovurrsl/plugin-warehouse/commit/f330fc257c1d65211b39de078a3362ccc6c57e77))
 - Panelde durup hiçbir şey yapmayan dört kontrolü gerçekle ([`1c32173`](https://github.com/ovurrsl/plugin-warehouse/commit/1c32173ebf67c1181bb91b626929b95742401241))
 - Position front lamp inside hazard stripe (nose equipment) ([`e959a11`](https://github.com/ovurrsl/plugin-warehouse/commit/e959a11c8199a32e4b6e0f163096586b0805874a))

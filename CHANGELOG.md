@@ -18,6 +18,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1e2d96e`](https://github.com/ovurrsl/plugin-warehouse/commit/1e2d96e53a89ff34e068cb1fe691df6ed9c05e1f))
 - Refresh generated README blocks [skip ci] ([`5c714a8`](https://github.com/ovurrsl/plugin-warehouse/commit/5c714a8fd92c6f5d81abaa333ff27750efcb6b86))
 - Refresh generated README blocks [skip ci] ([`47eafd7`](https://github.com/ovurrsl/plugin-warehouse/commit/47eafd7e89ae699aa8634ebc00669ab4f63b20a6))
 - Refresh generated README blocks [skip ci] ([`e7f62bc`](https://github.com/ovurrsl/plugin-warehouse/commit/e7f62bc61907114a61706d946321fbc4af501705))
@@ -106,6 +107,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Kenar merdiveni poligona oturuyor + 2D plan tamamlandı ([`a7ae64d`](https://github.com/ovurrsl/plugin-warehouse/commit/a7ae64d01ab9ce142cab5c50cb3b505bb8ee248d))
 - Anahat sonradan düzenlenebiliyor — köşe tutamakları ([`470090b`](https://github.com/ovurrsl/plugin-warehouse/commit/470090b3f93593e67d14b98badd0528d64bbaf9e))
 - Korkuluk anahatı takip ediyor — 2B ve 3B aynı kaynaktan ([`e7b6860`](https://github.com/ovurrsl/plugin-warehouse/commit/e7b6860a38316960c789171e7714bb589bc8e850))
 - Şekil çizim aracı — mezzanine artık elle çiziliyor ([`39514e0`](https://github.com/ovurrsl/plugin-warehouse/commit/39514e0013e0e29f208aaf0a1a66d3984214d069))

@@ -26,11 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@v4.37.3
         with:
           languages: javascript-typescript
           # `security-and-quality` over the default `security-extended`: this is
           # a small package where the quality rules are signal, not noise.
           queries: security-and-quality
 
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@v4.37.3

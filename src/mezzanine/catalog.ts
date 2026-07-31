@@ -193,11 +193,16 @@ export const HEA_PROFILES: Record<string, IBeamProfile> = {
  *  detayı (gövde/flanş/dudak) RESEARCHED (Albion ASB240 referansı). Kutu
  *  yaklaşıklığı `parts.ts`'te bu değerlerden kurulur. */
 export const SIGMA_PROFILE = {
-  lengthRangeM: { min: mm(1000), max: mm(12000), stepM: mm(250) }, // CATALOG
+  /**
+   * Yükseklik/genişlik aralığı CATALOG — tüketicisi geometri değil TEST:
+   * `SIGMA_DEFAULT_*` varsayılanlarının katalog aralığının içinde kaldığını
+   * kilitliyor. Boy aralığı (1000–12000/250), gövde düzlüğü ve dudak ölçüsü
+   * SİLİNDİ: eleman boyunu ifade eden bir alan yok ve kutu yaklaşıklığı
+   * kesit detayını zaten çizemez — okunmayan sabit, kural gibi görünen
+   * süs olurdu.
+   */
   heightRangeM: { min: mm(240), max: mm(400) }, // CATALOG
   widthRangeM: { min: mm(100), max: mm(120) }, // CATALOG
-  outerWebFlatM: mm(50), // RESEARCHED
-  lipM: mm(20), // RESEARCHED
   thicknessM: mm(2.0), // RESEARCHED, aralık 1.5–2.8 mm'nin ortası
 }
 
@@ -254,7 +259,16 @@ export const STAIRCASE_GEOMETRY = {
   flightClimbHeightMaxM: mm(3000),
   singleFlightClimbHeightMaxM: mm(4000),
   landingLengthMinM: mm(800),
+  /**
+   * Serbest genişlikler: tek kullanıcı / çok kullanıcı. Tüketicisi TEST:
+   * şemanın `widthM` literalleri (0.8 | 1) bu iki sayının ta kendisi olmak
+   * zorunda — literal şemada, kaynak burada; test ikisini birbirine
+   * kilitliyor, yoksa biri sessizce öbüründen koparır.
+   *
+   * 600 mm "kısaltılmış kısa kol" genişliği SİLİNDİ: şema onu ifade
+   * edemiyor (widthM 0.8|1) ve 1.5 m altı kol vakası modellenmedi —
+   * okunmayan sabit kural gibi görünen süs olurdu.
+   */
   clearWidthMinM: mm(800),
   clearWidthMultiUserM: mm(1000),
-  clearWidthReducedShortFlightM: mm(600),
 }

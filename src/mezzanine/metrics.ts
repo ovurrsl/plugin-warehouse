@@ -60,11 +60,19 @@ export function resolveTierElevations(tiers: readonly MezzanineTier[]): Resolved
  * duruyor, çünkü biri kullanıcının yazdığı, öteki yapının verdiği.
  */
 export function effectiveClearHeightM(node: MezzanineNode, tier: MezzanineTier): number {
-  const structure =
-    resolveMainBeamProfile(node).h +
-    resolveSecondaryBeamProfile(node).h +
-    FLOOR_TYPES[tier.floorType].structuralDepthM
-  return tier.clearHeightM + FLOOR_TYPES[tier.floorType].structuralDepthM - structure
+  /**
+   * GL2000 ikincil kirişi ana kirişe GÖMER (katalogun `secondaryBeamEmbedded`
+   * verisi): iki kiriş aynı derinliği paylaşır, yapı yalnız derin olanı
+   * kadar sarkar. Yan yana istifleyen sistemlerde ikisi toplanır. Bu alan
+   * denetimde "tüketicisiz katalog verisi" çıkmıştı — gerçek etkisi tam
+   * olarak bu satır ve `pushTierBeams`teki kot.
+   */
+  const main = resolveMainBeamProfile(node)
+  const secondary = resolveSecondaryBeamProfile(node)
+  const beams = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem].secondaryBeamEmbedded
+    ? Math.max(main.h, secondary.h)
+    : main.h + secondary.h
+  return tier.clearHeightM - beams
 }
 
 /** Yapının toplam yüksekliği: en üst yürüme yüzeyi + korkuluk. Kolider ve

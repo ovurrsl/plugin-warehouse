@@ -1,3 +1,4 @@
+import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import type { LiveRackingNode } from './live-racking/schema'
@@ -342,7 +343,23 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
 
   activeDeck: null,
-  setActiveDeck: (activeDeck) => set({ activeDeck }),
+  setActiveDeck: (activeDeck) => {
+    /**
+     * İlgili mezzanine'ler kirletiliyor ki 2D plan yeniden çizilsin: plan
+     * seçili katı gösteriyor (`buildMezzanineFloorplan` `activeDeck` okuyor)
+     * ama yalnız düğüm kirlenince yeniden kuruluyor — store değişimi tek
+     * başına onu tetiklemez. Eski VE yeni hedefin sahibi ayrı düğümlerse
+     * ikisi de tazelenmeli.
+     */
+    const previous = get().activeDeck
+    set({ activeDeck })
+    const scene = useScene.getState()
+    for (const id of new Set(
+      [previous?.mezzanineId, activeDeck?.mezzanineId].filter((v): v is string => !!v),
+    )) {
+      scene.markDirty(id as never)
+    }
+  },
 
   mezzanineBrush: {
     constructiveSystem: 'SIGMA',

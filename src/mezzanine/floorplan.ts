@@ -1,4 +1,5 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { useWarehouseStore } from '../store'
 import { FLOOR_TYPES } from './catalog'
 import {
   footprintDepthM,
@@ -149,7 +150,22 @@ export function buildMezzanineFloorplan(
   const hatchTint = selected ? stroke : '#93a3b8'
 
   const resolved = resolveTierElevations(node.tiers)
-  const top = resolved[resolved.length - 1]
+
+  /**
+   * Hangi tier çizilir: HEDEF SEÇİLİ olan, yoksa en üstteki.
+   *
+   * Plan tek bir kotu gösterir ve varsayılan üst kat — kullanıcının üstünde
+   * yürüdüğü kat. Ama iki katlı bir mezzanine'de alt katın korkuluğuna,
+   * kapısına, merdivenine planda hiç erişilemiyordu. Yerleştirme hedefi
+   * (`activeDeck`) zaten kat seçimi: aynı seçim planı da sürüyor —
+   * hedeflediğin katın planına bakarsın. `setActiveDeck` düğümü kirletiyor,
+   * plan o yüzden tazeleniyor.
+   */
+  const targeted = useWarehouseStore.getState().activeDeck
+  const top =
+    (targeted?.mezzanineId === node.id
+      ? resolved.find((tier) => tier.index === targeted.tierIndex)
+      : undefined) ?? resolved[resolved.length - 1]
 
   const outline = outlinePolygon(node)
   const children: FloorplanGeometry[] = [
@@ -481,7 +497,9 @@ export function buildMezzanineFloorplan(
         kind: 'dimension-label',
         cx: 0,
         cy: -depth / 2 - 0.6,
-        text: `${node.tiers.length} tier · ${top.deckTopM.toFixed(2)} m · ${FLOOR_TYPES[top.floorType].label}`,
+        // Hangi katın planına bakıldığı etikette — iki katlıda "hangisi bu?"
+        // sorusu sorulmamalı.
+        text: `tier ${top.index + 1}/${node.tiers.length} · ${top.deckTopM.toFixed(2)} m · ${FLOOR_TYPES[top.floorType].label}`,
         angle: 0,
         screenUpright: true,
       })

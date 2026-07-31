@@ -211,6 +211,17 @@ export const MezzanineNode = BaseNode.extend({
   // ── Finish ────────────────────────────────────────────────────────────────
   frameColor: z.string().default(STEEL_FRAME_COLOR),
 
+  /**
+   * İntumesan (yangında kabaran) boya — GL2000'in katalog seçeneği.
+   *
+   * Görsel karşılığı gerçek: intumesan boya mat, açık gri-beyaz bir yüzeydir
+   * ve `frameColor`u geçersiz kılar. Bayrağı renkten ayrı tutmanın sebebi
+   * dürüstlük: kullanıcının beyaza boyadığı bir çerçeve yangın koruması
+   * DEĞİLDİR; bu bayrak "bu yapı korumalı" bilgisini taşır, panel de öyle
+   * gösterir.
+   */
+  intumescentPaint: z.boolean().default(false),
+
   /** Slab the mezzanine stands on, elected at placement time. */
   supportSlabId: z.string().nullable().default(null),
 })

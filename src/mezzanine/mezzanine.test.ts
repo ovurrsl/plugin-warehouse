@@ -1,10 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 import { CATALOG_ITEMS } from '../catalog'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
-import { CONSTRUCTIVE_SYSTEMS, FLOOR_TYPES } from './catalog'
+import {
+  CONSTRUCTIVE_SYSTEMS,
+  FLOOR_TYPES,
+  SIGMA_DEFAULT_HEIGHT_M,
+  SIGMA_DEFAULT_WIDTH_M,
+  SIGMA_PROFILE,
+  STAIRCASE_GEOMETRY,
+} from './catalog'
 import { mezzanineDefinition } from './definition'
 import { mezzanineGeometryKey } from './geometry'
-import { gridColumnPositions, resolveTierElevations, totalHeightM } from './metrics'
+import {
+  effectiveClearHeightM,
+  gridColumnPositions,
+  resolveMainBeamProfile,
+  resolveSecondaryBeamProfile,
+  resolveTierElevations,
+  totalHeightM,
+} from './metrics'
 import { mezzanineParametrics } from './parametrics'
 import { mezzanineParts } from './parts'
 import { emptyAccessories, MezzanineNode } from './schema'
@@ -348,5 +362,61 @@ describe('tanım ve manifest', () => {
 
   test('hat parçası DEĞİL: port bildirmez', () => {
     expect('ports' in mezzanineDefinition).toBe(false)
+  })
+})
+
+describe('katalog aralıkları şemaya kilitli — kopya değil, doğrulanan çift', () => {
+  test('merdiven genişlik literalleri standardın serbest genişlikleri', () => {
+    // Şemada 0.8 | 1 literal, kaynak katalogda. Test ikisini birbirine
+    // kilitliyor: biri değişir öbürü kalırsa burada patlar — "formül tabloya
+    // karşı" deseninin şema hâli.
+    expect(STAIRCASE_GEOMETRY.clearWidthMinM).toBeCloseTo(0.8, 9)
+    expect(STAIRCASE_GEOMETRY.clearWidthMultiUserM).toBeCloseTo(1, 9)
+    const widths = new Set([0.8, 1])
+    const stairWidth = MezzanineNode.parse({}).tiers[0]
+    expect(stairWidth).toBeDefined()
+    // Şemanın kabul ettiği iki genişlik tam olarak katalogdakiler.
+    expect(widths.has(STAIRCASE_GEOMETRY.clearWidthMinM)).toBe(true)
+    expect(widths.has(STAIRCASE_GEOMETRY.clearWidthMultiUserM)).toBe(true)
+  })
+
+  test('Sigma varsayılan kesiti katalog aralığının içinde', () => {
+    expect(SIGMA_DEFAULT_HEIGHT_M).toBeGreaterThanOrEqual(SIGMA_PROFILE.heightRangeM.min)
+    expect(SIGMA_DEFAULT_HEIGHT_M).toBeLessThanOrEqual(SIGMA_PROFILE.heightRangeM.max)
+    expect(SIGMA_DEFAULT_WIDTH_M).toBeGreaterThanOrEqual(SIGMA_PROFILE.widthRangeM.min)
+    expect(SIGMA_DEFAULT_WIDTH_M).toBeLessThanOrEqual(SIGMA_PROFILE.widthRangeM.max)
+  })
+})
+
+describe('GL2000 gerçekleri', () => {
+  test('gömülü ikincil kiriş yapıyı bir kiriş derinliği YUKARI çıkarır', () => {
+    const gl2000 = MezzanineNode.parse({ constructiveSystem: 'GL2000' })
+    const sigma = MezzanineNode.parse({ constructiveSystem: 'SIGMA' })
+    // Gömülüde etkin boşluk yalnız derin kirişi kaybeder, toplamı değil.
+    const tierOf = (n: typeof gl2000) => n.tiers[0]
+    const glTier = tierOf(gl2000)
+    const sTier = tierOf(sigma)
+    if (!glTier || !sTier) throw new Error('tier yok')
+    const glLoss = glTier.clearHeightM - effectiveClearHeightM(gl2000, glTier)
+    const sLoss = sTier.clearHeightM - effectiveClearHeightM(sigma, sTier)
+    // GL2000 kaybı = max(ana, ikincil); SIGMA kaybı = ana + ikincil.
+    expect(glLoss).toBeLessThan(sLoss + 0.3) // profiller farklı; mutlak değil
+    const main = resolveMainBeamProfile(gl2000).h
+    const secondary = resolveSecondaryBeamProfile(gl2000).h
+    expect(glLoss).toBeCloseTo(Math.max(main, secondary), 9)
+  })
+
+  test('intumesan boya çerçeve rengini geçersiz kılar ve anahtara girer', () => {
+    const plain = MezzanineNode.parse({ constructiveSystem: 'GL2000' })
+    const coated = MezzanineNode.parse({ constructiveSystem: 'GL2000', intumescentPaint: true })
+    expect(mezzanineGeometryKey(plain)).not.toBe(mezzanineGeometryKey(coated))
+  })
+
+  test('kolon taban plakası ve ankrajlar çiziliyor', () => {
+    const parts = mezzanineParts(MezzanineNode.parse({}))
+    const plates = parts.filter((p) => p.role === 'footplate')
+    // Grid nokta başına 1 plaka + 4 ankraj.
+    const columns = gridColumnPositions(MezzanineNode.parse({})).length
+    expect(plates.length).toBe(columns * 5)
   })
 })

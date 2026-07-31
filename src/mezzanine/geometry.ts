@@ -24,13 +24,22 @@ import {
 import { type MezzaninePart, mezzanineParts } from './parts'
 import type { MezzanineNode } from './schema'
 
+/** İntumesan kaplamanın rengi — mat, açık gri-beyaz (ASSUMPTION). */
+const INTUMESCENT_COAT_COLOR = '#dcdcd4'
+
 function colorOf(node: MezzanineNode, role: MezzaninePart['role']): string {
   switch (role) {
     case 'column':
     case 'main-beam':
     case 'secondary-beam':
     case 'stair-stringer':
-      return node.frameColor
+    // Taban plakası gövdeyle aynı boyada — ayrı bir donanım değil, kolonun
+    // zemine basma biçimi.
+    case 'footplate':
+      // İntumesan boya çerçeve rengini geçersiz kılar: yangında kabaran
+      // kaplama mat, açık gri-beyazdır ve hangi RAL seçilirse seçilsin onu
+      // örter — gerçek üründe de öyle.
+      return node.intumescentPaint ? INTUMESCENT_COAT_COLOR : node.frameColor
     // Döşeme kendi rengini taşımıyor — tek bir nötr ton; hatch2D yalnız 2D
     // planda, 3B'de floorType'a göre renk ayrımı yok.
     case 'floor':
@@ -110,6 +119,7 @@ export function mezzanineGeometryKey(node: MezzanineNode): string {
     node.secondaryBeamProfile ?? '',
     node.columnProfile ?? '',
     node.frameColor,
+    node.intumescentPaint,
     tierKey,
   ].join('|')
 }

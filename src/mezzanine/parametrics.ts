@@ -34,7 +34,22 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
     },
     {
       label: 'Finish',
-      fields: [{ key: 'frameColor', kind: 'color' }],
+      fields: [
+        {
+          key: 'frameColor',
+          kind: 'color',
+          // İntumesan boya rengi zaten örtüyor; alanı göstermek "değiştir
+          // ama hiçbir şey olmasın" demekti.
+          visibleIf: (node) => !node.intumescentPaint,
+        },
+        {
+          key: 'intumescentPaint',
+          kind: 'boolean',
+          // Katalog bu seçeneği GL2000 için veriyor; öteki sistemlerde
+          // göstermek katalogla çelişirdi.
+          visibleIf: (node) => node.constructiveSystem === 'GL2000',
+        },
+      ],
     },
     {
       label: 'Transform',

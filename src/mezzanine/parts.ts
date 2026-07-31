@@ -10,7 +10,13 @@
  * altında, ana kirişler onların da altında, kolonlar tepeye kadar tek parça.
  */
 
-import { FLOOR_TYPES, GATE_SPECS, type IBeamProfile, STAIRCASE_GEOMETRY } from './catalog'
+import {
+  CONSTRUCTIVE_SYSTEMS,
+  FLOOR_TYPES,
+  GATE_SPECS,
+  type IBeamProfile,
+  STAIRCASE_GEOMETRY,
+} from './catalog'
 import {
   footprintDepthM,
   footprintWidthM,
@@ -57,6 +63,8 @@ export type MezzaninePartRole =
   | 'gate'
   | 'gate-post'
   | 'gate-pivot'
+  /** Kolon taban plakası ve ankrajları. */
+  | 'footplate'
 
 export type MezzaninePart = {
   role: MezzaninePartRole
@@ -77,6 +85,13 @@ export type MezzaninePart = {
  * yüksekliği boyunca tek parça — gerçek mezzanine'de kolon tüm katları
  * kesintisiz geçer, kirişler ona braketle bağlanır.
  */
+/** Kolon taban plakası ve ankraj ölçüleri (ASSUMPTION — katalog bileşen
+ *  listesinde var, kesit yayınlamıyor). */
+const BASE_PLATE_THICKNESS_M = 0.02
+const BASE_PLATE_OVERHANG = 1.7
+const COLUMN_ANCHOR_M = 0.024
+const COLUMN_ANCHOR_HEIGHT_M = 0.05
+
 function pushColumn(
   parts: MezzaninePart[],
   gx: number,
@@ -92,6 +107,30 @@ function pushColumn(
       center: [gx, heightM / 2, gz + (side * (h - tf)) / 2],
       size: [b, heightM, tf],
     })
+  }
+
+  // Taban plakası + dört ankraj. Kolon zemine çıplak profil kesiti olarak
+  // dayanıyordu — katalogun kendi bileşen listesi (taban plakası, ankraj)
+  // hiç çizilmiyordu ve yapı yere "saplanmış" görünüyordu.
+  const plateW = b * BASE_PLATE_OVERHANG
+  const plateD = h * BASE_PLATE_OVERHANG
+  parts.push({
+    role: 'footplate',
+    center: [gx, BASE_PLATE_THICKNESS_M / 2, gz],
+    size: [plateW, BASE_PLATE_THICKNESS_M, plateD],
+  })
+  for (const sx of [-1, 1] as const) {
+    for (const sz of [-1, 1] as const) {
+      parts.push({
+        role: 'footplate',
+        center: [
+          gx + (sx * plateW) / 2.6,
+          BASE_PLATE_THICKNESS_M + COLUMN_ANCHOR_HEIGHT_M / 2,
+          gz + (sz * plateD) / 2.6,
+        ],
+        size: [COLUMN_ANCHOR_M, COLUMN_ANCHOR_HEIGHT_M, COLUMN_ANCHOR_M],
+      })
+    }
   }
 }
 
@@ -158,7 +197,14 @@ function pushTierBeams(parts: MezzaninePart[], node: MezzanineNode, deckUndersid
   const secondaryProfile = resolveSecondaryBeamProfile(node)
 
   const secondaryTopY = deckUndersideY
-  const mainTopY = secondaryTopY - secondaryProfile.h
+  // GL2000 ikincil kirişi ana kirişe GÖMER: ikisi aynı üst kotu paylaşır ve
+  // yapı bir ikincil-kiriş derinliği kadar YUKARI çıkar. Yan yana istifleyen
+  // sistemlerde ana kiriş ikincilin altına oturur. Katalogun
+  // `secondaryBeamEmbedded` verisi buraya kadar hiç okunmuyordu — yapı her
+  // sistemde gerçek üründen bir IPE derinliği aşağıda duruyordu.
+  const mainTopY = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem].secondaryBeamEmbedded
+    ? secondaryTopY
+    : secondaryTopY - secondaryProfile.h
 
   for (let iz = 0; iz <= baysY; iz++) {
     const z = -halfDepth + iz * bayDepthM

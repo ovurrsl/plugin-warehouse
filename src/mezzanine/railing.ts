@@ -308,6 +308,3 @@ export function stairOrigin(
   }
   return { x: geo.fixed, z: along, rotationRad: geo.outward > 0 ? -Math.PI / 2 : Math.PI / 2 }
 }
-
-export type { Rect }
-export { rectsOverlap }

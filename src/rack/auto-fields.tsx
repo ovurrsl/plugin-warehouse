@@ -10,6 +10,7 @@ import {
   autoPickingBoxesDeep,
   fittedLevelCount,
   levelClearOpening,
+  levelTypeOf,
 } from './slots'
 
 /**
@@ -158,71 +159,121 @@ export function PickingBoxesDeepField({ node, onUpdate }: CustomField) {
   )
 }
 
+const rowInputStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  padding: '0.25rem 0.375rem',
+  borderRadius: '0.25rem',
+  border: '1px solid var(--border)',
+  background: 'var(--background)',
+  color: 'var(--foreground)',
+  fontSize: '0.6875rem',
+}
+
 /**
- * Kat başına açıklık — `levelClears` geçersiz kılmaları.
+ * Katlar — TEK tablo: her satır bir kat, açıklığı ve tipi yan yana.
  *
- * Boş kutu = varsayılan (`firstLevelClear` / `levelClear` / picking açıklığı);
- * sayı = o katın kendi açıklığı. Yalnız gerçekten sığan katlar listelenir —
- * sığmayan bir kata değer yazdırmak, hiçbir şeyi hareket ettirmeyen bir alan
- * üretirdi.
+ * Önceden ikiye bölünmüştü (açıklıklar burada, kat tipleri trailing panelde).
+ * Aynı şeyin iki ayrı yerde ayarlanması kullanıcının haklı olarak saçma
+ * bulduğu şeydi — bir kat bir satırdır.
+ *
+ * Üç ölçülmüş hata bu birleştirmeyle düzeldi:
+ *
+ *  1. **Eksik satır.** Liste `fittedLevelCount` kadar satır çiziyordu ama
+ *     katlar `0..fitted` (zemin açıklığı + kiriş katları), yani HER ZAMAN
+ *     son katın açıklığı düzenlenemiyordu. İki katlı bir rafta "Kat 2" hiç
+ *     görünmüyordu — "aralıkları ayarlayamıyorum"un sebebi buydu.
+ *  2. **Sığmayan kat gizleniyordu.** Açıklığı küçültüp o katı sığdırmak
+ *     isteyen kullanıcı bunu yapamıyordu, çünkü satır ancak sığdıktan sonra
+ *     çiziliyordu. Artık istenen kat kadar satır var; sığmayan işaretli ama
+ *     DÜZENLENEBİLİR.
+ *  3. **Kat sayısı düşünce hayalet değer.** Dizi hiç kırpılmıyordu: 5 kattan
+ *     2'ye inip tekrar 5'e çıkınca eski geçersiz kılmalar geri geliyordu.
+ *     Artık her yazımda satır sayısına kırpılıyor.
  */
-export function LevelClearsField({
+export function LevelsField({
   node,
   onUpdate,
 }: {
   node: PalletRackNode
   onUpdate: (patch: Partial<PalletRackNode>) => void
 }) {
+  // Kullanıcının İSTEDİĞİ kat sayısı — sığan değil. Zemin açıklığı da bir
+  // satır, o yüzden `levels + 1`.
+  const rows = node.levels + 1
   const fitted = fittedLevelCount(node)
-  if (fitted === 0) return null
-  const current = node.levelClears ?? []
+  const clears = node.levelClears ?? []
 
-  const setLevel = (level: number, raw: string) => {
-    const next: Array<number | null> = Array.from(
-      { length: Math.max(current.length, fitted) },
-      (_, index) => current[index] ?? null,
-    )
+  /** Diziyi satır sayısına kırp — hayalet değer kalmasın. */
+  const sized = <T,>(source: readonly T[] | null | undefined, fill: (i: number) => T): T[] =>
+    Array.from({ length: rows }, (_, i) => source?.[i] ?? fill(i))
+
+  const setClear = (level: number, raw: string) => {
+    const next = sized<number | null>(clears, () => null)
     next[level] = raw === '' ? null : Number(raw)
     // Hepsi null'a dönerse alan şemadaki "hiç geçersiz kılma yok" hâline
     // döner — kaydedilmiş sahne, hiç dokunulmamış sahneyle aynı okunur.
     onUpdate({ levelClears: next.every((v) => v == null) ? null : next })
   }
 
+  const setType = (level: number, type: 'pallet' | 'picking') => {
+    const next = sized<'pallet' | 'picking'>(node.levelTypes, (i) => levelTypeOf(node, i))
+    next[level] = type
+    onUpdate({ levelTypes: next })
+  }
+
   return (
     <div style={styles.field}>
       <span style={styles.label}>
-        <span>Kat açıklıkları</span>
+        <span>Katlar</span>
         <span>boş = varsayılan</span>
       </span>
-      {Array.from({ length: fitted }, (_, index) => {
-        const level = index // 0 = zemin açıklığı
-        const value = current[level]
+      {Array.from({ length: rows }, (_, level) => {
+        const doesNotFit = level > fitted
         return (
           <div key={level} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-            <span style={{ fontSize: '0.625rem', color: MUTED, width: '3.5rem' }}>
+            <span
+              style={{
+                fontSize: '0.625rem',
+                color: doesNotFit ? '#f59e0b' : MUTED,
+                width: '3.5rem',
+              }}
+              title={doesNotFit ? 'Dikme yüksekliğine sığmıyor — açıklığı küçültün' : undefined}
+            >
               {level === 0 ? 'Zemin' : `Kat ${level}`}
+              {doesNotFit ? ' ⚠' : ''}
             </span>
             <input
               inputMode="decimal"
-              onChange={(event) => setLevel(level, event.target.value)}
+              onChange={(event) => setClear(level, event.target.value)}
               placeholder={levelClearOpening({ ...node, levelClears: null }, level).toFixed(2)}
               step={0.05}
-              style={{
-                flex: 1,
-                padding: '0.25rem 0.375rem',
-                borderRadius: '0.25rem',
-                border: '1px solid var(--border)',
-                background: 'var(--background)',
-                color: 'var(--foreground)',
-                fontSize: '0.6875rem',
-              }}
+              style={rowInputStyle}
               type="number"
-              value={value ?? ''}
+              value={clears[level] ?? ''}
             />
             <span style={{ fontSize: '0.625rem', color: MUTED }}>m</span>
+            {/* Zemin katının TİPİ yok: `levelTypeOf` kiriş katlarını
+                adlandırıyor, zemin açıklığı yalnız ilk kirişe kadar boşluk. */}
+            {level > 0 && (
+              <SegmentedControl
+                onChange={(value: string) => setType(level, value as 'pallet' | 'picking')}
+                options={[
+                  { label: 'Palet', value: 'pallet' },
+                  { label: 'Toplama', value: 'picking' },
+                ]}
+                value={levelTypeOf(node, level)}
+              />
+            )}
           </div>
         )
       })}
+      {node.levels > fitted && (
+        <span style={{ fontSize: '0.625rem', color: '#f59e0b' }}>
+          {node.levels - fitted} kat {node.uprightHeight.toFixed(2)} m dikmeye sığmıyor —
+          açıklıkları küçültün ya da dikmeyi yükseltin.
+        </span>
+      )}
     </div>
   )
 }

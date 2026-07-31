@@ -1,7 +1,7 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
 import {
-  LevelClearsField,
+  LevelsField,
   PalletSupportBarsField,
   PalletsPerLevelField,
   PickingBoxesAcrossField,
@@ -93,7 +93,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         // Kat başına açıklık: tekdüze `levelClear`ın yetmediği gerçek rafın
         // alanı — ilk kat yüksek, üstler alçak. Custom, çünkü eleman sayısı
         // sığan kat sayısını izler.
-        { key: 'levelClears', kind: 'custom', component: LevelClearsField },
+        { key: 'levelClears', kind: 'custom', component: LevelsField },
         { key: 'firstLevelClear', kind: 'number', unit: 'm', min: 0.2, max: 6, step: 0.05 },
         {
           key: 'levelClear',

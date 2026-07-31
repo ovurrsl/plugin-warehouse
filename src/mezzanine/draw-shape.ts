@@ -78,6 +78,52 @@ export type FinishedOutline = {
 }
 
 /**
+ * Var olan bir anahatta köşe taşı / ekle / sil.
+ *
+ * **Yeniden merkezleme YOK — bilerek.** `finishOutline` yeni çizimde konumu
+ * ağırlık merkezine oturtuyor; ama düzenlemede merkez her köşe hamlesinde
+ * kayar, ve merdivenler/kapılar mezzanine-YEREL koordinatta durduğu için
+ * yerel çerçevenin kayması onları görsel olarak yerinden oynatırdı. Düzenleme
+ * konumu sabit tutar, yalnız köşeleri değiştirir.
+ *
+ * Üçü de dejenere sonucu REDDEDER (null): alanı `MIN_AREA_M2` altına düşüren
+ * bir hamle commit edilmemeli — çağıran eski hâli korur.
+ */
+export function withVertexMoved(
+  polygon: readonly Point2[],
+  index: number,
+  next: Point2,
+): Point2[] | null {
+  if (index < 0 || index >= polygon.length) return null
+  const moved = polygon.map((p, i) => (i === index ? next : p))
+  return Math.abs(signedArea(moved)) < MIN_AREA_M2
+    ? null
+    : moved.map((p) => [...p] as [number, number])
+}
+
+/** `index` kenarının ortasına yeni köşe — kenar `index → index+1`. */
+export function withVertexInserted(
+  polygon: readonly Point2[],
+  edgeIndex: number,
+  point: Point2,
+): Point2[] | null {
+  if (edgeIndex < 0 || edgeIndex >= polygon.length) return null
+  const inserted = [...polygon.slice(0, edgeIndex + 1), point, ...polygon.slice(edgeIndex + 1)]
+  return Math.abs(signedArea(inserted)) < MIN_AREA_M2
+    ? null
+    : inserted.map((p) => [...p] as [number, number])
+}
+
+export function withVertexRemoved(polygon: readonly Point2[], index: number): Point2[] | null {
+  // Üç köşe bir alanın alt sınırı — daha azı şekil değil.
+  if (polygon.length <= 3 || index < 0 || index >= polygon.length) return null
+  const removed = polygon.filter((_, i) => i !== index)
+  return Math.abs(signedArea(removed)) < MIN_AREA_M2
+    ? null
+    : removed.map((p) => [...p] as [number, number])
+}
+
+/**
  * Çizimi bitir: doğrula, merkeze taşı, sarımı normalleştir.
  *
  * `null` dönüyorsa çizim kabul edilemez ve araç onu commit ETMEMELİ —
@@ -86,7 +132,8 @@ export type FinishedOutline = {
  * **Neden merkeze taşınıyor:** düğümün `position`'ı ile `polygon`'ı ayrı
  * yaşıyor; poligon dünya koordinatında bırakılsaydı mezzanine'i taşımak
  * şekli yerinde bırakırdı. Merkez = konum kuralı, döndürmenin de şeklin
- * ortasından olmasını sağlıyor.
+ * ortasından olmasını sağlıyor. (Düzenleme bunun TERSİNİ yapıyor — bkz.
+ * `withVertexMoved`ün notu.)
  */
 export function finishOutline(points: readonly Point2[]): FinishedOutline | null {
   if (points.length < 3) return null

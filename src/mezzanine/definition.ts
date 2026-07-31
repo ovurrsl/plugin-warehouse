@@ -81,6 +81,13 @@ export const mezzanineDefinition = {
 
   tool: () => import('./tool'),
 
+  // Seçiliyken köşe tutamakları — anahat sonradan düzenlenebilsin.
+  // `system` DEĞİL: sistemler read-only viewer rotasında da mount edilir ve
+  // orada düzenleme tutamağının işi yok (host'un kendi kuralı).
+  affordanceTools: {
+    selection: () => import('./outline-editor'),
+  },
+
   toolHints: [
     { key: 'Left click', label: 'Place mezzanine' },
     { key: 'R / T', label: 'Rotate 45°' },

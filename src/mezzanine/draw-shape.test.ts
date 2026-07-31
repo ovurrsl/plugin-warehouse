@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { centroidOf, closeEnough, finishOutline, type Point2, signedArea } from './draw-shape'
+import {
+  centroidOf,
+  closeEnough,
+  finishOutline,
+  type Point2,
+  signedArea,
+  withVertexInserted,
+  withVertexMoved,
+  withVertexRemoved,
+} from './draw-shape'
 
 const square: Point2[] = [
   [0, 0],
@@ -88,5 +97,42 @@ describe('ağırlık merkezi', () => {
     ])
     expect(Number.isFinite(centre[0])).toBe(true)
     expect(Number.isFinite(centre[1])).toBe(true)
+  })
+})
+
+describe('anahat düzenleme — yeniden merkezleme YOK', () => {
+  test('köşe taşımak konumu değil yalnız köşeyi değiştirir', () => {
+    // Merdivenler mezzanine-YEREL koordinatta; merkez kaysaydı yerlerinden
+    // oynarlardı. Düzenleme bu yüzden `finishOutline`dan farklı: recenter yok.
+    const moved = withVertexMoved(square, 0, [-2, -2])
+    expect(moved).not.toBeNull()
+    expect(moved?.[0]).toEqual([-2, -2])
+    expect(moved?.[1]).toEqual([4, 0])
+  })
+
+  test('alanı yok eden hamle REDDEDİLİR', () => {
+    // Kareyi karşı köşesinin üstüne katlamak alanı sıfıra indirir.
+    const collapsed = withVertexMoved(
+      [
+        [0, 0],
+        [4, 0],
+        [4, 0.01],
+      ],
+      2,
+      [2, 0],
+    )
+    expect(collapsed).toBeNull()
+  })
+
+  test('kenara köşe eklenir ve alan korunur', () => {
+    const inserted = withVertexInserted(square, 0, [2, 0])
+    expect(inserted).toHaveLength(5)
+    expect(inserted?.[1]).toEqual([2, 0])
+  })
+
+  test('köşe silinir ama üçten aşağı İNİLMEZ', () => {
+    const removed = withVertexRemoved(square, 0)
+    expect(removed).toHaveLength(3)
+    expect(withVertexRemoved(removed ?? [], 0)).toBeNull()
   })
 })

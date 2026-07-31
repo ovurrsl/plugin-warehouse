@@ -11,7 +11,13 @@
  */
 
 import { CONSTRUCTIVE_SYSTEMS } from './catalog'
-import { footprintDepthM, footprintWidthM, outlinePolygon, pointInPolygon } from './metrics'
+import {
+  footprintDepthM,
+  footprintWidthM,
+  hasCustomOutline,
+  outlinePolygon,
+  pointInPolygon,
+} from './metrics'
 import type { MezzanineNode, MezzanineTier } from './schema'
 import { type Rect, rectsOverlap, resolveSteps, stairVoidRect } from './stairs'
 
@@ -265,6 +271,34 @@ export function stairOrigin(
       rotationRad: (stair.placement.rotationDeg * Math.PI) / 180,
     }
   }
+  /**
+   * Özel şekilde kenara sabitli merdiven, kardinalinin TEMSİLCİ anahat
+   * kenarına oturur — sınır dikdörtgenine değil. `offsetM` o kenarın kendi
+   * parametresinde (0 → uzunluk) ve iniş yönü kenarın dış normalinin tersi:
+   * merdiven döşemedeki boşluktan İÇERİ iner.
+   *
+   * Dikdörtgen yol aşağıda aynen duruyor: dört kardinal kenar orada
+   * `edgeGeometry`den geliyor ve mevcut sahnelerin davranışı değişmiyor.
+   */
+  if (hasCustomOutline(node) && stair.placement.mode === 'edge') {
+    // Daraltma kapanışın içinde kayboluyor; kardinali önce yakala.
+    const cardinal = stair.placement.edge
+    const edge = outlineEdges(node).find(
+      (candidate) => candidate.representative && candidate.cardinal === cardinal,
+    )
+    if (edge) {
+      const t = Math.min(Math.max(stair.placement.offsetM, 0), edge.lengthM)
+      const ux = (edge.b[0] - edge.a[0]) / edge.lengthM
+      const uz = (edge.b[1] - edge.a[1]) / edge.lengthM
+      return {
+        x: edge.a[0] + ux * t,
+        z: edge.a[1] + uz * t,
+        // Yerel +Z'yi içe (−normal) çeviren yaw: (−sin, cos) = (−nx, −nz).
+        rotationRad: Math.atan2(edge.outward[0], -edge.outward[1]),
+      }
+    }
+  }
+
   const geo = edgeGeometry(node, stair.placement.edge)
   const along = geo.startM + stair.placement.offsetM
   // Merdiven çevreden İÇERİ doğru iner: yönü kenarın dışa bakan yönünün

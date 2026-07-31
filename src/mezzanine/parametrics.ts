@@ -2,6 +2,7 @@ import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { GridField, TiersField } from './auto-fields'
 import { CONSTRUCTIVE_SYSTEMS, RAILING_RULES } from './catalog'
 import { effectiveClearHeightM, hasCustomOutline, resolveTierElevations } from './metrics'
+import { outlineEdges } from './railing'
 import type { MezzanineNode } from './schema'
 import { resolveSteps } from './stairs'
 
@@ -96,16 +97,28 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
        * hatasının aynısı olurdu — kullanıcı L şeklinde bir güverte çizip
        * korkuluğun onu takip ettiğini sanardı.
        */
+      /**
+       * Kenara sabitli merdiven artık kardinalinin TEMSİLCİ anahat kenarına
+       * oturuyor; uyarı yalnız o kardinalin poligonda hiç karşılığı yoksa
+       * kalıyor (üçgen bir güvertede güneye bakan kenar olmayabilir) — o
+       * durumda merdiven sınır dikdörtgenine düşer ve bunu söylemek gerekir.
+       */
       if (hasCustomOutline(node)) {
-        const edgeAnchored = node.tiers.some((t) =>
-          t.accessories.staircases.some((s) => s.placement.mode === 'edge'),
+        const cardinals = new Set(
+          outlineEdges(node)
+            .filter((edge) => edge.representative)
+            .map((edge) => edge.cardinal),
         )
-        if (edgeAnchored) {
-          issues.push({
-            field: 'polygon',
-            severity: 'warning',
-            msg: 'Kenara sabitli merdivenler özel şekilde sınır dikdörtgenine oturuyor — serbest konuma (⤢) alarak istediğiniz yere taşıyın.',
-          })
+        for (const tier of node.tiers) {
+          for (const stair of tier.accessories.staircases) {
+            if (stair.placement.mode !== 'edge') continue
+            if (cardinals.has(stair.placement.edge)) continue
+            issues.push({
+              field: 'polygon',
+              severity: 'warning',
+              msg: `"${stair.id}" merdiveni ${stair.placement.edge} kenarına sabitli ama bu şeklin o yöne bakan kenarı yok — merdiven sınır dikdörtgenine düşüyor. Serbest konuma (⤢) alın.`,
+            })
+          }
         }
       }
 

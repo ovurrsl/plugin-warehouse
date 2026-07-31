@@ -100,22 +100,64 @@ describe('plan sembolü okunabilir kalıyor', () => {
     }
   })
 
-  test('kapı planda kendi rengiyle çizilir', () => {
-    const node = nodeWith({ swingGates: [{ edge: 'north', offsetM: 10, widthM: 0.75 }] })
-    const gate = childrenOf(node, CTX_UNSELECTED).find(
-      (c) => c.kind === 'rect' && 'fill' in c && c.fill === '#f2c200',
-    )
-    expect(gate).toBeDefined()
-  })
-
-  test('korkuluk kapıda kesilir — planda iki ayrı parça', () => {
-    const plain = childrenOf(nodeWith(), CTX_UNSELECTED).length
-    const gated = childrenOf(
+  test('kanat kapı: kanat + menteşe + süpürme yayı — düz bant değil', () => {
+    // Düz sarı bir bant kapının hangi yöne açıldığını ve ne kadar zemin
+    // süpürdüğünü söylemiyordu; planı okuyan kişi tam bunu soruyor.
+    const kids = childrenOf(
       nodeWith({ swingGates: [{ edge: 'north', offsetM: 10, widthM: 0.75 }] }),
       CTX_UNSELECTED,
-    ).length
-    // Kuzey korkuluğu ikiye bölünür (+1) ve kapı kanadı eklenir (+1).
-    expect(gated).toBe(plain + 2)
+    )
+    const paths = kids.filter((c) => c.kind === 'path' && 'stroke' in c && c.stroke === '#f2c200')
+    // Kanat çizgisi + süpürme yayı.
+    expect(paths.length).toBe(2)
+    expect(paths.some((c) => 'd' in c && String(c.d).includes('A'))).toBe(true)
+    // Menteşe noktası.
+    expect(kids.some((c) => c.kind === 'circle' && 'fill' in c && c.fill === '#f2c200')).toBe(true)
+  })
+
+  test('yukarı-devrilir kapı kanat kapıdan AYIRT EDİLİYOR', () => {
+    // Personel kapısı ile palet kapısı planda aynı görünmemeli.
+    const upOver = childrenOf(
+      nodeWith({ upAndOverGates: [{ edge: 'north', offsetM: 10, widthM: 1.5 }] }),
+      CTX_UNSELECTED,
+    )
+    // Yay YOK (dikey döner); onun yerine içeri uzanan kesikli flap var —
+    // 3B'deki yatay kanadın gerçek izdüşümü.
+    expect(upOver.some((c) => c.kind === 'path' && 'd' in c && String(c.d).includes('A'))).toBe(
+      false,
+    )
+    expect(
+      upOver.some((c) => c.kind === 'rect' && 'strokeDasharray' in c && c.fill === 'none'),
+    ).toBe(true)
+  })
+
+  test('güvenlik bölgesi zincirle çiziliyor: kesikli çizgi + baklalar', () => {
+    const kids = childrenOf(
+      nodeWith({ safetyZones: [{ edge: 'east', offsetM: 8, widthM: 1.5 }] }),
+      CTX_UNSELECTED,
+    )
+    const rings = kids.filter(
+      (c) => c.kind === 'circle' && 'stroke' in c && c.stroke === '#f2c200' && c.fill === 'none',
+    )
+    expect(rings.length).toBe(3)
+  })
+
+  test('korkuluk kapıda kesilir — kapılı planda dolu korkuluk parçası artar', () => {
+    const railPieces = (accessories: Parameters<typeof nodeWith>[0]) =>
+      childrenOf(nodeWith(accessories), CTX_UNSELECTED).filter(
+        (c) => c.kind === 'polygon' && 'fill' in c && c.fill === '#5a6570',
+      ).length
+    // Kuzey korkuluğu ikiye bölünür: +1 dolu parça.
+    expect(railPieces({ swingGates: [{ edge: 'north', offsetM: 10, widthM: 0.75 }] })).toBe(
+      railPieces({}) + 1,
+    )
+  })
+
+  test('kiriş ızgarası planda — yükün neyin üstünde durduğu okunur', () => {
+    const kids = childrenOf(nodeWith(), CTX_UNSELECTED)
+    const beams = kids.filter((c) => c.kind === 'rect' && 'opacity' in c && c.opacity !== undefined)
+    // Ana hatlar (baysY+1) + ikinciller — sayı grid'e bağlı, varlığı sabit.
+    expect(beams.length).toBeGreaterThan(5)
   })
 
   test('etiketler yalnız seçiliyken — plan kalabalıklaşmasın', () => {

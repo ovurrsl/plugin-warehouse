@@ -256,12 +256,95 @@ export function buildMezzanineFloorplan(
       }
     }
 
-    // ── Kapılar: açıklıkta duran kanat ───────────────────────────────────
-    const gates = [...top.accessories.swingGates, ...top.accessories.upAndOverGates]
-    for (const gate of gates) {
+    // ── Kiriş ızgarası — yükün NEYİN üstünde durduğu plansız okunmaz ─────
+    //
+    // 3B ile aynı yerleşim (`pushTierBeams`): ana kirişler her göz hattında,
+    // ikinciller sabit aralıkta. İkisi kalınlıkla ayrılıyor — plan dili.
+    {
+      const { baysY, bayDepthM } = node.grid
+      const secondarySpacing = 1.25
+      for (let iz = 0; iz <= baysY; iz++) {
+        const z = -depth / 2 + iz * bayDepthM
+        if (z > depth / 2 + 1e-9) break
+        children.push({
+          kind: 'rect',
+          x: -width / 2,
+          y: z - 0.03,
+          width,
+          height: 0.06,
+          fill: railStroke,
+          opacity: 0.3,
+        })
+      }
+      const secondaryCount = Math.max(1, Math.round(width / secondarySpacing))
+      for (let i = 0; i <= secondaryCount; i++) {
+        const x = -width / 2 + (i / secondaryCount) * width
+        children.push({
+          kind: 'rect',
+          x: x - 0.012,
+          y: -depth / 2,
+          width: 0.024,
+          height: depth,
+          fill: railStroke,
+          opacity: 0.18,
+        })
+      }
+    }
+
+    // ── Kanat kapı: kanat + menteşe noktası + süpürme yayı ───────────────
+    //
+    // Düz sarı bir bant, kapının hangi yöne açıldığını ve ne kadar zemin
+    // süpürdüğünü söylemiyordu — planı okuyan kişi tam bunu soruyor.
+    for (const gate of top.accessories.swingGates) {
+      const geo = edgeGeometry(node, gate.edge)
+      const along = geo.startM + gate.offsetM
+      // Menteşe: kapının bir ucu. Kanat kapalı konumda kenar boyunca.
+      const hinge: [number, number] =
+        geo.axis === 'x'
+          ? [along - gate.widthM / 2, geo.fixed]
+          : [geo.fixed, along - gate.widthM / 2]
+      const latch: [number, number] =
+        geo.axis === 'x'
+          ? [along + gate.widthM / 2, geo.fixed]
+          : [geo.fixed, along + gate.widthM / 2]
+      // İçe açılır: süpürme yayı içeri doğru çeyrek daire.
+      const inward = -geo.outward
+      const sweepEnd: [number, number] =
+        geo.axis === 'x'
+          ? [hinge[0], hinge[1] + inward * gate.widthM]
+          : [hinge[0] + inward * gate.widthM, hinge[1]]
+
+      children.push({
+        kind: 'path',
+        d: `M ${latch[0]} ${latch[1]} A ${gate.widthM} ${gate.widthM} 0 0 ${
+          // Yay yönü: menteşe etrafında kapalıdan açığa.
+          geo.axis === 'x' ? (inward > 0 ? 1 : 0) : inward > 0 ? 0 : 1
+        } ${sweepEnd[0]} ${sweepEnd[1]}`,
+        fill: 'none',
+        stroke: gateFill,
+        strokeWidth: 0.02,
+        strokeDasharray: '0.15 0.1',
+      })
+      // Kanat (kapalı konum) ve menteşe işareti.
+      children.push({
+        kind: 'path',
+        d: `M ${hinge[0]} ${hinge[1]} L ${latch[0]} ${latch[1]}`,
+        fill: 'none',
+        stroke: gateFill,
+        strokeWidth: 0.06,
+      })
+      children.push({ kind: 'circle', cx: hinge[0], cy: hinge[1], r: 0.09, fill: gateFill })
+    }
+
+    // ── Yukarı-devrilir kapı: kanat + palet üstü yatay flap ──────────────
+    //
+    // Kanat kapıdan AYRI sembol: yay yok (dikey döner), onun yerine içeri
+    // uzanan kesikli dikdörtgen — 3B'deki yatay kanadın gerçek izdüşümü.
+    for (const gate of top.accessories.upAndOverGates) {
       const geo = edgeGeometry(node, gate.edge)
       const along = geo.startM + gate.offsetM
       const thickness = 0.08
+      const inward = -geo.outward
       children.push({
         kind: 'rect',
         x: geo.axis === 'x' ? along - gate.widthM / 2 : geo.fixed - thickness / 2,
@@ -272,6 +355,62 @@ export function buildMezzanineFloorplan(
         stroke: gateFill,
         strokeWidth: 0.008,
       })
+      const flapDepth = gate.widthM / 2
+      children.push({
+        kind: 'rect',
+        x:
+          geo.axis === 'x'
+            ? along - gate.widthM / 2
+            : inward > 0
+              ? geo.fixed
+              : geo.fixed - flapDepth,
+        y:
+          geo.axis === 'x'
+            ? inward > 0
+              ? geo.fixed
+              : geo.fixed - flapDepth
+            : along - gate.widthM / 2,
+        width: geo.axis === 'x' ? gate.widthM : flapDepth,
+        height: geo.axis === 'x' ? flapDepth : gate.widthM,
+        fill: 'none',
+        stroke: gateFill,
+        strokeWidth: 0.02,
+        strokeDasharray: '0.12 0.08',
+      })
+    }
+
+    // ── Güvenlik bölgesi: zincir — kesikli çizgi + baklalar ──────────────
+    for (const zone of top.accessories.safetyZones) {
+      const geo = edgeGeometry(node, zone.edge)
+      const along = geo.startM + zone.offsetM
+      const a: [number, number] =
+        geo.axis === 'x'
+          ? [along - zone.widthM / 2, geo.fixed]
+          : [geo.fixed, along - zone.widthM / 2]
+      const b: [number, number] =
+        geo.axis === 'x'
+          ? [along + zone.widthM / 2, geo.fixed]
+          : [geo.fixed, along + zone.widthM / 2]
+      children.push({
+        kind: 'path',
+        d: `M ${a[0]} ${a[1]} L ${b[0]} ${b[1]}`,
+        fill: 'none',
+        stroke: gateFill,
+        strokeWidth: 0.03,
+        strokeDasharray: '0.1 0.08',
+      })
+      // Zincir baklaları: uçlarda ve ortada birer halka.
+      for (const t of [0, 0.5, 1] as const) {
+        children.push({
+          kind: 'circle',
+          cx: a[0] + (b[0] - a[0]) * t,
+          cy: a[1] + (b[1] - a[1]) * t,
+          r: 0.07,
+          fill: 'none',
+          stroke: gateFill,
+          strokeWidth: 0.025,
+        })
+      }
     }
 
     // ── Merdiven: basamak çizgileri + çıkış oku + etiket ─────────────────
@@ -343,6 +482,16 @@ export function buildMezzanineFloorplan(
         cx: 0,
         cy: -depth / 2 - 0.6,
         text: `${node.tiers.length} tier · ${top.deckTopM.toFixed(2)} m · ${FLOOR_TYPES[top.floorType].label}`,
+        angle: 0,
+        screenUpright: true,
+      })
+      // Ölçüler: toplam ayak izi + göz adımı. Yerleşim kararı veren kişinin
+      // plandan okuyamadığı iki sayı buydu.
+      children.push({
+        kind: 'dimension-label',
+        cx: 0,
+        cy: depth / 2 + 0.5,
+        text: `${width.toFixed(1)} m × ${depth.toFixed(1)} m · göz ${node.grid.bayWidthM.toFixed(1)} × ${node.grid.bayDepthM.toFixed(1)} m`,
         angle: 0,
         screenUpright: true,
       })

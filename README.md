@@ -227,6 +227,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5c714a8`](https://github.com/ovurrsl/plugin-warehouse/commit/5c714a8fd92c6f5d81abaa333ff27750efcb6b86))
 - Refresh generated README blocks [skip ci] ([`47eafd7`](https://github.com/ovurrsl/plugin-warehouse/commit/47eafd7e89ae699aa8634ebc00669ab4f63b20a6))
 - Refresh generated README blocks [skip ci] ([`e7f62bc`](https://github.com/ovurrsl/plugin-warehouse/commit/e7f62bc61907114a61706d946321fbc4af501705))
 - Refresh generated README blocks [skip ci] ([`cb05e0a`](https://github.com/ovurrsl/plugin-warehouse/commit/cb05e0ae7d8f0c325d898dcfde8db5ba852b6302))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`4697fdd`](https://github.com/ovurrsl/plugin-warehouse/commit/4697fdd338982d8da5e5d1383c6dc1e8ea4055f6))
 - Refresh generated README blocks [skip ci] ([`b519c72`](https://github.com/ovurrsl/plugin-warehouse/commit/b519c72fc1eeac406433bd454d0cf502c879d08f))
 - Refresh generated README blocks [skip ci] ([`7326461`](https://github.com/ovurrsl/plugin-warehouse/commit/7326461c64866b919c8851e69c19fb7a189f1758))
-- Refresh generated README blocks [skip ci] ([`a70a3bd`](https://github.com/ovurrsl/plugin-warehouse/commit/a70a3bd66b5a07461767f37a8c3ca5df117f7809))
 
 …
 

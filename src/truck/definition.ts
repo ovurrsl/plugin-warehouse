@@ -50,6 +50,10 @@ export const truckDefinition = {
           routeId: null,
           routeAnchor: 0,
           duty: 'parked',
+          // Sabitlenmiş yuvalar kopyaya TAŞINMAZ: iki araç aynı kaynağı
+          // sabitlerse ikisi de aynı paleti almaya gider.
+          pickSlot: null,
+          dropSlot: null,
           carryingPalletId: null,
         } as unknown as AnyNode,
       }),

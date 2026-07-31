@@ -177,7 +177,14 @@ export function buildFleet(nodes: Readonly<Record<string, unknown>>): Fleet {
   for (const truck of trucks) {
     const model = TRUCK_MODELS[truck.modelId]
     const stations = stationsAlong(nodes, truck.track, model)
-    const assignment = assignmentFor(truck.id, stations)
+    // Kullanıcının sabitlediği yuvalar kurayı geçersiz kılar — düğümden
+    // burada okunuyor, FleetTruck'a kopyalanmıyor: sabit sahne verisi ve
+    // filo kaydı canlı durum taşır, konfigürasyon değil.
+    const node = nodes[truck.id] as TruckNode | undefined
+    const assignment = assignmentFor(truck.id, stations, {
+      pick: node?.pickSlot,
+      drop: node?.dropSlot,
+    })
     if (!assignment) continue
     const steps = buildCycle(model, assignment.source, assignment.target, truck.s)
     if (steps.length === 0) continue

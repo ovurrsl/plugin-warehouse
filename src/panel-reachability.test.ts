@@ -58,6 +58,8 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
     { field: 'routeId', kind: 'SYSTEM', where: 'filo sistemi yazar' },
     { field: 'routeAnchor', kind: 'SYSTEM', where: 'filo sistemi yazar' },
     { field: 'carryingPalletId', kind: 'SYSTEM', where: 'palet görev döngüsü yazar' },
+    { field: 'pickSlot', kind: 'CUSTOM', where: 'truck paneli kaynak yuva sabitleme seçicisi' },
+    { field: 'dropSlot', kind: 'CUSTOM', where: 'truck paneli hedef yuva sabitleme seçicisi' },
   ],
   'warehouse:conveyor-roller': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },

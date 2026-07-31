@@ -5,9 +5,8 @@ import { TRUCK_MODEL_ID_LIST } from '../handling/models'
 
 const tuple3 = z.tuple([z.number(), z.number(), z.number()])
 
-/** Raf yuvası adresi: hangi raf, hangi `Bx-Ly-Pz`. Dilim 8'in palet
- *  alma/bırakması bunu doldurur; bugünden şemada, ki o gün kayıtlı sahne
- *  migrasyonu gerektirmesin. */
+/** Raf yuvası adresi: hangi raf, hangi `Bx-Ly-Pz`. */
+const SlotRef = z.object({ rackId: z.string(), address: z.string() })
 /**
  * Bir iş makinesi. Ölçü YOK: her figür `model` üzerinden katalogdan okunur,
  * düğüm yalnız seçimleri taşır. Bir katalog düzeltmesi böylece kaydedilmiş
@@ -54,10 +53,25 @@ export const TruckNode = BaseNode.extend({
    *  canlı poz `useLiveTransforms`'ta yaşar, düğümde değil. */
   forkHeight: z.number().min(0).max(18).default(0),
 
-  // ── Görev (dilim 6+ bunları sürer; bugün yalnız veri) ─────────────────
+  // ── Görev ─────────────────────────────────────────────────────────────
   routeId: z.string().nullable().default(null),
   routeAnchor: z.number().min(0).max(1).default(0),
   duty: z.enum(['parked', 'shuttle']).default('parked'),
+  /**
+   * Kullanıcının SABİTLEDİĞİ kaynak/hedef yuva — plan §6.1'in alanları.
+   *
+   * `null` → çevrim yuvayı deterministik kurayla seçer (`assignmentFor`,
+   * araç kimliğinden hash). Sabitlenmişse VE hâlâ geçerliyse (kaynak dolu,
+   * hedef boş ve hayaletsiz, ikisi de rotadan erişilebilir) kura yerine bu
+   * kullanılır; geçersiz kalmış bir sabit sessizce kuraya düşer ve panel
+   * bunu söyler — silinen bir rafın yuvasına çevrimi kilitlemek simülasyonu
+   * durdurmak olurdu.
+   *
+   * (Bir kez "yer tutucu" diye silinmişti; kullanıcı düzeltti — amaç tam
+   * buydu: simülasyonda paletin NEREDEN alınıp NEREYE konacağını seçmek.)
+   */
+  pickSlot: SlotRef.nullable().default(null),
+  dropSlot: SlotRef.nullable().default(null),
   carryingPalletId: z.string().nullable().default(null),
 
   /** Üzerinde durduğu slab, yerleştirmede seçilir — istatistik panelinin

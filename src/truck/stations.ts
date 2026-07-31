@@ -168,22 +168,55 @@ export type Assignment = {
   target: Station
 }
 
+/** Kullanıcının sabitlediği yuva — `TruckNode.pickSlot`/`dropSlot`'un şekli. */
+export type SlotPin = { rackId: string; address: string } | null | undefined
+
+/** Sabitin istasyon listesinde hâlâ bir karşılığı var mı. `slot.id`
+ *  biçimlenmiş adresin ta kendisi (`formatSlotAddress`). */
+function stationForPin(stations: readonly Station[], pin: SlotPin): Station | null {
+  if (!pin) return null
+  return (
+    stations.find((station) => station.rackId === pin.rackId && station.slot.id === pin.address) ??
+    null
+  )
+}
+
 /**
- * Kaynak–hedef eşlemesi, araç kimliğinden deterministik.
+ * Kaynak–hedef eşlemesi: SABİTLENMİŞ yuva kurayı geçersiz kılar, kalanı
+ * araç kimliğinden deterministik.
  *
  * `Math.random` YOK: sahne dosyasının bir fonksiyonu olmak zorunda, yoksa
  * her yeniden yükleme farklı bir çevrim üretir ve kullanıcı aynı sahneyi
- * ikinci kez açtığında araç başka bir paleti taşır (T34).
+ * ikinci kez açtığında araç başka bir paleti taşır (T34). Sabitleme bu
+ * kuralı BOZMAZ — sabit de sahne dosyasında yaşıyor.
+ *
+ * Geçersiz kalmış bir sabit (raf silinmiş, kaynak boşalmış, hedef dolmuş
+ * ya da hayaletlenmiş) sessizce kuraya düşer; panel invariant'ı bunu
+ * söyler. Çevrimi ölü bir yuvaya kilitlemek simülasyonu durdurmak olurdu.
  */
-export function assignmentFor(truckId: string, stations: readonly Station[]): Assignment | null {
+export function assignmentFor(
+  truckId: string,
+  stations: readonly Station[],
+  pins?: { pick?: SlotPin; drop?: SlotPin },
+): Assignment | null {
   const sources = stations.filter((station) => station.occupied)
   // Hayaletli yuva hedef DEĞİL: ekranda dolu görünüyor ve oraya gerçek bir
   // palet bırakmak, tek yuvada iki palet demek.
   const targets = stations.filter((station) => !station.occupied && !station.ghosted)
   if (sources.length === 0 || targets.length === 0) return null
+
+  const pinnedSource = stationForPin(stations, pins?.pick)
+  const pinnedTarget = stationForPin(stations, pins?.drop)
+
   const seed = hash(truckId)
-  const source = sources[seed % sources.length]
-  const target = targets[(seed >>> 8) % targets.length]
+  // Sabit yalnız ROLÜNE uygunsa kazanır: boş bir yuvayı kaynak sabitlemek,
+  // aracı olmayan bir paleti almaya göndermek olurdu.
+  const source =
+    pinnedSource && pinnedSource.occupied ? pinnedSource : sources[seed % sources.length]
+  const target =
+    pinnedTarget && !pinnedTarget.occupied && !pinnedTarget.ghosted
+      ? pinnedTarget
+      : targets[(seed >>> 8) % targets.length]
   if (!source || !target) return null
   // Aynı yuvaya taşımak bir çevrim değildir.
   if (source.rackId === target.rackId && source.slot.id === target.slot.id) return null

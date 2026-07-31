@@ -372,3 +372,69 @@ describe('hayalet stok ile çakışma — ekranda dolu yuvaya gerçek palet bır
     expect(stations.every((s) => !s.ghosted)).toBe(true)
   })
 })
+
+describe('yuva sabitleme — kullanıcı kurayı geçersiz kılar (plan §6.1)', () => {
+  function pinFixture() {
+    const r = rack('pallet-rack_a', 5)
+    const slots = palletSlotsOf(r)
+    const pallets = slots.slice(0, 3).map((slot, index) =>
+      PalletNode.parse({
+        id: `pallet_${index}`,
+        parentId: LEVEL,
+        slotRackId: r.id,
+        slotAddress: slot.id,
+      }),
+    )
+    const stations = stationsAlong(scene(r, ...pallets), track(), FORKLIFT)
+    return { rackId: r.id, stations }
+  }
+
+  test('sabitlenen kaynak ve hedef kurayı yener', () => {
+    const { rackId, stations } = pinFixture()
+    const occupied = stations.filter((s) => s.occupied)
+    const empty = stations.filter((s) => !s.occupied && !s.ghosted)
+    const pick = occupied[occupied.length - 1]
+    const drop = empty[empty.length - 1]
+    if (!pick || !drop) throw new Error('fikstür yetersiz')
+
+    const pinned = assignmentFor('truck_abc', stations, {
+      pick: { rackId, address: pick.slot.id },
+      drop: { rackId, address: drop.slot.id },
+    })
+    expect(pinned?.source.slot.id).toBe(pick.slot.id)
+    expect(pinned?.target.slot.id).toBe(drop.slot.id)
+  })
+
+  test('ROLE uymayan sabit yok sayılır: boş yuva kaynak olamaz', () => {
+    const { rackId, stations } = pinFixture()
+    const empty = stations.find((s) => !s.occupied && !s.ghosted)
+    if (!empty) throw new Error('boş yuva yok')
+    // Boş yuvayı KAYNAK sabitle: araç olmayan paleti almaya gitmemeli.
+    const assignment = assignmentFor('truck_abc', stations, {
+      pick: { rackId, address: empty.slot.id },
+    })
+    expect(assignment?.source.occupied).toBe(true)
+    expect(assignment?.source.slot.id).not.toBe(empty.slot.id)
+  })
+
+  test('silinmiş rafın sabiti sessizce kuraya düşer', () => {
+    const { stations } = pinFixture()
+    const withDeadPin = assignmentFor('truck_abc', stations, {
+      pick: { rackId: 'pallet-rack_deleted', address: 'R1-B1-L1-P1-D1' },
+    })
+    const unpinned = assignmentFor('truck_abc', stations)
+    // Ölü sabit kurayı DEĞİŞTİRMEZ — davranış sabitsiz hâlin aynısı.
+    expect(withDeadPin?.source.slot.id).toBe(unpinned?.source.slot.id ?? '')
+  })
+
+  test('sabit de deterministik: aynı sahne + aynı sabit = aynı çevrim', () => {
+    const { rackId, stations } = pinFixture()
+    const occupied = stations.find((s) => s.occupied)
+    if (!occupied) throw new Error('dolu yuva yok')
+    const pins = { pick: { rackId, address: occupied.slot.id } }
+    const a = assignmentFor('truck_abc', stations, pins)
+    const b = assignmentFor('truck_abc', stations, pins)
+    expect(a?.source.slot.id).toBe(b?.source.slot.id ?? '')
+    expect(a?.target.slot.id).toBe(b?.target.slot.id ?? '')
+  })
+})

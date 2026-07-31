@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5a447ef`](https://github.com/ovurrsl/plugin-warehouse/commit/5a447ef0a39cebcffbd5980456fc47464498c19e))
 - Refresh generated README blocks [skip ci] ([`4cd5ee7`](https://github.com/ovurrsl/plugin-warehouse/commit/4cd5ee7cdc606802d510a7cd983e99ab8c7fc59a))
 - Refresh generated README blocks [skip ci] ([`ba72a58`](https://github.com/ovurrsl/plugin-warehouse/commit/ba72a58458f3c67b150f955da39fe7e2322cb8be))
 - Refresh generated README blocks [skip ci] ([`c9983a2`](https://github.com/ovurrsl/plugin-warehouse/commit/c9983a2976c56d815bba46a7f5c9a446ce865ce2))
@@ -111,6 +112,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- PickSlot/dropSlot geri — kullanıcı sabitlemesi kurayı geçersiz kılıyor ([`938518f`](https://github.com/ovurrsl/plugin-warehouse/commit/938518f95b3005037ef7eca35c6b4745f56e2a37))
 - Panel erişilebilirlik bekçisi — her alan ya panelde ya kayıtlı istisnada ([`12bfc90`](https://github.com/ovurrsl/plugin-warehouse/commit/12bfc90c22f1d3f7e3d2bd985512a61e0e48f70e))
 - 2D kat seçici, kolon tabanı, GL2000 gerçekleri, ölü sabit temizliği ([`d2e3d59`](https://github.com/ovurrsl/plugin-warehouse/commit/d2e3d595ebe2005680d2b863ccad9d8b8a1c3c82))
 - Kenar merdiveni poligona oturuyor + 2D plan tamamlandı ([`a7ae64d`](https://github.com/ovurrsl/plugin-warehouse/commit/a7ae64d01ab9ce142cab5c50cb3b505bb8ee248d))

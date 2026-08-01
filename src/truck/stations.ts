@@ -211,8 +211,7 @@ export function assignmentFor(
   const seed = hash(truckId)
   // Sabit yalnız ROLÜNE uygunsa kazanır: boş bir yuvayı kaynak sabitlemek,
   // aracı olmayan bir paleti almaya göndermek olurdu.
-  const source =
-    pinnedSource?.occupied ? pinnedSource : sources[seed % sources.length]
+  const source = pinnedSource?.occupied ? pinnedSource : sources[seed % sources.length]
   const target =
     pinnedTarget && !pinnedTarget.occupied && !pinnedTarget.ghosted
       ? pinnedTarget

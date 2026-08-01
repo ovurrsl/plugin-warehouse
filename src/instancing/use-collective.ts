@@ -16,9 +16,9 @@ export type CollectiveOptions = {
   objectRef: React.RefObject<THREE.Object3D | null>
   geometryFor: (tier: InstanceTier) => THREE.BufferGeometry
   keyFor: (tier: InstanceTier) => string
-  material: THREE.Material
-  materialKey: string
-  castShadowWhenFull: boolean
+  materialFor: (tier: InstanceTier) => THREE.Material
+  materialKeyFor: (tier: InstanceTier) => string
+  castsShadow: boolean
   farSq: number
   nearSq: number
   /** Kendi mesh'ini çizmesi gereken hâller: seçili ya da canlı sürükleniyor. */
@@ -51,9 +51,9 @@ export function useCollective(options: CollectiveOptions): boolean {
       object,
       geometryFor: current.geometryFor,
       keyFor: current.keyFor,
-      material: current.material,
-      materialKey: current.materialKey,
-      castShadowWhenFull: current.castShadowWhenFull,
+      materialFor: current.materialFor,
+      materialKeyFor: current.materialKeyFor,
+      castsShadow: current.castsShadow,
       farSq: current.farSq,
       nearSq: current.nearSq,
       excluded: current.excluded,
@@ -78,15 +78,19 @@ export function useCollective(options: CollectiveOptions): boolean {
    * Silip yeniden kurmak düğümü bir kare boyunca hiç çizilmez bırakırdı:
    * eski kayıt gitmiş, yenisi henüz havuza toplanmamış olurdu.
    */
-  const shapeKey = `${options.keyFor('full')}::${options.materialKey}`
+  // İki katmanın anahtarı da girer: yalnız `full`'e bakmak, uzak katmanın
+  // materyali değişince kaydı tazelemeden bırakırdı.
+  const shapeKey =
+    `${options.keyFor('full')}::${options.materialKeyFor('full')}|` +
+    `${options.keyFor('simple')}::${options.materialKeyFor('simple')}`
   useEffect(() => {
     if (!enabled) return
     const current = latest.current
     refreshInstance(current.nodeId, {
       geometryFor: current.geometryFor,
       keyFor: current.keyFor,
-      material: current.material,
-      materialKey: current.materialKey,
+      materialFor: current.materialFor,
+      materialKeyFor: current.materialKeyFor,
     })
   }, [enabled, shapeKey])
 

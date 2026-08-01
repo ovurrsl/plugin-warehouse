@@ -104,7 +104,6 @@ export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLaunc
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getLauncherGeometry(node, next, abutted)
-    mesh.castShadow = next === 'full'
   })
 
   /**
@@ -152,7 +151,7 @@ export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLaunc
           ))}
 
         <mesh
-          castShadow={isExporting || detailRef.current === 'full'}
+          castShadow
           // Never dispose: shared by every module of this shape.
           dispose={null}
           geometry={geometry}

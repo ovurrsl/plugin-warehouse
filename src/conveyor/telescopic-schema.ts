@@ -5,13 +5,23 @@ import { TELESCOPIC_BELT_WIDTHS, TELESCOPIC_MODEL_IDS } from './telescopic-catal
 /**
  * Teleskopik bant konveyör — araç yükleme bomu.
  *
- * Roller ailesinin aksine bir HAT parçası değildir: portu yoktur, komşuya
- * eklenmez; sabit gövdesinden (A) araca doğru B kadar uzayan bağımsız bir
- * makinedir. Ölçüler düğümde DEĞİL katalogdadır — düğüm yalnız model,
- * bant genişliği ve anlık uzama oranını taşır; katalog düzeltmesi kayıtlı
- * her sahneye kendiliğinden yayılır (aracın T16 kuralının aynısı).
+ * Sabit gövdesinden (A) araca doğru B kadar uzar. Ölçüler düğümde DEĞİL
+ * katalogdadır — düğüm yalnız model, bant genişliği ve anlık uzama oranını
+ * taşır; katalog düzeltmesi kayıtlı her sahneye kendiliğinden yayılır (aracın
+ * T16 kuralının aynısı).
  *
  * "Fixed Type": yükseklik modelindir, alan değildir.
+ *
+ * ## Tek portlu, ve bu kasten
+ *
+ * Bir zamanlar "portu yoktur, komşuya eklenmez" yazıyordu ve bu, hatta
+ * bağlanamamak demekti. Gerçekte bu makinenin KUYRUĞU bir hatta beslenir;
+ * uzayan bom ucu ise dorsenin içine girer, oraya konveyör bağlanmaz. Yani
+ * asimetrik: **yalnız sabit uç port taşır** (`ports.ts` → `localPorts`).
+ *
+ * İki ucu da port yapmak, bom ucuna yapışan bir modülün her uzama
+ * değişiminde kopması ya da sürüklenmesi demekti — sistem, kurulamayacak bir
+ * düzene izin vermiş olurdu.
  */
 export const ConveyorTelescopicNode = BaseNode.extend({
   // Yeni kind, eski kimlik yok — tireli tek token, kimlik sözleşmesine uygun.
@@ -33,6 +43,18 @@ export const ConveyorTelescopicNode = BaseNode.extend({
    * rampaya uzanmış bomun kapladığı zemin planın konusudur.
    */
   extension: z.number().min(0).max(1).default(0),
+
+  /**
+   * Malın hangi yöne aktığı — ailenin `flow` alanının aynısı.
+   *
+   * Tek portlu bir makinede bile ANLAMLI, çünkü kuyruk ucunun rolünü bu
+   * belirliyor: `forward` yükleme (mal hattan gelir, kuyruktan girer, bomdan
+   * dorseye çıkar) → kuyruk `in`; `reverse` boşaltma (mal dorseden gelir,
+   * bomdan girer, kuyruktan hatta çıkar) → kuyruk `out`. Rol, kuyruğun hangi
+   * komşu porta yapışabileceğini belirlediği için bu alan olmadan mıknatıs
+   * rolleri TERS atardı (`inletPort` tanımsız `flow`'u `reverse` sayardı).
+   */
+  flow: z.enum(['forward', 'reverse']).default('forward'),
 
   // ── Finish — aile mavisi: teleskopik, roller hattıyla aynı tesiste aynı
   // boyayı giyer (kullanıcı kararı). ───────────────────────────────────────

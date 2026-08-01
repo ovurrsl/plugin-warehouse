@@ -131,7 +131,6 @@ export default function TruckRenderer({ node }: { node: TruckNode }) {
       const mesh = meshRefs.current.get(body)
       if (!mesh) continue
       mesh.geometry = getTruckGeometry(node.model, node.mastRowId, body, next)
-      mesh.castShadow = next === 'full'
     }
   })
 
@@ -164,7 +163,27 @@ export default function TruckRenderer({ node }: { node: TruckNode }) {
               <mesh
                 castShadow
                 dispose={null}
-                geometry={getTruckGeometry(node.model, node.mastRowId, body, 'full')}
+                /**
+                 * Katman `detailRef`'ten okunur, SABİTLENMEZ.
+                 *
+                 * `'full'` yazılıydı ve rack'ın aynı hatayı düzeltirken
+                 * anlattığı şey burada da geçerliydi: R3F prop'ları referansla
+                 * karşılaştırıyor, yani memo yalnız farklı bir buffer
+                 * ürettiğinde imperatif takası eziyor — ama eziyor. Uzaktaki
+                 * bir araç, herhangi bir yeniden render'da (seçim, panel
+                 * düzenlemesi) tam mesh'e geri dönüyor, `detailRef` hâlâ
+                 * `'simple'` dediği için de `next === current` koruması
+                 * kameranın histerezis bandını baştan sona geçmesine kadar
+                 * yeniden düşürmeyi engelliyordu.
+                 *
+                 * Dışa aktarım mesafeye bağlı bir katmanı dosyaya pişirmemeli.
+                 */
+                geometry={getTruckGeometry(
+                  node.model,
+                  node.mastRowId,
+                  body,
+                  isExporting ? 'full' : detailRef.current,
+                )}
                 material={material}
                 raycast={NO_RAYCAST}
                 receiveShadow

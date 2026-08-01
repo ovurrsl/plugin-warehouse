@@ -13,8 +13,10 @@ import {
   isCurveModule,
   isLauncherModule,
   isObliqueModule,
+  isTelescopicModule,
   isTransferModule,
   localPorts,
+  transportHeightAt,
 } from './ports'
 import { speedMPerSec as transferSpeed } from './transfer-metrics'
 
@@ -82,6 +84,10 @@ export function moduleSpeedMPerSec(module: ConveyorModule): number {
   if (isBoosterModule(module)) return boosterSpeed(module)
   if (isTransferModule(module)) return transferSpeed(module)
   if (isObliqueModule(module)) return obliqueSpeed(module)
+  // Teleskopik ağa hiç girmiyor (aşağıdaki `buildFlowNetwork` gerekçesi), ama
+  // birleşim tipi onu içerdiği için dal burada da olmalı: 0, "bu makineyi
+  // simüle etmiyoruz" demenin dürüst hâli.
+  if (isTelescopicModule(module)) return 0
   return straightSpeed(module)
 }
 
@@ -112,6 +118,19 @@ export function buildNetwork(nodes: Readonly<Record<string, unknown>>): FlowNetw
   for (const value of Object.values(nodes)) {
     const module = asConveyorModule(value)
     if (!module) continue
+    /**
+     * Teleskopik simülasyona GİRMEZ — ve bu, mıknatısa girmesiyle çelişmiyor.
+     *
+     * Mıknatıs "bu iki ucun geometrisi birleşir mi" sorusunu soruyor;
+     * simülasyon "kutu buradan nereye gider" sorusunu. Teleskopiğin bomu bir
+     * dorsenin içine giriyor: rotanın öbür ucunda sahnede modellenmiş hiçbir
+     * şey yok. Ayrıca katalog bu makineler için bant hızı yayınlamıyor, yani
+     * kutunun ne kadar sürede gideceğini söyleyecek bir ölçü de yok.
+     *
+     * (Akış simülasyonu ayrıca kullanıcı tarafından beklemeye alındı; burası
+     * onu genişletmenin yeri değil.)
+     */
+    if (isTelescopicModule(module)) continue
     modules.set(module.id, module)
     const list = routesOf(module)
     routes.set(module.id, list)
@@ -351,7 +370,9 @@ export function poseOf(network: FlowNetwork, box: FlowBox): FlowLocalPose | null
   return {
     nodeId: box.nodeId,
     // Sitting on the rollers, not through them.
-    local: [local.x, module.transportHeight + FLOW_BOX_M[1] / 2, local.z],
+    // `transportHeightAt` üstünden: kot her şekilde alandan okunmuyor
+    // (teleskopikte modelin), ve o farkı bilen tek yer o fonksiyon.
+    local: [local.x, transportHeightAt(module, 'a') + FLOW_BOX_M[1] / 2, local.z],
     heading: local.heading,
   }
 }

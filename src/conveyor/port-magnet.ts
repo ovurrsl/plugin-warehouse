@@ -145,6 +145,60 @@ export function resetPortMagnet(): void {
  * node, and what it needs is where the node goes so that its end lands on the
  * other's.
  */
+/** Bu modülün uçları, verilen aday dönüşümde. */
+type PlacedEnd = {
+  id: ConveyorPortId
+  role: PortRole
+  lane: number
+  x: number
+  z: number
+  dx: number
+  dz: number
+}
+
+function endsAt(
+  module: ConveyorModule,
+  position: readonly [number, number, number],
+  rotationY: number,
+): PlacedEnd[] {
+  const cos = Math.cos(rotationY)
+  const sin = Math.sin(rotationY)
+  // Built from the same local list `def.ports` uses, so a bend's ends are on
+  // its arc and a junction's third end is where it actually is — rather than on
+  // an assumed ±X, the assumption a straight-only magnet was making.
+  return localPorts(module).map((local) => {
+    const [x, z] = toWorldPlan([local.x, local.z], position, cos, sin)
+    const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
+    return { id: local.id, role: local.role, lane: local.laneMm, x, z, dx, dz }
+  })
+}
+
+/** Hangi kural iki ucun birleşmesini engelliyor — ya da `null`, engel yok. */
+export type MateRule = 'role' | 'lane' | 'height' | 'facing'
+
+/**
+ * Birleşme kurallarının TEK kaynağı.
+ *
+ * Hem mıknatıs hem panelin "neden yapışmadı" teşhisi buradan okuyor. İki ayrı
+ * yerde yazılsalardı biri değiştiğinde öteki sessizce yalan söylerdi: kullanıcı
+ * "kot tutmuyor" uyarısını görüp kotu düzeltir, mıknatıs yine yapışmazdı.
+ */
+function blockingRule(module: ConveyorModule, end: PlacedEnd, other: FreeEnd): MateRule | null {
+  // Head to tail: one end has to deliver into the other.
+  if (!rolesComplement(end.role, other.role)) return 'role'
+  // R1 — the lane a box travels through has to be the same lane. Read off both
+  // ports, because a junction's ends are not all one class.
+  if (other.lane !== end.lane) return 'lane'
+  // R2 — and it has to be at the same height, with no tolerance. A step between
+  // two beds is a step a box falls down.
+  if (Math.abs(other.height - transportHeightAt(module, end.id)) > 1e-6) return 'height'
+  // Facing each other, not side by side: the two outward directions must be
+  // opposed. `-0.99` rather than `-1` leaves room for the float drift in a
+  // rotation the user reached through eight 45° steps.
+  if (end.dx * other.dx + end.dz * other.dz > -0.99) return 'facing'
+  return null
+}
+
 export function snapToLineEnd(
   module: ConveyorModule,
   candidate: readonly [number, number, number],
@@ -156,19 +210,8 @@ export function snapToLineEnd(
   moving.add(module.id)
 
   const cells = freeEnds(nodes)
-  const cos = Math.cos(rotationY)
-  const sin = Math.sin(rotationY)
   const [cx, cy, cz] = candidate
-
-  // This module's own ends, at the candidate transform. Built from the same
-  // local list `def.ports` uses, so a bend's ends are on its arc and a
-  // junction's third end is where it actually is — rather than on an assumed
-  // ±X, the assumption a straight-only magnet was making.
-  const mine = localPorts(module).map((local) => {
-    const [x, z] = toWorldPlan([local.x, local.z], candidate, cos, sin)
-    const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
-    return { id: local.id, role: local.role, lane: local.laneMm, x, z, dx, dz }
-  })
+  const mine = endsAt(module, candidate, rotationY)
 
   let bestDistance = MAGNET_RADIUS_SQ
   let best: { position: [number, number, number] } | null = null
@@ -180,18 +223,7 @@ export function snapToLineEnd(
       for (let iz = bz - 1; iz <= bz + 1; iz++) {
         for (const other of cells.get(`${ix}:${iz}`) ?? []) {
           if (moving.has(other.nodeId)) continue
-          // Head to tail: one end has to deliver into the other.
-          if (!rolesComplement(end.role, other.role)) continue
-          // R1 — the lane a box travels through has to be the same lane. Read
-          // off both ports, because a junction's ends are not all one class.
-          if (other.lane !== end.lane) continue
-          // R2 — and it has to be at the same height, with no tolerance. A step
-          // between two beds is a step a box falls down.
-          if (Math.abs(other.height - transportHeightAt(module, end.id)) > 1e-6) continue
-          // Facing each other, not side by side: the two outward directions must
-          // be opposed. `-0.99` rather than `-1` leaves room for the float drift
-          // in a rotation the user reached through eight 45° steps.
-          if (end.dx * other.dx + end.dz * other.dz > -0.99) continue
+          if (blockingRule(module, end, other) !== null) continue
 
           const distance = (other.x - end.x) ** 2 + (other.z - end.z) ** 2
           if (distance >= bestDistance) continue
@@ -221,6 +253,74 @@ export function snapToLineEnd(
  * lane, so the check would have been vacuous where it was right and wrong
  * everywhere else. What has to agree is the lane and the height.
  */
+/**
+ * Yakındaki bir uca NEDEN yapışmadığını söyler — ve hiçbir şeyi düzeltmez.
+ *
+ * `jointProblems` yalnız zaten ÇAKIŞMIŞ (5 cm) eklemleri denetliyor. Ama
+ * mıknatıs bir kuralı çiğneyen ucu hiç çekmiyor, dolayısıyla kullanıcı
+ * modülü yaklaştırıp bırakıyor ve hiçbir şey olmuyor — sessizlik. Sessizlik,
+ * "bu ikisi birleşmez"in en kötü anlatımı: kullanıcı ya yanlış bir şey
+ * yaptığını sanır ya da özelliğin bozuk olduğunu.
+ *
+ * Özellikle teleskopik konveyörde bu neredeyse kesin: varsayılan bant
+ * genişliği 800 mm, roller ailesininki 600 mm; kot ise modele gömülü
+ * (0,80–1,05 m) ve roller varsayılanı 0,75 m. R1 ve R2 sıfır toleranslı
+ * olduğu için VARSAYILANLAR ASLA EŞLEŞMEZ.
+ *
+ * Kullanıcı kararı gereği burası **yalnız haber verir**: hangi değerin
+ * tutmadığını ve karşı tarafın ne olduğunu yazar, düzeltmeyi kullanıcıya
+ * bırakır. Otomatik eşitleme, elle ayarlanmış bir değeri habersiz değiştirmek
+ * olurdu.
+ */
+export function mateBlockers(
+  module: ConveyorModule,
+  position: readonly [number, number, number],
+  rotationY: number,
+  nodes: Readonly<Record<string, unknown>>,
+): string[] {
+  const cells = freeEnds(nodes)
+  const mine = endsAt(module, position, rotationY)
+  const seen = new Set<MateRule>()
+  const messages: string[] = []
+
+  for (const end of mine) {
+    const bx = Math.floor(end.x / CELL)
+    const bz = Math.floor(end.z / CELL)
+    for (let ix = bx - 1; ix <= bx + 1; ix++) {
+      for (let iz = bz - 1; iz <= bz + 1; iz++) {
+        for (const other of cells.get(`${ix}:${iz}`) ?? []) {
+          if (other.nodeId === module.id) continue
+          const distance = (other.x - end.x) ** 2 + (other.z - end.z) ** 2
+          if (distance >= MAGNET_RADIUS_SQ) continue
+          const rule = blockingRule(module, end, other)
+          // Yönü tutmayan bir uç yalnızca "henüz döndürmedin" demek olabilir;
+          // kullanıcı zaten döndürerek çözer, uyarı gürültü olurdu.
+          if (rule === null || rule === 'facing' || seen.has(rule)) continue
+          seen.add(rule)
+          const mineHeight = transportHeightAt(module, end.id)
+          if (rule === 'lane') {
+            messages.push(
+              `Yakındaki uç ${other.lane} mm şeritli, bu makine ${end.lane} mm — ` +
+                'şerit sınıfları eşit olmadan birleşmezler.',
+            )
+          } else if (rule === 'height') {
+            messages.push(
+              `Yakındaki ucun bant kotu ${other.height.toFixed(3)} m, bu makinenin ` +
+                `${mineHeight.toFixed(3)} m — aradaki basamak kutunun takılacağı yerdir.`,
+            )
+          } else {
+            messages.push(
+              'Yakındaki uç da aynı yöne besliyor: biri diğerine mal vermeli ' +
+                '(akış yönünü ters çevirin ya da öbür ucu kullanın).',
+            )
+          }
+        }
+      }
+    }
+  }
+  return messages
+}
+
 export function jointProblems(
   module: ConveyorModule,
   nodes: Readonly<Record<string, unknown>>,

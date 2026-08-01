@@ -36,6 +36,12 @@ import {
 import type { ConveyorObliqueNode } from './oblique-schema'
 import type { ConveyorRollerNode } from './schema'
 import {
+  currentLengthM as telescopicCurrentLengthM,
+  frameWidthM as telescopicFrameWidthM,
+  telescopicModelOf,
+} from './telescopic-metrics'
+import type { ConveyorTelescopicNode } from './telescopic-schema'
+import {
   dischargeSign,
   frameWidthM as transferFrameWidthM,
   laneMm as transferLaneMm,
@@ -76,6 +82,7 @@ export type ConveyorModule =
   | ConveyorBoosterNode
   | ConveyorTransferNode
   | ConveyorObliqueNode
+  | ConveyorTelescopicNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -116,6 +123,10 @@ const CONVEYOR_KINDS = new Set([
   'warehouse:conveyor-booster',
   'warehouse:conveyor-transfer',
   'warehouse:conveyor-oblique',
+  // Bu sette YOKTU ve yokluğu tam olarak bu yorumun tarif ettiği şeye yol
+  // açıyordu: teleskopiğin ucu hat indeksine hiç görünmüyor, dolayısıyla ne
+  // ona yapışılabiliyor ne o bir hatta yapışabiliyordu.
+  'warehouse:conveyor-telescopic',
 ])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
@@ -138,6 +149,10 @@ export function isObliqueModule(module: ConveyorModule): module is ConveyorObliq
   return module.type === 'warehouse:conveyor-oblique'
 }
 
+export function isTelescopicModule(module: ConveyorModule): module is ConveyorTelescopicNode {
+  return module.type === 'warehouse:conveyor-telescopic'
+}
+
 /** Narrow an unknown scene node to a module of this kind, any shape. */
 export function asConveyorModule(node: unknown): ConveyorModule | null {
   const record = node as { type?: unknown; id?: unknown } | null
@@ -156,10 +171,15 @@ export function asConveyorModule(node: unknown): ConveyorModule | null {
  * instead, which is the question that actually has an answer there.
  */
 export function inletPort(module: ConveyorModule): ConveyorPortId {
+  // Teleskopiğin TEK portu var (kuyruk). Akış yönü onun rolünü belirler ama
+  // ikinci bir uç yaratmaz — `'b'` döndürmek olmayan bir portu adlandırmak
+  // olurdu ve o adı okuyan her şey sessizce boşa düşerdi.
+  if (isTelescopicModule(module)) return 'a'
   return module.flow === 'forward' ? 'a' : 'b'
 }
 
 export function outletPort(module: ConveyorModule): ConveyorPortId {
+  if (isTelescopicModule(module)) return 'a'
   return module.flow === 'forward' ? 'b' : 'a'
 }
 
@@ -171,6 +191,16 @@ export function outletPort(module: ConveyorModule): ConveyorPortId {
  * field would silently mate a 0.75 m end onto a 1.2 m one the day that lands.
  */
 export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId): number {
+  /**
+   * Teleskopikte kot ALAN DEĞİL, modelin: katalog bu makineleri "Fixed Type"
+   * diye tanımlıyor — bant kotu bölüm sayısının sonucu ve sahada ayarlanmıyor.
+   *
+   * Bu dal olmadan `module.transportHeight` `undefined` dönerdi ve kot kuralı
+   * SESSİZCE atlanırdı: `Math.abs(x - undefined) > 1e-6` → `NaN > 1e-6` →
+   * `false`, yani "kotlar uyuşuyor". Uyuşmayan iki ucu birleştirmek, kutunun
+   * takılacağı bir eklemi sahnede sorunsuz göstermek olurdu.
+   */
+  if (isTelescopicModule(module)) return telescopicModelOf(module.model).heightM
   return module.transportHeight
 }
 
@@ -184,6 +214,11 @@ export function moduleLaneMm(module: ConveyorModule): number {
   // The **main** line's class. A branch is narrower, and anything that needs to
   // know reads the port rather than the node — which is what this shape forced.
   if (isObliqueModule(module)) return mainLaneMm(module)
+  // Teleskopikte şerit sınıfı `beltWidth` (600/800/1000), roller ailesinde
+  // `usefulWidth` (400/600). İki listenin tek ortak değeri 600 — R1 sıfır
+  // toleranslı olduğu için varsayılanlar (800 ⨯ 600) asla eşleşmez ve panel
+  // bunu açıkça söyler.
+  if (isTelescopicModule(module)) return Number(module.beltWidth)
   return usefulWidthMm(module)
 }
 
@@ -201,6 +236,8 @@ export function moduleRunLengthM(module: ConveyorModule): number {
   if (isBoosterModule(module)) return boosterLengthM(module)
   if (isTransferModule(module)) return transferLengthM(module)
   if (isObliqueModule(module)) return obliqueLengthM(module)
+  // Anlık uzamış boy (A + B·e) — bom uzadıkça malın kat ettiği yol da uzuyor.
+  if (isTelescopicModule(module)) return telescopicCurrentLengthM(module)
   return moduleLengthM(module)
 }
 
@@ -212,6 +249,7 @@ export function moduleFrameWidthM(module: ConveyorModule): number {
   if (isBoosterModule(module)) return boosterFrameWidthM(module)
   if (isTransferModule(module)) return transferFrameWidthM(module)
   if (isObliqueModule(module)) return mainWidthM(module)
+  if (isTelescopicModule(module)) return telescopicFrameWidthM(module)
   return frameWidthM(module)
 }
 
@@ -255,6 +293,38 @@ export type LocalPort = {
  * shape it is holding.
  */
 export function localPorts(module: ConveyorModule): LocalPort[] {
+  /**
+   * Teleskopik: TEK port, sabit uçta. Asimetri fiziksel.
+   *
+   * Yerel çerçevede origin sabit kısmın ORTASINDA ve bom +X'e uzuyor
+   * (`telescopic-metrics.ts`). Yani kuyruk `-A/2`'de ve `extension`'dan
+   * BAĞIMSIZ — uzama yalnız burnu taşıyor. Kuyruğun yerinde durması, bir
+   * hatta yapıştıktan sonra bomu uzatıp kısaltmanın eklemi bozmaması demek.
+   *
+   * Bom ucu (`boomTipX`) kasten port DEĞİL: orası dorsenin içine giren uç.
+   * Port yapılsaydı oraya yapışan bir modül her uzama değişiminde ya kopar
+   * ya sürüklenirdi — sistem, kurulamayacak bir düzene izin vermiş olurdu.
+   *
+   * Rol akıştan: `forward` yükleme (mal hattan gelir, kuyruktan girer) →
+   * `in`; `reverse` boşaltma (mal dorseden gelir, kuyruktan çıkar) → `out`.
+   */
+  if (isTelescopicModule(module)) {
+    const model = telescopicModelOf(module.model)
+    return [
+      {
+        id: 'a',
+        x: -model.fixedM / 2,
+        y: model.heightM,
+        z: 0,
+        dx: -1,
+        dz: 0,
+        role: (module.flow === 'forward' ? 'in' : 'out') as PortRole,
+        laneMm: Number(module.beltWidth),
+        frameWidthM: telescopicFrameWidthM(module),
+      },
+    ]
+  }
+
   if (isCurveModule(module)) {
     const sweep = angleRad(module)
     const radius = centrelineRadiusM(module)

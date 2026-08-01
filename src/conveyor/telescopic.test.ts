@@ -1,7 +1,12 @@
-import { describe, expect, test } from 'bun:test'
+import { beforeEach, describe, expect, test } from 'bun:test'
 import type { GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS } from '../catalog'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
+import { resetLineIndex } from './line-index'
+import { moduleLengthM } from './metrics'
+import { mateBlockers, resetPortMagnet, snapToLineEnd } from './port-magnet'
+import { localPorts, transportHeightAt } from './ports'
+import { ConveyorRollerNode } from './schema'
 import {
   TELESCOPIC_MODEL_IDS,
   TELESCOPIC_MODELS,
@@ -232,8 +237,132 @@ describe('tanım ve manifest', () => {
     expect(resolver(open as never).dimensions[2]).toBeCloseTo(frameWidthM(open), 9)
   })
 
-  test('hat parçası DEĞİL: port bildirmez', () => {
-    expect('ports' in conveyorTelescopicDefinition).toBe(false)
+  /**
+   * Bu test bir zamanlar `expect('ports' in def).toBe(false)` idi ve o hâliyle
+   * bir KARARI kilitliyordu: "teleskopik bir hat parçası değil, portu yok."
+   * Karar kullanıcı tarafından geri alındı — makinenin kuyruğu gerçekte bir
+   * hatta beslenir. Yeni kural, kararın yerini alan asimetri: **kuyruk port,
+   * bom ucu değil.**
+   */
+  test('kuyruk portu bildirir — hatta bağlanabilmesinin şartı', () => {
+    expect(conveyorTelescopicDefinition.ports).toBeDefined()
+    const node = ConveyorTelescopicNode.parse({ model: 'a4-6+12' })
+    const ports = localPorts(node)
+    expect(ports).toHaveLength(1)
+    expect(ports[0]?.id).toBe('a')
+  })
+
+  test('kuyruk ucu uzamadan ETKİLENMEZ, bom ucu port DEĞİL', () => {
+    const closed = ConveyorTelescopicNode.parse({ model: 'a4-6+12', extension: 0 })
+    const open = ConveyorTelescopicNode.parse({ model: 'a4-6+12', extension: 1 })
+    // Kuyruk sabit kısmın arkasında: −A/2, uzamadan bağımsız. Bir hatta
+    // yapıştıktan sonra bomu açmak eklemi bozmamalı.
+    expect(localPorts(closed)[0]?.x).toBeCloseTo(-3, 9)
+    expect(localPorts(open)[0]?.x).toBeCloseTo(-3, 9)
+    // Bom ucu 6 m ilerledi ama port listesine hiç girmedi.
+    expect(boomTipX(open) - boomTipX(closed)).toBeCloseTo(12, 9)
+    expect(localPorts(open)).toHaveLength(1)
+  })
+
+  test('kuyruk rolü akıştan gelir: yükleme girdi, boşaltma çıktı', () => {
+    const loading = ConveyorTelescopicNode.parse({ flow: 'forward' })
+    const unloading = ConveyorTelescopicNode.parse({ flow: 'reverse' })
+    expect(localPorts(loading)[0]?.role).toBe('in')
+    expect(localPorts(unloading)[0]?.role).toBe('out')
+  })
+
+  test('kot MODELDEN okunur — alan yok, ve NaN sessizliği olmamalı', () => {
+    const node = ConveyorTelescopicNode.parse({ model: 'a4-6+12' })
+    const height = transportHeightAt(node, 'a')
+    expect(Number.isNaN(height)).toBe(false)
+    expect(height).toBe(TELESCOPIC_MODELS['a4-6+12'].heightM)
+    expect(localPorts(node)[0]?.y).toBe(height)
+  })
+
+  test('şerit portun kendi bant genişliği — R1 bunu karşılaştırıyor', () => {
+    const wide = ConveyorTelescopicNode.parse({ beltWidth: '1000' })
+    expect(localPorts(wide)[0]?.laneMm).toBe(1000)
+  })
+
+  test('port mıknatısı bağlı — kanca olmadan host hizalama dalına hiç girmez', () => {
+    expect(conveyorTelescopicDefinition.capabilities.movable?.groupMoveSnap).toBeDefined()
+  })
+
+  test('distributionRole YOK — bağlı hat sürüklenince yerinde kalır', () => {
+    expect('distributionRole' in conveyorTelescopicDefinition).toBe(false)
+  })
+})
+
+/**
+ * Mıknatıs ve "neden yapışmadı" teşhisi.
+ *
+ * Buradaki en önemli olgu bir HATA değil, bir ÖLÇÜ: varsayılan teleskopik ile
+ * varsayılan roller asla eşleşmez (800 ⨯ 600 mm şerit, 0,90 ⨯ 0,75 m kot; iki
+ * kural da sıfır toleranslı). Kullanıcı kararı gereği sistem bunu düzeltmiyor,
+ * SÖYLÜYOR — ve bu testler söylediğini kilitliyor.
+ */
+describe('teleskopik mıknatısı — kuyruktan hatta', () => {
+  const A4 = TELESCOPIC_MODELS['a4-6+12']
+  const roller = (id: string, overrides: Record<string, unknown> = {}) =>
+    ConveyorRollerNode.parse({ id: `conveyor_roller_${id}`, rollers: 40, ...overrides })
+  const tele = (id: string, overrides: Record<string, unknown> = {}) =>
+    ConveyorTelescopicNode.parse({ id: `conveyor-telescopic_${id}`, ...overrides })
+  const scene = (...nodes: Array<{ id: string }>) =>
+    Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, unknown>
+
+  beforeEach(() => {
+    resetLineIndex()
+    resetPortMagnet()
+  })
+
+  test('şerit ve kot uyunca kuyruk hattın çıkışına TAM oturur', () => {
+    // Roller'ı teleskopiğe uydur: 600 mm şerit, modelin kotu.
+    const line = roller('line', {
+      position: [0, 0, 0],
+      usefulWidth: '600',
+      transportHeight: A4.heightM,
+    })
+    const lineLength = moduleLengthM(line)
+    const boom = tele('boom', { beltWidth: '600', position: [40, 0, 40] })
+
+    // Kuyruk `-A/2`'de; hattın çıkışına oturması için gövde merkezi
+    // `lineLength/2 + A/2` olmalı. Elle 9 cm ıskalanmış bir bırakma.
+    const target = lineLength / 2 + A4.fixedM / 2
+    const snapped = snapToLineEnd(boom, [target - 0.09, 0, 0.06], 0, [boom.id], scene(line, boom))
+    expect(snapped).not.toBeNull()
+    expect(snapped?.[0]).toBeCloseTo(target, 9)
+    expect(snapped?.[2]).toBeCloseTo(0, 9)
+  })
+
+  test('VARSAYILANLAR eşleşmez — ve panel bunu sessizce geçmez', () => {
+    const line = roller('line', { position: [0, 0, 0] }) // 600 mm, 0.75 m
+    const target = moduleLengthM(line) / 2 + A4.fixedM / 2
+    const boom = tele('boom', { position: [target, 0, 0] }) // 800 mm, 0.90 m
+
+    const nodes = scene(line, boom)
+    // Mıknatıs çekmiyor…
+    expect(snapToLineEnd(boom, [target - 0.05, 0, 0], 0, [boom.id], nodes)).toBeNull()
+    // …ama sebebi yazılı. Sessizlik en kötü anlatım olurdu.
+    const blockers = mateBlockers(boom, [target, 0, 0], 0, nodes)
+    expect(blockers.length).toBeGreaterThan(0)
+    expect(blockers.join(' ')).toContain('şerit')
+  })
+
+  test('şerit düzelince sıra kota gelir — kullanıcı adım adım görür', () => {
+    const line = roller('line', { position: [0, 0, 0], usefulWidth: '600' })
+    const target = moduleLengthM(line) / 2 + A4.fixedM / 2
+    const boom = tele('boom', { beltWidth: '600', position: [target, 0, 0] })
+    const blockers = mateBlockers(boom, [target, 0, 0], 0, scene(line, boom))
+    expect(blockers.join(' ')).toContain('kot')
+    // Ve teleskopiğin kotu ALANDAN değil modelden geldiği için mesajda o değer
+    // geçmeli — kullanıcı hangi tarafı düzelteceğini bilsin.
+    expect(blockers.join(' ')).toContain(A4.heightM.toFixed(3))
+  })
+
+  test('uzakta hiçbir uyarı üretmez — gürültü yapmaz', () => {
+    const line = roller('line', { position: [0, 0, 0], usefulWidth: '600' })
+    const boom = tele('boom', { position: [60, 0, 60] })
+    expect(mateBlockers(boom, [60, 0, 60], 0, scene(line, boom))).toHaveLength(0)
   })
 
   test('trailingSection tanımlı — yoksa invariants çöpe gider', () => {

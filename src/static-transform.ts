@@ -1,7 +1,11 @@
 'use client'
 
+import { sceneRegistry } from '@pascal-app/core'
 import { useLayoutEffect } from 'react'
 import type { Object3D } from 'three'
+
+/** Donmuş matris ile canlı `position` arasındaki kabul edilebilir fark, metre. */
+const DRIFT_EPSILON = 1e-6
 
 /**
  * Recomposes a registered object's local matrix, and freezes it there.
@@ -52,6 +56,58 @@ export function applyStaticTransform(
  * guess it, the caller must pass it through from the same live-state read
  * that drives the JSX `position`/`rotation` props.
  */
+/**
+ * Dondurulmuş yerel matrisi, biri `position`'a doğrudan yazdıysa yeniden basar.
+ *
+ * ## Neden gerekli — ölçülmüş, bildirilmemiş bir hata
+ *
+ * `matrixAutoUpdate = false` yapmak yalnız three'nin kendi yeniden hesabını
+ * kapatmıyor; `position`'a **başkasının** yazdığını da yutuyor. Ve host tam
+ * olarak bunu yapıyor:
+ *
+ *   `floor-elevation-system.tsx` → `mesh.position.y = visualPosition[1]`
+ *
+ * Zemine oturan kind'ların Y'si host'un sorumluluğu — düğüm verisindeki
+ * `position[1]` taban yükseklikte kalıyor, slab lifti yalnız mesh'e yazılıyor.
+ * `matrixAutoUpdate` kapalıyken bu yazım yerel matrise HİÇ işlemiyordu, yani
+ * asma kat güvertesine konan bir raf zeminde kalıyordu. (Güvertenin kendisi
+ * host `slab` düğümü olduğu için doğru yükseliyor — bu yüzden belirti "güverte
+ * çıkıyor, üstündeki raf çıkmıyor" biçiminde görünüyor.)
+ *
+ * Aynı yutma, host'un `MoveTool`'unun kayıtlı nesneye imperatif yazdığı
+ * sürükleme yolunu da donduruyordu: `isLive` bayrağı o yolu göremiyor.
+ *
+ * ## Neden ucuz
+ *
+ * Kaçınılan maliyet `compose()` + `multiplyMatrices()` idi. Buradaki kontrol
+ * üç float karşılaştırması ve `matrixAutoUpdate` açık olan her düğümü ilk
+ * satırda eliyor — host düğümleri hiç sırayı bile tutmuyor. Yeniden basma
+ * yalnız gerçekten kaymış düğüm için. Yani sürüş, ölçülen %24,5'lik kazancı
+ * korurken doğruluğu geri veriyor.
+ *
+ * @returns kaç düğüm yeniden basıldı (teşhis ve test için)
+ */
+export function rebakeDriftedStaticTransforms(): number {
+  let rebaked = 0
+  for (const object of sceneRegistry.nodes.values()) {
+    // three zaten her kare basıyor — bizim dondurduklarımız dışında iş yok.
+    if (object.matrixAutoUpdate) continue
+    const { elements } = object.matrix
+    if (
+      Math.abs((elements[12] ?? 0) - object.position.x) <= DRIFT_EPSILON &&
+      Math.abs((elements[13] ?? 0) - object.position.y) <= DRIFT_EPSILON &&
+      Math.abs((elements[14] ?? 0) - object.position.z) <= DRIFT_EPSILON
+    ) {
+      continue
+    }
+    // `updateMatrix` ayrıca `matrixWorldNeedsUpdate` işaretliyor, dolayısıyla
+    // three çizim sırasında dünya matrisini kendiliğinden tazeliyor.
+    object.updateMatrix()
+    rebaked++
+  }
+  return rebaked
+}
+
 export function useStaticTransform(
   ref: { current: Object3D | null },
   position: readonly [number, number, number],

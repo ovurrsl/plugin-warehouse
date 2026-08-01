@@ -119,7 +119,6 @@ export default function ConveyorCurveRenderer({ node }: { node: ConveyorCurveNod
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getCurveGeometry(node, next, abutted)
-    mesh.castShadow = next === 'full'
   })
 
   /**
@@ -152,7 +151,7 @@ export default function ConveyorCurveRenderer({ node }: { node: ConveyorCurveNod
           ))}
 
         <mesh
-          castShadow={isExporting || detailRef.current === 'full'}
+          castShadow
           // Never dispose: shared by every module of this shape.
           dispose={null}
           geometry={geometry}

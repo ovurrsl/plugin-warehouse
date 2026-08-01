@@ -1,4 +1,6 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { snapToLineEnd } from './port-magnet'
+import { conveyorPorts } from './ports'
 import { TELESCOPIC_MODELS } from './telescopic-catalog'
 import { buildTelescopicFloorplan } from './telescopic-floorplan'
 import {
@@ -15,11 +17,16 @@ const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
 /**
  * Teleskopik bant konveyör.
  *
- * Ailenin diğer şekillerinden iki yapısal farkı var ve ikisi de kasıtlı:
+ * Ailenin diğer şekillerinden üç farkı var ve üçü de kasıtlı:
  *
- * - **Port yok.** Bu bir hat parçası değil, bir yükleme bomu: kuyruğundan
- *   bir hatta beslenebilir ama kendisi uç makinedir. `ports` bildirmemek,
- *   port mıknatısının onu bir modül gibi hizalamaya çalışmasını engeller.
+ * - **Tek port, kuyrukta.** Bir zamanlar hiç port yoktu ("uç makinedir")
+ *   ve sonuç, kuyruğundan bir hatta bağlanamamasıydı — oysa bu makinenin
+ *   kuyruğu tam da bir hatta beslenir. Şimdi sabit uç port taşıyor, uzayan
+ *   bom ucu taşımıyor: orası dorsenin içine giren uç.
+ * - **`distributionRole` YOK.** Bağlı hat sürüklendiğinde teleskopik
+ *   YERİNDE kalır (kullanıcı kararı). Bu bir uç makinesi: rampaya
+ *   sabitlenir, hat ona gelir. Rol bildirmek onu host'un bağlantı-takip
+ *   analizine sokar ve 60 metrelik bir hattın peşine takardı.
  * - **Taban izi uzamayla büyür.** `footprint` anlık boyu okur; kapalı bir
  *   bomun yeri A, açık bomunki C'dir ve ikisi arasındaki fark rampanın
  *   önündeki manevra alanının ta kendisidir.
@@ -44,9 +51,29 @@ export const conveyorTelescopicDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: {
+      axes: ['x', 'z'],
+      gridSnap: true,
+      /**
+       * Ailenin port mıknatısı — diğer altı modülün birebir aynısı.
+       *
+       * Bu kanca YOKTU ve mıknatısın hiç çağrılmamasının üç bağımsız
+       * sebebinden biriydi (diğer ikisi: `ports` bildirilmemesi ve
+       * `CONVEYOR_KINDS` setinde bulunmaması). Host `groupMoveSnap`'i
+       * okuyamayınca hizalama dalına hiç girmiyordu.
+       */
+      groupMoveSnap: ({ node, candidatePosition, movingIds, nodes }) => {
+        const tele = node as unknown as ConveyorTelescopicNode
+        return snapToLineEnd(
+          tele,
+          candidatePosition,
+          tele.rotation?.[1] ?? 0,
+          movingIds as readonly string[],
+          nodes as Readonly<Record<string, unknown>>,
+        )
+      },
+    },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
-    snappable: {},
 
     floorPlaced: {
       footprint: (node) => {
@@ -81,6 +108,16 @@ export const conveyorTelescopicDefinition = {
   },
 
   parametrics: conveyorTelescopicParametrics,
+
+  /**
+   * Tek port, kuyrukta — `localPorts` orada tek bir giriş üretiyor.
+   *
+   * `distributionRole` bilinçli olarak YOK: host'un bağlantı-takip analizi
+   * yalnız `'run'` ya da `'fitting'` bildiren kind'ları aday alıyor, yani
+   * teleskopik bağlı bir hat sürüklendiğinde yerinde kalıyor. Bu bir uç
+   * makinesi — rampaya sabitlenir, hat ona gelir.
+   */
+  ports: conveyorPorts,
 
   renderer: {
     kind: 'parametric',

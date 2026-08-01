@@ -70,9 +70,9 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
     objectRef: registeredRef,
     geometryFor: () => getMezzanineGeometry(node),
     keyFor: () => mezzanineGeometryKey(node),
-    material,
-    materialKey: 'mezzanine',
-    castShadowWhenFull: true,
+    materialFor: () => material,
+    materialKeyFor: () => 'mezzanine',
+    castsShadow: true,
     farSq: 90 * 90,
     nearSq: 70 * 70,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -102,7 +102,15 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
       <group position={position} ref={registeredRef} rotation={rotation}>
         {drawsSelf && (
           <mesh
-            castShadow={isExporting}
+            /**
+             * Koşulsuz. `castShadow={isExporting}` idi ve kolektif kayıt
+             * `castsShadow: true` diyordu — yani asma kat, KENDİ çizerken
+             * (seçili ya da sürükleniyorken) gölge atmıyor, kolektif çizerken
+             * atıyordu. Kullanıcının gördüğü: asma katı seçince gölgesi
+             * kayboluyor. Gölgeyi host `shadowMap.enabled` üstünden yönetiyor;
+             * mesh düzeyinde ikinci bir karar noktası olmamalı.
+             */
+            castShadow
             dispose={null}
             geometry={geometry}
             material={material}

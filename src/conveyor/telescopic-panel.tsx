@@ -1,9 +1,10 @@
 'use client'
 
-import { type AnyNodeId, useScene } from '@pascal-app/core'
+import { type AnyNodeId, type Issue, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import type { CSSProperties } from 'react'
 import { IssueList } from '../panels/issue-list'
+import { jointProblems, mateBlockers } from './port-magnet'
 import { TELESCOPIC_MODELS, TELESCOPIC_UNPUBLISHED_NOTE } from './telescopic-catalog'
 import { currentLengthM } from './telescopic-metrics'
 import { conveyorTelescopicParametrics } from './telescopic-parametrics'
@@ -52,10 +53,31 @@ function useInspected(provided?: ConveyorTelescopicNode): ConveyorTelescopicNode
 
 export default function TelescopicPanel({ node: provided }: { node?: ConveyorTelescopicNode }) {
   const node = useInspected(provided)
+  // Kancalar koşulsuz çağrılmalı; erken çıkış aşağıda.
+  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
   if (!node) return null
 
   const model = TELESCOPIC_MODELS[node.model]
-  const issues = conveyorTelescopicParametrics.invariants?.flatMap((check) => check(node)) ?? []
+  const invariantIssues =
+    conveyorTelescopicParametrics.invariants?.flatMap((check) => check(node)) ?? []
+
+  /**
+   * Neden yapışmadığı — ve neyi düzeltmesi gerektiği.
+   *
+   * Mıknatıs kuralı çiğneyen bir uca hiç yaklaşmıyor, yani kullanıcıya geri
+   * bildirim SESSİZLİK oluyordu. Teleskopikte bu neredeyse kesin: bant
+   * genişliği varsayılanı 800 mm (roller ailesi 600), kot ise modele gömülü
+   * ve ayarlanamaz. Panel hangi değerin tutmadığını yazıyor; düzeltmeyi
+   * kullanıcı yapıyor — burada hiçbir şey kendiliğinden değişmiyor.
+   */
+  const joint = jointProblems(node, nodes)
+  const blockers = mateBlockers(node, node.position ?? [0, 0, 0], node.rotation?.[1] ?? 0, nodes)
+  const issues = [
+    ...invariantIssues,
+    ...[...joint, ...blockers].map(
+      (msg): Issue => ({ field: 'position', severity: 'warning', msg }),
+    ),
+  ]
   const now = currentLengthM(node)
 
   return (

@@ -1,3 +1,4 @@
+import { sceneRegistry } from '@pascal-app/core'
 import * as THREE from 'three'
 
 /**
@@ -18,14 +19,26 @@ import * as THREE from 'three'
  * instanced kind whose renderer is an invisible selection proxy and whose
  * real geometry comes from a system"*. `RegisteredSystems` doğrudan
  * `<Canvas>` altında mount edilir — dünya dönüşümü BİRİMDİR, dolayısıyla
- * buradaki `InstancedMesh` dünya-uzayı matrisleri taşıyabilir ve kat
- * istifleme/slab lifti bedavaya doğru kalır.
+ * buradaki `InstancedMesh` dünya-uzayı matrisleri taşıyabilir.
+ *
+ * ## Dünya matrisi ÖNBELLEĞE ALINIR — ve bu bir borçtur
+ *
+ * Burada bir zamanlar "kat istifleme/slab lifti bedavaya doğru kalır"
+ * yazıyordu. Doğrusu: **yalnız `rebuildPools` çağrıldığı an için** doğru
+ * kalır. Kat kendi altındaki her şeyi taşıyabilir — patlatılmış görünümde
+ * `LevelSystem` her kare `position.y`'yi lerpler — ve bu, kayıtlı gruba
+ * işler ama önbelleğe alınmış matrise işlemez.
+ *
+ * Bir önbellek ancak onu geçersiz kılan olayların listesi eksiksizse
+ * doğrudur. O liste `collective-system.tsx`'te tutuluyor ve kat hareketini
+ * de içermek ZORUNDA. (Ölçülen belirti: patlatınca raflar eski katta asılı
+ * kalıyor, kamera bir katman sınırı geçince yerine zıplıyordu.)
  *
  * ## İki kural, ikisi de zorunlu
  *
  * 1. **Matrisler her kare yazılmaz.** 10.000 örneğe kare başına matris
  *    yazmak, kurtardığı çizim çağrısından pahalıya gelir. Yeniden inşa
- *    yalnız sahne değiştiğinde ya da bir katman sınırı geçildiğinde olur.
+ *    yalnız sahne, katman ya da KAT KONUMU değiştiğinde olur.
  *
  * 2. **Seçili ve sürüklenen düğüm kendini çizer.** Ana hat geçişi
  *    (`merged-outline-node.ts:629`) kayıtlı nesnenin GÖRÜNÜR mesh'lerini
@@ -43,10 +56,29 @@ export type InstanceEntry = {
   /** Katman başına buffer; anahtar havuzu böler. */
   geometryFor: (tier: InstanceTier) => THREE.BufferGeometry
   keyFor: (tier: InstanceTier) => string
-  material: THREE.Material
+  /**
+   * Materyal de KATMAN BAŞINA — geometriyle aynı biçimde.
+   *
+   * Skalerdi ve palet bunun bedelini ödüyordu: uzak katman geometrisi çıplak
+   * bir kutu ve kendi düz materyali var (`getPalletFarMaterial`), tam da EPAL
+   * atlasının on iki üçgene yayılmasını önlemek için yazılmış. Kolektif yol
+   * skaler materyali kullandığı için uzaktaki paletlere atlas kutuya
+   * sürülüyordu — kodun yanındaki yorum bunun olmaması gerektiğini
+   * söylüyordu ama tip bunu ifade edemiyordu.
+   */
+  materialFor: (tier: InstanceTier) => THREE.Material
   /** Materyal kimliği — havuz anahtarına girer, iki materyal karışamaz. */
-  materialKey: string
-  castShadowWhenFull: boolean
+  materialKeyFor: (tier: InstanceTier) => string
+  /**
+   * Gölge düşürür mü. Bir zamanlar `castShadowWhenFull` idi ve katmanla
+   * çarpılıyordu; sonuç, 70 m'nin ötesindeki her rafın sistem gölgesi AÇIK
+   * olsa bile gölge düşürmemesiydi. Host gölgeyi mesh düzeyinde değil
+   * `renderer.shadowMap.enabled` üstünden açıp kapatıyor ve built-in
+   * kind'ların hepsi `castShadow`'u koşulsuz bırakıyor — mesafeye göre
+   * kısmak host'un sözleşmesine aykırı. Uzaktaki nesneler gölge haritasında
+   * zaten birkaç texel: frustum binaya fit ve harita 1024².
+   */
+  castsShadow: boolean
   /** Katman eşikleri, metre² (kind'ın kendi bandı). */
   farSq: number
   nearSq: number
@@ -85,7 +117,7 @@ export function setInstanceExcluded(nodeId: string, excluded: boolean): void {
  */
 export function refreshInstance(
   nodeId: string,
-  patch: Partial<Pick<InstanceEntry, 'geometryFor' | 'keyFor' | 'material' | 'materialKey'>>,
+  patch: Partial<Pick<InstanceEntry, 'geometryFor' | 'keyFor' | 'materialFor' | 'materialKeyFor'>>,
 ): void {
   const entry = entries.get(nodeId)
   if (!entry) return
@@ -152,6 +184,29 @@ export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boo
   return changed
 }
 
+/**
+ * Düğüm gerçekten görünür mü — ATALARI dâhil.
+ *
+ * Kolektif mesh sahne KÖKÜNDE duruyor, düğümün kendi ağacında değil. Yani
+ * düğümü ya da onu taşıyan katı gizleyen her şey kolektif çiziciyi atlıyordu:
+ *
+ *  - Renderer'ın dış sarmalayıcısı (`<group visible={node.visible !== false}>`)
+ *    kayıtlı grubu sarıyor → bir nesneyi gizlemek onu gizlemiyordu.
+ *  - `LevelSystem` solo modunda kat grubuna `obj.visible = !hidden` yazıyor →
+ *    gizlenen kattaki raflar çizilmeye devam ediyordu.
+ *
+ * Görünürlük three'de kalıtsal olduğu için ata zincirini yürümek şart; ~5
+ * derinlikte bir boolean taraması ve yalnız yeniden inşa sırasında ödeniyor.
+ */
+function isEffectivelyVisible(object: THREE.Object3D): boolean {
+  let current: THREE.Object3D | null = object
+  while (current) {
+    if (!current.visible) return false
+    current = current.parent
+  }
+  return true
+}
+
 type Pool = {
   mesh: THREE.InstancedMesh
   capacity: number
@@ -180,14 +235,15 @@ export function rebuildPools(root: THREE.Object3D): void {
 
   for (const entry of entries.values()) {
     if (entry.excluded) continue
+    if (!isEffectivelyVisible(entry.object)) continue
     const tier = entry.tier
-    const poolKey = `${entry.keyFor(tier)}::${entry.materialKey}`
+    const poolKey = `${entry.keyFor(tier)}::${entry.materialKeyFor(tier)}`
     let bucket = buckets.get(poolKey)
     if (!bucket) {
       bucket = {
         geometry: entry.geometryFor(tier),
-        material: entry.material,
-        castShadow: entry.castShadowWhenFull && tier === 'full',
+        material: entry.materialFor(tier),
+        castShadow: entry.castsShadow,
         objects: [],
       }
       buckets.set(poolKey, bucket)
@@ -198,7 +254,7 @@ export function rebuildPools(root: THREE.Object3D): void {
   // Kullanılmayan havuzları düşür.
   for (const [poolKey, pool] of pools) {
     if (buckets.has(poolKey)) continue
-    root.remove(pool.mesh)
+    pool.mesh.removeFromParent()
     // Geometri PAYLAŞIMLI — asla dispose edilmez; yalnız örnek tamponu.
     pool.mesh.dispose()
     pools.delete(poolKey)
@@ -208,7 +264,7 @@ export function rebuildPools(root: THREE.Object3D): void {
     const needed = bucket.objects.length
     let pool = pools.get(poolKey)
     if (pool && (pool.capacity < needed || pool.mesh.geometry !== bucket.geometry)) {
-      root.remove(pool.mesh)
+      pool.mesh.removeFromParent()
       pool.mesh.dispose()
       pool = undefined
       pools.delete(poolKey)
@@ -217,7 +273,6 @@ export function rebuildPools(root: THREE.Object3D): void {
       const capacity = Math.max(16, 1 << Math.ceil(Math.log2(needed || 1)))
       const mesh = new THREE.InstancedMesh(bucket.geometry, bucket.material, capacity)
       mesh.frustumCulled = false
-      mesh.castShadow = bucket.castShadow
       mesh.receiveShadow = true
       // Örnekler kendi kayıtlı gruplarından tıklanır; kolektif mesh ışın
       // testine hiç girmez.
@@ -227,6 +282,20 @@ export function rebuildPools(root: THREE.Object3D): void {
       pool = { mesh, capacity }
       pools.set(poolKey, pool)
     }
+    /**
+     * Havuz modül kapsamında yaşıyor, `root` ise sistem örneğine ait —
+     * ve sistem, Canvas yeniden mount edildiğinde (editör ⇄ preview geçişi)
+     * yeni bir `root` ile geri gelir. Yeniden kullanılan bir mesh yalnız
+     * yaratıldığı dalda eklendiği için ölü sahnenin çocuğu olarak kalıyordu:
+     * havuz doluydu, `count` doğruydu, ama mesh hiçbir yerde çizilmiyordu.
+     * Ölçülen belirti "preview'da uzaklaşınca raflar kayboluyor"du —
+     * uzaktaki `simple` anahtarı eski Canvas'tan miras kalmış hayalet havuza
+     * düşüyor, yakındaki `full` anahtarı yeni olduğu için görünüyordu.
+     */
+    if (pool.mesh.parent !== root) root.add(pool.mesh)
+    // Gölge kararı her yeniden kuruluşta yazılır: aynı havuz anahtarı farklı
+    // bir bucket'a denk gelirse yaratım anındaki değere saplanıp kalırdı.
+    pool.mesh.castShadow = bucket.castShadow
 
     for (let index = 0; index < needed; index++) {
       const object = bucket.objects[index]
@@ -243,6 +312,75 @@ export function rebuildPools(root: THREE.Object3D): void {
   }
 }
 
+/**
+ * Kat hareketini "değişti" saymak için eşik, metre.
+ *
+ * `LevelSystem` hedefe lerp'liyor (`position.y += (target − y) · delta · 12`),
+ * yani matematiksel olarak asla tam oturmaz. Eşik olmadan her kare yeniden
+ * inşa tetiklerdik. Yarım milimetre gözle görülemez ve lerp'in oraya inmesi
+ * yarım saniye sürüyor.
+ */
+const LEVEL_SETTLED_M = 5e-4
+
+/**
+ * Kat grupları son bakıştan bu yana kımıldadı ya da görünürlüğü değişti mi.
+ *
+ * Bu, önbelleğin geçersiz kılma listesindeki EKSİK maddeydi. Havuz dünya
+ * matrislerini saklıyor; kat kendi altındaki her şeyi taşıyabiliyor
+ * (patlatılmış görünüm) ya da gizleyebiliyor (solo) — ikisi de `useScene`'e
+ * dokunmuyor, `generation`'ı artırmıyor, katman değiştirmiyor. Yani havuzun
+ * bildiği hiçbir tetikleyici bunları duymuyordu.
+ *
+ * Neden `levelMode`'a abone olmak yerine konumu ÖLÇÜYORUZ: `LevelSystem`
+ * hedefe lerp'liyor, yani mod değiştiği kare ile katın yerine oturduğu kare
+ * arasında yarım saniye var — moda abone olmak o aralığın yalnız ilk karesini
+ * yakalardı. Ölçmek ayrıca `solo`, `manual` ve dışa aktarımın katları gerçek
+ * yığına çektiği `snapLevelsToTruePositions` yolunu da bedavaya kapsıyor.
+ *
+ * Sahnede bir avuç kat vardır; bu, kare başına birkaç karşılaştırma.
+ */
+export function pollLevelPositions(seen: Map<string, number>): boolean {
+  let moved = false
+  const alive = new Set<string>()
+  for (const levelId of sceneRegistry.byType.level ?? []) {
+    const object = sceneRegistry.nodes.get(levelId)
+    if (!object) continue
+    alive.add(levelId)
+    // Y ve görünürlük tek sayıya katlanıyor: gizli kat NaN, görünür kat Y.
+    const y = object.visible ? object.position.y : Number.NaN
+    const previous = seen.get(levelId)
+    const changed =
+      previous === undefined ||
+      Number.isNaN(previous) !== Number.isNaN(y) ||
+      (!Number.isNaN(y) && Math.abs(previous - y) > LEVEL_SETTLED_M)
+    if (changed) {
+      seen.set(levelId, y)
+      moved = true
+    }
+  }
+  // Kaybolan kat haritadan düşer. "Değişti" DEMEZ: sahne değişimi zaten kendi
+  // tetikleyicisinden yeniden inşa ettiriyor, burada tekrar demek boşa iş olur.
+  for (const levelId of seen.keys()) {
+    if (!alive.has(levelId)) seen.delete(levelId)
+  }
+  return moved
+}
+
+/**
+ * Kat alt ağaçlarının dünya matrislerini ŞİMDİ tazele.
+ *
+ * R3F dünya matrislerini `useFrame`'lerden SONRA, çizim sırasında günceller —
+ * yani bir sistemin okuduğu `matrixWorld` bir önceki karenin değeridir. Kat
+ * hareket ederken bu bir kare gecikme demek. Katın alt ağacını güncellemek,
+ * render'ın zaten yapacağı işi öne almaktan ibaret ve yalnız gerçekten
+ * yeniden inşa ederken ödeniyor.
+ */
+export function refreshLevelWorldMatrices(): void {
+  for (const levelId of sceneRegistry.byType.level ?? []) {
+    sceneRegistry.nodes.get(levelId)?.updateWorldMatrix(true, true)
+  }
+}
+
 /** Test ve teşhis: kaç çizim çağrısına indi. */
 export function poolCount(): number {
   return pools.size
@@ -250,6 +388,10 @@ export function poolCount(): number {
 
 export function clearPools(root: THREE.Object3D | null): void {
   for (const pool of pools.values()) {
+    // `root`'tan değil, GERÇEK ebeveyninden sökülür: Canvas yeniden mount
+    // edildiğinde mesh hâlâ eski sahnenin çocuğu olabilir ve yeni root'tan
+    // silmeye çalışmak sessizce hiçbir şey yapardı.
+    pool.mesh.removeFromParent()
     root?.remove(pool.mesh)
     pool.mesh.dispose()
   }

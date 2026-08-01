@@ -151,7 +151,6 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getConveyorGeometry(node, next, abutted)
-    mesh.castShadow = next === 'full'
   })
 
   const length = moduleLengthM(node)
@@ -177,7 +176,8 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
 
       <group position={position} ref={registeredRef} rotation={rotation}>
         <mesh
-          castShadow={isExporting || detailRef.current === 'full'}
+          // Koşulsuz — gerekçe `instancing/collective.ts`'teki `castsShadow`.
+          castShadow
           // Never dispose: shared by every module of this shape.
           dispose={null}
           geometry={geometry}

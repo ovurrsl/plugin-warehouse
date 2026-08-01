@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
+import type { InstanceTier } from './collective'
 import {
   clearPools,
   evaluateTiers,
   instanceCount,
+  instanceEntries,
   instanceGeneration,
   poolCount,
   rebuildPools,
@@ -33,13 +35,15 @@ function entry(id: string, x: number, shape: 'a' | 'b' = 'a') {
     object: objectAt(x),
     geometryFor: () => (shape === 'a' ? GEOM_A : GEOM_B),
     keyFor: (tier: 'full' | 'simple') => `${shape}:${tier}`,
-    material: MATERIAL,
-    materialKey: 'test',
-    castShadowWhenFull: true,
+    materialFor: () => MATERIAL,
+    materialKeyFor: () => 'test',
+    castsShadow: true,
     farSq: 70 * 70,
     nearSq: 55 * 55,
     excluded: false,
-    tier: 'full' as const,
+    // `as const` DEĞİL: testlerin katmanı elle değiştirebilmesi gerekiyor ve
+    // literal tip bunu engelliyordu.
+    tier: 'full' as InstanceTier,
   }
 }
 
@@ -81,7 +85,7 @@ describe('kayıt defteri', () => {
   test('refreshInstance kaydı YERİNDE günceller — bir kare kaybolmaz', () => {
     registerInstance(entry('a', 0))
     const before = instanceGeneration()
-    refreshInstance('a', { materialKey: 'other' })
+    refreshInstance('a', { materialKeyFor: () => 'other' })
     expect(instanceCount()).toBe(1) // hâlâ kayıtlı
     expect(instanceGeneration()).toBeGreaterThan(before)
   })
@@ -133,13 +137,11 @@ describe('katman değerlendirmesi — histerezis ve faz', () => {
 
 /** Tek kaydın katmanını havuzdan okur. */
 function poolBucketTier(): 'full' | 'simple' {
-  const probe = new THREE.Object3D()
-  rebuildPools(probe)
-  const mesh = probe.children[0] as THREE.InstancedMesh | undefined
-  clearPools(probe)
-  // Anahtar `a:full` / `a:simple`; havuz anahtarını doğrudan okuyamadığımız
-  // için gölge bayrağından çıkarıyoruz (yalnız full gölge atar).
-  return mesh?.castShadow ? 'full' : 'simple'
+  // Katmanı doğrudan kaydından okur. Bir zamanlar gölge bayrağından
+  // çıkarılıyordu ("yalnız full gölge atar") — o bağ artık yok: gölge host'un
+  // anahtarına ait, mesafeye değil. Vekil bir ölçüt, ölçtüğü şey değiştiğinde
+  // sessizce yanlış cevap verir; burada gürültülü biçimde patladı ve iyi oldu.
+  return [...instanceEntries()][0]?.tier ?? 'full'
 }
 
 describe('havuz toplama — ölçülen kazancın kendisi', () => {
@@ -221,5 +223,109 @@ describe('havuz toplama — ölçülen kazancın kendisi', () => {
     const hits: THREE.Intersection[] = []
     mesh.raycast(new THREE.Raycaster(), hits)
     expect(hits.length).toBe(0)
+  })
+})
+
+describe('Canvas yeniden mount — ölçülen "preview’da kayboluyor" hatası', () => {
+  test('yeniden kullanılan havuz YENİ köke bağlanır', () => {
+    for (let i = 0; i < 4; i++) registerInstance(entry(`n${i}`, i))
+    rebuildPools(root)
+    const mesh = root.children[0] as THREE.InstancedMesh
+    expect(mesh.parent).toBe(root)
+
+    // Editör ⇄ preview geçişi: Canvas komple yenilenir, sistem yeni bir
+    // `root` ile geri gelir. Havuz modül kapsamında olduğu için hayatta kalır.
+    const freshRoot = new THREE.Object3D()
+    rebuildPools(freshRoot)
+
+    // Eskiden: mesh yalnız yaratıldığı dalda ekleniyordu, yani ölü sahnenin
+    // çocuğu olarak kalıyor ve hiçbir yerde çizilmiyordu.
+    expect(mesh.parent).toBe(freshRoot)
+    expect(freshRoot.children).toContain(mesh)
+    expect(root.children.length).toBe(0)
+  })
+
+  test('clearPools mesh’i GERÇEK ebeveyninden söker, verilen kökten değil', () => {
+    registerInstance(entry('a', 0))
+    rebuildPools(root)
+    const mesh = root.children[0] as THREE.InstancedMesh
+
+    // Alakasız bir kökle temizlemek bile mesh'i sahnede bırakmamalı.
+    clearPools(new THREE.Object3D())
+    expect(mesh.parent).toBeNull()
+    expect(root.children.length).toBe(0)
+  })
+})
+
+describe('görünürlük — kolektif mesh kökte durduğu için MİRAS ALMAZ', () => {
+  test('gizli ATA altındaki düğüm havuza girmez', () => {
+    const visible = entry('görünür', 0)
+    const hidden = entry('gizli', 5)
+    // Renderer'ın dış sarmalayıcısı (`<group visible={node.visible !== false}>`)
+    // ya da solo modunda `LevelSystem`'in gizlediği kat grubu.
+    const hiddenParent = new THREE.Object3D()
+    hiddenParent.visible = false
+    hiddenParent.add(hidden.object)
+    registerInstance(visible)
+    registerInstance(hidden)
+
+    rebuildPools(root)
+    const mesh = root.children[0] as THREE.InstancedMesh
+    expect(mesh.count).toBe(1)
+  })
+
+  test('ata tekrar görünür olunca düğüm geri gelir', () => {
+    const e = entry('a', 0)
+    const parent = new THREE.Object3D()
+    parent.visible = false
+    parent.add(e.object)
+    registerInstance(e)
+    rebuildPools(root)
+    expect(poolCount()).toBe(0)
+
+    parent.visible = true
+    rebuildPools(root)
+    expect((root.children[0] as THREE.InstancedMesh).count).toBe(1)
+  })
+})
+
+describe('gölge — host’un anahtarına ait, mesafeye değil', () => {
+  test('uzak katmandaki düğüm de gölge düşürür', () => {
+    const e = entry('a', 0)
+    e.tier = 'simple'
+    registerInstance(e)
+    rebuildPools(root)
+    // Bir zamanlar `castsShadow && tier === 'full'` idi: 70 m'nin ötesindeki
+    // hiçbir raf, sistem gölgesi AÇIK olsa bile gölge düşürmüyordu.
+    expect((root.children[0] as THREE.InstancedMesh).castShadow).toBe(true)
+  })
+
+  test('castsShadow: false diyen kind gölge düşürmez', () => {
+    const e = { ...entry('a', 0), castsShadow: false }
+    registerInstance(e)
+    rebuildPools(root)
+    expect((root.children[0] as THREE.InstancedMesh).castShadow).toBe(false)
+  })
+})
+
+describe('materyal katman başına — paletin uzak materyali', () => {
+  const FAR_MATERIAL = new THREE.MeshBasicMaterial()
+
+  test('katman değişince materyal ve havuz da değişir', () => {
+    const e = {
+      ...entry('p', 0),
+      materialFor: (tier: InstanceTier) => (tier === 'full' ? MATERIAL : FAR_MATERIAL),
+      materialKeyFor: (tier: InstanceTier) => `pallet:${tier}`,
+    }
+    registerInstance(e)
+
+    rebuildPools(root)
+    expect((root.children[0] as THREE.InstancedMesh).material).toBe(MATERIAL)
+
+    // Uzaklaştı: çıplak kutu geometrisi + kendi düz materyali. Skaler
+    // materyalle EPAL atlası on iki üçgene sürülüyordu.
+    e.tier = 'simple'
+    rebuildPools(root)
+    expect((root.children[0] as THREE.InstancedMesh).material).toBe(FAR_MATERIAL)
   })
 })

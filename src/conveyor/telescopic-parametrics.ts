@@ -30,6 +30,15 @@ export const conveyorTelescopicParametrics: ParametricDescriptor<ConveyorTelesco
           options: ['600', '800', '1000'],
           display: 'segmented',
         },
+        // Yükleme mi boşaltma mı. Tek portlu bir makinede bile ANLAMLI:
+        // kuyruk ucunun rolünü (`in`/`out`) bu belirliyor, yani hangi komşu
+        // porta yapışabileceğini. Ailenin `flow` alanıyla aynı adı taşıyor.
+        {
+          key: 'flow',
+          kind: 'enum',
+          options: ['forward', 'reverse'],
+          display: 'segmented',
+        },
       ],
     },
     {

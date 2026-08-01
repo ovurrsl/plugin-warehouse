@@ -151,7 +151,6 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getBoosterGeometry(node, next, abutted)
-    mesh.castShadow = next === 'full'
   })
 
   const length = moduleLengthM(node)
@@ -177,7 +176,7 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
 
       <group position={position} ref={registeredRef} rotation={rotation}>
         <mesh
-          castShadow={isExporting || detailRef.current === 'full'}
+          castShadow
           // Never dispose: shared by every module of this shape.
           dispose={null}
           geometry={geometry}

@@ -168,9 +168,9 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     objectRef: registeredRef,
     geometryFor: (tier) => getRackGeometry(node, tier, abutted),
     keyFor: (tier) => rackGeometryKey(node, tier, abutted),
-    material,
-    materialKey: 'rack',
-    castShadowWhenFull: true,
+    materialFor: () => material,
+    materialKeyFor: () => 'rack',
+    castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -228,9 +228,6 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getRackGeometry(node, next, abutted)
-    // A rack far enough away to lose its bracing is far enough that its shadow
-    // is a smudge, and every caster is a second draw call in the shadow pass.
-    mesh.castShadow = next === 'full'
   })
 
   const width = totalWidth(node)
@@ -261,10 +258,21 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
             çizer ve bu boş kalır. İkisi birden çizerse z-savaşı olur. */}
         {drawsSelf && (
           <mesh
-            // Derived from the same tier as the geometry, for the same reason: a
-            // hardcoded `castShadow` re-promoted a demoted rack to a caster on the
-            // next re-render, and every caster is a second draw in the shadow pass.
-            castShadow={isExporting || detailRef.current === 'full'}
+            /**
+             * Koşulsuz — host'un sözleşmesi bu.
+             *
+             * Gölge, kullanıcının anahtarıyla `renderer.shadowMap.enabled`
+             * üstünden açılıp kapanıyor; host bunu bilerek seçmiş, çünkü
+             * `castShadow`'u runtime'da çevirmek three r184'ün WebGPU node
+             * cache'ini bozuyor. Built-in kind'ların hepsi koşulsuz bırakıyor.
+             *
+             * Burası bir zamanlar LOD katmanına bağlıydı ("uzaktaki gölge
+             * zaten leke") ve ölçülen sonuç şuydu: 70 m'nin ötesindeki hiçbir
+             * raf, sistem gölgesi AÇIK olsa bile gölge düşürmüyordu. Kazanç da
+             * sanıldığı kadar değil — host'un gölge frustum'u binaya fit ve
+             * harita 1024², yani o raflar gölge haritasında zaten birkaç texel.
+             */
+            castShadow
             // Never dispose: shared by every rack of this shape.
             dispose={null}
             geometry={geometry}
@@ -395,11 +403,20 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         yetim tampon da yok — ve `count` yanlış sayıda palet çizilmesini
         `key`'in yaptığı gibi ama bedelsiz engelliyor.
       */}
+      {/*
+        `frustumCulled={false}` ŞART — kuralı bu paket başka bir dosyasında
+        zaten yazmış (`conveyor/flow-system.tsx`): three bir `InstancedMesh`'in
+        sınır küresini İLK frustum testinde bir kez hesaplar ve `setMatrixAt`
+        onu geçersiz kılmaz. Yerleşimler `ghostFill`, doluluk ve kat düzeni
+        değiştikçe yeniden yazılıyor; küre ilk hâline saplanıp kalıyor ve
+        hayalet paletler görüş alanındayken kırpılıyordu.
+      */}
       <instancedMesh
         args={[geometry, material, capacity]}
         castShadow
         count={placements.length}
         dispose={null}
+        frustumCulled={false}
         raycast={NO_RAYCAST}
         ref={palletRef}
       />
@@ -408,6 +425,7 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         castShadow
         count={placements.length}
         dispose={null}
+        frustumCulled={false}
         raycast={NO_RAYCAST}
         ref={loadRef}
       />

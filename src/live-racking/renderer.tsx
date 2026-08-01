@@ -89,9 +89,9 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     objectRef: registeredRef,
     geometryFor: (tier) => getLiveRackingGeometry(node, tier === 'full' ? 'full' : 'simple'),
     keyFor: (tier) => liveRackingGeometryKey(node, tier === 'full' ? 'full' : 'simple'),
-    material,
-    materialKey: 'live-racking',
-    castShadowWhenFull: true,
+    materialFor: () => material,
+    materialKeyFor: () => 'live-racking',
+    castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -133,7 +133,6 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     if (next === current) return
     detailRef.current = next
     mesh.geometry = getLiveRackingGeometry(node, next)
-    mesh.castShadow = next === 'full'
   })
 
   const width = bayWidthM(node)
@@ -155,7 +154,7 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
       <group position={position} ref={registeredRef} rotation={rotation}>
         {drawsSelf && (
           <mesh
-            castShadow={isExporting || detailRef.current === 'full'}
+            castShadow
             dispose={null}
             geometry={geometry}
             material={material}

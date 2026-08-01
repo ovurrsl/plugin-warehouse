@@ -277,11 +277,16 @@ export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicN
             }}
           />
         ))}
-        {/* Kutu havuzu — tek çizim çağrısı, matrisleri kare döngüsü yazar. */}
+        {/* Kutu havuzu — tek çizim çağrısı, matrisleri kare döngüsü yazar.
+            `frustumCulled={false}`: matrisler her kare değiştiği için sınır
+            küresi ilk frustum testindeki hâline saplanır (`setMatrixAt` onu
+            geçersiz kılmaz) — `flow-system.tsx`'in uzun uzun anlattığı kural
+            burada da geçerli, çünkü kutular bomun ucuna kadar yürüyor. */}
         <instancedMesh
           args={[BOX_GEOMETRY, BOX_MATERIAL, MAX_BOXES]}
           count={0}
           dispose={null}
+          frustumCulled={false}
           raycast={NO_RAYCAST}
           ref={boxesRef}
         />

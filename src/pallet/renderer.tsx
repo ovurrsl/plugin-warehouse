@@ -142,9 +142,9 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
     geometryFor: (tier) =>
       tier === 'full' ? getPalletGeometry(node.preset) : getPalletFarGeometry(node.preset),
     keyFor: (tier) => `pallet-deck:${node.preset}:${tier}`,
-    material,
-    materialKey: 'pallet-deck',
-    castShadowWhenFull: true,
+    materialFor: (tier) => (tier === 'full' ? getPalletMaterial() : getPalletFarMaterial()),
+    materialKeyFor: (tier) => `pallet-deck:${tier}`,
+    castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -188,11 +188,9 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
     if (next === 'far') {
       mesh.geometry = getPalletFarGeometry(node.preset)
       mesh.material = getPalletFarMaterial()
-      mesh.castShadow = false
     } else {
       mesh.geometry = getPalletGeometry(node.preset)
       mesh.material = getPalletMaterial()
-      mesh.castShadow = true
     }
   })
 

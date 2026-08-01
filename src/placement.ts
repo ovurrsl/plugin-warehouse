@@ -80,6 +80,12 @@ const CLICK_TRIGGER_KINDS = [
   // Bir filo yan yana park eder: ikinci araç ilkinin kolideri üzerindeyken
   // yerleştirilir.
   'warehouse:truck',
+  // İkisi de bu listede YOKTU ve ikisinin de kolideri var: asma katın ya da
+  // canlı raf kanalının üzerindeyken yapılan yerleştirme tıklaması yutuluyordu.
+  // Asma kat özellikle can alıcı — insanın oraya bir şey koymak için tıkladığı
+  // yerin kendisi o.
+  'warehouse:mezzanine',
+  'warehouse:live-racking',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

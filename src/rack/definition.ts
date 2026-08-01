@@ -141,8 +141,15 @@ export const palletRackDefinition = {
    * gerekçeyle açıkça yazılmış). Rafsız bir tesiste de mount edilir:
    * `RegisteredSystems` kayıtlı her kind'ın sistemini kurar.
    *
-   * Öncelik 3: `FloorElevationSystem` (1) ve geometri sistemleri (2)
-   * matrisleri yazdıktan SONRA, ama akış/filo (5/6) sürmeden önce toplar.
+   * `system.priority` MOUNT sırasıdır, kare sırası değil — `RegisteredSystems`
+   * kayıtları buna göre sıralayıp mount ediyor, o kadar. Kare sırası
+   * `useFrame`'in kendi öncelik argümanıyla belirlenir ve kolektif çizicinin
+   * gerçekten önem taşıyan sıralaması orada: `LevelSystem` (5) kat konumlarını
+   * yazdıktan SONRA okuması gerekiyor, çünkü havuz dünya matrislerini
+   * önbelleğe alıyor. Bkz. `collective-system.tsx` → `FRAME_PRIORITY`.
+   *
+   * Buradaki 3, mount sırasında akış/filo sistemlerinden önce gelmesinden
+   * ibaret; ikisi de etkiyle çalıştığı için pratikte fark etmiyor.
    */
   system: { module: () => import('../instancing/collective-system'), priority: 3 },
 

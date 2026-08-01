@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`fed18af`](https://github.com/ovurrsl/plugin-warehouse/commit/fed18afd12276c30da8e5ed8d039764541a5ebdc))
 - Refresh generated README blocks [skip ci] ([`1d773a4`](https://github.com/ovurrsl/plugin-warehouse/commit/1d773a485f065b5b054a0a5e5775c558a271bf7d))
 - Refresh generated README blocks [skip ci] ([`5a447ef`](https://github.com/ovurrsl/plugin-warehouse/commit/5a447ef0a39cebcffbd5980456fc47464498c19e))
 - Refresh generated README blocks [skip ci] ([`4cd5ee7`](https://github.com/ovurrsl/plugin-warehouse/commit/4cd5ee7cdc606802d510a7cd983e99ab8c7fc59a))
@@ -198,6 +199,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Patlatma, preview kaybolması, gölge ve teleskopik mıknatıs ([`0944920`](https://github.com/ovurrsl/plugin-warehouse/commit/0944920c07d93f164973135ed2daa62d9a699041))
 - Kat tablosu tek yerde — üç ölçülmüş hata düzeldi ([`9e1b525`](https://github.com/ovurrsl/plugin-warehouse/commit/9e1b525b54f3a604f72d805b12b27d7f3949fae0))
 - Alt güverteye yerleştirme — hedef kat açıkça seçiliyor ([`f330fc2`](https://github.com/ovurrsl/plugin-warehouse/commit/f330fc257c1d65211b39de078a3362ccc6c57e77))
 - Panelde durup hiçbir şey yapmayan dört kontrolü gerçekle ([`1c32173`](https://github.com/ovurrsl/plugin-warehouse/commit/1c32173ebf67c1181bb91b626929b95742401241))

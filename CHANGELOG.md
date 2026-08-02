@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`9a022c4`](https://github.com/ovurrsl/plugin-warehouse/commit/9a022c4776d65b82d4152ad32d456ba686d11c18))
 - Refresh generated README blocks [skip ci] ([`e57fd9e`](https://github.com/ovurrsl/plugin-warehouse/commit/e57fd9ec2124387002354b2ee6cea1e5d27d54aa))
 - Refresh generated README blocks [skip ci] ([`7b052d6`](https://github.com/ovurrsl/plugin-warehouse/commit/7b052d6dd8cfe7391213dda68d6bc5897eb12a96))
 - Refresh generated README blocks [skip ci] ([`88e51d0`](https://github.com/ovurrsl/plugin-warehouse/commit/88e51d0f3fedf9a1ba5d225df51839ff2bc11eb2))
@@ -120,6 +121,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Draw the area to place it, and make the size controls real ([`040ff68`](https://github.com/ovurrsl/plugin-warehouse/commit/040ff68a36fdf6f7fb5b42499ee999cf3f468893))
 - M3 picking shelving — no beams, one 25 mm grid, published loads ([`527519c`](https://github.com/ovurrsl/plugin-warehouse/commit/527519ca9e5c983eacdd20dd8d09420316c6e539))
 - M7 Longspan shelving — levels that do not have to match ([`e8e99c6`](https://github.com/ovurrsl/plugin-warehouse/commit/e8e99c68db5e503f5c07347dbfeb32d93f7e0e2c))
 - Drive-in pallet racking — one node is one lane ([`aef0de0`](https://github.com/ovurrsl/plugin-warehouse/commit/aef0de0ed494414aaa5f3fa412835fa7c05245ad))

@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`540d5df`](https://github.com/ovurrsl/plugin-warehouse/commit/540d5dff7e3b3e25517a24c82610c70f8cbf23af))
 - Refresh generated README blocks [skip ci] ([`314df04`](https://github.com/ovurrsl/plugin-warehouse/commit/314df04e52e3f0d1fb2a9f8d5363073985fa1dfa))
 - Refresh generated README blocks [skip ci] ([`fed18af`](https://github.com/ovurrsl/plugin-warehouse/commit/fed18afd12276c30da8e5ed8d039764541a5ebdc))
 - Refresh generated README blocks [skip ci] ([`1d773a4`](https://github.com/ovurrsl/plugin-warehouse/commit/1d773a485f065b5b054a0a5e5775c558a271bf7d))
@@ -244,6 +245,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Konveyör ailesi kolektife girdi, ölü kare döngüleri kalktı ([`1cc0a41`](https://github.com/ovurrsl/plugin-warehouse/commit/1cc0a419a7428ebc62cc859fd7a5dcadc09fabae))
 - Collective instancing — 10,300 draw calls measured down to ~11 ([`336d7e6`](https://github.com/ovurrsl/plugin-warehouse/commit/336d7e6e2aa9a4941d6f29d57f0cb0f16c1c9dc5))
 - The collider fix the rack already had, applied to the other three ([`77f3393`](https://github.com/ovurrsl/plugin-warehouse/commit/77f3393380d4a0ca773021e8f570996f2759c128))
 - Stop recomposing static nodes' matrices every frame ([`8044114`](https://github.com/ovurrsl/plugin-warehouse/commit/80441140b17d3b1c06d35080c2ed4e680b06752f))

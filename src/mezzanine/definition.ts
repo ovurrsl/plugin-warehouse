@@ -88,12 +88,15 @@ export const mezzanineDefinition = {
     selection: () => import('./outline-editor'),
   },
 
+  // Bir asma kat çizilerek konur: yerleştirme "nereye" değil "nereyi
+  // kaplayacak" sorusunun cevabı. Döndürme ipucu YOK çünkü şekil zaten
+  // istenen yönde çiziliyor.
   toolHints: [
-    { key: 'Left click', label: 'Place mezzanine' },
-    { key: 'R / T', label: 'Rotate 45°' },
-    { key: 'D', label: 'Draw custom outline' },
+    { key: 'Left click', label: 'Add corner' },
+    { key: '2 corners + Enter', label: 'Rectangle' },
+    { key: 'Click first corner', label: 'Close outline' },
     { key: 'Enter', label: 'Finish outline' },
-    { key: 'Esc', label: 'Undo corner / cancel' },
+    { key: 'Esc', label: 'Undo corner' },
     { key: 'Alt', label: 'Force place' },
   ],
 

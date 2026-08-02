@@ -1,5 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
-import { GridField, TiersField } from './auto-fields'
+import { GridField, OutlineField, TiersField } from './auto-fields'
 import { CONSTRUCTIVE_SYSTEMS, RAILING_RULES } from './catalog'
 import { effectiveClearHeightM, hasCustomOutline, resolveTierElevations } from './metrics'
 import { outlineEdges } from './railing'
@@ -15,6 +15,13 @@ import { resolveSteps } from './stairs'
  */
 export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
   groups: [
+    {
+      // Ölçü kendi başına ve EN ÜSTTE: kullanıcının bir asma katı seçtikten
+      // sonra en sık aradığı şey bu, ve panelde ölçü diye bulduğu tek kontrol
+      // (kolon aksı) onu değiştirmiyordu.
+      label: 'Deck',
+      fields: [{ key: 'polygon', kind: 'custom', component: OutlineField }],
+    },
     {
       label: 'Machine',
       fields: [

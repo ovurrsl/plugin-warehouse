@@ -10,6 +10,13 @@ import {
   RAILING_RULES,
   STAIRCASE_STEP_COUNTS,
 } from './catalog'
+import {
+  isAxisAlignedRectangle,
+  outlineBounds,
+  withOutlineScaled,
+  withRectangleSize,
+} from './draw-shape'
+import { outlinePolygon } from './metrics'
 import { emptyAccessories, type MezzanineNode, type MezzanineTier } from './schema'
 
 /**
@@ -86,12 +93,112 @@ const styles = {
 
 type CustomField = { node: MezzanineNode; onUpdate: (patch: Partial<MezzanineNode>) => void }
 
+/**
+ * Güvertenin ÖLÇÜSÜ — kullanıcının "değiştiremiyorum" dediği şey.
+ *
+ * ## Neden değiştirilemiyordu
+ *
+ * Panelde ölçü diye tek bir kontrol vardı: `GridField`. Ama bir mezzanine bir
+ * kez şekil kazandığında (`polygon`) `grid` artık SINIRI değil KOLON AKSINI
+ * tanımlıyor — yani "Bay width" sürgüsü kolonları seyreltiyor, yapıyı
+ * büyütmüyordu. Kullanıcının gördüğü tam olarak buydu: ölçü kontrolü var,
+ * ölçü değişmiyor. Bu turda temizlenen "görünür ama etkisiz" hatasının en
+ * pahalı örneği.
+ *
+ * ## Eski düğümler ne oluyor
+ *
+ * `outlinePolygon` poligonu olmayan bir düğüm için ızgaradan zaten ORTALANMIŞ
+ * bir dikdörtgen türetiyor. Bu kontrol onu okuyup yazdığı için, poligonsuz
+ * eski bir mezzanine ilk ölçü dokunuşunda sessizce yeni modele geçiyor —
+ * ayrı bir geçiş adımı, ayrı bir bayrak gerekmeden.
+ *
+ * ## Neden keyfî şekilde genişlik/derinlik YOK
+ *
+ * L şeklinde bir güverteye "genişlik" yazmak, ölçüyü sınır kutusuna indirgeyip
+ * şekli sessizce dikdörtgene çevirmek olurdu. Onun yerine oranları koruyan bir
+ * ölçek veriliyor ve panel neden öyle olduğunu söylüyor.
+ */
+export function OutlineField({ node, onUpdate }: CustomField) {
+  const outline = outlinePolygon(node)
+  const bounds = outlineBounds(outline)
+  const rectangular = isAxisAlignedRectangle(outline)
+
+  const setSize = (widthM: number, depthM: number) => {
+    const next = withRectangleSize(outline, widthM, depthM)
+    if (next) onUpdate({ polygon: next.map(([x, z]) => [x, z] as [number, number]) })
+  }
+
+  const scaleBy = (factor: number) => {
+    const next = withOutlineScaled(outline, factor)
+    if (next) onUpdate({ polygon: next.map(([x, z]) => [x, z] as [number, number]) })
+  }
+
+  return (
+    <>
+      <Caption hint={`${(bounds.widthM * bounds.depthM).toFixed(1)} m² sınır`}>Güverte</Caption>
+
+      {rectangular ? (
+        <>
+          <SliderControl
+            label="Genişlik"
+            max={60}
+            min={2}
+            onChange={(widthM) => setSize(widthM, bounds.depthM)}
+            precision={2}
+            step={0.25}
+            unit="m"
+            value={bounds.widthM}
+          />
+          <SliderControl
+            label="Derinlik"
+            max={60}
+            min={2}
+            onChange={(depthM) => setSize(bounds.widthM, depthM)}
+            precision={2}
+            step={0.25}
+            unit="m"
+            value={bounds.depthM}
+          />
+        </>
+      ) : (
+        <>
+          <SliderControl
+            label="Ölçek"
+            max={2}
+            min={0.5}
+            // Her sürükleme MEVCUT şekli çarpıyor, mutlak bir ölçek saklanmıyor:
+            // saklanmış bir ölçek, köşe düzenleyicinin yazdığı şekille çelişen
+            // ikinci bir doğruluk kaynağı olurdu.
+            onChange={(factor) => scaleBy(factor)}
+            precision={2}
+            step={0.05}
+            value={1}
+          />
+          <Note>
+            Bu güverte dikdörtgen değil, o yüzden genişlik/derinlik yerine ölçek var: bir L şekline
+            genişlik yazmak, onu sessizce dikdörtgene çevirmek olurdu. Sınır kutusu{' '}
+            {bounds.widthM.toFixed(2)} × {bounds.depthM.toFixed(2)} m. Köşeleri tek tek taşımak için
+            yapıyı seçip anahat düzenleyiciyi kullanın.
+          </Note>
+        </>
+      )}
+    </>
+  )
+}
+
 export function GridField({ node, onUpdate }: CustomField) {
   const { grid } = node
   const set = (patch: Partial<typeof grid>) => onUpdate({ grid: { ...grid, ...patch } })
   return (
     <>
-      <Caption>Grid</Caption>
+      {/* Başlık "Grid" değil: bu dört sürgü güvertenin SINIRINI değil kolon
+          aksını sürüyor. Eski başlık, ölçü kontrolü sanılmasının sebebiydi. */}
+      <Caption hint={`${grid.baysX} × ${grid.baysY}`}>Kolon aksı</Caption>
+      <Note>
+        Bu ayarlar güvertenin ölçüsünü DEĞİŞTİRMEZ — kolonların hangi aralıkta durduğunu belirler.
+        Ölçü yukarıdaki “Güverte” bölümünde. Kolonlar akstadır ama yalnız güvertenin içinde kalanlar
+        çizilir.
+      </Note>
       <SliderControl
         label="Bays X"
         max={40}

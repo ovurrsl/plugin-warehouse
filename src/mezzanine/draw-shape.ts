@@ -77,6 +77,117 @@ export type FinishedOutline = {
   polygon: [number, number][]
 }
 
+// ── Dikdörtgen kısayolu ─────────────────────────────────────────────────────
+
+/**
+ * İki karşı köşeden eksen hizalı dikdörtgen.
+ *
+ * Çizim artık asma katın TEK yerleştirme yolu, ve bir asma katın çoğu zaman
+ * dikdörtgen olduğu doğru. Dört köşeyi tek tek tıklatmak, sık olanı zor
+ * yapmak olurdu — iki tıklama + Enter bir dikdörtgen veriyor.
+ *
+ * Sarım burada normalleştirilmiyor; `finishOutline` zaten yapıyor ve iki yerde
+ * yapmak ikisinin ayrışması demekti.
+ */
+export function rectangleFrom(a: Point2, b: Point2): Point2[] {
+  return [
+    [a[0], a[1]],
+    [b[0], a[1]],
+    [b[0], b[1]],
+    [a[0], b[1]],
+  ]
+}
+
+// ── Ölçü ────────────────────────────────────────────────────────────────────
+
+export type OutlineBounds = {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+  widthM: number
+  depthM: number
+}
+
+export function outlineBounds(polygon: readonly Point2[]): OutlineBounds {
+  const xs = polygon.map(([x]) => x)
+  const zs = polygon.map(([, z]) => z)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minZ = Math.min(...zs)
+  const maxZ = Math.max(...zs)
+  return { minX, maxX, minZ, maxZ, widthM: maxX - minX, depthM: maxZ - minZ }
+}
+
+/**
+ * Anahat eksen hizalı bir dikdörtgen mi.
+ *
+ * Panelin "Genişlik / Derinlik" kontrollerini göstermesinin ÖLÇÜTÜ bu. Keyfî
+ * bir L şeklinde genişlik ve derinlik yazmak, ölçüyü sınır kutusuna
+ * indirgeyip şekli sessizce dikdörtgene çevirmek olurdu — bu turda temizlenen
+ * "yalan söyleyen kontrol" hatasının aynısı.
+ *
+ * Tolerans milimetre altı: bir köşeyi elle sürükleyip neredeyse hizalayan
+ * kullanıcı dikdörtgen kontrollerini geri kazanmamalı, çünkü şekli artık
+ * dikdörtgen değil.
+ */
+export function isAxisAlignedRectangle(polygon: readonly Point2[], tolerance = 1e-4): boolean {
+  if (polygon.length !== 4) return false
+  const { minX, maxX, minZ, maxZ } = outlineBounds(polygon)
+  if (maxX - minX < tolerance || maxZ - minZ < tolerance) return false
+  // Dört köşenin dördü de sınır kutusunun dört köşesinden biri olmalı, ve
+  // hepsi FARKLI köşeler olmalı — aksi hâlde ikisi üst üste binen dejenere bir
+  // dörtgen de geçerdi.
+  const seen = new Set<string>()
+  for (const [x, z] of polygon) {
+    const onX = Math.abs(x - minX) < tolerance || Math.abs(x - maxX) < tolerance
+    const onZ = Math.abs(z - minZ) < tolerance || Math.abs(z - maxZ) < tolerance
+    if (!onX || !onZ) return false
+    seen.add(`${Math.abs(x - minX) < tolerance ? 0 : 1}${Math.abs(z - minZ) < tolerance ? 0 : 1}`)
+  }
+  return seen.size === 4
+}
+
+/**
+ * Dikdörtgen anahattı yeni ölçüye getir — merkez sabit.
+ *
+ * Merkezden büyütmek, kenardan büyütmekten daha az sürpriz: düğümün
+ * `position`'ı ağırlık merkezinde duruyor ve bir kenarı sabitlemek, panelden
+ * genişliği değiştiren kullanıcının yapıyı ekranda KAYIYOR görmesi demekti.
+ *
+ * Dikdörtgen olmayan şekle uygulanmaz — çağıran `isAxisAlignedRectangle` ile
+ * ayırıyor; yine de burada `null` dönerek sözleşmeyi tek yerde kilitliyoruz.
+ */
+export function withRectangleSize(
+  polygon: readonly Point2[],
+  widthM: number,
+  depthM: number,
+): Point2[] | null {
+  if (!isAxisAlignedRectangle(polygon)) return null
+  if (widthM * depthM < MIN_AREA_M2) return null
+  const { minX, maxX, minZ, maxZ } = outlineBounds(polygon)
+  const cx = (minX + maxX) / 2
+  const cz = (minZ + maxZ) / 2
+  const hw = widthM / 2
+  const hd = depthM / 2
+  return rectangleFrom([cx - hw, cz - hd], [cx + hw, cz + hd])
+}
+
+/**
+ * Keyfî anahattı merkezden ölçekle.
+ *
+ * Dikdörtgen olmayan bir güvertenin ölçüsünü değiştirmenin ŞEKLİ BOZMAYAN tek
+ * yolu bu. Genişlik/derinlik yazdırmak L şeklini dikdörtgene çevirirdi;
+ * ölçekleme oranları koruyor ve panel ne yaptığını söylüyor.
+ */
+export function withOutlineScaled(polygon: readonly Point2[], factor: number): Point2[] | null {
+  if (!(factor > 0)) return null
+  const scaled = polygon.map(([x, z]) => [x * factor, z * factor] as Point2)
+  return Math.abs(signedArea(scaled)) < MIN_AREA_M2
+    ? null
+    : scaled.map((p) => [...p] as [number, number])
+}
+
 /**
  * Var olan bir anahatta köşe taşı / ekle / sil.
  *

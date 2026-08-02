@@ -200,7 +200,11 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       kind: 'SYSTEM',
       where: 'yerleştirme/uzlaştırıcı yazar (zemin çivisi)',
     },
-    { field: 'polygon', kind: 'CUSTOM', where: 'çizim aracı (D) + seçim tutamakları' },
+    // `polygon` ARTIK MUAF DEĞİL — `Deck → OutlineField` onu gerçekten
+    // düzenliyor (dikdörtgende genişlik/derinlik, keyfî şekilde ölçek). Eski
+    // muafiyet "çizim aracı (D)" diyordu; o tuş da kalktı, çizim artık tek
+    // yerleştirme yolu. Muafiyeti silip testin yeşil kalması, alanın
+    // erişilebilirliğinin kanıtı.
     { field: 'mainBeamProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },
     { field: 'secondaryBeamProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },
     { field: 'columnProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },

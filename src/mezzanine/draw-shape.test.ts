@@ -3,8 +3,13 @@ import {
   centroidOf,
   closeEnough,
   finishOutline,
+  isAxisAlignedRectangle,
+  outlineBounds,
   type Point2,
+  rectangleFrom,
   signedArea,
+  withOutlineScaled,
+  withRectangleSize,
   withVertexInserted,
   withVertexMoved,
   withVertexRemoved,
@@ -134,5 +139,149 @@ describe('anahat düzenleme — yeniden merkezleme YOK', () => {
     const removed = withVertexRemoved(square, 0)
     expect(removed).toHaveLength(3)
     expect(withVertexRemoved(removed ?? [], 0)).toBeNull()
+  })
+})
+
+// ── Dikdörtgen kısayolu ve ölçü ─────────────────────────────────────────────
+
+describe('rectangleFrom', () => {
+  test('iki karşı köşeden dört köşe', () => {
+    const rect = rectangleFrom([0, 0], [4, 3])
+    expect(rect).toHaveLength(4)
+    expect(outlineBounds(rect)).toMatchObject({ widthM: 4, depthM: 3 })
+  })
+
+  test('köşeler ters sırada verilse de aynı dikdörtgen', () => {
+    const a = outlineBounds(rectangleFrom([4, 3], [0, 0]))
+    const b = outlineBounds(rectangleFrom([0, 0], [4, 3]))
+    expect(a).toEqual(b)
+  })
+
+  test('üretilen şey gerçekten eksen hizalı dikdörtgen sayılıyor', () => {
+    expect(isAxisAlignedRectangle(rectangleFrom([-2, -1], [2, 1]))).toBe(true)
+  })
+})
+
+describe('isAxisAlignedRectangle — panelin ölçü kontrollerinin ÖLÇÜTÜ', () => {
+  test('L şekli dikdörtgen değil', () => {
+    expect(
+      isAxisAlignedRectangle([
+        [0, 0],
+        [4, 0],
+        [4, 2],
+        [2, 2],
+        [2, 4],
+        [0, 4],
+      ]),
+    ).toBe(false)
+  })
+
+  test('döndürülmüş kare dikdörtgen sayılmıyor — sınır kutusu şekil değil', () => {
+    expect(
+      isAxisAlignedRectangle([
+        [0, 2],
+        [2, 0],
+        [4, 2],
+        [2, 4],
+      ]),
+    ).toBe(false)
+  })
+
+  test('bir köşesi elle kaydırılmış dörtgen dikdörtgenliğini KAYBEDER', () => {
+    // Kullanıcı köşeyi sürükleyip neredeyse hizaladıysa şekli artık dikdörtgen
+    // değil; genişlik/derinlik kontrollerini geri vermek onu sessizce
+    // dikdörtgene çevirmek olurdu.
+    expect(
+      isAxisAlignedRectangle([
+        [0, 0],
+        [4, 0],
+        [4.3, 3],
+        [0, 3],
+      ]),
+    ).toBe(false)
+  })
+
+  test('üçgen dikdörtgen değil', () => {
+    expect(
+      isAxisAlignedRectangle([
+        [0, 0],
+        [4, 0],
+        [0, 3],
+      ]),
+    ).toBe(false)
+  })
+
+  test('üst üste binen köşeli dejenere dörtgen reddediliyor', () => {
+    expect(
+      isAxisAlignedRectangle([
+        [0, 0],
+        [4, 0],
+        [4, 0],
+        [0, 3],
+      ]),
+    ).toBe(false)
+  })
+})
+
+describe('withRectangleSize', () => {
+  test('yeni ölçüyü veriyor ve MERKEZİ koruyor', () => {
+    const before = rectangleFrom([-2, -1.5], [2, 1.5])
+    const after = withRectangleSize(before, 8, 5)
+    expect(after).not.toBeNull()
+    if (!after) return
+    const bounds = outlineBounds(after)
+    expect(bounds.widthM).toBeCloseTo(8, 9)
+    expect(bounds.depthM).toBeCloseTo(5, 9)
+    // Merkez sabit: kenardan büyütmek yapıyı ekranda kaydırırdı.
+    expect((bounds.minX + bounds.maxX) / 2).toBeCloseTo(0, 9)
+    expect((bounds.minZ + bounds.maxZ) / 2).toBeCloseTo(0, 9)
+  })
+
+  test('dikdörtgen olmayan şekli REDDEDİYOR', () => {
+    const l = [
+      [0, 0],
+      [4, 0],
+      [4, 2],
+      [2, 2],
+      [2, 4],
+      [0, 4],
+    ] as const
+    expect(withRectangleSize(l as never, 6, 6)).toBeNull()
+  })
+
+  test('alanı asgarinin altına düşüren ölçü reddediliyor', () => {
+    expect(withRectangleSize(rectangleFrom([0, 0], [4, 3]), 0.5, 0.5)).toBeNull()
+  })
+})
+
+describe('withOutlineScaled', () => {
+  test('L şeklini oranları bozmadan büyütüyor', () => {
+    const l = [
+      [-2, -2],
+      [2, -2],
+      [2, 0],
+      [0, 0],
+      [0, 2],
+      [-2, 2],
+    ] as const
+    const scaled = withOutlineScaled(l as never, 2)
+    expect(scaled).not.toBeNull()
+    if (!scaled) return
+    const before = outlineBounds(l as never)
+    const after = outlineBounds(scaled)
+    expect(after.widthM).toBeCloseTo(before.widthM * 2, 9)
+    expect(after.depthM).toBeCloseTo(before.depthM * 2, 9)
+    // Oran korunuyor — dikdörtgene dönüşmedi.
+    expect(after.widthM / after.depthM).toBeCloseTo(before.widthM / before.depthM, 9)
+  })
+
+  test('sıfır ve negatif çarpan reddediliyor', () => {
+    const rect = rectangleFrom([0, 0], [4, 3])
+    expect(withOutlineScaled(rect, 0)).toBeNull()
+    expect(withOutlineScaled(rect, -1)).toBeNull()
+  })
+
+  test('alanı asgarinin altına düşüren küçültme reddediliyor', () => {
+    expect(withOutlineScaled(rectangleFrom([0, 0], [4, 3]), 0.05)).toBeNull()
   })
 })

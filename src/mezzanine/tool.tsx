@@ -5,136 +5,98 @@ import {
   EDITOR_LAYER,
   isGridSnapActive,
   movementSfxStepKey,
-  PlacementBox,
   triggerSFX,
   useEditor,
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Group } from 'three'
 import { electSupportSlab, subscribeGridMove, subscribePlacementClicks } from '../placement'
 import { useWarehouseStore } from '../store'
 import { GROUND_SUPPORT_ID } from './deck-slabs'
-import { closeEnough, finishOutline, type Point2 } from './draw-shape'
-import { footprintDepthM, footprintWidthM, totalHeightM } from './metrics'
-import MezzaninePreview from './preview'
+import { closeEnough, finishOutline, outlineBounds, type Point2, rectangleFrom } from './draw-shape'
+import { totalHeightM } from './metrics'
 import { MezzanineNode } from './schema'
 
-const ROTATION_STEP = Math.PI / 4
-
 /**
- * Mezzanine yerleştirme aracı — rafın/aracın deseninin sadeleştirilmiş hâli:
- * tek tık yerleştirme + R/T döndürme. Hizalama kılavuzları YOK (Faz 1'de
- * komşu-mıknatıs kavramı yok — bir sonraki fazın konusu değil bile, bu
- * kind'ın komşu paylaşımı hiç olmayacak); `floorPlaced.collides: true`
- * geçerlilik kutusunu `spatialGridManager.canPlaceOnFloor` sürüyor.
+ * Mezzanine yerleştirme aracı — **alan çizerek**.
+ *
+ * Bir asma kat, zemine konan bir nesne değil, bir alanın üstüne kurulan bir
+ * yapı: onu yerleştirmek "nereye" değil "nereyi kaplayacak" sorusunun cevabı.
+ * Bu yüzden tek yerleştirme yolu çizim, ve host'un kendi oda/slab aracının
+ * etkileşimi birebir örnek alındı: her tıklama bir köşe, ilk köşeye yaklaşmak
+ * ya da Enter kapatır, Escape son köşeyi geri alır.
+ *
+ * Önceki sürümde çizim `D` tuşunun arkasındaydı ve VARSAYILAN tek tıkla
+ * ızgaradan üretilen bir dikdörtgendi. İki sonucu vardı: alanı çizmek gizli
+ * bir özellikti, ve panelin ölçü kontrolleri poligon yokken ızgarayı, varken
+ * yalnız kolon aksını sürüyordu — kullanıcının "ölçüleri değiştiremiyorum"
+ * dediği durum.
+ *
+ * ## Çift tık neden kapatmıyor
+ *
+ * Host'un slab aracı çift tıkla da kapatıyor. Burada YAPILAMAZ ve bu bir
+ * eksiklik değil bir çakışma: `subscribePlacementClicks`, aynı noktada 200 ms
+ * içinde gelen ikinci tıklamayı YUTUYOR — çünkü tek bir fiziksel tıklama bu
+ * listeye iki kez ulaşıyor (düğüm yüzeyi `pointerup`'ta sentezliyor, tarayıcı
+ * `click`'i canvas dinleyicisine gidiyor) ve o koruma olmadan her tıklama iki
+ * köşe eklerdi. Gerçek bir çift tık, tam olarak o yutulan kopyaya benziyor.
+ * İki kapanış yolu — ilk köşeye dönmek ve Enter — bu yüzden yeterli sayıldı.
  */
 export default function MezzanineTool() {
   const activeLevelId = useViewer((s) => s.selection.levelId)
-  const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.mezzanineBrush)
 
-  const cursorRef = useRef<Group>(null)
-  const [cursorVisible, setCursorVisible] = useState(false)
-  const [cursorPosition, setCursorPosition] = useState<[number, number, number]>([0, 0, 0])
-  const [cursorRotationY, setCursorRotationY] = useState(0)
-  const [valid, setValid] = useState(true)
-
-  const rotationRef = useRef(0)
-  const validRef = useRef(true)
-  /**
-   * Çizim kipi ve taslak köşeler.
-   *
-   * Hem ref hem state: olay dinleyicileri efektin kapanışında yaşıyor ve
-   * state'in eski değerini görürdü (araçtaki `rotationRef`in aynı gerekçesi);
-   * state yalnız önizlemeyi yeniden çizdirmek için.
-   */
-  const drawingRef = useRef(false)
-  const draftRef = useRef<Point2[]>([])
-  const [drawing, setDrawing] = useState(false)
+  const [cursor, setCursor] = useState<Point2>([0, 0])
   const [draft, setDraft] = useState<Point2[]>([])
-  const altRef = useRef(false)
-  const lastPositionRef = useRef<[number, number, number] | null>(null)
-  const previousSnapRef = useRef<string | null>(null)
   const [placementSerial, setPlacementSerial] = useState(0)
+  const [blocked, setBlocked] = useState(false)
+
+  /** Hem ref hem state: olay dinleyicileri efektin kapanışında yaşıyor ve
+   *  state'in eski değerini görürdü; state yalnız önizlemeyi çizdirmek için. */
+  const draftRef = useRef<Point2[]>([])
+  const cursorRef = useRef<Point2>([0, 0])
+  const altRef = useRef(false)
 
   const previewNode = useMemo(
     () => MezzanineNode.parse({ ...brush, position: [0, 0, 0], rotation: [0, 0, 0] }),
     [brush, placementSerial],
   )
 
-  const boxDimensions = useMemo(
-    (): [number, number, number] => [
-      footprintWidthM(previewNode),
-      totalHeightM(previewNode),
-      footprintDepthM(previewNode),
-    ],
-    [previewNode],
-  )
-
   useEffect(() => {
     if (!activeLevelId) return
-    setCursorVisible(false)
-    lastPositionRef.current = null
-    previousSnapRef.current = null
-    rotationRef.current = 0
+    draftRef.current = []
+    setDraft([])
+    setBlocked(false)
     altRef.current = false
-    validRef.current = true
-    setCursorRotationY(0)
 
-    const recomputeValidity = (position: [number, number, number]) => {
-      if (altRef.current) {
-        validRef.current = true
-        setValid(true)
-        return
-      }
-      const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
-        activeLevelId,
-        position,
-        boxDimensions,
-        [0, rotationRef.current, 0],
-        [],
-      )
-      validRef.current = placeable
-      setValid(placeable)
-    }
-
-    const applyCursor = (position: [number, number, number]) => {
-      cursorRef.current?.position.set(...position)
-      cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      setCursorPosition(position)
-      setCursorRotationY(rotationRef.current)
-      lastPositionRef.current = position
-      recomputeValidity(position)
-    }
-
-    const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
-      setCursorVisible(true)
-      const position: [number, number, number] = [rawX, 0, rawZ]
-      applyCursor(position)
-
-      const nextSnapKey = movementSfxStepKey({
-        coords: [position[0], position[2]],
-        gridSnapActive: isGridSnapActive(),
-        gridStep: useEditor.getState().gridSnapStep,
-      })
-      if (previousSnapRef.current !== nextSnapKey) {
-        triggerSFX('sfx:grid-snap')
-        previousSnapRef.current = nextSnapKey
-      }
-    })
+    let previousSnapKey: string | null = null
 
     /**
-     * Çizilmiş şekli düğüme çevir ve sahneye koy.
+     * Çizilen alanı düğüme çevir.
      *
-     * Dikdörtgen yerleştirmeyle aynı commit yolu — tek fark `polygon` ve
-     * konumun ağırlık merkezinden gelmesi. Dönüş SIFIR: kullanıcı şekli
-     * zaten istediği yönde çizdi, üstüne bir de araç dönüşü uygulamak onu
-     * çizdiği yerden kaydırırdı.
+     * Dönüş SIFIR: kullanıcı şekli zaten istediği yönde çizdi ve üstüne bir de
+     * araç dönüşü uygulamak onu çizdiği yerden kaydırırdı.
      */
-    const commitOutline = (): boolean => {
-      const finished = finishOutline(draftRef.current)
+    const commit = (points: readonly Point2[]): boolean => {
+      const finished = finishOutline(points)
       if (!finished) return false
+
+      // Çizilen alan gerçekten boş mu. Alt bunu atlatır — rafın/M3'ün
+      // "zorla yerleştir" davranışının aynısı, aynı tuşla.
+      if (!altRef.current) {
+        const bounds = outlineBounds(finished.polygon)
+        const { valid } = spatialGridManager.canPlaceOnFloor(
+          activeLevelId,
+          finished.position,
+          [bounds.widthM, totalHeightM(previewNode), bounds.depthM],
+          [0, 0, 0],
+          [],
+        )
+        if (!valid) {
+          setBlocked(true)
+          return false
+        }
+      }
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const committed = MezzanineNode.parse({
@@ -145,6 +107,11 @@ export default function MezzanineTool() {
         rotation: [0, 0, 0],
         polygon: finished.polygon,
         parentId: activeLevelId,
+        // Zemine ya da gerçek bir slab'a ÇİVİLENİR — asla boş bırakılmaz.
+        // Boş bırakılsaydı `getFloorPlacedElevation` her karede seçim yapardı
+        // ve adaylar arasında mezzanine'in KENDİ güverte slab'ları da olurdu:
+        // mezzanine kendi üstüne çıkar, güverte bir üst kota taşınır, sonraki
+        // karede yine.
         supportSlabId:
           electSupportSlab(nodes, activeLevelId, finished.position[0], finished.position[2]) ??
           GROUND_SUPPORT_ID,
@@ -156,119 +123,87 @@ export default function MezzanineTool() {
 
       draftRef.current = []
       setDraft([])
-      setDrawing(false)
+      setBlocked(false)
       setPlacementSerial((serial) => serial + 1)
       return true
     }
 
-    const unsubscribeClicks = subscribePlacementClicks((event) => {
-      const position = lastPositionRef.current
-      if (!position) return
-
-      // ── Çizim kipi: tıklama köşe ekler, ilk köşeye dönmek kapatır ──────
-      if (drawingRef.current) {
-        const point: Point2 = [position[0], position[2]]
-        const first = draftRef.current[0]
-        if (first && draftRef.current.length >= 3 && closeEnough(point, first)) {
-          commitOutline()
-        } else {
-          draftRef.current = [...draftRef.current, point]
-          setDraft(draftRef.current)
-          triggerSFX('sfx:grid-snap')
-        }
-        event.stopPropagation?.()
+    /**
+     * Enter ile bitir.
+     *
+     * **İki köşe bir DİKDÖRTGEN demek** — ve bu, çizimi tek yol yaptıktan
+     * sonra sık olanı zor bırakmamanın yolu. Çoğu asma kat dikdörtgen; dört
+     * köşeyi tek tek tıklatmak, kullanıcıyı en yaygın durumda cezalandırırdı.
+     * Üç ve üstü kendi poligonudur.
+     */
+    const finish = () => {
+      const points = draftRef.current
+      if (points.length === 2) {
+        const [a, b] = points
+        if (a && b) commit(rectangleFrom(a, b))
         return
       }
+      commit(points)
+    }
 
-      if (!validRef.current) {
-        event.stopPropagation?.()
-        return
-      }
+    const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
+      cursorRef.current = [rawX, rawZ]
+      setCursor([rawX, rawZ])
 
-      const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const committed = MezzanineNode.parse({
-        ...previewNode,
-        id: previewNode.id,
-        name: 'Mezzanine',
-        position,
-        rotation: [0, rotationRef.current, 0],
-        parentId: activeLevelId,
-        // Zemine ya da gerçek bir slab'a ÇİVİLENİR — asla boş bırakılmaz.
-        // Boş bırakılsaydı `getFloorPlacedElevation` her karede seçim
-        // yapardı ve adaylar arasında mezzanine'in KENDİ güverte slab'ları
-        // da olurdu: mezzanine kendi üstüne çıkar, güverte bir üst kota
-        // taşınır, sonraki karede yine... Düz zeminde bu kenar durum değil
-        // varsayılan durumdur, çünkü `resolveSupportSlabPatch` tek slablı
-        // katta hiçbir şey kalıcılaştırmaz.
-        supportSlabId:
-          electSupportSlab(nodes, activeLevelId, position[0], position[2]) ?? GROUND_SUPPORT_ID,
+      const nextSnapKey = movementSfxStepKey({
+        coords: [rawX, rawZ],
+        gridSnapActive: isGridSnapActive(),
+        gridStep: useEditor.getState().gridSnapStep,
       })
+      if (previousSnapKey !== nextSnapKey) {
+        triggerSFX('sfx:grid-snap')
+        previousSnapKey = nextSnapKey
+      }
+    })
 
-      useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
-      useViewer.getState().setSelection({ selectedIds: [committed.id as AnyNodeId] })
-      triggerSFX('sfx:item-place')
-
-      setPlacementSerial((serial) => serial + 1)
+    const unsubscribeClicks = subscribePlacementClicks((event) => {
+      const point = cursorRef.current
+      const first = draftRef.current[0]
+      // İlk köşeye dönmek kapatır — üç köşeden itibaren, çünkü iki köşe zaten
+      // Enter'ın dikdörtgen kısayolu.
+      if (first && draftRef.current.length >= 3 && closeEnough(point, first)) {
+        commit(draftRef.current)
+      } else {
+        draftRef.current = [...draftRef.current, point]
+        setDraft(draftRef.current)
+        setBlocked(false)
+        triggerSFX('sfx:grid-snap')
+      }
       event.stopPropagation?.()
     })
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Alt') {
         altRef.current = true
-        const position = lastPositionRef.current
-        if (position) applyCursor(position)
         return
       }
       if (event.metaKey || event.ctrlKey || event.altKey) return
 
-      // ── Çizim kipi ────────────────────────────────────────────────────
-      if (event.key === 'd' || event.key === 'D') {
+      if (event.key === 'Enter') {
         event.preventDefault()
-        draftRef.current = []
-        setDraft([])
-        drawingRef.current = !drawingRef.current
-        setDrawing(drawingRef.current)
+        finish()
         return
       }
-      if (drawingRef.current) {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          commitOutline()
-          return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        // Bir köşe geri al. Boşta ise araç zaten bir sonraki Escape'te host
+        // tarafından kapatılır — burada yutmak, aracı terk etmeyi imkânsız
+        // kılardı.
+        if (draftRef.current.length > 0) {
+          draftRef.current = draftRef.current.slice(0, -1)
+          setDraft(draftRef.current)
+          setBlocked(false)
         }
-        if (event.key === 'Escape') {
-          event.preventDefault()
-          // Bir köşe geri al; boşta ise çizim kipinden çık.
-          if (draftRef.current.length > 0) {
-            draftRef.current = draftRef.current.slice(0, -1)
-            setDraft(draftRef.current)
-          } else {
-            drawingRef.current = false
-            setDrawing(false)
-          }
-          return
-        }
-        // Çizerken döndürme yok: şekil zaten istenen yönde çiziliyor.
-        return
       }
-
-      let delta = 0
-      if (event.key === 'r' || event.key === 'R') delta = ROTATION_STEP
-      else if (event.key === 't' || event.key === 'T') delta = -ROTATION_STEP
-      else return
-      event.preventDefault()
-      triggerSFX('sfx:item-rotate')
-      rotationRef.current += delta
-      setCursorRotationY(rotationRef.current)
-      const position = lastPositionRef.current
-      if (position) applyCursor(position)
     }
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key !== 'Alt') return
-      altRef.current = false
-      const position = lastPositionRef.current
-      if (position) applyCursor(position)
+      if (event.key === 'Alt') altRef.current = false
     }
 
     window.addEventListener('keydown', onKeyDown)
@@ -280,65 +215,53 @@ export default function MezzanineTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [activeLevelId, previewNode, boxDimensions])
+  }, [activeLevelId, previewNode])
 
   if (!activeLevelId) return null
 
   /**
    * Çizim önizlemesi — köşe işaretleri ve aralarındaki kenarlar.
    *
-   * Kutu primitifleriyle: bu paketin bütün geometrisi kutu ve çizgi için
-   * ayrı bir malzeme yolu açmak, önizleme uğruna render yoluna yeni bir
-   * kavram sokmak olurdu. Son kenar imlece kadar uzuyor, yani kullanıcı
-   * kapanışı tıklamadan önce görüyor.
+   * Son kenar imlece kadar uzuyor, yani kullanıcı kapanışı tıklamadan önce
+   * görüyor. İki köşedeyken Enter'ın çizeceği DİKDÖRTGEN gösteriliyor, ki
+   * kısayol keşfedilebilir olsun — görünmeyen bir kısayol yok sayılır.
    */
-  const draftEdges = drawing
-    ? draft.map((point, i) => {
-        const next = draft[i + 1] ?? [cursorPosition[0], cursorPosition[2]]
-        const dx = next[0] - point[0]
-        const dz = next[1] - point[1]
-        const length = Math.hypot(dx, dz)
-        return {
-          key: `${point[0]},${point[1]}`,
-          center: [point[0] + dx / 2, 0.02, point[1] + dz / 2] as [number, number, number],
-          length,
-          angle: Math.atan2(dz, dx),
-        }
-      })
-    : []
+  const preview: Point2[] =
+    draft.length === 2 && draft[0] && draft[1] ? rectangleFrom(draft[0], draft[1]) : draft
+
+  const closed = preview.length >= 3 && draft.length === 2
+  const edges = preview.map((point, index) => {
+    const next = preview[index + 1] ?? (closed ? preview[0] : cursor)
+    if (!next) return null
+    const dx = next[0] - point[0]
+    const dz = next[1] - point[1]
+    return {
+      key: `${index}-${point[0]},${point[1]}`,
+      center: [point[0] + dx / 2, 0.02, point[1] + dz / 2] as [number, number, number],
+      length: Math.hypot(dx, dz),
+      angle: Math.atan2(dz, dx),
+    }
+  })
+
+  const tint = blocked ? '#dc2626' : '#e69a47'
 
   return (
-    <>
-      {/* Çizerken dikdörtgen hayalet gizli — iki şekil aynı anda yanıltır. */}
-      <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible && !drawing}>
-        <MezzaninePreview node={previewNode} />
-      </group>
-      {cursorVisible && !drawing && (
-        <PlacementBox
-          dimensions={boxDimensions}
-          measurements={{ unit }}
-          position={cursorPosition}
-          rotationY={cursorRotationY}
-          valid={valid}
-        />
-      )}
-
-      {drawing && (
-        <group layers={EDITOR_LAYER}>
-          {draft.map((point) => (
-            <mesh key={`v-${point[0]},${point[1]}`} position={[point[0], 0.03, point[1]]}>
-              <boxGeometry args={[0.22, 0.06, 0.22]} />
-              <meshBasicMaterial color="#e69a47" depthTest={false} />
-            </mesh>
-          ))}
-          {draftEdges.map((edge) => (
+    <group layers={EDITOR_LAYER}>
+      {preview.map((point, index) => (
+        <mesh key={`v-${index}-${point[0]},${point[1]}`} position={[point[0], 0.03, point[1]]}>
+          <boxGeometry args={[0.22, 0.06, 0.22]} />
+          <meshBasicMaterial color={tint} depthTest={false} />
+        </mesh>
+      ))}
+      {edges.map(
+        (edge) =>
+          edge && (
             <mesh key={`e-${edge.key}`} position={edge.center} rotation={[0, -edge.angle, 0]}>
               <boxGeometry args={[edge.length, 0.03, 0.06]} />
-              <meshBasicMaterial color="#e69a47" depthTest={false} />
+              <meshBasicMaterial color={tint} depthTest={false} />
             </mesh>
-          ))}
-        </group>
+          ),
       )}
-    </>
+    </group>
   )
 }

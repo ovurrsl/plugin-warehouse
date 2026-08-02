@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`e57fd9e`](https://github.com/ovurrsl/plugin-warehouse/commit/e57fd9ec2124387002354b2ee6cea1e5d27d54aa))
 - Refresh generated README blocks [skip ci] ([`7b052d6`](https://github.com/ovurrsl/plugin-warehouse/commit/7b052d6dd8cfe7391213dda68d6bc5897eb12a96))
 - Refresh generated README blocks [skip ci] ([`88e51d0`](https://github.com/ovurrsl/plugin-warehouse/commit/88e51d0f3fedf9a1ba5d225df51839ff2bc11eb2))
 - Refresh generated README blocks [skip ci] ([`be935ff`](https://github.com/ovurrsl/plugin-warehouse/commit/be935ffa0c89997e5444880695801f93ddd39178))
@@ -260,6 +261,7 @@ index to it, not a replacement for it.
 
 ### Refactors
 
+- One naming standard, read off the editor's own kind list ([`7c25751`](https://github.com/ovurrsl/plugin-warehouse/commit/7c2575187203aa7ad62938a45d31d74758909f7f))
 - Host primitiflerine geçiş + iç içe giren ayarların birleştirilmesi ([`519e2ff`](https://github.com/ovurrsl/plugin-warehouse/commit/519e2fffca9a7748bb889ee43ec71e92123a90ff))
 
 ### Tests

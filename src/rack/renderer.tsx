@@ -11,14 +11,14 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
-import { getPalletGeometry } from '../pallet/geometry-builder'
-import { getPalletMaterial } from '../pallet/materials'
+import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-builder'
+import { getPalletFarMaterial, getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
 import { useStaticTransform } from '../static-transform'
 import {
   getRackGeometry,
-  type RackDetail,
   rackGeometryKey,
   releaseRackGeometry,
   retainRackGeometry,
@@ -51,18 +51,6 @@ const NO_RAYCAST = () => {}
 const LOD_FAR_SQ = 70 * 70
 const LOD_NEAR_SQ = 55 * 55
 
-/**
- * Frames between distance tests, and how the racks are spread across them.
- *
- * The test is cheap but there is one per rack per frame, and a warehouse has
- * thousands. Testing every eighth frame is imperceptible at ten metres of
- * hysteresis — a camera would have to cross the band in under a tenth of a
- * second — and staggering by a per-instance phase keeps a thousand racks from
- * all recomputing on the same frame, which is what turns a small cost into a
- * periodic hitch.
- */
-const LOD_INTERVAL = 8
-
 /** Shared by every rack's picking collider, scaled per node. A box geometry per
  *  rack is a thousand allocations that all describe the same cube. */
 const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
@@ -90,7 +78,6 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
  */
 export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const steelRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
@@ -130,28 +117,6 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
    */
   const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
 
-  /**
-   * The tier this rack is drawing. Owned by the frame loop below — and the
-   * mounted geometry has to be read *from* it, not hardcoded.
-   *
-   * It was hardcoded to `'full'`, and the two paths fought. R3F diffs props by
-   * reference, so the memo only clobbered the imperative swap when it produced a
-   * different buffer — which is exactly what happens when `abutted` flips. So a
-   * distant rack that had dropped to its silhouette was handed the full mesh
-   * back the moment a bay was placed against it, while `detailRef` still said
-   * `'simple'` and the `next === current` guard blocked re-demotion until the
-   * camera made a full round trip through the hysteresis band. Multiplying a run
-   * walked bay after bay into the full tier, and LOD is the only thing paying
-   * for two thousand nodes.
-   *
-   * Exporting must not bake a distance-dependent tier into the file, so it pins
-   * the full mesh and the swap below is skipped.
-   */
-  const detailRef = useRef<RackDetail>('full')
-  const geometry = useMemo(
-    () => getRackGeometry(node, isExporting ? 'full' : detailRef.current, abutted),
-    [node, abutted, isExporting],
-  )
   const material = getRackMaterial()
 
   /**
@@ -197,39 +162,6 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     }
   }, [node, abutted])
 
-  const frameRef = useRef(0)
-  // Spread the checks across the interval so the racks do not all land on the
-  // same frame. Derived from the id rather than counted, so it survives a
-  // remount and needs no shared state.
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = steelRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
-
-    // Straight off the world matrix R3F has already updated this frame.
-    // `getWorldPosition` would walk and re-multiply the whole ancestor chain
-    // per rack per check, which is the actual cost at warehouse scale.
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    mesh.geometry = getRackGeometry(node, next, abutted)
-  })
-
   const width = totalWidth(node)
   const depth = totalDepth(node)
 
@@ -257,29 +189,13 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
             kendi mesh'ini çizer; açıkken tek `InstancedMesh` onun yerine
             çizer ve bu boş kalır. İkisi birden çizerse z-savaşı olur. */}
         {drawsSelf && (
-          <mesh
-            /**
-             * Koşulsuz — host'un sözleşmesi bu.
-             *
-             * Gölge, kullanıcının anahtarıyla `renderer.shadowMap.enabled`
-             * üstünden açılıp kapanıyor; host bunu bilerek seçmiş, çünkü
-             * `castShadow`'u runtime'da çevirmek three r184'ün WebGPU node
-             * cache'ini bozuyor. Built-in kind'ların hepsi koşulsuz bırakıyor.
-             *
-             * Burası bir zamanlar LOD katmanına bağlıydı ("uzaktaki gölge
-             * zaten leke") ve ölçülen sonuç şuydu: 70 m'nin ötesindeki hiçbir
-             * raf, sistem gölgesi AÇIK olsa bile gölge düşürmüyordu. Kazanç da
-             * sanıldığı kadar değil — host'un gölge frustum'u binaya fit ve
-             * harita 1024², yani o raflar gölge haritasında zaten birkaç texel.
-             */
-            castShadow
-            // Never dispose: shared by every rack of this shape.
-            dispose={null}
-            geometry={geometry}
-            material={material}
-            raycast={NO_RAYCAST}
-            ref={steelRef}
-            receiveShadow
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) => getRackGeometry(node, tier, abutted)}
+            isExporting={isExporting}
+            materialFor={() => material}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
           />
         )}
         {node.ghostFill > 0 && <GhostStock node={node} />}
@@ -288,18 +204,16 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
   )
 }
 
-const worldPosition = new THREE.Vector3()
-
-/** A stable 0..LOD_INTERVAL-1 bucket for an id. FNV-1a, the same hash the ghost
- *  fill uses — cheap, and identical for the same rack on every mount. */
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
-}
+/**
+ * Katman döngüsü ve fazlama artık `../instancing/self-drawn`'da.
+ *
+ * Buradaki kopya, kolektif çizici AÇIKKEN bile R3F'in abonelik listesinde
+ * duruyordu: `steelRef.current` `null` olduğu için ilk satırda dönüyor, ama
+ * kare başına bir kez çağrılıyordu. İki bin raflık bir sahnede kare başına iki
+ * bin boş kapanış — ve aynı işi kolektif sistem zaten tek merkezî döngüde
+ * yapıyor. `SelfDrawnBody` yalnız düğüm kendi çizerken mount olduğu için
+ * abonelik o hâlde hiç kurulmuyor.
+ */
 
 /**
  * Illustrative stock in slots no real pallet occupies.
@@ -309,9 +223,31 @@ function hashPhase(id: string): number {
  * Both meshes reuse the pallet node's own cached geometry and material, so a
  * scene holding real pallets *and* ghost stock still compiles one pallet shader.
  */
+/**
+ * Hayalet güvertenin katman bandı — paletin KENDİ bandıyla aynı.
+ *
+ * Ayrı sayılar yazmak, gerçek bir paletin kutuya düştüğü mesafede yanındaki
+ * hayaletin hâlâ tam tahta çizmesi (ya da tersi) demek olurdu; ikisi yan yana
+ * duruyor ve fark görünür.
+ */
+const GHOST_FAR_SQ = 25 * 25
+const GHOST_NEAR_SQ = 18 * 18
+const GHOST_LOD_INTERVAL = 8
+const ghostWorldPosition = new THREE.Vector3()
+
 function GhostStock({ node }: { node: PalletRackNode }) {
   const palletRef = useRef<THREE.InstancedMesh>(null)
   const loadRef = useRef<THREE.InstancedMesh>(null)
+  const ghostTierRef = useRef<'full' | 'far'>('full')
+  const ghostFrameRef = useRef(0)
+  const ghostPhase = useMemo(() => {
+    let hash = 0x811c9dc5
+    for (let index = 0; index < node.id.length; index++) {
+      hash ^= node.id.charCodeAt(index)
+      hash = Math.imul(hash, 0x01000193)
+    }
+    return (hash >>> 0) % GHOST_LOD_INTERVAL
+  }, [node.id])
 
   // One shared index for the whole scene rather than a scan per rack — see
   // `occupancy.ts`. Selecting the set here keeps this rack re-rendering only
@@ -384,6 +320,50 @@ function GhostStock({ node }: { node: PalletRackNode }) {
     pallets.instanceMatrix.needsUpdate = true
     loads.instanceMatrix.needsUpdate = true
   }, [placements, spec.height, turned, alongRun, intoDepth])
+
+  /**
+   * Hayalet güvertelerin katmanı — ölçülmüş, bildirilmemiş bir maliyet.
+   *
+   * Bu `InstancedMesh` `getPalletGeometry`'yi HER MESAFEDE kullanıyordu, yani
+   * palet düğümünün kendisi için özellikle yazılmış uzak katman burada hiç
+   * devreye girmiyordu. Rakam palet renderer'ının kendi yorumundan: tam güverte
+   * 228 bin üçgen, ve `ghostFill: 1` olan on gözlük bir raf birkaç yüz kopya
+   * demek — gerçek paletler 25 m'de tek kutuya düşerken, onların yanındaki
+   * hayaletler tam tahtayla çizilmeye devam ediyordu.
+   *
+   * Örnek matrisleri korunuyor: yalnız `geometry` ve `material` takas ediliyor,
+   * `instanceMatrix` aynı tampon olarak kalıyor.
+   *
+   * Bu döngü ÖLÜ DEĞİL — `GhostStock` yalnız `ghostFill > 0` iken mount
+   * ediliyor ve mount olduğunda mesh gerçekten ekranda.
+   */
+  useFrame(({ camera }) => {
+    const pallets = palletRef.current
+    if (!pallets) return
+    ghostFrameRef.current += 1
+    if ((ghostFrameRef.current + ghostPhase) % GHOST_LOD_INTERVAL !== 0) return
+
+    const { elements } = pallets.matrixWorld
+    const distanceSq = camera.position.distanceToSquared(
+      ghostWorldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+    )
+    const current = ghostTierRef.current
+    const next =
+      current === 'full'
+        ? distanceSq > GHOST_FAR_SQ
+          ? 'far'
+          : 'full'
+        : distanceSq < GHOST_NEAR_SQ
+          ? 'full'
+          : 'far'
+    if (next === current) return
+    ghostTierRef.current = next
+    pallets.geometry =
+      next === 'far'
+        ? getPalletFarGeometry(node.palletPreset)
+        : getPalletGeometry(node.palletPreset)
+    pallets.material = next === 'far' ? getPalletFarMaterial() : getPalletMaterial()
+  })
 
   if (placements.length === 0) return null
 

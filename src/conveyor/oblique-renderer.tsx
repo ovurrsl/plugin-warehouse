@@ -8,14 +8,14 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import type { ConveyorDetail } from './geometry-builder'
+import { SelfDrawnBody } from '../instancing/self-drawn'
+import { useCollective } from '../instancing/use-collective'
 import { releaseGeometry } from './geometry-builder'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
-import { getObliqueGeometry, retainObliqueGeometry } from './oblique-geometry'
+import { getObliqueGeometry, obliqueGeometryKey, retainObliqueGeometry } from './oblique-geometry'
 import {
   branchCentreLocal,
   branchHeadingRad,
@@ -25,17 +25,7 @@ import {
   moduleLengthM,
 } from './oblique-metrics'
 import type { ConveyorObliqueNode } from './oblique-schema'
-
-const NO_RAYCAST = () => {}
-
-/** Distance band at which a module drops to its silhouette, squared to keep the
- *  per-frame test off the square root. Ten metres of hysteresis so a module on
- *  the threshold does not swap geometry every time the camera breathes. */
-const LOD_FAR_SQ = 45 * 45
-const LOD_NEAR_SQ = 35 * 35
-
-/** Frames between distance tests, staggered by a per-instance phase. */
-const LOD_INTERVAL = 8
+import { LOD_FAR_SQ, LOD_NEAR_SQ } from './renderer'
 
 const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
 
@@ -48,7 +38,6 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
 
 export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqueNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const bodyRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
@@ -69,12 +58,22 @@ export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqu
 
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const detailRef = useRef<ConveyorDetail>('full')
-  const geometry = useMemo(
-    () => getObliqueGeometry(node, isExporting ? 'full' : detailRef.current, abutted),
-    [node, abutted, isExporting],
-  )
   const material = getConveyorMaterial()
+
+  // Kolektif çiziciye katılım ve gerekçesi `./renderer.tsx`'te; eşikler oradan.
+  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const drawsSelf = useCollective({
+    nodeId: node.id,
+    objectRef: registeredRef,
+    geometryFor: (tier) => getObliqueGeometry(node, tier, abutted),
+    keyFor: (tier) => obliqueGeometryKey(node, tier, abutted),
+    materialFor: () => material,
+    materialKeyFor: () => 'conveyor',
+    castsShadow: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded: selected || live !== undefined || override !== undefined || isExporting,
+  })
 
   useEffect(() => {
     const near = retainObliqueGeometry(node, 'full', abutted)
@@ -84,33 +83,6 @@ export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqu
       releaseGeometry(far)
     }
   }, [node, abutted])
-
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = bodyRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
-
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    mesh.geometry = getObliqueGeometry(node, next, abutted)
-  })
 
   /**
    * Two pickers, and the second one is turned.
@@ -155,30 +127,17 @@ export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqu
             />
           ))}
 
-        <mesh
-          castShadow
-          // Never dispose: shared by every module of this shape.
-          dispose={null}
-          geometry={geometry}
-          material={material}
-          raycast={NO_RAYCAST}
-          ref={bodyRef}
-          receiveShadow
-        />
+        {drawsSelf && (
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) => getObliqueGeometry(node, tier, abutted)}
+            isExporting={isExporting}
+            materialFor={() => material}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
+          />
+        )}
       </group>
     </group>
   )
-}
-
-const worldPosition = new THREE.Vector3()
-
-/** A stable 0..LOD_INTERVAL-1 bucket for an id. FNV-1a — cheap, and identical
- *  for the same module on every mount, so it survives a remount. */
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
 }

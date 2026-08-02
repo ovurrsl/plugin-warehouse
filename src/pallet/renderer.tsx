@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { colliderProps } from '../collider'
+import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
@@ -121,8 +122,6 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   )
 
   const spec = specOf(node.preset)
-  const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
-  const material = getPalletMaterial()
 
   /**
    * Güverte kolektif çiziciye girer — sahnedeki en kalabalık mesh bu.
@@ -151,48 +150,20 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   })
 
   /**
-   * The deck's own LOD, in the same hysteresis band the cargo uses.
+   * Güvertenin katman döngüsü `SelfDrawnBody`'ye taşındı.
    *
-   * The deck was the one mesh in the package drawn at full detail at every
-   * distance — invisible at a few hundred pallets, and 228k triangles of
-   * sub-pixel boards on a real 3,704-bay scene. Past 25 m it swaps to a single
-   * box with a flat wood material; the maps would smear over a box's UVs, so
-   * the material swaps with the geometry.
+   * Güverte, paketteki her mesafede tam detay çizilen tek mesh'ti — birkaç yüz
+   * palette görünmez, gerçek bir 3.704 gözlük sahnede 228 bin üçgenlik piksel
+   * altı tahta. Uzakta tek bir kutuya ve düz ahşap materyaline düşüyor;
+   * haritalar bir kutunun UV'lerine yayılacağı için materyal geometriyle
+   * birlikte takas ediliyor.
+   *
+   * Döngünün burada durmasının bedeli ölçülebilirdi: kolektif çizici AÇIKKEN
+   * güverte mesh'i hiç mount edilmiyor, yani ref `null` kalıyor ve döngü ilk
+   * satırda dönüyordu — ama sahnedeki HER palet için, HER karede bir kez
+   * çağrılıyordu. `SelfDrawnBody` yalnız düğüm kendi çizerken mount olduğu için
+   * o abonelik artık hiç kurulmuyor.
    */
-  const deckRef = useRef<Mesh>(null)
-  const deckTierRef = useRef<'full' | 'far'>('full')
-  const deckFrameRef = useRef(0)
-  const deckPhase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = deckRef.current
-    if (!mesh || isExporting) return
-    deckFrameRef.current += 1
-    if ((deckFrameRef.current + deckPhase) % LOD_INTERVAL !== 0) return
-
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = deckTierRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'far'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'far'
-    if (next === current) return
-    deckTierRef.current = next
-    if (next === 'far') {
-      mesh.geometry = getPalletFarGeometry(node.preset)
-      mesh.material = getPalletFarMaterial()
-    } else {
-      mesh.geometry = getPalletGeometry(node.preset)
-      mesh.material = getPalletMaterial()
-    }
-  })
 
   // One height, from the one function that knows: a cargo load answers with
   // what its variant resolved to, an empty pallet with nothing. The collider
@@ -219,15 +190,21 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
             güvertesini çizer; açıkken tek `InstancedMesh` preset başına
             hepsini birden çizer. */}
         {drawsSelf && (
-          <mesh
-            castShadow
-            // Never dispose: shared across every pallet of this preset.
-            dispose={null}
-            geometry={geometry}
-            material={material}
-            raycast={NO_RAYCAST}
-            ref={deckRef}
-            receiveShadow
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) =>
+              tier === 'full' ? getPalletGeometry(node.preset) : getPalletFarGeometry(node.preset)
+            }
+            isExporting={isExporting}
+            /**
+             * Uzak katmanda materyal DE değişiyor: EPAL atlası çıplak bir
+             * kutunun UV'lerine yayılınca tahta dokusu leke oluyor. Kolektif
+             * yolun `materialFor`'uyla birebir aynı ifade — iki yolun farklı
+             * görünmesi imkânsız olsun diye.
+             */
+            materialFor={(tier) => (tier === 'full' ? getPalletMaterial() : getPalletFarMaterial())}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
           />
         )}
         {/* Cargo or nothing. There is no third branch: the plain block that
@@ -331,7 +308,18 @@ function CargoLoad({
     const swapped = cargoInputOf(node, next)
     if (!swapped) return
     mesh.geometry = getCargoGeometry(swapped)
-    mesh.castShadow = next === 'full'
+    /**
+     * `mesh.castShadow = next === 'full'` BURADAYDI ve kaldırıldı.
+     *
+     * Aşama 1'de raf, asma kat ve konveyörden temizlenen hatanın bu dosyada
+     * kalan kopyası: gölge, mesafeye bağlı katmana bağlanmıştı, yani uzaktaki
+     * hiçbir yük — sistem gölgesi AÇIK olsa bile — gölge düşürmüyordu.
+     *
+     * Host'un sözleşmesi bunu ayrıca açıkça yasaklıyor: `castShadow`'u runtime'da
+     * çevirmek three r184'ün WebGPU node cache'ini bozuyor, o yüzden gölge
+     * yalnız `renderer.shadowMap.enabled` üzerinden, kullanıcının anahtarıyla
+     * açılıp kapanıyor ve built-in kind'ların hepsi bayrağı koşulsuz bırakıyor.
+     */
   })
 
   if (!geometry) return null

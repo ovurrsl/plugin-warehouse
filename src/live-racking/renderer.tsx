@@ -7,10 +7,10 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { colliderProps } from '../collider'
+import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
 import {
@@ -21,10 +21,9 @@ import {
 } from './geometry'
 import { getLiveRackingMaterial } from './materials'
 import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
-import type { LiveRackingDetail } from './parts'
 import type { LiveRackingNode } from './schema'
 
-const NO_RAYCAST = () => {}
+const _NO_RAYCAST = () => {}
 
 /**
  * LOD bandı — rafın kendi değerleriyle aynı gerekçe: tek eşik, tam üstünde
@@ -37,9 +36,9 @@ const LOD_FAR_SQ = 45 * 45
 const LOD_NEAR_SQ = 32 * 32
 const LOD_INTERVAL = 8
 
-const worldPosition = new THREE.Vector3()
+const _worldPosition = new THREE.Vector3()
 
-function hashPhase(id: string): number {
+function _hashPhase(id: string): number {
   let hash = 0x811c9dc5
   for (let index = 0; index < id.length; index++) {
     hash ^= id.charCodeAt(index)
@@ -50,7 +49,7 @@ function hashPhase(id: string): number {
 
 export default function LiveRackingRenderer({ node }: { node: LiveRackingNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const meshRef = useRef<THREE.Mesh>(null)
+  const _meshRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
@@ -76,11 +75,6 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     live !== undefined || override !== undefined,
   )
 
-  const detailRef = useRef<LiveRackingDetail>('full')
-  const geometry = useMemo(
-    () => getLiveRackingGeometry(node, isExporting ? 'full' : detailRef.current),
-    [node, isExporting],
-  )
   const material = getLiveRackingMaterial()
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
@@ -108,33 +102,6 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     }
   }, [node])
 
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = meshRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
-
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    mesh.geometry = getLiveRackingGeometry(node, next)
-  })
-
   const width = bayWidthM(node)
   const depth = channelDepthM(node)
   const height = frameHeightM(node)
@@ -153,14 +120,13 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
 
       <group position={position} ref={registeredRef} rotation={rotation}>
         {drawsSelf && (
-          <mesh
-            castShadow
-            dispose={null}
-            geometry={geometry}
-            material={material}
-            raycast={NO_RAYCAST}
-            receiveShadow
-            ref={meshRef}
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) => getLiveRackingGeometry(node, tier)}
+            isExporting={isExporting}
+            materialFor={() => material}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
           />
         )}
       </group>

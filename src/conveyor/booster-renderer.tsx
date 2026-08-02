@@ -8,37 +8,17 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { getBoosterGeometry, retainBoosterGeometry } from './booster-geometry'
+import { SelfDrawnBody } from '../instancing/self-drawn'
+import { useCollective } from '../instancing/use-collective'
+import { boosterGeometryKey, getBoosterGeometry, retainBoosterGeometry } from './booster-geometry'
 import { frameWidthM, moduleLengthM } from './booster-metrics'
 import type { ConveyorBoosterNode } from './booster-schema'
-import type { ConveyorDetail } from './geometry-builder'
 import { releaseGeometry } from './geometry-builder'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
-
-const NO_RAYCAST = () => {}
-
-/**
- * Distance band at which a module drops to its silhouette, in metres, squared
- * to keep the per-frame test off the square root.
- *
- * The two bounds differ on purpose: a single threshold makes a module sitting
- * exactly on it swap geometry every time the camera breathes, which reads as
- * flicker. Ten metres of hysteresis means it has to travel to change tier.
- */
-const LOD_FAR_SQ = 45 * 45
-const LOD_NEAR_SQ = 35 * 35
-
-/**
- * Frames between distance tests, and how the modules are spread across them.
- * Staggering by a per-instance phase keeps two hundred modules from all
- * recomputing on the same frame, which is what turns a small cost into a
- * periodic hitch.
- */
-const LOD_INTERVAL = 8
+import { LOD_FAR_SQ, LOD_NEAR_SQ } from './renderer'
 
 /** Shared by every module's picking collider, scaled per node. */
 const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
@@ -59,10 +39,14 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
  * every rebuild, and the geometry here is shared by every module of the same
  * shape — so one rebuild anywhere would free the buffer forty other modules are
  * drawing from and blank them all at once.
+ *
+ * Kolektif çiziciye katılım ve gerekçesi `./renderer.tsx`'te; bu aile aynı
+ * deseni izliyor ve LOD eşiklerini oradan paylaşıyor — iki modülün aynı
+ * mesafede farklı katmana düşmesi, bir hattın ortasında görünür bir dikiş
+ * demek olurdu.
  */
 export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBoosterNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const bodyRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
@@ -87,27 +71,24 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
    * The catalogue puts one support at every joint, not two, so a run of modules
    * must not each build one — every seam would carry doubled steel, a doubled
    * shadow and z-fighting on every coincident face.
-   *
-   * The index behind this is built once per store write and shared by every
-   * module; the selector narrows it to one boolean, so a module re-renders only
-   * when its *own* answer changes rather than on every scene edit.
    */
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  /**
-   * The tier this module is drawing. Owned by the frame loop below, and the
-   * mounted geometry is read *from* it rather than hardcoded — the rack shipped
-   * the hardcoded version and the two paths fought: R3F diffs props by
-   * reference, so the memo clobbered the imperative swap whenever it produced a
-   * different buffer, while the ref still said `simple` and the guard blocked
-   * re-demotion until the camera made a full round trip.
-   */
-  const detailRef = useRef<ConveyorDetail>('full')
-  const geometry = useMemo(
-    () => getBoosterGeometry(node, isExporting ? 'full' : detailRef.current, abutted),
-    [node, abutted, isExporting],
-  )
   const material = getConveyorMaterial()
+
+  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const drawsSelf = useCollective({
+    nodeId: node.id,
+    objectRef: registeredRef,
+    geometryFor: (tier) => getBoosterGeometry(node, tier, abutted),
+    keyFor: (tier) => boosterGeometryKey(node, tier, abutted),
+    materialFor: () => material,
+    materialKeyFor: () => 'conveyor',
+    castsShadow: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded: selected || live !== undefined || override !== undefined || isExporting,
+  })
 
   /**
    * Tell the cache this shape is on screen. The cache is bounded — a slider
@@ -122,36 +103,6 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
       releaseGeometry(far)
     }
   }, [node, abutted])
-
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = bodyRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
-
-    // Straight off the world matrix R3F has already updated this frame.
-    // `getWorldPosition` would walk and re-multiply the whole ancestor chain per
-    // module per check, which is the actual cost at warehouse scale.
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    mesh.geometry = getBoosterGeometry(node, next, abutted)
-  })
 
   const length = moduleLengthM(node)
   const width = frameWidthM(node)
@@ -175,30 +126,17 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
-        <mesh
-          castShadow
-          // Never dispose: shared by every module of this shape.
-          dispose={null}
-          geometry={geometry}
-          material={material}
-          raycast={NO_RAYCAST}
-          ref={bodyRef}
-          receiveShadow
-        />
+        {drawsSelf && (
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) => getBoosterGeometry(node, tier, abutted)}
+            isExporting={isExporting}
+            materialFor={() => material}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
+          />
+        )}
       </group>
     </group>
   )
-}
-
-const worldPosition = new THREE.Vector3()
-
-/** A stable 0..LOD_INTERVAL-1 bucket for an id. FNV-1a — cheap, and identical
- *  for the same module on every mount, so it survives a remount. */
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
 }

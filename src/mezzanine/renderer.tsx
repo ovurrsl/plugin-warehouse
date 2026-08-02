@@ -73,8 +73,25 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
     materialFor: () => material,
     materialKeyFor: () => 'mezzanine',
     castsShadow: true,
-    farSq: 90 * 90,
-    nearSq: 70 * 70,
+    /**
+     * Bu kind'ın LOD'u YOK — ve eşikleri sonsuz yapmak bir ihmal değil, bir
+     * düzeltme.
+     *
+     * `90*90 / 70*70` yazıyordu, ama `geometryFor` ve `keyFor` katmanı hiç
+     * okumuyor: iki katman da aynı geometri, aynı anahtar. Sonuç ölçülebilir
+     * bir israftı — 70–90 m bandını geçen HER asma kat `evaluateTiers`'a
+     * `changed = true` döndürüyor, o da `rebuildPools`'u tetikliyordu. Yani
+     * kameranın bir asma katın yanından geçmesi, ekrandaki HİÇBİR şey
+     * değişmeden bütün kolektif havuzu (raflar, paletler, konveyörler dâhil)
+     * baştan kurduruyordu.
+     *
+     * Sonsuz eşikle katman `'full'`de sabitlenir: `distSq > Infinity` hiçbir
+     * zaman doğru olmaz, dolayısıyla bu kind bir daha yeniden inşa tetiklemez.
+     * Asma kata gerçek bir uzak katman yazılırsa eşikler o zaman gerçek
+     * sayılara döner.
+     */
+    farSq: Number.POSITIVE_INFINITY,
+    nearSq: Number.POSITIVE_INFINITY,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
   })
 

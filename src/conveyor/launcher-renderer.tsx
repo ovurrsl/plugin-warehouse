@@ -8,28 +8,22 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { SelfDrawnBody } from '../instancing/self-drawn'
+import { useCollective } from '../instancing/use-collective'
 import { LNC } from './catalog'
-import type { ConveyorDetail } from './geometry-builder'
 import { releaseGeometry } from './geometry-builder'
-import { getLauncherGeometry, retainLauncherGeometry } from './launcher-geometry'
+import {
+  getLauncherGeometry,
+  launcherGeometryKey,
+  retainLauncherGeometry,
+} from './launcher-geometry'
 import { frameWidthM, lateralOuterZM, launchSign, moduleLengthM } from './launcher-metrics'
 import type { ConveyorLauncherNode } from './launcher-schema'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
-
-const NO_RAYCAST = () => {}
-
-/** Distance band at which a module drops to its silhouette, squared to keep the
- *  per-frame test off the square root. Ten metres of hysteresis so a module on
- *  the threshold does not swap geometry every time the camera breathes. */
-const LOD_FAR_SQ = 45 * 45
-const LOD_NEAR_SQ = 35 * 35
-
-/** Frames between distance tests, staggered by a per-instance phase. */
-const LOD_INTERVAL = 8
+import { LOD_FAR_SQ, LOD_NEAR_SQ } from './renderer'
 
 const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
 
@@ -42,7 +36,6 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
 
 export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLauncherNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const bodyRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
@@ -63,12 +56,22 @@ export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLaunc
 
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const detailRef = useRef<ConveyorDetail>('full')
-  const geometry = useMemo(
-    () => getLauncherGeometry(node, isExporting ? 'full' : detailRef.current, abutted),
-    [node, abutted, isExporting],
-  )
   const material = getConveyorMaterial()
+
+  // Kolektif çiziciye katılım ve gerekçesi `./renderer.tsx`'te; eşikler oradan.
+  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const drawsSelf = useCollective({
+    nodeId: node.id,
+    objectRef: registeredRef,
+    geometryFor: (tier) => getLauncherGeometry(node, tier, abutted),
+    keyFor: (tier) => launcherGeometryKey(node, tier, abutted),
+    materialFor: () => material,
+    materialKeyFor: () => 'conveyor',
+    castsShadow: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded: selected || live !== undefined || override !== undefined || isExporting,
+  })
 
   useEffect(() => {
     const near = retainLauncherGeometry(node, 'full', abutted)
@@ -78,33 +81,6 @@ export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLaunc
       releaseGeometry(far)
     }
   }, [node, abutted])
-
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
-
-  useFrame(({ camera }) => {
-    const mesh = bodyRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
-
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    mesh.geometry = getLauncherGeometry(node, next, abutted)
-  })
 
   /**
    * Two pickers, not one box round both.
@@ -150,30 +126,17 @@ export default function ConveyorLauncherRenderer({ node }: { node: ConveyorLaunc
             />
           ))}
 
-        <mesh
-          castShadow
-          // Never dispose: shared by every module of this shape.
-          dispose={null}
-          geometry={geometry}
-          material={material}
-          raycast={NO_RAYCAST}
-          ref={bodyRef}
-          receiveShadow
-        />
+        {drawsSelf && (
+          <SelfDrawnBody
+            farSq={LOD_FAR_SQ}
+            geometryFor={(tier) => getLauncherGeometry(node, tier, abutted)}
+            isExporting={isExporting}
+            materialFor={() => material}
+            nearSq={LOD_NEAR_SQ}
+            nodeId={node.id}
+          />
+        )}
       </group>
     </group>
   )
-}
-
-const worldPosition = new THREE.Vector3()
-
-/** A stable 0..LOD_INTERVAL-1 bucket for an id. FNV-1a — cheap, and identical
- *  for the same module on every mount, so it survives a remount. */
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
 }

@@ -229,6 +229,7 @@ export function rebuildPools(root: THREE.Object3D): void {
       geometry: THREE.BufferGeometry
       material: THREE.Material
       castShadow: boolean
+      layersMask: number
       objects: THREE.Object3D[]
     }
   >()
@@ -237,13 +238,33 @@ export function rebuildPools(root: THREE.Object3D): void {
     if (entry.excluded) continue
     if (!isEffectivelyVisible(entry.object)) continue
     const tier = entry.tier
-    const poolKey = `${entry.keyFor(tier)}::${entry.materialKeyFor(tier)}`
+    /**
+     * Katman maskesi HAVUZ ANAHTARININ parçası — solo kipinin öteki yarısı.
+     *
+     * Host solo'da iki farklı şey yapıyor: seçili katın ALTINDAKİLER
+     * `visible = false` olur (yukarıdaki görünürlük taraması yakalar), ama
+     * ÜSTÜNDEKİLER görünür KALIR ve `applyShadowOnly` her alt nesnenin
+     * katman maskesini "yalnız gölge"ye çevirir — güneş, gizlenen katların
+     * içinden solo katı yine gölgelesin diye. Maske kalıtsal değildir; host
+     * bu yüzden alt ağacı tek tek damgalar ve kayıtlı grubumuz da damgayı
+     * alır. Ama kolektif mesh sahne KÖKÜNDE durur, damga ona hiç ulaşmaz —
+     * yani üst katlardaki raflar renk geçişinde çizilmeye devam ediyordu.
+     *
+     * Maske anahtara girince aynı şeklin renkli ve yalnız-gölge örnekleri
+     * ayrı mesh'lere düşer, mesh kaynağın maskesini AYNEN kopyalar. Sabit
+     * (`SHADOW_ONLY_LAYER`) okunmuyor — bilerek: viewer barrel'ı onu dışa
+     * vermiyor ve kopyalamak zaten daha doğru, host yarın başka bir maske
+     * damgalarsa havuz onu da bedavaya izler.
+     */
+    const layersMask = entry.object.layers.mask
+    const poolKey = `${entry.keyFor(tier)}::${entry.materialKeyFor(tier)}::L${layersMask}`
     let bucket = buckets.get(poolKey)
     if (!bucket) {
       bucket = {
         geometry: entry.geometryFor(tier),
         material: entry.materialFor(tier),
         castShadow: entry.castsShadow,
+        layersMask,
         objects: [],
       }
       buckets.set(poolKey, bucket)
@@ -293,9 +314,12 @@ export function rebuildPools(root: THREE.Object3D): void {
      * düşüyor, yakındaki `full` anahtarı yeni olduğu için görünüyordu.
      */
     if (pool.mesh.parent !== root) root.add(pool.mesh)
-    // Gölge kararı her yeniden kuruluşta yazılır: aynı havuz anahtarı farklı
-    // bir bucket'a denk gelirse yaratım anındaki değere saplanıp kalırdı.
+    // Gölge kararı ve katman maskesi her yeniden kuruluşta yazılır: aynı
+    // havuz anahtarı farklı bir bucket'a denk gelirse yaratım anındaki değere
+    // saplanıp kalırdı. Maske kaynağın kopyası — solo'da üst katların
+    // yalnız-gölge damgası böylece kolektif mesh'e de işler.
     pool.mesh.castShadow = bucket.castShadow
+    pool.mesh.layers.mask = bucket.layersMask
 
     for (let index = 0; index < needed; index++) {
       const object = bucket.objects[index]
@@ -339,7 +363,8 @@ const LEVEL_SETTLED_M = 5e-4
  *
  * Sahnede bir avuç kat vardır; bu, kare başına birkaç karşılaştırma.
  */
-export function pollLevelPositions(seen: Map<string, number>): boolean {
+export type LevelSignature = { y: number; mask: number }
+export function pollLevelPositions(seen: Map<string, LevelSignature>): boolean {
   let moved = false
   const alive = new Set<string>()
   for (const levelId of sceneRegistry.byType.level ?? []) {
@@ -348,13 +373,24 @@ export function pollLevelPositions(seen: Map<string, number>): boolean {
     alive.add(levelId)
     // Y ve görünürlük tek sayıya katlanıyor: gizli kat NaN, görünür kat Y.
     const y = object.visible ? object.position.y : Number.NaN
+    /**
+     * Katman maskesi de ölçülüyor — Y'nin yakalayamadığı geçiş bu.
+     *
+     * Solo'da seçili katın ÜSTÜNDEKİ katlar ne taşınır ne gizlenir: yerli
+     * yerinde, `visible = true`, yalnız maskeleri "yalnız gölge" olur. Y'ye
+     * bakan bir ölçüm bu geçişi hiç görmez ve havuz eski maskeyle çizmeye
+     * devam ederdi. Kat grubunun kendi maskesi yeter: `applyShadowOnly` alt
+     * ağacı kökünden damgalar, yani kök değiştiyse altındakiler de değişti.
+     */
+    const mask = object.layers.mask
     const previous = seen.get(levelId)
     const changed =
       previous === undefined ||
-      Number.isNaN(previous) !== Number.isNaN(y) ||
-      (!Number.isNaN(y) && Math.abs(previous - y) > LEVEL_SETTLED_M)
+      Number.isNaN(previous.y) !== Number.isNaN(y) ||
+      (!Number.isNaN(y) && Math.abs(previous.y - y) > LEVEL_SETTLED_M) ||
+      previous.mask !== mask
     if (changed) {
-      seen.set(levelId, y)
+      seen.set(levelId, { y, mask })
       moved = true
     }
   }

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { sceneRegistry } from '@pascal-app/core'
 import * as THREE from 'three'
-import type { InstanceTier } from './collective'
+import type { InstanceTier, LevelSignature } from './collective'
 import {
   clearPools,
   evaluateTiers,
   instanceCount,
   instanceEntries,
   instanceGeneration,
+  pollLevelPositions,
   poolCount,
   rebuildPools,
   refreshInstance,
@@ -327,5 +329,134 @@ describe('materyal katman başına — paletin uzak materyali', () => {
     e.tier = 'simple'
     rebuildPools(root)
     expect((root.children[0] as THREE.InstancedMesh).material).toBe(FAR_MATERIAL)
+  })
+})
+
+describe('solo kipi — katman maskesi havuza işliyor', () => {
+  /**
+   * Host'un solo davranışının İKİ yarısı var ve ilkini görünürlük taraması
+   * zaten yakalıyordu: seçili katın ALTINDAKİLER `visible = false` olur.
+   * Bu blok ikinci yarıyı kilitliyor: ÜSTTEKİLER görünür KALIR ve
+   * `applyShadowOnly` alt ağacın maskesini "yalnız gölge"ye çevirir — güneş
+   * gizlenen katların içinden solo katı yine gölgelesin diye. Kolektif mesh
+   * sahne kökünde durduğu için damgayı almıyordu ve üst katlardaki raflar
+   * renk geçişinde çizilmeye devam ediyordu — kullanıcının bildirdiği hata.
+   *
+   * Host taklidi: maske kalıtsal DEĞİL, host bu yüzden alt ağacı tek tek
+   * damgalıyor; testte de kayıtlı nesnenin kendi maskesi damgalanıyor.
+   */
+  const SHADOW_ONLY_MASK = 1 << 4 // host `layers.ts`: SHADOW_ONLY_LAYER = 4
+
+  function stampShadowOnly(object: THREE.Object3D): void {
+    object.layers.disable(0)
+    object.layers.enable(4)
+  }
+
+  test('yalnız-gölge örnek AYRI havuza düşüyor ve maskeyi kopyalıyor', () => {
+    const color = entry('renkli', 0)
+    const above = entry('ust-kat', 3)
+    stampShadowOnly(above.object)
+    registerInstance(color)
+    registerInstance(above)
+    rebuildPools(root)
+
+    // Aynı şekil, iki havuz: bir InstancedMesh tek maske taşıyabilir.
+    expect(poolCount()).toBe(2)
+    const meshes = root.children.filter(
+      (child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh,
+    )
+    const masks = meshes.map((mesh) => mesh.layers.mask).sort((a, b) => a - b)
+    expect(masks).toEqual([1, SHADOW_ONLY_MASK])
+  })
+
+  test('yalnız-gölge havuz gölge ATMAYA devam ediyor — solo bunun için var', () => {
+    const above = entry('ust-kat', 3)
+    stampShadowOnly(above.object)
+    registerInstance(above)
+    rebuildPools(root)
+
+    const mesh = root.children.find(
+      (child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh,
+    )
+    expect(mesh?.castShadow).toBe(true)
+    // Ana kamera 0. katmanı görür; bu mesh onda YOK.
+    expect(mesh?.layers.mask ?? 0 & 1).not.toBe(1)
+  })
+
+  test('damga kalkınca örnek renkli havuza geri dönüyor', () => {
+    const node = entry('gidip-gelen', 0)
+    stampShadowOnly(node.object)
+    registerInstance(node)
+    rebuildPools(root)
+
+    // Solo kapandı: host `clearShadowOnly` maskeyi eski hâline döndürür.
+    node.object.layers.mask = 1
+    rebuildPools(root)
+
+    const meshes = root.children.filter(
+      (child): child is THREE.InstancedMesh => child instanceof THREE.InstancedMesh,
+    )
+    expect(meshes).toHaveLength(1)
+    expect(meshes[0]?.layers.mask).toBe(1)
+  })
+})
+
+describe('kat imzası maskeyi de ölçüyor', () => {
+  /**
+   * Yeniden inşayı TETİKLEYEN taraf. Solo'da üst katlar ne taşınır ne
+   * gizlenir — Y'ye bakan eski imza geçişi hiç görmüyordu ve havuz, maskeyi
+   * kopyalamayı öğrenmiş olsa bile, eski maskeyle çizmeye devam ederdi.
+   *
+   * GERÇEK `pollLevelPositions` sınanıyor, karşılaştırmanın bir kopyası
+   * değil: kayıt defteri enjekte edilebilir bir tekil, sahte bir kat konup
+   * sonda temizleniyor. Kopya, fonksiyondaki bir gerileme ne yaparsa yapsın
+   * yeşil kalırdı — bu turda ayıklanan kendini-doğrulayan test sınıfı.
+   */
+  const LEVEL_ID = 'level_poll-probe'
+
+  function withFakeLevel(run: (object: THREE.Object3D) => void): void {
+    const object = new THREE.Object3D()
+    sceneRegistry.nodes.set(LEVEL_ID as never, object)
+    sceneRegistry.byType.level?.add(LEVEL_ID as never)
+    try {
+      run(object)
+    } finally {
+      sceneRegistry.byType.level?.delete(LEVEL_ID as never)
+      sceneRegistry.nodes.delete(LEVEL_ID as never)
+    }
+  }
+
+  test('aynı Y, değişen maske yeniden inşa istiyor — solo geçişinin kendisi', () => {
+    withFakeLevel((object) => {
+      const seen = new Map<string, LevelSignature>()
+      expect(pollLevelPositions(seen)).toBe(true) // ilk görüş her zaman değişimdir
+
+      // Kat yerinde, görünür — hiçbir şey değişmedi.
+      expect(pollLevelPositions(seen)).toBe(false)
+
+      // Solo: üst kat taşınmaz, gizlenmez, yalnız damgalanır.
+      object.layers.disable(0)
+      object.layers.enable(4)
+      expect(pollLevelPositions(seen)).toBe(true)
+      expect(pollLevelPositions(seen)).toBe(false)
+
+      // Solo kapandı: damga geri alındı.
+      object.layers.mask = 1
+      expect(pollLevelPositions(seen)).toBe(true)
+    })
+  })
+
+  test('görünürlük ve Y eski davranışını koruyor', () => {
+    withFakeLevel((object) => {
+      const seen = new Map<string, LevelSignature>()
+      pollLevelPositions(seen)
+
+      object.visible = false
+      expect(pollLevelPositions(seen)).toBe(true) // gizlenen alt kat
+
+      object.visible = true
+      object.position.y = 5 // patlatmada taşınan kat
+      expect(pollLevelPositions(seen)).toBe(true)
+    })
   })
 })

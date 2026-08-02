@@ -11,6 +11,7 @@ import {
   clearPools,
   evaluateTiers,
   instanceGeneration,
+  type LevelSignature,
   pollLevelPositions,
   rebuildPools,
   refreshLevelWorldMatrices,
@@ -61,8 +62,10 @@ export default function CollectiveInstancingSystem() {
   const frameRef = useRef(0)
   const generationRef = useRef(-1)
   const dirtyRef = useRef(true)
-  /** Kat kimliği → son görülen yerel Y. Patlatma/solo/manuel hepsini kapsar. */
-  const levelYRef = useRef(new Map<string, number>())
+  /** Kat kimliği → son görülen (Y, katman maskesi). Patlatma katı taşır,
+   *  solo alttakileri gizler ve ÜSTTEKİLERİ yalnız-gölgeye damgalar — üçü de
+   *  bu imzada görünür. */
+  const levelYRef = useRef(new Map<string, LevelSignature>())
 
   // Sahne değişti: bir sonraki karede havuzlar yeniden kurulur. `nodes`
   // burada OKUNMAZ — kimliği sahne değişiminin ta kendisidir ve tek işi bu

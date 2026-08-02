@@ -369,7 +369,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'longspan-picking',
-    kind: 'warehouse:longspan',
+    kind: 'warehouse:longspan-rack',
     label: 'M7 Longspan (Picking)',
     sectionId: 'storage',
     description:
@@ -389,7 +389,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'longspan-bulk',
-    kind: 'warehouse:longspan',
+    kind: 'warehouse:longspan-rack',
     label: 'M7 Longspan (Bulk)',
     sectionId: 'storage',
     description:
@@ -409,7 +409,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'm3-picking',
-    kind: 'warehouse:m3-shelving',
+    kind: 'warehouse:m3-rack',
     label: 'M3 Shelving (Picking)',
     sectionId: 'storage',
     description:
@@ -432,7 +432,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'm3-drawers',
-    kind: 'warehouse:m3-shelving',
+    kind: 'warehouse:m3-rack',
     label: 'M3 Drawer Unit',
     sectionId: 'storage',
     description:
@@ -455,7 +455,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'm3-cabinet',
-    kind: 'warehouse:m3-shelving',
+    kind: 'warehouse:m3-rack',
     label: 'M3 Cabinet (Office)',
     sectionId: 'storage',
     description:
@@ -516,7 +516,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'live-racking-fifo',
-    kind: 'warehouse:live-racking',
+    kind: 'warehouse:live-rack',
     label: 'Live Racking (FIFO)',
     sectionId: 'storage',
     description:
@@ -529,7 +529,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
   },
   {
     id: 'live-racking-lifo',
-    kind: 'warehouse:live-racking',
+    kind: 'warehouse:live-rack',
     label: 'Live Racking (LIFO Push-back)',
     sectionId: 'storage',
     description: 'Tek koridorlu push-back: aynı uçtan yükle ve al. Sığ kanallar için, tutuculu.',

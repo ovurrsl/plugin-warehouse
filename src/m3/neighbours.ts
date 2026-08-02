@@ -36,7 +36,7 @@ type BayLike = {
 
 function asBay(node: unknown): BayLike | null {
   const record = node as BayLike | null
-  if (record?.type !== 'warehouse:m3-shelving') return null
+  if (record?.type !== 'warehouse:m3-rack') return null
   if (typeof record.id !== 'string') return null
   if (!Array.isArray(record.position) || !Array.isArray(record.rotation)) return null
   return record

@@ -101,7 +101,7 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'Levels → LevelClearsField, "Üst boşluk" varsayılanı',
     },
   ],
-  'warehouse:longspan': [
+  'warehouse:longspan-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     // `levels` bir `custom` alan, yani içindeki her şey ayrıca yazılmalı — bir
     // custom bileşen ne düzenlediğini yalnız kendisi bilir.
@@ -126,7 +126,7 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'Levels → LevelsField, kirişli katlarda "Panel" slider',
     },
   ],
-  'warehouse:m3-shelving': [
+  'warehouse:m3-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     // `levels` bir `custom` alan, yani içindeki her şey ayrıca yazılmalı — bir
     // custom bileşen ne düzenlediğini yalnız kendisi bilir.
@@ -324,7 +324,7 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'AccessoryEditor bölge genişlik slider (1.2 m eşiği uyarısıyla)',
     },
   ],
-  'warehouse:live-racking': [
+  'warehouse:live-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'skus', kind: 'CUSTOM', where: 'trailing panel kat başına SKU girdileri' },
   ],

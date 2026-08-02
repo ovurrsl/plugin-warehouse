@@ -491,9 +491,9 @@ describe('çakışma ve kapasite', () => {
 describe('tanım ve manifest', () => {
   test('kayıtlı, panelde listeli, katalogda iki fiş', () => {
     const registered = new Set(warehousePlugin.nodes?.map((def) => def.kind))
-    expect(registered.has('warehouse:live-racking')).toBe(true)
+    expect(registered.has('warehouse:live-rack')).toBe(true)
     expect([...registered].sort()).toEqual([...(warehouseCatalogPanel.kinds ?? [])].sort())
-    expect(CATALOG_ITEMS.filter((i) => i.kind === 'warehouse:live-racking')).toHaveLength(2)
+    expect(CATALOG_ITEMS.filter((i) => i.kind === 'warehouse:live-rack')).toHaveLength(2)
   })
 
   test('taban izi türetilmiş ölçüleri okur', () => {

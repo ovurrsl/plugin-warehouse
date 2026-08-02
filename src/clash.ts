@@ -221,7 +221,7 @@ export function occupiedVolumes(node: unknown): ClashBox[] {
     )
   }
 
-  if (placement.type === 'warehouse:live-racking') {
+  if (placement.type === 'warehouse:live-rack') {
     // The rack's reasoning: a gravity channel is mostly air, and the air
     // under its lowest level is a walkway. The `full` tier is used so the
     // rollers are present — a pallet resting on a channel is resting on

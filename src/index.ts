@@ -91,10 +91,10 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:route',
     'warehouse:truck',
     'warehouse:mezzanine',
-    'warehouse:live-racking',
+    'warehouse:live-rack',
     'warehouse:drive-in-rack',
-    'warehouse:longspan',
-    'warehouse:m3-shelving',
+    'warehouse:longspan-rack',
+    'warehouse:m3-rack',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

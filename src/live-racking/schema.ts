@@ -22,7 +22,7 @@ import { DEFAULT_GRADIENT, DEFAULT_ROLLER_PITCH_M, GRADIENT_RANGE, PALETTE } fro
  */
 export const LiveRackingNode = BaseNode.extend({
   id: objectId('live-racking'),
-  type: nodeType('warehouse:live-racking'),
+  type: nodeType('warehouse:live-rack'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

@@ -117,7 +117,7 @@ export const truckDefinition = {
   ],
 
   presentation: {
-    label: 'Handling truck',
+    label: 'Handling Truck',
     description:
       'Hand and electric pallet trucks, an electric forklift, a reach truck and a turret truck — each with its published aisle figures.',
     icon: { kind: 'iconify', name: 'lucide:forklift' },

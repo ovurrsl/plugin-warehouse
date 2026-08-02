@@ -11,7 +11,7 @@ import { M3ShelvingNode } from './schema'
 const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
 
 export const m3ShelvingDefinition = {
-  kind: 'warehouse:m3-shelving',
+  kind: 'warehouse:m3-rack',
   schemaVersion: 1,
   schema: M3ShelvingNode,
   category: 'furnish',

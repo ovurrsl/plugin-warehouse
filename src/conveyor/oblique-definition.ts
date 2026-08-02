@@ -141,7 +141,7 @@ export const conveyorObliqueDefinition = {
   ],
 
   presentation: {
-    label: 'Oblique Transfer',
+    label: 'Oblique Transfer Conveyor',
     description:
       'Branches a line at an angle without stopping it: a narrower lane leaves the main bed, taken by short angled rollers.',
     icon: { kind: 'iconify', name: 'lucide:split' },

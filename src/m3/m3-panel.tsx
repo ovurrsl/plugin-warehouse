@@ -42,7 +42,7 @@ function useInspected(provided?: M3ShelvingNode): M3ShelvingNode | null {
   const selectedId = useViewer((s) => s.selection.selectedIds[0])
   const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
   if (provided) return provided
-  if (!selected || (selected as { type?: string }).type !== 'warehouse:m3-shelving') return null
+  if (!selected || (selected as { type?: string }).type !== 'warehouse:m3-rack') return null
   return selected as unknown as M3ShelvingNode
 }
 

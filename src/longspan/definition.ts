@@ -11,7 +11,7 @@ import { LongspanNode } from './schema'
 const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
 
 export const longspanDefinition = {
-  kind: 'warehouse:longspan',
+  kind: 'warehouse:longspan-rack',
   schemaVersion: 1,
   schema: LongspanNode,
   category: 'furnish',

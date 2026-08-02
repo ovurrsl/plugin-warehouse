@@ -85,7 +85,7 @@ export const CLICK_TRIGGER_KINDS = [
   // Asma kat özellikle can alıcı — insanın oraya bir şey koymak için tıkladığı
   // yerin kendisi o.
   'warehouse:mezzanine',
-  'warehouse:live-racking',
+  'warehouse:live-rack',
   // Üç raf kind'ı da EKSİKTİ ve üçünün de seçim kolideri var — gözün içi hava
   // olduğu için raflar arasına nişan alan bir tıklama arkadakini seçmesin diye
   // konmuş, görünmez bir kutu. Kolider tam olarak imlecin üzerinde durduğu şey:
@@ -96,8 +96,8 @@ export const CLICK_TRIGGER_KINDS = [
   // `placement.test.ts` artık kaydedilen HER kind'ın burada olmasını istiyor, ki
   // bu üç kez üst üste yapılan atlama dördüncü kez yapılmasın.
   'warehouse:drive-in-rack',
-  'warehouse:longspan',
-  'warehouse:m3-shelving',
+  'warehouse:longspan-rack',
+  'warehouse:m3-rack',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

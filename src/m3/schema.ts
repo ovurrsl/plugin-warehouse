@@ -84,7 +84,7 @@ export type M3Level = z.infer<typeof M3Level>
 
 export const M3ShelvingNode = BaseNode.extend({
   id: migratedObjectId('m3', 'm3'),
-  type: nodeType('warehouse:m3-shelving'),
+  type: nodeType('warehouse:m3-rack'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

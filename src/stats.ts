@@ -401,7 +401,7 @@ function levelFigures(
      * olarak bu raf tipinin neden seçildiğini anlatıyor — derinlik depolama
      * kazandırır, erişim kazandırmaz.
      */
-    if (record.type === 'warehouse:live-racking') {
+    if (record.type === 'warehouse:live-rack') {
       rackCount += 1
       rackIds.add(id)
       if (record.visible === false) hiddenNodes += 1

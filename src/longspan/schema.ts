@@ -72,7 +72,7 @@ export type LongspanLevel = z.infer<typeof LongspanLevel>
 
 export const LongspanNode = BaseNode.extend({
   id: migratedObjectId('longspan', 'longspan'),
-  type: nodeType('warehouse:longspan'),
+  type: nodeType('warehouse:longspan-rack'),
 
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),

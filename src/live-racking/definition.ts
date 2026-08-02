@@ -14,7 +14,7 @@ const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
  * paylaşmıyor, her kanal kendi dikmelerini taşıyor.
  */
 export const liveRackingDefinition = {
-  kind: 'warehouse:live-racking',
+  kind: 'warehouse:live-rack',
   schemaVersion: 1,
   schema: LiveRackingNode,
   category: 'furnish',

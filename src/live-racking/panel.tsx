@@ -57,7 +57,7 @@ function useInspected(provided?: LiveRackingNode): LiveRackingNode | null {
   const selectedId = useViewer((s) => s.selection.selectedIds[0])
   const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
   if (provided) return provided
-  if (!selected || (selected as { type?: string }).type !== 'warehouse:live-racking') return null
+  if (!selected || (selected as { type?: string }).type !== 'warehouse:live-rack') return null
   return selected as unknown as LiveRackingNode
 }
 

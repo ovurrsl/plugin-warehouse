@@ -120,7 +120,7 @@ export const conveyorTransferDefinition = {
   ],
 
   presentation: {
-    label: 'Mixed Transfer',
+    label: 'Mixed Transfer Conveyor',
     description:
       'Turns a line through ninety degrees without turning the box: belt strips rise between the rollers and carry it off sideways.',
     icon: { kind: 'iconify', name: 'lucide:move-diagonal' },

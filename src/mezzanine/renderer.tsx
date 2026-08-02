@@ -12,6 +12,7 @@ import type * as THREE from 'three'
 import { colliderProps } from '../collider'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
+import ExplodedTiers from './exploded-tiers'
 import {
   getMezzanineGeometry,
   mezzanineGeometryKey,
@@ -20,6 +21,7 @@ import {
 } from './geometry'
 import { getMezzanineMaterial } from './materials'
 import { footprintDepthM, footprintWidthM, totalHeightM } from './metrics'
+import { tierCount } from './parts'
 import type { MezzanineNode } from './schema'
 
 const NO_RAYCAST = () => {}
@@ -42,6 +44,19 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
+
+  /**
+   * Patlatılmış görünüm — SİSTEMİ dinliyor.
+   *
+   * Host'un `levelMode`'u `useViewer`'da yaşıyor ve bina katlarını ayıran şey
+   * o. Asma kat da onu okuyup KENDİ katlarını ayırıyor: ayrı bir anahtar
+   * olsaydı, kullanıcı patlatmayı açtığında yapının bir kısmı açılır bir kısmı
+   * kapalı kalırdı.
+   *
+   * İhracatta ayrılma YOK: bir PDF/GLB çıktısı yapıyı gerçek hâliyle taşımalı.
+   */
+  const exploded = useViewer((s) => s.levelMode === 'exploded') && !isExporting
+  const tiers = tierCount(node)
 
   const live = useLiveTransforms((s) => s.get(node.id))
   const override = useLiveNodeOverrides((s) => s.overrides.get(node.id))
@@ -92,7 +107,19 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
      */
     farSq: Number.POSITIVE_INFINITY,
     nearSq: Number.POSITIVE_INFINITY,
-    excluded: selected || live !== undefined || override !== undefined || isExporting,
+    /**
+     * Patlatma açıkken kolektiften ÇIKIYOR.
+     *
+     * Havuz, yeniden inşa anında her düğümün dünya matrisini DONDURUYOR
+     * (`collective.ts` `scratchMatrix.copy(object.matrixWorld)`), yani her kare
+     * yer değiştiren katları taşıyamaz. Alternatif — her karede havuzu yeniden
+     * kurdurmak — bütün sahnenin (raflar, paletler, konveyörler) havuzunu
+     * lerp süresince kare başına bir kez yeniden inşa etmek olurdu.
+     *
+     * Bir sahnede bir-iki asma kat var; patlatma açıkken onları kendi çizmek
+     * birkaç çizim çağrısı. Doğru kaldıraç bu.
+     */
+    excluded: selected || exploded || live !== undefined || override !== undefined || isExporting,
   })
 
   // Havuzun tahliye kuralı görünürken cache'i bilgilendirir — telescopic'in
@@ -117,25 +144,40 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
       )}
 
       <group position={position} ref={registeredRef} rotation={rotation}>
-        {drawsSelf && (
-          <mesh
-            /**
-             * Koşulsuz. `castShadow={isExporting}` idi ve kolektif kayıt
-             * `castsShadow: true` diyordu — yani asma kat, KENDİ çizerken
-             * (seçili ya da sürükleniyorken) gölge atmıyor, kolektif çizerken
-             * atıyordu. Kullanıcının gördüğü: asma katı seçince gölgesi
-             * kayboluyor. Gölgeyi host `shadowMap.enabled` üstünden yönetiyor;
-             * mesh düzeyinde ikinci bir karar noktası olmamalı.
-             */
-            castShadow
-            dispose={null}
-            geometry={geometry}
-            material={material}
-            raycast={NO_RAYCAST}
-            receiveShadow
-            ref={meshRef}
-          />
-        )}
+        {/*
+          Patlatılmışken kat başına bir grup, kapalıyken tek birleşik mesh —
+          ama İKİSİ DE `drawsSelf`in altında, ve bu bir tekrar değil bir
+          doğruluk: patlatma `excluded`ı zaten kuruyor, yani o daldayken
+          düğüm kendi çiziyor. İki dalı `drawsSelf`in dışına almak, kolektifin
+          kapattığı gövdenin ne olduğunu gizlerdi — `instancing/coverage.test`
+          tam olarak bunu ölçüyor ve ilk yazımda kaymayı yakaladı.
+
+          `ExplodedTiers` koşullu MOUNT ediliyor: `useFrame` koşullu
+          çağrılamaz ama bir bileşen koşullu mount edilebilir, yani patlatma
+          kapalıyken ne kare döngüsü ne kat geometrisi var.
+        */}
+        {drawsSelf &&
+          (exploded ? (
+            <ExplodedTiers node={node} tierCount={tiers} />
+          ) : (
+            <mesh
+              /**
+               * Koşulsuz. `castShadow={isExporting}` idi ve kolektif kayıt
+               * `castsShadow: true` diyordu — yani asma kat, KENDİ çizerken
+               * (seçili ya da sürükleniyorken) gölge atmıyor, kolektif çizerken
+               * atıyordu. Kullanıcının gördüğü: asma katı seçince gölgesi
+               * kayboluyor. Gölgeyi host `shadowMap.enabled` üstünden yönetiyor;
+               * mesh düzeyinde ikinci bir karar noktası olmamalı.
+               */
+              castShadow
+              dispose={null}
+              geometry={geometry}
+              material={material}
+              raycast={NO_RAYCAST}
+              receiveShadow
+              ref={meshRef}
+            />
+          ))}
       </group>
     </group>
   )

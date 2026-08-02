@@ -118,7 +118,15 @@ describe('ölü kare döngüsü kalmadı', () => {
   for (const file of INSTANCED) {
     test(`${file} gövdesi SelfDrawnBody`, () => {
       const text = source(file)
-      const gate = text.indexOf('{drawsSelf && (')
+      /**
+       * İşaretçi DÜZ DİZGE değil, çünkü düz dizge biçimlendiriciye bağımlıydı.
+       *
+       * `text.indexOf('{drawsSelf && (')` yazıyordu ve asma kata ikinci bir
+       * dal eklendiğinde Biome ifadeyi `{drawsSelf &&\n  (exploded ? …` diye
+       * sardı — kod tamamen doğruyken test kırmızıya döndü. Bir bekçinin
+       * yakalaması gereken şey yapı, satır sonu değil.
+       */
+      const gate = text.search(/\{drawsSelf\s*&&\s*\(/)
       expect(gate, `${file}: drawsSelf koruması bulunamadı`).toBeGreaterThan(-1)
 
       /**

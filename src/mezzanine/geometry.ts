@@ -128,4 +128,30 @@ export function getMezzanineGeometry(node: MezzanineNode): THREE.BufferGeometry 
   return getCachedGeometry(mezzanineGeometryKey(node), () => buildParts(node, mezzanineParts(node)))
 }
 
+/**
+ * Tek bir katın geometrisi — patlatılmış görünümün istediği şey.
+ *
+ * Normalde asma kat TEK birleşik mesh: katlar gerçek kotlarında duruyor,
+ * ayırmaya gerek yok ve tek mesh tek çizim demek. Yalnız patlatma açıkken
+ * katların birbirinden BAĞIMSIZ hareket etmesi gerekiyor, ve bir mesh'in
+ * parçaları ayrı ayrı taşınamaz.
+ *
+ * Bu yüzden bölünmüş yol ikinci bir temsil, birinci değil: kapalıyken hiç
+ * çağrılmıyor, yani olağan durumda ne fazladan geometri ne fazladan çizim
+ * var. Anahtar bütünün anahtarını İÇERİYOR — kat listesi, ızgara, renk,
+ * aksesuar hepsi orada zaten — üstüne yalnız kat numarası biniyor.
+ */
+export function mezzanineTierGeometryKey(node: MezzanineNode, tier: number): string {
+  return `${mezzanineGeometryKey(node)}|t${tier}`
+}
+
+export function getMezzanineTierGeometry(node: MezzanineNode, tier: number): THREE.BufferGeometry {
+  return getCachedGeometry(mezzanineTierGeometryKey(node, tier), () =>
+    buildParts(
+      node,
+      mezzanineParts(node).filter((part) => part.tier === tier),
+    ),
+  )
+}
+
 export { releaseGeometry, retainGeometry }

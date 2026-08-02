@@ -652,6 +652,47 @@ export function TiersField({ node, onUpdate }: CustomField) {
     onUpdate({ tiers: next })
   }
 
+  /**
+   * Bir katı AKSESUARLARIYLA çoğalt, hemen üstüne.
+   *
+   * `+ Tier ekle`den farkı tam olarak bu: ekleme boş aksesuarla gelir, çünkü
+   * bir öncekinin merdivenini kopyalamak aynı yere ikinci bir merdiven koymak
+   * demekti. Çoğaltma ise kullanıcının AÇIKÇA "bunun bir eşi" dediği hâl —
+   * host'un kendi kat çoğaltmasının yaptığı şey — ve orada merdivenin,
+   * kapıların, güvenlik bölgelerinin gelmesi istenen davranış.
+   *
+   * Kopya derin: `accessories` iç içe diziler taşıyor ve sığ bir kopyada iki
+   * kat aynı merdiven dizisini PAYLAŞIRDI — birine merdiven eklemek ötekine de
+   * eklerdi, ve sebebi hiçbir yerde görünmezdi.
+   */
+  const duplicateTier = (index: number) => {
+    const source = node.tiers[index]
+    if (!source) return
+    const copy: MezzanineTier = {
+      ...source,
+      // Kot 'auto': kopya bir ÜSTE giriyor ve kümülatif zincir onu kendi
+      // yerine oturtuyor. Kaynağın açık kotunu taşımak, iki katı aynı yere
+      // koyup üst üste çizerdi.
+      elevationM: 'auto',
+      accessories: {
+        staircases: source.accessories.staircases.map((stair) => ({
+          ...stair,
+          placement: { ...stair.placement },
+          // Kimlik benzersiz olmalı: panel satırları ve uyarı mesajları bunu
+          // adres olarak kullanıyor.
+          id: `${stair.id}-kopya`,
+        })),
+        swingGates: source.accessories.swingGates.map((gate) => ({ ...gate })),
+        upAndOverGates: source.accessories.upAndOverGates.map((gate) => ({ ...gate })),
+        safetyZones: source.accessories.safetyZones.map((zone) => ({ ...zone })),
+      },
+    }
+    const next = [...node.tiers.slice(0, index + 1), copy, ...node.tiers.slice(index + 1)].map(
+      (tier, i) => ({ ...tier, index: i }),
+    )
+    onUpdate({ tiers: next })
+  }
+
   return (
     <>
       <Caption hint={`${node.tiers.length}`}>Tier</Caption>
@@ -661,12 +702,16 @@ export function TiersField({ node, onUpdate }: CustomField) {
             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
               Tier {index} {index === 0 ? '(zemin)' : ''}
             </span>
+            <button
+              onClick={() => duplicateTier(index)}
+              style={{ ...styles.chip, marginLeft: 'auto' }}
+              title="Bu katı aksesuarlarıyla birlikte hemen üstüne kopyalar"
+              type="button"
+            >
+              Kopyala
+            </button>
             {node.tiers.length > 1 && (
-              <button
-                onClick={() => removeTier(index)}
-                style={{ ...styles.chip, marginLeft: 'auto' }}
-                type="button"
-              >
+              <button onClick={() => removeTier(index)} style={styles.chip} type="button">
                 Sil
               </button>
             )}

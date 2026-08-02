@@ -68,6 +68,19 @@ export type MezzaninePartRole =
 
 export type MezzaninePart = {
   role: MezzaninePartRole
+  /**
+   * Hangi kata ait — 0 tabandan.
+   *
+   * Yalnız patlatma için var: host'un patlatılmış görünümünde bir kat
+   * içindekiyle birlikte kalkıyor ve bir asma katın da kendi katlarını aynı
+   * şekilde ayırması isteniyor. Etiket olmadan hangi kutunun hangi katla
+   * kalkacağı bilinemez.
+   *
+   * Katı olmayan bir parça YOK ve bu bilinçli: kolonlar bile kat başına
+   * BÖLÜNDÜ (bkz. `pushColumn`), çünkü güvertesi kalkarken kolonu yerinde
+   * kalan bir kat havada asılı dururdu.
+   */
+  tier: number
   center: readonly [number, number, number]
   size: readonly [number, number, number]
   /**
@@ -81,6 +94,18 @@ export type MezzaninePart = {
 }
 
 /**
+ * Kat etiketi HENÜZ basılmamış bir parça.
+ *
+ * Üreticiyle tüketiciyi ayırıyor: dokuz yardımcı fonksiyon (kiriş, döşeme,
+ * korkuluk, kapı, merdiven…) kendi katını bilmiyor ve bilmesi de gerekmiyor —
+ * `mezzanineParts` her katın çağrılarını bir aralık olarak sarıp damgayı
+ * sonradan vuruyor. Etiketi dokuz imzaya parametre olarak geçirmek, birinde
+ * unutulduğunda SESSİZCE yanlış katta duran bir kutu üretirdi; aralık damgası
+ * unutulamaz.
+ */
+export type MezzaninePartDraft = Omit<MezzaninePart, 'tier'> & { tier?: number }
+
+/**
  * Kolon: dikey ekstrüzyon, kesit X-Z düzleminde (h→Z, b→X). Yapının TAM
  * yüksekliği boyunca tek parça — gerçek mezzanine'de kolon tüm katları
  * kesintisiz geçer, kirişler ona braketle bağlanır.
@@ -92,30 +117,53 @@ const BASE_PLATE_OVERHANG = 1.7
 const COLUMN_ANCHOR_M = 0.024
 const COLUMN_ANCHOR_HEIGHT_M = 0.05
 
+/**
+ * Bir kolon PARÇASI — `y0`'dan `y1`'e.
+ *
+ * Kolon gerçek yapıda tüm katları kesintisiz geçer ve bu fonksiyon onu
+ * bölmüyor: `y0`–`y1` aralıkları uç uca eklendiğinde geometri eskisinin
+ * aynısı. Bölünen şey kolonun kendisi değil, hangi KATA ait sayıldığı — ve
+ * bunun tek sebebi patlatma: host'un patlatılmış görünümünde bir kat
+ * içindekiyle birlikte kalkar, yani bir asma katın da her katı kendi kolon
+ * boyunu taşımalı. Aksi hâlde güverteler kolonlardan sıyrılıp havada asılı
+ * kalırdı.
+ *
+ * Taban plakası yalnız zemine basan parçada: ikinci bir plaka, birinci katın
+ * ortasında havada duran bir çelik levha demekti.
+ */
 function pushColumn(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   gx: number,
   gz: number,
-  heightM: number,
+  y0: number,
+  y1: number,
   profile: IBeamProfile,
+  tier: number,
 ): void {
   const { h, b, tw, tf } = profile
-  parts.push({ role: 'column', center: [gx, heightM / 2, gz], size: [tw, heightM, h - 2 * tf] })
+  const heightM = y1 - y0
+  if (heightM <= 0) return
+  const midY = y0 + heightM / 2
+  parts.push({ role: 'column', tier, center: [gx, midY, gz], size: [tw, heightM, h - 2 * tf] })
   for (const side of [-1, 1] as const) {
     parts.push({
       role: 'column',
-      center: [gx, heightM / 2, gz + (side * (h - tf)) / 2],
+      tier,
+      center: [gx, midY, gz + (side * (h - tf)) / 2],
       size: [b, heightM, tf],
     })
   }
 
-  // Taban plakası + dört ankraj. Kolon zemine çıplak profil kesiti olarak
-  // dayanıyordu — katalogun kendi bileşen listesi (taban plakası, ankraj)
-  // hiç çizilmiyordu ve yapı yere "saplanmış" görünüyordu.
+  // Taban plakası + dört ankraj — YALNIZ zemine basan parçada. Kolon zemine
+  // çıplak profil kesiti olarak dayanıyordu; katalogun kendi bileşen listesi
+  // (taban plakası, ankraj) hiç çizilmiyordu ve yapı yere "saplanmış"
+  // görünüyordu.
+  if (y0 > 1e-9) return
   const plateW = b * BASE_PLATE_OVERHANG
   const plateD = h * BASE_PLATE_OVERHANG
   parts.push({
     role: 'footplate',
+    tier,
     center: [gx, BASE_PLATE_THICKNESS_M / 2, gz],
     size: [plateW, BASE_PLATE_THICKNESS_M, plateD],
   })
@@ -123,6 +171,7 @@ function pushColumn(
     for (const sz of [-1, 1] as const) {
       parts.push({
         role: 'footplate',
+        tier,
         center: [
           gx + (sx * plateW) / 2.6,
           BASE_PLATE_THICKNESS_M + COLUMN_ANCHOR_HEIGHT_M / 2,
@@ -136,7 +185,7 @@ function pushColumn(
 
 /** X boyunca ekstrüde kiriş; `topY` üst flanşın ÜST yüzü. */
 function pushBeamAlongX(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   role: 'main-beam' | 'secondary-beam',
   x0: number,
   x1: number,
@@ -160,7 +209,7 @@ function pushBeamAlongX(
 
 /** Z boyunca ekstrüde ikincil kiriş; `topY` üst flanşın ÜST yüzü. */
 function pushBeamAlongZ(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   z0: number,
   z1: number,
   x: number,
@@ -189,7 +238,11 @@ function pushBeamAlongZ(
  * Bir tier'in kiriş seti. `deckUndersideY` döşeme panelinin ALT yüzü —
  * ikincil kirişler oraya dayanır, ana kirişler onların altına.
  */
-function pushTierBeams(parts: MezzaninePart[], node: MezzanineNode, deckUndersideY: number): void {
+function pushTierBeams(
+  parts: MezzaninePartDraft[],
+  node: MezzanineNode,
+  deckUndersideY: number,
+): void {
   const { baysY, bayDepthM } = node.grid
   const halfWidth = footprintWidthM(node) / 2
   const halfDepth = footprintDepthM(node) / 2
@@ -227,7 +280,7 @@ function pushTierBeams(parts: MezzaninePart[], node: MezzanineNode, deckUndersid
  * ızgarasının aynısı, yani bir boşluk en fazla kendi gözünü siler.
  */
 function pushFloorPanels(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   node: MezzanineNode,
   deckTopY: number,
   thicknessM: number,
@@ -294,7 +347,7 @@ const KICKBOARD_THICKNESS_M = 0.015
  * değil.
  */
 function pushRailing(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   node: MezzanineNode,
   tier: MezzanineNode['tiers'][number],
   deckTopY: number,
@@ -463,7 +516,7 @@ function flightFrames(
 }
 
 function pushStaircase(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   node: MezzanineNode,
   stair: MezzanineNode['tiers'][number]['accessories']['staircases'][number],
   fromY: number,
@@ -583,7 +636,7 @@ function pushStaircase(
 
 /** Kapı kanadı — korkuluğun açıklığında duran tek panel. */
 function pushGates(
-  parts: MezzaninePart[],
+  parts: MezzaninePartDraft[],
   node: MezzanineNode,
   tier: MezzanineNode['tiers'][number],
   deckTopY: number,
@@ -678,20 +731,41 @@ function pushGates(
  * Bütün mezzanine'in parça listesi — geometri havuzunun tükettiği tek yer.
  */
 export function mezzanineParts(node: MezzanineNode): MezzaninePart[] {
-  const parts: MezzaninePart[] = []
+  const parts: MezzaninePartDraft[] = []
   const resolved = resolveTierElevations(node.tiers)
-  const last = resolved[resolved.length - 1]
-  const columnTop = last ? last.deckTopM : 0
 
   const columnProfile = resolveColumnProfile(node)
-  for (const point of gridColumnPositions(node)) {
-    pushColumn(parts, point.x, point.z, columnTop, columnProfile)
-    if (node.columnType === 'double') {
-      pushColumn(parts, point.x, point.z + columnProfile.b, columnTop, columnProfile)
-    }
-  }
+  const columnPoints = gridColumnPositions(node)
 
-  for (const tier of resolved) {
+  for (const [order, tier] of resolved.entries()) {
+    /**
+     * Bu katın parçaları nerede başlıyor.
+     *
+     * Etiket beş yardımcının her birine parametre olarak geçirilmek yerine
+     * SONRADAN basılıyor, ve gerekçesi şu: beşinden birine eklemeyi unutmak
+     * sessizce yanlış katta duran bir kutu üretirdi. Aralık damgası unutulamaz.
+     */
+    const from = parts.length
+
+    // Kolonun bu kata düşen boyu: bir önceki katın güverte üstünden bu katın
+    // güverte üstüne. En alttaki zeminden başlar ve taban plakasını taşır.
+    const previous = resolved[order - 1]
+    const y0 = previous ? previous.deckTopM : 0
+    for (const point of columnPoints) {
+      pushColumn(parts, point.x, point.z, y0, tier.deckTopM, columnProfile, order)
+      if (node.columnType === 'double') {
+        pushColumn(
+          parts,
+          point.x,
+          point.z + columnProfile.b,
+          y0,
+          tier.deckTopM,
+          columnProfile,
+          order,
+        )
+      }
+    }
+
     const thickness = FLOOR_TYPES[tier.floorType].structuralDepthM
     const deckTop = tier.deckTopM
     // Merdiven bu tier'e ALTINDAKİNDEN çıkar; en alttaki zeminden.
@@ -708,7 +782,22 @@ export function mezzanineParts(node: MezzanineNode): MezzaninePart[] {
     for (const stair of tier.accessories.staircases) {
       pushStaircase(parts, node, stair, fromY, deckTop)
     }
+
+    for (let index = from; index < parts.length; index++) {
+      const part = parts[index]
+      if (part) part.tier = order
+    }
   }
 
-  return parts
+  // Damga her aralığa vuruldu, yani her taslak artık tam. Tek dönüşüm noktası
+  // burası ve bilerek: `tier`i "opsiyonel ama aslında hep var" bırakmak,
+  // tüketicilerin her okumada `?? 0` yazması demekti — ve o `?? 0`, etiketi
+  // basmayı unutan bir yardımcıyı sessizce zemin katına koyardı.
+  return parts as MezzaninePart[]
+}
+
+/** Üst kotu kolonun tepesini veren kat — patlatmanın kolon boyunu buradan
+ *  okuyor. Dışa açık, çünkü test onu bağımsız ölçüyor. */
+export function tierCount(node: MezzanineNode): number {
+  return resolveTierElevations(node.tiers).length
 }

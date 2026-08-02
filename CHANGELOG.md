@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
 - Refresh generated README blocks [skip ci] ([`0b936a0`](https://github.com/ovurrsl/plugin-warehouse/commit/0b936a0c33f4086e309f1438286f6ddde4bc7714))
 - Refresh generated README blocks [skip ci] ([`9a022c4`](https://github.com/ovurrsl/plugin-warehouse/commit/9a022c4776d65b82d4152ad32d456ba686d11c18))
 - Refresh generated README blocks [skip ci] ([`e57fd9e`](https://github.com/ovurrsl/plugin-warehouse/commit/e57fd9ec2124387002354b2ee6cea1e5d27d54aa))
@@ -212,6 +213,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Solo mode — copy the level's layer mask into the pool ([`8148267`](https://github.com/ovurrsl/plugin-warehouse/commit/8148267fb1b74d5e561aa730fc9742d679deed53))
 - The three new racking kinds never triggered a placement click ([`41546b8`](https://github.com/ovurrsl/plugin-warehouse/commit/41546b82ce43d91476ae6d56829e59c759868b99))
 - Patlatma, preview kaybolması, gölge ve teleskopik mıknatıs ([`0944920`](https://github.com/ovurrsl/plugin-warehouse/commit/0944920c07d93f164973135ed2daa62d9a699041))
 - Kat tablosu tek yerde — üç ölçülmüş hata düzeldi ([`9e1b525`](https://github.com/ovurrsl/plugin-warehouse/commit/9e1b525b54f3a604f72d805b12b27d7f3949fae0))

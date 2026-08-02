@@ -38,6 +38,7 @@ const INSTANCED = [
   'rack/renderer.tsx',
   'drivein/renderer.tsx',
   'longspan/renderer.tsx',
+  'm3/renderer.tsx',
   'pallet/renderer.tsx',
   'mezzanine/renderer.tsx',
   'live-racking/renderer.tsx',

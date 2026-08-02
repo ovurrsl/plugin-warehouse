@@ -387,6 +387,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'longspan') {
       useWarehouseStore.getState().setLongspanBrush(item.brush.patch)
     }
+    if (item.brush?.kind === 'm3') {
+      useWarehouseStore.getState().setM3Brush(item.brush.patch)
+    }
     if (item.brush?.kind === 'drive-in') {
       useWarehouseStore.getState().setDriveInBrush(item.brush.patch)
     }

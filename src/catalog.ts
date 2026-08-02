@@ -54,6 +54,20 @@ export type CatalogItem = {
         }
       }
     | {
+        kind: 'm3'
+        patch: {
+          shelfLength: number
+          shelfDepth: number
+          frameHeight: number
+          frameVariant: 'basic' | 'diagonals' | 'central-panel' | 'side-panel' | 'mesh'
+          backPanel: 'none' | 'metal' | 'mesh'
+          door: 'none' | 'h1000' | 'h2000'
+          levelCount: number
+          structure: 'shelf' | 'drawers'
+          model: 'HL' | 'HM'
+        }
+      }
+    | {
         kind: 'drive-in'
         patch: {
           laneClearWidth: number
@@ -390,6 +404,75 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
         levelCount: 3,
         structure: 'beam-shelf',
         shelfKind: 'mesh',
+      },
+    },
+  },
+  {
+    id: 'm3-picking',
+    kind: 'warehouse:m3-shelving',
+    label: 'M3 Shelving (Picking)',
+    sectionId: 'storage',
+    description:
+      'Elle toplama rafı: kirişsiz, raflar dikmenin yan yuvalarına 25 mm adımla asılır. HL paneli kat başına 150 kg, HM 275 kg — bu paketin YAYIMLANMIŞ tek kapasitesi. [ ve ] ile kat sayısı.',
+    icon: 'lucide:layout-grid',
+    brush: {
+      kind: 'm3',
+      patch: {
+        shelfLength: 1,
+        shelfDepth: 0.4,
+        frameHeight: 2,
+        frameVariant: 'basic',
+        backPanel: 'none',
+        door: 'none',
+        levelCount: 4,
+        structure: 'shelf',
+        model: 'HL',
+      },
+    },
+  },
+  {
+    id: 'm3-drawers',
+    kind: 'warehouse:m3-shelving',
+    label: 'M3 Drawer Unit',
+    sectionId: 'storage',
+    description:
+      'Küçük parça toplama: her kat polipropilen çekmece taşır. Çekmece sayısı elle girilmez — göz boyu ÷ çekmece genişliği, katalogun 1.000 mm için 4/8 ve 1.250 mm için 5/10 satırlarını birebir veren bölme.',
+    icon: 'lucide:archive',
+    brush: {
+      kind: 'm3',
+      patch: {
+        shelfLength: 1,
+        shelfDepth: 0.5,
+        frameHeight: 2,
+        frameVariant: 'basic',
+        backPanel: 'none',
+        door: 'none',
+        levelCount: 5,
+        structure: 'drawers',
+        model: 'HM',
+      },
+    },
+  },
+  {
+    id: 'm3-cabinet',
+    kind: 'warehouse:m3-shelving',
+    label: 'M3 Cabinet (Office)',
+    sectionId: 'storage',
+    description:
+      'Kapalı ofis dolabı: sac arka panel + iki kanatlı kapı. Arka panel çapraz bağın YERİNİ alır (katalog kuralı), kapı yalnız 1.000 mm gözde var. RAL 5014 dikme + RAL 7035 gövde.',
+    icon: 'lucide:door-closed',
+    brush: {
+      kind: 'm3',
+      patch: {
+        shelfLength: 1,
+        shelfDepth: 0.4,
+        frameHeight: 2,
+        frameVariant: 'basic',
+        backPanel: 'metal',
+        door: 'h2000',
+        levelCount: 4,
+        structure: 'shelf',
+        model: 'HL',
       },
     },
   },

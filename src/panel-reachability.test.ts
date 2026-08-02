@@ -126,6 +126,41 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'Levels → LevelsField, kirişli katlarda "Panel" slider',
     },
   ],
+  'warehouse:m3-shelving': [
+    { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    // `levels` bir `custom` alan, yani içindeki her şey ayrıca yazılmalı — bir
+    // custom bileşen ne düzenlediğini yalnız kendisi bilir.
+    {
+      field: 'levels.elevation',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kat başına "Kot" slider (adımı 25 mm yuva aralığı)',
+    },
+    {
+      field: 'levels.structure',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, Raf / Çekmeceli segmenti',
+    },
+    {
+      field: 'levels.model',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, "Panel" seçicisi (HL 150 kg / HM 275 kg)',
+    },
+    {
+      field: 'levels.dividers',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, raflı katlarda "Bölücü" slider',
+    },
+    {
+      field: 'levels.drawerModel',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, çekmeceli katlarda "Çekmece" seçicisi (MA/MB)',
+    },
+    {
+      field: 'levels.drawerWidth',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, çekmeceli katlarda Dar/Geniş segmenti',
+    },
+  ],
   'warehouse:route': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'points', kind: 'CUSTOM', where: 'çizim aracı; nokta listesi generic alan değil' },

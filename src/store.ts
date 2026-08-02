@@ -4,6 +4,7 @@ import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import type { DriveInRackNode } from './drivein/schema'
 import type { LiveRackingNode } from './live-racking/schema'
 import type { LongspanLevel, LongspanNode } from './longspan/schema'
+import type { M3Level, M3ShelvingNode } from './m3/schema'
 import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
@@ -192,6 +193,9 @@ type WarehouseStore = {
 
   longspanBrush: LongspanBrush
   setLongspanBrush: (patch: Partial<LongspanBrush>) => void
+
+  m3Brush: M3Brush
+  setM3Brush: (patch: Partial<M3Brush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -239,6 +243,29 @@ export type LongspanBrush = {
   levelCount: number
   structure: LongspanLevel['structure']
   shelfKind: LongspanLevel['shelfKind']
+}
+
+/**
+ * M3 yerleştirme fırçası.
+ *
+ * M7'yle aynı gerekçe: kat SAYISI burada, kat listesi değil — yerleştirme
+ * sırasında `[`/`]` ile ayarlanan tek ölçü odur ve araç listeyi çerçeve
+ * yüksekliğine göre 25 mm ızgarasına kendisi yayıyor.
+ *
+ * `frameVariant` ve `backPanel` fırçada duruyor çünkü katalog fişleri bunlarla
+ * ayrışıyor: ofis dolabı arka panelli, atölye rafı çıplak çerçeve. İkisi de
+ * yerleştirmeden ÖNCE seçilen şeyler.
+ */
+export type M3Brush = {
+  shelfLength: M3ShelvingNode['shelfLength']
+  shelfDepth: M3ShelvingNode['shelfDepth']
+  frameHeight: M3ShelvingNode['frameHeight']
+  frameVariant: M3ShelvingNode['frameVariant']
+  backPanel: M3ShelvingNode['backPanel']
+  door: M3ShelvingNode['door']
+  levelCount: number
+  structure: M3Level['structure']
+  model: M3Level['model']
 }
 
 export type MezzanineBrush = Pick<
@@ -446,4 +473,17 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setLongspanBrush: (patch) =>
     set((state) => ({ longspanBrush: { ...state.longspanBrush, ...patch } })),
+
+  m3Brush: {
+    shelfLength: 1,
+    shelfDepth: 0.4,
+    frameHeight: 2,
+    frameVariant: 'basic',
+    backPanel: 'none',
+    door: 'none',
+    levelCount: 4,
+    structure: 'shelf',
+    model: 'HL',
+  },
+  setM3Brush: (patch) => set((state) => ({ m3Brush: { ...state.m3Brush, ...patch } })),
 }))

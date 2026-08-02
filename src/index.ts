@@ -10,6 +10,7 @@ import { conveyorTransferDefinition } from './conveyor/transfer-definition'
 import { driveInRackDefinition } from './drivein/definition'
 import { liveRackingDefinition } from './live-racking/definition'
 import { longspanDefinition } from './longspan/definition'
+import { m3ShelvingDefinition } from './m3/definition'
 import { mezzanineDefinition } from './mezzanine/definition'
 import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
@@ -55,6 +56,7 @@ export const warehousePlugin: Plugin = {
     liveRackingDefinition as unknown as AnyNodeDefinition,
     driveInRackDefinition as unknown as AnyNodeDefinition,
     longspanDefinition as unknown as AnyNodeDefinition,
+    m3ShelvingDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -92,6 +94,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:live-racking',
     'warehouse:drive-in-rack',
     'warehouse:longspan',
+    'warehouse:m3-shelving',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

@@ -63,7 +63,17 @@ export type Sink = {
 export type EmittablePart = {
   center: readonly [number, number, number]
   size: readonly [number, number, number]
+  /** Lean in the Y–Z plane — a frame's own diagonal, across its depth. */
   tiltX?: number
+  /**
+   * Lean in the X–Y plane — a **down-aisle** diagonal, across the bay.
+   *
+   * A separate axis rather than a generic quaternion because these are the only
+   * two leans any racking part in this package has, and a quaternion per part
+   * would cost three more numbers on a list that runs to hundreds of entries per
+   * bay. Applied after `tiltX`; no part uses both.
+   */
+  tiltZ?: number
   pattern?: 'slots' | 'mesh'
 }
 
@@ -164,9 +174,20 @@ export function emitRackPart(
 ): void {
   const [cx, cy, cz] = part.center
   const [hx, hy, hz] = [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
-  const tilt = part.tiltX ?? 0
-  const cos = Math.cos(tilt)
-  const sin = Math.sin(tilt)
+  const cosX = Math.cos(part.tiltX ?? 0)
+  const sinX = Math.sin(part.tiltX ?? 0)
+  const cosZ = Math.cos(part.tiltZ ?? 0)
+  const sinZ = Math.sin(part.tiltZ ?? 0)
+
+  /** X first, then Z. Positions and normals go through the same rotation, so a
+   *  leaned part is lit as the solid it is rather than as the box it started
+   *  from. */
+  const lean = (x: number, y: number, z: number): [number, number, number] => {
+    const y1 = y * cosX - z * sinX
+    const z1 = y * sinX + z * cosX
+    return [x * cosZ - y1 * sinZ, x * sinZ + y1 * cosZ, z1]
+  }
+
   // Repeat each pattern along the axis that carries it, so the pitch stays the
   // real 50 mm / 100 mm whatever the part's size — a 0..1 map would stretch the
   // holes further apart on a taller frame and the mesh coarser on a wider bay.
@@ -175,16 +196,16 @@ export function emitRackPart(
 
   for (const face of FACES) {
     const base = sink.positions.length / 3
-    const ny = face.n[1] * cos - face.n[2] * sin
-    const nz = face.n[1] * sin + face.n[2] * cos
+    const [nx, ny, nz] = lean(face.n[0], face.n[1], face.n[2])
     // An upright is read from the side and a deck from above, so "the face that
-    // carries the pattern" is the opposite one in each case.
+    // carries the pattern" is the opposite one in each case. Decided from the
+    // part's OWN axes, not the leaned ones: which face of the box carries holes
+    // is a property of the part, not of how it is tipped.
     const upright = Math.abs(face.n[1]) < 0.5
     for (const corner of face.c) {
-      const y = corner[1] * hy
-      const z = corner[2] * hz
-      sink.positions.push(cx + corner[0] * hx, cy + y * cos - z * sin, cz + y * sin + z * cos)
-      sink.normals.push(face.n[0], ny, nz)
+      const [px, py, pz] = lean(corner[0] * hx, corner[1] * hy, corner[2] * hz)
+      sink.positions.push(cx + px, cy + py, cz + pz)
+      sink.normals.push(nx, ny, nz)
       sink.colors.push(color[0], color[1], color[2])
 
       if (part.pattern === 'slots' && upright) {

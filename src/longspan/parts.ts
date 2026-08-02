@@ -36,6 +36,7 @@ export type LongspanPart = {
   center: [number, number, number]
   size: [number, number, number]
   tiltX?: number
+  tiltZ?: number
   pattern?: 'slots' | 'mesh'
   /** Which shelf this is, so the builder can colour board apart from mesh
    *  without asking the node a second time. */
@@ -188,16 +189,23 @@ export function longspanParts(
   }
 
   // ── Down-aisle cross-bracing ──────────────────────────────────────────────
+  //
+  // A real X across the rear face, and it took a `tiltZ` on the shared emitter
+  // to draw one. The first version leaned it with `tiltX` — the Y–Z lean — at
+  // one degree, which drew a HORIZONTAL bar of `hypot(length, rise)`: on a
+  // 1.9 m bay that is 2.76 m of steel sticking 40 cm into the neighbour at each
+  // end, in two copies a degree apart that z-fight. Invisible without flying
+  // the camera in, and measurable from this list, which is why the test
+  // measures it.
   if (bay.crossBracing && detail === 'full' && !omission.omitRight) {
     const rise = bay.frameHeight * 0.8
+    const angle = Math.atan2(rise, bay.bayLength)
     for (const direction of [1, -1] as const) {
       parts.push({
         role: 'brace',
         center: [0, bay.frameHeight / 2, -bay.frameDepth / 2 + upright.depth],
         size: [Math.hypot(bay.bayLength, rise), BRACE_SECTION, BRACE_SECTION],
-        // Leaned in the X–Y plane; `tiltX` is the ZY lean, so the diagonal is
-        // approximated by its span. Two of them make the X.
-        tiltX: (direction * Math.PI) / 180,
+        tiltZ: direction * angle,
       })
     }
   }

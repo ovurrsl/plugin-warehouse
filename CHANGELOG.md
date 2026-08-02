@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7b052d6`](https://github.com/ovurrsl/plugin-warehouse/commit/7b052d6dd8cfe7391213dda68d6bc5897eb12a96))
 - Refresh generated README blocks [skip ci] ([`88e51d0`](https://github.com/ovurrsl/plugin-warehouse/commit/88e51d0f3fedf9a1ba5d225df51839ff2bc11eb2))
 - Refresh generated README blocks [skip ci] ([`be935ff`](https://github.com/ovurrsl/plugin-warehouse/commit/be935ffa0c89997e5444880695801f93ddd39178))
 - Refresh generated README blocks [skip ci] ([`540d5df`](https://github.com/ovurrsl/plugin-warehouse/commit/540d5dff7e3b3e25517a24c82610c70f8cbf23af))
@@ -206,6 +207,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- The three new racking kinds never triggered a placement click ([`41546b8`](https://github.com/ovurrsl/plugin-warehouse/commit/41546b82ce43d91476ae6d56829e59c759868b99))
 - Patlatma, preview kaybolması, gölge ve teleskopik mıknatıs ([`0944920`](https://github.com/ovurrsl/plugin-warehouse/commit/0944920c07d93f164973135ed2daa62d9a699041))
 - Kat tablosu tek yerde — üç ölçülmüş hata düzeldi ([`9e1b525`](https://github.com/ovurrsl/plugin-warehouse/commit/9e1b525b54f3a604f72d805b12b27d7f3949fae0))
 - Alt güverteye yerleştirme — hedef kat açıkça seçiliyor ([`f330fc2`](https://github.com/ovurrsl/plugin-warehouse/commit/f330fc257c1d65211b39de078a3362ccc6c57e77))

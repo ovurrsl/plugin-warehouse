@@ -43,6 +43,17 @@ export type CatalogItem = {
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
     | {
+        kind: 'longspan'
+        patch: {
+          bayLength: number
+          frameDepth: number
+          frameHeight: number
+          levelCount: number
+          structure: 'beam-shelf' | 'reinforced-hm' | 'beam-only' | 'hanging'
+          shelfKind: 'chipboard' | 'mesh' | 'galvanised-picking' | 'hm'
+        }
+      }
+    | {
         kind: 'drive-in'
         patch: {
           laneClearWidth: number
@@ -341,6 +352,46 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
     icon: 'lucide:split',
+  },
+  {
+    id: 'longspan-picking',
+    kind: 'warehouse:longspan',
+    label: 'M7 Longspan (Picking)',
+    sectionId: 'storage',
+    description:
+      'Elle toplama gozu: kirisli sunta raflar, 1.9 m goz. Katlar serbestce karisir - kirisli raf, kirissiz HM, yalniz kiris ya da aski. Kose parantezlerle kat sayisini ayarlayin.',
+    icon: 'lucide:library',
+    brush: {
+      kind: 'longspan',
+      patch: {
+        bayLength: 1.9,
+        frameDepth: 0.6,
+        frameHeight: 2.5,
+        levelCount: 4,
+        structure: 'beam-shelf',
+        shelfKind: 'chipboard',
+      },
+    },
+  },
+  {
+    id: 'longspan-bulk',
+    kind: 'warehouse:longspan',
+    label: 'M7 Longspan (Bulk)',
+    sectionId: 'storage',
+    description:
+      'Hacimli mal gozu: 2.7 m aciklik, 1.0 m derinlik, tel raf. Uzun mal icin katlari yalniz kiris yapabilirsiniz.',
+    icon: 'lucide:layout-list',
+    brush: {
+      kind: 'longspan',
+      patch: {
+        bayLength: 2.7,
+        frameDepth: 1,
+        frameHeight: 4,
+        levelCount: 3,
+        structure: 'beam-shelf',
+        shelfKind: 'mesh',
+      },
+    },
   },
   {
     id: 'drive-in-rack',

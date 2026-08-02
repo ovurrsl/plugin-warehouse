@@ -37,6 +37,7 @@ function source(relative: string): string {
 const INSTANCED = [
   'rack/renderer.tsx',
   'drivein/renderer.tsx',
+  'longspan/renderer.tsx',
   'pallet/renderer.tsx',
   'mezzanine/renderer.tsx',
   'live-racking/renderer.tsx',

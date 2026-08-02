@@ -3,6 +3,7 @@ import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import type { DriveInRackNode } from './drivein/schema'
 import type { LiveRackingNode } from './live-racking/schema'
+import type { LongspanLevel, LongspanNode } from './longspan/schema'
 import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
@@ -188,6 +189,9 @@ type WarehouseStore = {
 
   driveInBrush: DriveInBrush
   setDriveInBrush: (patch: Partial<DriveInBrush>) => void
+
+  longspanBrush: LongspanBrush
+  setLongspanBrush: (patch: Partial<LongspanBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -220,6 +224,22 @@ export type DriveInBrush = Pick<
   DriveInRackNode,
   'laneClearWidth' | 'palletsDeep' | 'levels' | 'railType' | 'entryMode' | 'palletPreset'
 >
+
+/**
+ * M7 Longspan yerleştirme fırçası.
+ *
+ * Kat SAYISI burada, kat listesi değil: yerleştirme sırasında ayarlanan tek
+ * ölçü odur ve araç listeyi çerçeve yüksekliğine göre kendisi yayıyor. Listeyi
+ * fırçaya koymak, katalog fişinin dört katlı bir düzeni sabitlemesi demekti.
+ */
+export type LongspanBrush = {
+  bayLength: LongspanNode['bayLength']
+  frameDepth: LongspanNode['frameDepth']
+  frameHeight: LongspanNode['frameHeight']
+  levelCount: number
+  structure: LongspanLevel['structure']
+  shelfKind: LongspanLevel['shelfKind']
+}
 
 export type MezzanineBrush = Pick<
   MezzanineNode,
@@ -415,4 +435,15 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setDriveInBrush: (patch) =>
     set((state) => ({ driveInBrush: { ...state.driveInBrush, ...patch } })),
+
+  longspanBrush: {
+    bayLength: 1.9,
+    frameDepth: 0.6,
+    frameHeight: 2.5,
+    levelCount: 4,
+    structure: 'beam-shelf',
+    shelfKind: 'chipboard',
+  },
+  setLongspanBrush: (patch) =>
+    set((state) => ({ longspanBrush: { ...state.longspanBrush, ...patch } })),
 }))

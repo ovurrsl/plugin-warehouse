@@ -101,6 +101,31 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'Levels → LevelClearsField, "Üst boşluk" varsayılanı',
     },
   ],
+  'warehouse:longspan': [
+    { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    // `levels` bir `custom` alan, yani içindeki her şey ayrıca yazılmalı — bir
+    // custom bileşen ne düzenlediğini yalnız kendisi bilir.
+    {
+      field: 'levels.elevation',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kat başına "Kot" slider (yuva aralığına yapışır)',
+    },
+    {
+      field: 'levels.structure',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kat başına "Yapı" seçicisi',
+    },
+    {
+      field: 'levels.shelfKind',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kirişli katlarda raf tipi segmenti',
+    },
+    {
+      field: 'levels.panels',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kirişli katlarda "Panel" slider',
+    },
+  ],
   'warehouse:route': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'points', kind: 'CUSTOM', where: 'çizim aracı; nokta listesi generic alan değil' },
@@ -372,6 +397,27 @@ describe('panel erişilebilirliği — her alan ya grupta ya kayıtlı istisnada
       const exempt = new Map(
         (EXEMPTIONS[def.kind] ?? []).map((entry) => [entry.field, entry] as const),
       )
+      /**
+       * `custom` alanlar alt ağaçlarını KAPATMAZ.
+       *
+       * Host'un kendi alan tipleri (`number`, `enum`, `color`, `vec3`,
+       * `boolean`) değerin TAMAMINI yazıyor, o yüzden anahtarın grupta olması
+       * içindeki her şeyin ulaşılabilir olduğu anlamına geliyor. Bir `custom`
+       * bileşen için bu doğru değil: ne yazdığını yalnız kendisi biliyor, ve
+       * iç içe bir şemanın bir alanını düzenlemeyi unutması hiçbir yerde
+       * görünmüyor.
+       *
+       * Bu, testin İLK yazımındaki delikti ve mezzanine'de tesadüfen
+       * kapanmıştı — `tiers` bir grup alanı değil muafiyet olduğu için
+       * özyineleme oraya inmişti ve yedi erişilemez alanı orada bulmuştu. M7'de
+       * `levels` bir grup alanı, yani aynı delik açık olsaydı dört iç alan
+       * denetimsiz geçecekti.
+       */
+      const customKeys = new Set(
+        (def.parametrics?.groups ?? []).flatMap((group) =>
+          group.fields.filter((field) => field.kind === 'custom').map((field) => String(field.key)),
+        ),
+      )
 
       const paths = leafPaths(def.schema)
       expect(paths.length).toBeGreaterThan(0)
@@ -379,13 +425,16 @@ describe('panel erişilebilirliği — her alan ya grupta ya kayıtlı istisnada
       for (const path of paths) {
         const head = path.split('.')[0] ?? path
         if (BASE.has(head)) continue
-        // Üst seviye anahtar bir grupta ise iç yapısı o alanın işi: host'un
-        // `vec3`/`enum` alanları zaten bütünü yazıyor. Muafiyet ise alt ağacı
-        // kapatır — `pickSlot` muafsa `pickSlot.rackId` de muaftır, çünkü o
-        // nesneyi yazan tek kontrol yuva seçicisidir.
-        const reachable =
-          covered.has(head) || ancestry(path).some((ancestor) => exempt.has(ancestor))
-        expect(reachable, `${def.kind}.${path} panelden erişilemez ve istisnada yok`).toBe(true)
+        // Muafiyet alt ağacı kapatır — `pickSlot` muafsa `pickSlot.rackId` de
+        // muaftır, çünkü o nesneyi yazan tek kontrol yuva seçicisidir.
+        const exemptedHere = ancestry(path).some((ancestor) => exempt.has(ancestor))
+        // Bir grup alanı yalnız KENDİ anahtarını kapatır; iç içe yaprakları
+        // ancak host'un tam-değer yazan bir alan tipiyse kapatır.
+        const coveredHere = covered.has(head) && (path === head || !customKeys.has(head))
+        expect(
+          coveredHere || exemptedHere,
+          `${def.kind}.${path} panelden erişilemez ve istisnada yok`,
+        ).toBe(true)
       }
 
       // Ters yön: istisna listesi şişmesin — şemadan silinen alanın

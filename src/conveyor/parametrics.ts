@@ -1,6 +1,7 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { CAR, SPEEDS_M_PER_MIN, STANDARD_TRANSPORT_HEIGHTS_M } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
+import { BedLengthField } from './length-field'
 import {
   carriesShortestBox,
   isCatalogueSpeed,
@@ -41,13 +42,15 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
           display: 'select',
         },
         {
+          // Uzunluk = bu × hatve, ve hiç saklanmıyor. Kontrol metreyi sunup
+          // makaraya çeviriyor: bir konveyör metreyle sipariş edilir, ama
+          // yatağı fiziksel olarak bir makara sayısıdır.
+          //
+          // Öncesinde burada bir adet slider'ı, trailing panelde de bir metre
+          // kutusu vardı — aynı sayı, iki yer, iki birim.
           key: 'rollers',
-          kind: 'number',
-          min: 27,
-          max: 200,
-          step: 1,
-          // Length is this times the pitch and is never stored. The trailing
-          // section offers the metres and converts.
+          kind: 'custom',
+          component: BedLengthField,
         },
         {
           key: 'rollerPitch',

@@ -232,6 +232,18 @@ export const RAILING_RULES = {
   openingProtectionM: mm(1200),
 }
 
+/**
+ * `+ Güvenlik bölgesi` düğmesinin yazdığı genişlik.
+ *
+ * Eşiğin KENDİSİ, ve buradan okunuyor — düğme 1.5 m yazıyordu, invariant
+ * 1.2 m'yi aşanı uyarıyordu, ve `widthM`'in hiçbir kontrolü yoktu: yeni konan
+ * her güvenlik bölgesi, kullanıcının kapatamayacağı sarı bir uyarıyla
+ * doğuyordu. Sabit burada durduğu için eşik değişirse düğme onu kendiliğinden
+ * izliyor, ve `merge.test.ts` ikisinin ayrışmadığını invariant üzerinden
+ * sınıyor.
+ */
+export const NEW_SAFETY_ZONE_WIDTH_M = RAILING_RULES.openingProtectionM
+
 export const GATE_SPECS = {
   swing: { singleWidthM: mm(750), doubleWidthM: mm(1500) }, // CATALOG
   upAndOver: {

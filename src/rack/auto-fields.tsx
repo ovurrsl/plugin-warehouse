@@ -1,7 +1,8 @@
 'use client'
 
-import { SegmentedControl } from '@pascal-app/editor'
+import { SegmentedControl, SliderControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
+import { Caption, Field, Note } from '../panels/kit'
 import type { PalletRackNode } from './schema'
 import {
   autoPalletSupportBars,
@@ -9,8 +10,10 @@ import {
   autoPickingBoxesAcross,
   autoPickingBoxesDeep,
   fittedLevelCount,
+  type LevelType,
   levelClearOpening,
   levelTypeOf,
+  nextLevelTypes,
 } from './slots'
 
 /**
@@ -36,16 +39,29 @@ import {
  */
 
 const MUTED = 'var(--muted-foreground)'
+const WARN = '#f59e0b'
 
 const styles = {
-  field: { display: 'flex', flexDirection: 'column', gap: '0.3125rem' },
-  label: {
+  levelRow: {
     display: 'flex',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    fontSize: '0.6875rem',
-    color: MUTED,
+    alignItems: 'center',
+    gap: '0.375rem',
+    padding: '0 0.5rem',
   },
+  levelName: { flex: '0 0 3.25rem', fontSize: '0.6875rem', color: MUTED },
+  levelInput: {
+    flex: '0 0 3.5rem',
+    minWidth: 0,
+    borderRadius: '0.375rem',
+    border: '1px solid color-mix(in oklab, var(--border) 50%, transparent)',
+    background: '#2C2C2E',
+    padding: '0.1875rem 0.375rem',
+    fontSize: '0.6875rem',
+    fontVariantNumeric: 'tabular-nums',
+    textAlign: 'right',
+    color: 'var(--foreground)',
+  },
+  levelUnit: { fontSize: '0.625rem', color: MUTED },
 } satisfies Record<string, CSSProperties>
 
 /** Auto plus the counts around the derived one, so the choice is a short list
@@ -75,11 +91,7 @@ function AutoField({
   value: number | null
 }) {
   return (
-    <div style={styles.field}>
-      <span style={styles.label}>
-        <span>{label}</span>
-        <span style={{ opacity: 0.7 }}>{value === null ? `auto — ${auto}` : 'set by hand'}</span>
-      </span>
+    <Field hint={value === null ? `auto — ${auto}` : 'elle'} label={label}>
       <SegmentedControl
         onChange={(next: string) => onChange(next === 'auto' ? null : Number(next))}
         options={[
@@ -88,7 +100,7 @@ function AutoField({
         ]}
         value={value === null ? 'auto' : String(value)}
       />
-    </div>
+    </Field>
   )
 }
 
@@ -106,6 +118,12 @@ export const PALLETS_PER_LEVEL_BOUNDS = { min: 1, max: 12 } as const
 export const SUPPORT_BARS_BOUNDS = { min: 0, max: 3 } as const
 export const BOXES_ACROSS_BOUNDS = { min: 1, max: 30 } as const
 export const BOXES_DEEP_BOUNDS = { min: 1, max: 10 } as const
+
+/** Kat açıklığı varsayılanlarının şema sınırları — `LevelsField` bunları
+ *  gösteriyor, `parametrics.test.ts` şemayla karşılaştırıyor. */
+export const FIRST_LEVEL_CLEAR_BOUNDS = { min: 0.2, max: 6, step: 0.05 } as const
+export const LEVEL_CLEAR_BOUNDS = { min: 0.2, max: 6, step: 0.05 } as const
+export const PICKING_LEVEL_CLEAR_BOUNDS = { min: 0.15, max: 3, step: 0.05 } as const
 
 export function PalletsPerLevelField({ node, onUpdate }: CustomField) {
   return (
@@ -159,50 +177,41 @@ export function PickingBoxesDeepField({ node, onUpdate }: CustomField) {
   )
 }
 
-const rowInputStyle: CSSProperties = {
-  flex: 1,
-  minWidth: 0,
-  padding: '0.25rem 0.375rem',
-  borderRadius: '0.25rem',
-  border: '1px solid var(--border)',
-  background: 'var(--background)',
-  color: 'var(--foreground)',
-  fontSize: '0.6875rem',
-}
-
 /**
- * Katlar — TEK tablo: her satır bir kat, açıklığı ve tipi yan yana.
+ * Katlar — kat açıklığının TEK editörü.
  *
- * Önceden ikiye bölünmüştü (açıklıklar burada, kat tipleri trailing panelde).
- * Aynı şeyin iki ayrı yerde ayarlanması kullanıcının haklı olarak saçma
- * bulduğu şeydi — bir kat bir satırdır.
+ * ## Neden dört kontrol bire indi
  *
- * Üç ölçülmüş hata bu birleştirmeyle düzeldi:
+ * Bir katın açıklığı **dört** ayrı yerden geliyordu ve üçü panelde ayrı
+ * slider'dı: `levelClears[i]` (buradaki satır) > `pickingLevelClear` (Picking
+ * grubunda) > `firstLevelClear` / `levelClear` (Levels grubunda). Aynı sayıyı
+ * yöneten kontroller iki ayrı bölüme dağılmıştı ve hangisinin hangisini
+ * yendiği yalnız `levelClearOpening`'in gövdesinde yazıyordu.
+ *
+ * Kullanıcının "içi içe giren ayarlar" dediği şeyin kanonik örneği bu.
+ * Çözüm alanları silmek değil — hepsi gerçek ve hepsi gerekli: biri zemin
+ * açıklığını, biri üst katları, biri toplama katlarını üretiyor. Çözüm
+ * **hepsini tek bileşene toplamak**, öncelik sırasını göstererek: üstte
+ * varsayılanlar, altta o varsayılanı yenen kat satırları.
+ *
+ * ## Üç ölçülmüş hata bu birleştirmeyle düzeldi
  *
  *  1. **Eksik satır.** Liste `fittedLevelCount` kadar satır çiziyordu ama
  *     katlar `0..fitted` (zemin açıklığı + kiriş katları), yani HER ZAMAN
- *     son katın açıklığı düzenlenemiyordu. İki katlı bir rafta "Kat 2" hiç
- *     görünmüyordu — "aralıkları ayarlayamıyorum"un sebebi buydu.
+ *     son katın açıklığı düzenlenemiyordu.
  *  2. **Sığmayan kat gizleniyordu.** Açıklığı küçültüp o katı sığdırmak
- *     isteyen kullanıcı bunu yapamıyordu, çünkü satır ancak sığdıktan sonra
- *     çiziliyordu. Artık istenen kat kadar satır var; sığmayan işaretli ama
- *     DÜZENLENEBİLİR.
+ *     isteyen kullanıcı bunu yapamıyordu. Artık istenen kat kadar satır var;
+ *     sığmayan işaretli ama DÜZENLENEBİLİR.
  *  3. **Kat sayısı düşünce hayalet değer.** Dizi hiç kırpılmıyordu: 5 kattan
  *     2'ye inip tekrar 5'e çıkınca eski geçersiz kılmalar geri geliyordu.
- *     Artık her yazımda satır sayısına kırpılıyor.
  */
-export function LevelsField({
-  node,
-  onUpdate,
-}: {
-  node: PalletRackNode
-  onUpdate: (patch: Partial<PalletRackNode>) => void
-}) {
+export function LevelsField({ node, onUpdate }: CustomField) {
   // Kullanıcının İSTEDİĞİ kat sayısı — sığan değil. Zemin açıklığı da bir
   // satır, o yüzden `levels + 1`.
   const rows = node.levels + 1
   const fitted = fittedLevelCount(node)
   const clears = node.levelClears ?? []
+  const hasPicking = node.pickingLevels > 0 || (node.levelTypes?.includes('picking') ?? false)
 
   /** Diziyi satır sayısına kırp — hayalet değer kalmasın. */
   const sized = <T,>(source: readonly T[] | null | undefined, fill: (i: number) => T): T[] =>
@@ -216,28 +225,69 @@ export function LevelsField({
     onUpdate({ levelClears: next.every((v) => v == null) ? null : next })
   }
 
-  const setType = (level: number, type: 'pallet' | 'picking') => {
-    const next = sized<'pallet' | 'picking'>(node.levelTypes, (i) => levelTypeOf(node, i))
-    next[level] = type
-    onUpdate({ levelTypes: next })
+  /**
+   * Kat tipi — YALNIZ dokunulan satır, ve türetilmiş desene dönerse dizi silinir.
+   *
+   * Öncesi diziyi her dokunuşta baştan sona dolduruyordu, iki sonucu vardı:
+   * `pickingLevels` bir daha hiçbir şeyi sürmüyordu (açık liste onu her zaman
+   * yener), ve şema yorumunun uyardığı şey oluyordu — "elli rafın paylaştığı
+   * tek mesh elli mesh olur", çünkü açık `levelTypes` geometri anahtarını
+   * benzersizleştiriyor.
+   *
+   * Artık geri dönüş var: her satırı türetilmiş tipine geri getirmek diziyi
+   * `null`'a düşürüyor ve raf tekrar komşularıyla mesh paylaşıyor.
+   */
+  const setType = (level: number, type: LevelType) => {
+    onUpdate({ levelTypes: nextLevelTypes(node, level, type) })
   }
 
   return (
-    <div style={styles.field}>
-      <span style={styles.label}>
-        <span>Katlar</span>
-        <span>boş = varsayılan</span>
-      </span>
+    <>
+      <Caption>Varsayılan açıklıklar</Caption>
+      <SliderControl
+        label="Zemin"
+        max={FIRST_LEVEL_CLEAR_BOUNDS.max}
+        min={FIRST_LEVEL_CLEAR_BOUNDS.min}
+        onChange={(firstLevelClear) => onUpdate({ firstLevelClear })}
+        precision={2}
+        step={FIRST_LEVEL_CLEAR_BOUNDS.step}
+        unit="m"
+        value={node.firstLevelClear}
+      />
+      {/* Tek kiriş katı varken üstünde aralanacak bir şey yok. Host'un aynı
+          alandaki `visibleIf`'i buydu; birleştirme onu da taşıdı. */}
+      {node.levels > 1 && (
+        <SliderControl
+          label="Üst katlar"
+          max={LEVEL_CLEAR_BOUNDS.max}
+          min={LEVEL_CLEAR_BOUNDS.min}
+          onChange={(levelClear) => onUpdate({ levelClear })}
+          precision={2}
+          step={LEVEL_CLEAR_BOUNDS.step}
+          unit="m"
+          value={node.levelClear}
+        />
+      )}
+      {hasPicking && (
+        <SliderControl
+          label="Toplama katı"
+          max={PICKING_LEVEL_CLEAR_BOUNDS.max}
+          min={PICKING_LEVEL_CLEAR_BOUNDS.min}
+          onChange={(pickingLevelClear) => onUpdate({ pickingLevelClear })}
+          precision={2}
+          step={PICKING_LEVEL_CLEAR_BOUNDS.step}
+          unit="m"
+          value={node.pickingLevelClear}
+        />
+      )}
+
+      <Caption hint="boş = varsayılan">Kat başına</Caption>
       {Array.from({ length: rows }, (_, level) => {
         const doesNotFit = level > fitted
         return (
-          <div key={level} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+          <div key={level} style={styles.levelRow}>
             <span
-              style={{
-                fontSize: '0.625rem',
-                color: doesNotFit ? '#f59e0b' : MUTED,
-                width: '3.5rem',
-              }}
+              style={doesNotFit ? { ...styles.levelName, color: WARN } : styles.levelName}
               title={doesNotFit ? 'Dikme yüksekliğine sığmıyor — açıklığı küçültün' : undefined}
             >
               {level === 0 ? 'Zemin' : `Kat ${level}`}
@@ -248,16 +298,16 @@ export function LevelsField({
               onChange={(event) => setClear(level, event.target.value)}
               placeholder={levelClearOpening({ ...node, levelClears: null }, level).toFixed(2)}
               step={0.05}
-              style={rowInputStyle}
+              style={styles.levelInput}
               type="number"
               value={clears[level] ?? ''}
             />
-            <span style={{ fontSize: '0.625rem', color: MUTED }}>m</span>
+            <span style={styles.levelUnit}>m</span>
             {/* Zemin katının TİPİ yok: `levelTypeOf` kiriş katlarını
                 adlandırıyor, zemin açıklığı yalnız ilk kirişe kadar boşluk. */}
             {level > 0 && (
               <SegmentedControl
-                onChange={(value: string) => setType(level, value as 'pallet' | 'picking')}
+                onChange={(value: string) => setType(level, value as LevelType)}
                 options={[
                   { label: 'Palet', value: 'pallet' },
                   { label: 'Toplama', value: 'picking' },
@@ -269,11 +319,17 @@ export function LevelsField({
         )
       })}
       {node.levels > fitted && (
-        <span style={{ fontSize: '0.625rem', color: '#f59e0b' }}>
+        <Note>
           {node.levels - fitted} kat {node.uprightHeight.toFixed(2)} m dikmeye sığmıyor —
           açıklıkları küçültün ya da dikmeyi yükseltin.
-        </span>
+        </Note>
       )}
-    </div>
+      {node.levelTypes !== null && (
+        <Note>
+          Kat tipleri elle yazıldı: bu raf artık komşularıyla mesh paylaşmıyor. Her satırı
+          türetilmiş tipine geri almak paylaşımı geri getirir.
+        </Note>
+      )}
+    </>
   )
 }

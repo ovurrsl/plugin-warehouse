@@ -1,9 +1,8 @@
 'use client'
 
-import { Icon } from '@iconify/react'
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
-import type { CSSProperties } from 'react'
+import { Note } from '../panels/kit'
 import { describeLine } from './conveyor-panel'
 import {
   angleDeg,
@@ -20,6 +19,7 @@ import {
 } from './curve-metrics'
 import { conveyorCurveParametrics } from './curve-parametrics'
 import type { ConveyorCurveNode } from './curve-schema'
+import { jointIssues, ModuleReadout } from './module-panel'
 import { jointProblems } from './port-magnet'
 
 /**
@@ -38,73 +38,6 @@ import { jointProblems } from './port-magnet'
  * drawn rather than after it is built.
  */
 
-const FG = 'var(--foreground)'
-const MUTED = 'var(--muted-foreground)'
-const BORDER = 'var(--border)'
-
-const styles = {
-  root: { display: 'flex', flexDirection: 'column', gap: '0.625rem', color: FG },
-  title: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.375rem',
-    fontSize: '0.6875rem',
-    fontWeight: 500,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: MUTED,
-  },
-  label: {
-    display: 'flex',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    fontSize: '0.6875rem',
-    color: MUTED,
-  },
-  issues: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.375rem',
-    borderRadius: '0.5rem',
-    border: '1px solid color-mix(in oklab, #f59e0b 40%, transparent)',
-    background: 'color-mix(in oklab, #f59e0b 10%, transparent)',
-    padding: '0.5rem 0.625rem',
-  },
-  issue: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: '0.375rem',
-    margin: 0,
-    fontSize: '0.6875rem',
-    lineHeight: 1.5,
-    color: FG,
-  },
-  readout: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.375rem',
-    paddingBottom: '0.75rem',
-    borderBottom: `1px solid ${BORDER}`,
-  },
-  hint: {
-    margin: 0,
-    borderRadius: '0.5rem',
-    border: `1px dashed ${BORDER}`,
-    padding: '0.5rem 0.625rem',
-    fontSize: '0.6875rem',
-    lineHeight: 1.5,
-    color: MUTED,
-  },
-} satisfies Record<string, CSSProperties>
-
-/**
- * The bend this panel is editing.
- *
- * `ParametricDescriptor.trailingSection` is typed `ComponentType<{ node: N }>`
- * but the host renders `<TrailingSection />` with no props at all, so a declared
- * `node` arrives `undefined` and the first property read throws. The node is
- * read the way the inspector itself reads it: whatever is selected.
- */
 function useInspectedCurve(provided?: ConveyorCurveNode): ConveyorCurveNode | null {
   const selectedId = useViewer((s) => s.selection.selectedIds[0])
   const selected = useScene((s) => (selectedId ? s.nodes[selectedId as AnyNodeId] : undefined))
@@ -124,70 +57,42 @@ export default function ConveyorCurvePanel({ node: provided }: { node?: Conveyor
   // can see it.
   const issues = [
     ...(conveyorCurveParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointProblems(node, nodes).map((msg) => ({ field: undefined, severity: 'warning', msg })),
+    ...jointIssues(jointProblems(node, nodes)),
   ]
 
   const lane = laneWidthM(node)
   const longest = longestBoxThroughBendM(node)
 
   return (
-    <div style={styles.root}>
-      {issues.length > 0 && (
-        <div style={styles.issues}>
-          {issues.map((issue) => (
-            <p key={`${issue.field ?? ''}:${issue.msg}`} style={styles.issue}>
-              <Icon
-                height={12}
-                icon={issue.severity === 'error' ? 'lucide:octagon-alert' : 'lucide:triangle-alert'}
-                style={{ flexShrink: 0, marginTop: '0.125rem' }}
-                width={12}
-              />
-              <span>{issue.msg}</span>
-            </p>
-          ))}
-        </div>
-      )}
-
-      <div style={styles.readout}>
-        <span style={styles.title}>
-          <Icon height={13} icon="lucide:gauge" width={13} />
-          This bend
-        </span>
-        {(
-          [
-            ['Arc', `${angleDeg(node)}° ${node.handed} · ${centrelineLengthM(node).toFixed(2)} m`],
-            [
-              'Radius',
-              `${(node.innerRadius * 1000).toFixed(0)} mm inner · ${(outerRadiusM(node) * 1000).toFixed(0)} mm outer`,
-            ],
-            [
-              'Frame',
-              `${(frameWidthM(node) * 1000).toFixed(0)} mm over a ${usefulWidthMm(node)} mm lane`,
-            ],
-            ['Rollers', `${rollerCount(node)} tapered · ${supportAngles(node).length} supports`],
-            ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
-            // The figure a bend exists to be checked against, and the one a
-            // straight has no equivalent of.
-            [
-              'Longest box',
-              `${(longest * 1000).toFixed(0)} mm at full ${(lane * 1000).toFixed(0)} mm width`,
-            ],
-            ['Line', describeLine(node, nodes)],
-          ] as Array<[string, string]>
-        ).map(([label, value]) => (
-          <div key={label} style={styles.label}>
-            <span>{label}</span>
-            <span style={{ color: FG, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
-          </div>
-        ))}
-      </div>
-
-      <p style={styles.hint}>
-        A bend preserves a box's orientation, so what leaves it faces the way it entered — which is
-        what separates it from a transfer, and why the next section's box-length limits still apply.
-        Drag it within half a metre of a free end and it clicks on: head to tail, matching lane,
-        matching height. Drag a joined module and the whole line comes with it.
-      </p>
-    </div>
+    <ModuleReadout
+      issues={issues}
+      rows={[
+        ['Arc', `${angleDeg(node)}° ${node.handed} · ${centrelineLengthM(node).toFixed(2)} m`],
+        [
+          'Radius',
+          `${(node.innerRadius * 1000).toFixed(0)} mm inner · ${(outerRadiusM(node) * 1000).toFixed(0)} mm outer`,
+        ],
+        [
+          'Frame',
+          `${(frameWidthM(node) * 1000).toFixed(0)} mm over a ${usefulWidthMm(node)} mm lane`,
+        ],
+        ['Rollers', `${rollerCount(node)} tapered · ${supportAngles(node).length} supports`],
+        ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
+        // The figure a bend exists to be checked against, and the one a straight
+        // has no equivalent of.
+        [
+          'Longest box',
+          `${(longest * 1000).toFixed(0)} mm at full ${(lane * 1000).toFixed(0)} mm width`,
+        ],
+        ['Line', describeLine(node, nodes)],
+      ]}
+      title="This bend"
+    >
+      <Note>
+        Bir viraj kutunun yönünü korur — çıkan, girdiği yöne bakar. Transferden ayıran budur ve bir
+        sonraki bölümün kutu-boyu sınırlarının hâlâ geçerli olmasının sebebi de budur. Boş bir ucun
+        yarım metre yakınına sürükleyin, yapışır: baş uca kuyruk, eşleşen şerit, eşleşen kot.
+      </Note>
+    </ModuleReadout>
   )
 }

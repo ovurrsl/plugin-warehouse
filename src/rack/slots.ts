@@ -169,6 +169,39 @@ export function levelTypeOf(rack: PalletRackNode, level: number): LevelType {
   return level < rack.pickingLevels ? 'picking' : 'pallet'
 }
 
+/**
+ * Bir katın tipini değiştirdikten sonraki `levelTypes` — ve türetilmiş desene
+ * dönüldüyse `null`.
+ *
+ * ## Neden `null`a dönmek şart
+ *
+ * Şemanın kendi uyarısı: açık bir `levelTypes` listesi rafın geometrisini
+ * BENZERSİZ yapıyor, yani "elli rafın paylaştığı tek mesh elli mesh olur".
+ * Paneldeki eski yazım diziyi her dokunuşta baştan sona dolduruyordu, dolayısıyla
+ * tek bir tıklama geri dönüşsüzdü: `pickingLevels` bir daha hiçbir şeyi
+ * sürmüyor, raf bir daha hiçbir komşusuyla mesh paylaşmıyordu.
+ *
+ * Burada dizinin türetilmiş desenle birebir aynı olup olmadığı sınanıyor;
+ * aynıysa alan yok sayılıyor. Yani her satırı kendi türetilmiş tipine geri
+ * getirmek, rafı hiç dokunulmamış hâline — ve paylaşımlı mesh'e — döndürüyor.
+ *
+ * Saf fonksiyon: paneldeki kopyası test edilemezdi, ve test edilemeyen yerde
+ * duran bir kural, ihlal edildiğinde kimseye haber vermez.
+ */
+export function nextLevelTypes(
+  rack: PalletRackNode,
+  level: number,
+  type: LevelType,
+): LevelType[] | null {
+  // Zemin açıklığı da bir satır, o yüzden `levels + 1`.
+  const rows = rack.levels + 1
+  const next = Array.from({ length: rows }, (_, index) =>
+    index === level ? type : (rack.levelTypes?.[index] ?? levelTypeOf(rack, index)),
+  )
+  const derived = (index: number): LevelType => (index < rack.pickingLevels ? 'picking' : 'pallet')
+  return next.every((value, index) => value === derived(index)) ? null : next
+}
+
 /** Beam profile carrying a level. Picking levels ride a shallower section. */
 export function levelBeamHeight(rack: PalletRackNode, level: number): number {
   return levelTypeOf(rack, level) === 'picking' ? rack.pickingBeamHeight : rack.beamHeight
@@ -633,6 +666,18 @@ export function palletSupportBarCount(rack: PalletRackNode): number {
  */
 export function barLevels(rack: PalletRackNode): number[] {
   if (palletSupportBarCount(rack) === 0) return []
+  return barCapableLevels(rack)
+}
+
+/**
+ * Çubuk TAŞIYABİLECEK katlar — sayı sıfır olsa bile.
+ *
+ * `barLevels`'tan tek farkı sayıya bakmaması, ve fark tam olarak panelin
+ * ihtiyacı olan şey: kontrol, çubuk *çizilebiliyorsa* görünmeli, ancak
+ * çizildiyse değil. Sıfırdan bir'e çıkarmanın yolu kontrolün kendisi olduğu
+ * için `barLevels` üzerinden görünürlük vermek kilitli bir kapı olurdu.
+ */
+function barCapableLevels(rack: PalletRackNode): number[] {
   const present = new Set(storageLevelsPresent(rack))
   return beamedLevels(rack).filter((level) => present.has(level) && !levelHasShelf(rack, level))
 }
@@ -640,6 +685,23 @@ export function barLevels(rack: PalletRackNode): number[] {
 /** Whether any bar is actually built. */
 export function palletSupportBarsDrawn(rack: PalletRackNode): boolean {
   return barLevels(rack).length > 0
+}
+
+/**
+ * Çubuk kontrolünün görünme koşulu — ÖLÇÜLMÜŞ bir "görünür ama etkisiz" alan.
+ *
+ * Önceki koşul `palletSupportBarsDrawn(node) || requiresPalletSupportBars(node)`
+ * idi ve ikinci şık kontrolü tam da hiçbir şey yapamayacağı yerde açıyordu:
+ * varsayılan tel döşemeli bir rafı `long-side-out`'a çevirmek
+ * `requiresPalletSupportBars`'ı doğru yapıyor, ama her kiriş katının üstünde
+ * panel olduğu için `barLevels` boş kalıyor — kullanıcı 0'dan 3'e kadar
+ * sürüklüyor ve rafta hiçbir şey değişmiyor.
+ *
+ * `parametrics.ts`'in kendi kuralı bunu yasaklıyor: "bir kontrol asla görünür,
+ * ayarlanabilir ve etkisiz olamaz." Doğru koşul çubuğun *çizilebilirliği*.
+ */
+export function palletSupportBarsPossible(rack: PalletRackNode): boolean {
+  return barCapableLevels(rack).length > 0
 }
 
 /**

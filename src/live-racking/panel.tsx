@@ -1,9 +1,10 @@
 'use client'
 
 import { type AnyNodeId, useScene } from '@pascal-app/core'
+import { PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
-import type { CSSProperties } from 'react'
 import { IssueList } from '../panels/issue-list'
+import { Figure, Figures, Note, TextRow } from '../panels/kit'
 import { LIVE_RACKING_UNPUBLISHED_NOTE } from './catalog'
 import {
   assignedSkuCount,
@@ -30,40 +31,12 @@ import type { LiveRackingNode } from './schema'
  * E ve D burada gösteriliyor çünkü ALAN DEĞİLLER — katalog formülünden
  * geliyorlar ve kullanıcının görmesi gereken tam olarak bu: paleti
  * değiştirince bay genişliğinin kendiliğinden değişmesi.
+ *
+ * Bölümler host'un `<PanelSection>`'ı: trailing bölüm host tarafından iç
+ * boşluksuz çizildiği için (`parametric-inspector.tsx:173`) panel eskiden
+ * kendi çerçeveli kartlarını çiziyordu — ve zaten çerçeveli grupların içinde
+ * ikinci bir çerçeve katmanı olarak okunuyordu.
  */
-
-const styles = {
-  root: { display: 'flex', flexDirection: 'column', gap: '0.5rem' },
-  card: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.25rem',
-    borderRadius: '0.5rem',
-    border: '1px solid var(--border)',
-    padding: '0.5rem 0.625rem',
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '0.5rem',
-    fontSize: '0.6875rem',
-    color: 'var(--foreground)',
-  },
-  figure: { fontVariantNumeric: 'tabular-nums', fontWeight: 600 },
-  note: { margin: 0, fontSize: '0.625rem', lineHeight: 1.45, color: 'var(--muted-foreground)' },
-  skuRow: { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.6875rem' },
-  skuLabel: { flex: '0 0 3.5rem', color: 'var(--muted-foreground)' },
-  skuInput: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: '0.25rem',
-    border: '1px solid var(--border)',
-    background: 'transparent',
-    color: 'var(--foreground)',
-    padding: '0.125rem 0.375rem',
-    fontSize: '0.6875rem',
-  },
-} satisfies Record<string, CSSProperties>
 
 /**
  * SKU yazımı — diziyi kat sayısına kadar doldurarak.
@@ -95,134 +68,98 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
   const issues = liveRackingParametrics.invariants?.flatMap((check) => check(node)) ?? []
 
   return (
-    <div style={styles.root}>
+    <>
       <IssueList issues={issues} />
 
-      <div style={styles.card}>
-        <div style={styles.row}>
-          <span>Palet ağzı · A</span>
-          <span style={styles.figure}>{(palletFaceWidthM(node) * 1000).toFixed(0)} mm</span>
-        </div>
-        <div style={styles.row}>
-          <span>Bay genişliği · E = A + 160</span>
-          <span style={styles.figure}>{(bayWidthM(node) * 1000).toFixed(0)} mm</span>
-        </div>
-        <div style={styles.row}>
-          <span>Makara boyu · D = A + 30</span>
-          <span style={styles.figure}>{(rollerLengthM(node) * 1000).toFixed(0)} mm</span>
-        </div>
-        <div style={styles.row}>
-          <span>Kanal derinliği · X</span>
-          <span style={styles.figure}>{channelDepthM(node).toFixed(2)} m</span>
-        </div>
-        <div style={styles.row}>
-          <span>Düşüş (%{(node.gradient * 100).toFixed(1)})</span>
-          <span style={styles.figure}>{(channelDropM(node) * 1000).toFixed(0)} mm</span>
-        </div>
-        <p style={styles.note}>
+      <PanelSection title="Türetilmiş ölçüler">
+        <Figures
+          rows={[
+            ['Palet ağzı · A', `${(palletFaceWidthM(node) * 1000).toFixed(0)} mm`],
+            ['Bay genişliği · E = A + 160', `${(bayWidthM(node) * 1000).toFixed(0)} mm`],
+            ['Makara boyu · D = A + 30', `${(rollerLengthM(node) * 1000).toFixed(0)} mm`],
+            ['Kanal derinliği · X', `${channelDepthM(node).toFixed(2)} m`],
+            [
+              `Düşüş (%${(node.gradient * 100).toFixed(1)})`,
+              `${(channelDropM(node) * 1000).toFixed(0)} mm`,
+            ],
+          ]}
+        />
+        <Note>
           E ve D alan değil, katalog formülüdür — palet standardını değiştirmek ikisini de
           değiştirir.
-        </p>
-      </div>
+        </Note>
+      </PanelSection>
 
-      <div style={styles.card}>
-        <div style={styles.row}>
-          <span>Palet pozisyonu</span>
-          <span style={styles.figure}>
-            {palletPositions(node)} ({node.levels} kat × {node.palletsDeep})
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Kat başına makara</span>
-          <span style={styles.figure}>{rollerCount(node)}</span>
-        </div>
-        <div style={styles.row}>
-          <span>Akış</span>
-          <span style={styles.figure}>
-            {node.variant === 'FIFO' ? 'FIFO · iki koridor' : 'LIFO push-back · tek koridor'}
-          </span>
-        </div>
-      </div>
+      <PanelSection title="Kapasite">
+        <Figures
+          rows={[
+            [
+              'Palet pozisyonu',
+              `${palletPositions(node)} (${node.levels} kat × ${node.palletsDeep})`,
+            ],
+            ['Kat başına makara', `${rollerCount(node)}`],
+            [
+              'Akış',
+              node.variant === 'FIFO' ? 'FIFO · iki koridor' : 'LIFO push-back · tek koridor',
+            ],
+          ]}
+        />
+      </PanelSection>
 
-      <div style={styles.card}>
-        <div style={styles.row}>
-          <span>Fren makarası</span>
-          <span style={styles.figure}>
-            {hasBrakeRollers(node) ? `${node.palletsDeep} adet · palet başına 1` : 'yok'}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Kanal dip ucu</span>
-          <span style={styles.figure}>
-            {node.variant === 'FIFO' ? 'çıkış kirişi + tampon' : 'son durdurucu'}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Palet tutucu</span>
-          <span style={styles.figure}>
-            {node.withRetainers ? 'çıkışta' : 'yok'}
-            {hasIntermediateRetainers(node) ? ' + 2 ara' : ''}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Makara</span>
-          <span style={styles.figure}>
-            {node.splitRollers ? 'bölünmüş · sert mastlı araç' : 'tam boy'}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Alt kat</span>
-          <span style={styles.figure}>
-            {node.floorSetPalletTruckLevel
-              ? 'zemin seviyesi · transpalet'
-              : `${(node.firstLevelClear * 1000).toFixed(0)} mm açıklık`}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Yapı</span>
-          <span style={styles.figure}>
-            {node.cladRack ? 'giydirme raf · çatıyı taşır' : 'serbest duran'}
-          </span>
-        </div>
-        <div style={styles.row}>
-          <span>Çerçeve yüksekliği</span>
-          <span style={styles.figure}>
-            {(frameHeightM(node) * 1000).toFixed(0)} mm
-            {frameHeightIsValid(node)
-              ? ''
-              : ` → ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)}`}
-          </span>
-        </div>
-      </div>
+      <PanelSection title="Donanım">
+        <Figures
+          rows={[
+            [
+              'Fren makarası',
+              hasBrakeRollers(node) ? `${node.palletsDeep} adet · palet başına 1` : 'yok',
+            ],
+            ['Kanal dip ucu', node.variant === 'FIFO' ? 'çıkış kirişi + tampon' : 'son durdurucu'],
+            [
+              'Palet tutucu',
+              `${node.withRetainers ? 'çıkışta' : 'yok'}${hasIntermediateRetainers(node) ? ' + 2 ara' : ''}`,
+            ],
+            ['Makara', node.splitRollers ? 'bölünmüş · sert mastlı araç' : 'tam boy'],
+            [
+              'Alt kat',
+              node.floorSetPalletTruckLevel
+                ? 'zemin seviyesi · transpalet'
+                : `${(node.firstLevelClear * 1000).toFixed(0)} mm açıklık`,
+            ],
+            ['Yapı', node.cladRack ? 'giydirme raf · çatıyı taşır' : 'serbest duran'],
+            [
+              'Çerçeve yüksekliği',
+              `${(frameHeightM(node) * 1000).toFixed(0)} mm${
+                frameHeightIsValid(node)
+                  ? ''
+                  : ` → ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)}`
+              }`,
+            ],
+          ]}
+        />
+      </PanelSection>
 
-      <div style={styles.card}>
-        <div style={styles.row}>
-          <span>Kanal referansı · SKU</span>
-          <span style={styles.figure}>
-            {assignedSkuCount(node)}/{node.levels}
-          </span>
-        </div>
+      <PanelSection title="Kanal referansı">
+        <Figure label="SKU atanan kanal">
+          {assignedSkuCount(node)}/{node.levels}
+        </Figure>
         {Array.from({ length: node.levels }, (_, level) => (
-          <label key={level} style={styles.skuRow}>
-            <span style={styles.skuLabel}>Kat {level + 1}</span>
-            <input
-              type="text"
-              value={skuOfLevel(node, level)}
-              placeholder="—"
-              style={styles.skuInput}
-              onChange={(event) => setSku(node, level, event.target.value)}
-            />
-          </label>
+          <TextRow
+            key={level}
+            label={`Kat ${level + 1}`}
+            onChange={(value) => setSku(node, level, value)}
+            placeholder="—"
+            value={skuOfLevel(node, level)}
+          />
         ))}
-        <p style={styles.note}>
+        <Note>
           Canlı rafta bir kanal bir referans taşır: paletler yerçekimiyle sıraya girer, araya başka
           bir SKU sokulamaz. Plan sembolü bunu seçim gerekmeden gösteriyor.
-        </p>
-      </div>
+        </Note>
+      </PanelSection>
 
-      <div style={styles.card}>
-        <p style={styles.note}>{LIVE_RACKING_UNPUBLISHED_NOTE}</p>
-      </div>
-    </div>
+      <PanelSection defaultExpanded={false} title="Kaynak">
+        <Note>{LIVE_RACKING_UNPUBLISHED_NOTE}</Note>
+      </PanelSection>
+    </>
   )
 }

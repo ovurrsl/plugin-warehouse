@@ -30,6 +30,12 @@ const styles = {
     border: '1px solid color-mix(in oklab, #f59e0b 40%, transparent)',
     background: 'color-mix(in oklab, #f59e0b 10%, transparent)',
     padding: '0.5rem 0.625rem',
+    /**
+     * Kendi yatay boşluğunu taşıyor, çünkü bir uyarı bir ayar DEĞİL: her
+     * bölümün üstünde, `PanelSection`'ın dışında duruyor. Ölçü host'un
+     * `p-3`'ünün aynısı, böylece altındaki bölümlerle aynı hizada başlıyor.
+     */
+    margin: '0.75rem 0.75rem 0',
   },
   /**
    * Errors are bordered red, warnings amber — but the container is amber

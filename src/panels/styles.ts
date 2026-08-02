@@ -19,10 +19,22 @@ import type { CSSProperties } from 'react'
  * the classes, pointing it at the symlink emits nothing.
  *
  * Compose host components wherever one exists — `SegmentedControl`,
- * `SliderControl`, `ToggleControl`, `ActionButton`. Note that `PanelWrapper`
- * and `PanelSection` are *inspector* chrome (title bar, drag handle, collapse
- * affordance, fixed width); a left-rail panel is a plain scroll container and
- * must not use them.
+ * `SliderControl`, `ToggleControl`, `ActionButton`.
+ *
+ * ## `PanelSection` — nerede evet, nerede hayır
+ *
+ * Bu dosya YALNIZ sol raydaki katalog paneline hizmet ediyor, ve ray düz bir
+ * kaydırma kabıdır: kendi başlığı, kendi genişliği ve kendi kaydırması var, o
+ * yüzden burası `PanelWrapper`/`PanelSection` KULLANMAZ — ikisi de müfettiş
+ * çerçevesi (başlık çubuğu, sürükleme tutamağı, katlanma, sabit genişlik).
+ *
+ * Müfettişteki trailing bölümler bunun TAM TERSİ ve bu dosyanın kuralı oraya
+ * uygulanmamalı: host trailing bölümü `<PanelSection>`'larının çıplak kardeşi
+ * olarak çiziyor (`parametric-inspector.tsx:173`), yani iç boşluk, başlık ve
+ * ayraç gelmiyor. Onları elle taklit etmek, zaten çerçeveli grupların içinde
+ * ikinci bir çerçeve katmanı üretiyordu — kullanıcının "içi içe giren ayarlar"
+ * dediği şeyin görsel yarısı. Nesne panelleri artık host'un `PanelSection`'ını
+ * kullanıyor; ortak parçaları `./kit.tsx` taşıyor.
  */
 
 const FG = 'var(--sidebar-foreground)'

@@ -14,9 +14,9 @@ import {
   fittedLevelCount,
   hasUnsupportedPallets,
   levelClearHeight,
+  levelClearOpening,
   levelSurfaceY,
-  palletSupportBarsDrawn,
-  requiresPalletSupportBars,
+  palletSupportBarsPossible,
   storageLevels,
   storageLevelsPresent,
 } from './slots'
@@ -90,21 +90,17 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
       label: 'Levels',
       fields: [
         { key: 'levels', kind: 'number', min: 0, max: 15, step: 1 },
-        // Kat başına açıklık: tekdüze `levelClear`ın yetmediği gerçek rafın
-        // alanı — ilk kat yüksek, üstler alçak. Custom, çünkü eleman sayısı
-        // sığan kat sayısını izler.
+        /**
+         * Kat açıklığının TEK kontrolü.
+         *
+         * Buraya üç ayrı slider daha geliyordu — `firstLevelClear`,
+         * `levelClear` ve (Picking grubunda) `pickingLevelClear` — hepsi aynı
+         * sayıyı, `levelClearOpening`'in içindeki bir öncelik zincirine göre
+         * yönetiyordu. Dördü artık `LevelsField`'in içinde: üstte varsayılanlar,
+         * altta onları yenen kat satırları. Alanların hiçbiri kaldırılmadı,
+         * yalnız hangisinin hangisini yendiği artık ekranda görünüyor.
+         */
         { key: 'levelClears', kind: 'custom', component: LevelsField },
-        { key: 'firstLevelClear', kind: 'number', unit: 'm', min: 0.2, max: 6, step: 0.05 },
-        {
-          key: 'levelClear',
-          kind: 'number',
-          unit: 'm',
-          min: 0.2,
-          max: 6,
-          step: 0.05,
-          // With one beam level there is nothing above the first to space.
-          visibleIf: (node) => node.levels > 1,
-        },
         {
           key: 'decking',
           kind: 'enum',
@@ -158,10 +154,13 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           key: 'palletSupportBars',
           kind: 'custom',
           component: PalletSupportBarsField,
-          // Bars only exist where a level has no panel over it. Shown against
-          // the same predicate the builder and the cache key use, so the control
-          // can never be visible and inert.
-          visibleIf: (node) => palletSupportBarsDrawn(node) || requiresPalletSupportBars(node),
+          // Bars only exist where a level has no panel over it. `…Possible`
+          // rather than `…Drawn`, because the control is how a zero becomes a
+          // three — gating on "is one drawn" would be a locked door. The old
+          // `|| requiresPalletSupportBars` disjunct was the reverse mistake: it
+          // opened the control on a wire-decked rack where no level can carry a
+          // bar at all, so the slider moved and nothing changed.
+          visibleIf: (node) => palletSupportBarsPossible(node),
         },
         { key: 'ghostFill', kind: 'number', min: 0, max: 1, step: 0.05 },
       ],
@@ -175,15 +174,10 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         // differ on the ground level: `pickingLevels: 1` designates the floor,
         // which carries no beam and no shelf, so the profile fields were visible
         // and moved nothing at exactly the setting a user reaches for first.
-        {
-          key: 'pickingLevelClear',
-          kind: 'number',
-          unit: 'm',
-          min: 0.15,
-          max: 3,
-          step: 0.05,
-          visibleIf: (node) => node.pickingLevels > 0,
-        },
+        //
+        // `pickingLevelClear` used to sit here, one group away from the two
+        // fields it competes with. It is now the third default inside
+        // `LevelsField`, next to them.
         {
           key: 'pickingBeamHeight',
           kind: 'number',
@@ -310,6 +304,33 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           severity: 'warning',
           msg: 'Pallets are turned long-side-out with no support bars. Their bottom deckboards run along the beams, leaving the middle unsupported.',
         })
+      }
+
+      /**
+       * Kutu yüksekliği açıklığa sığmıyor.
+       *
+       * `pickingBoxHeight` denetimde ÖLÜ ALAN olarak bulundu: şemada tanımlı,
+       * panelde slider'ı var, ve iki referansı dışında kodun hiçbir yeri onu
+       * okumuyordu — "görünür, ayarlanabilir ve etkisiz", yani bu dosyanın
+       * kendi yasakladığı şey.
+       *
+       * Alanı silmek yerine sonuç bağlandı. Kutular henüz çizilmiyor (bu bir
+       * özellik, bir kusur değil) ama yükseklik ZATEN bir şey söylüyor:
+       * toplama katının açıklığına sığmayan bir kap, o rafa konamaz. Ölçüyü
+       * karşılaştıracak veri elde olduğu hâlde karşılaştırmamak, kullanıcının
+       * girdiği sayıyı görmezden gelmekti.
+       */
+      for (const level of drawnPickingLevels(node)) {
+        const opening = levelClearOpening(node, level)
+        if (node.pickingBoxHeight <= opening) continue
+        issues.push({
+          field: 'pickingBoxHeight',
+          severity: 'warning',
+          msg: `${(node.pickingBoxHeight * 1000).toFixed(0)} mm kap, kat ${level}'in ${(opening * 1000).toFixed(0)} mm açıklığına sığmıyor.`,
+        })
+        // Bir tane yeter: toplama katlarının açıklığı tek varsayılandan
+        // geliyor, yani biri darsa hepsi dardır.
+        break
       }
 
       // A declared count above what the bay geometrically holds is legitimate

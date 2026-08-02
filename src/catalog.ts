@@ -131,12 +131,16 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
     icon: 'lucide:move-right',
     blurb: 'Conveyors and sortation.',
   },
-  {
-    id: 'stations',
-    label: 'Stations',
-    icon: 'lucide:table-2',
-    blurb: 'Packing, dispatch, and processing benches.',
-  },
+  /**
+   * `stations` — "Packing, dispatch, and processing benches" — BURADAN
+   * KALDIRILDI, çünkü hiçbir fişi yoktu.
+   *
+   * Bölüm başlığını, açıklamasını ve "Nothing here yet." kutusunu her açılışta
+   * çiziyordu: raftaki her şeyin yanında, var olmayan bir yetenek ilan eden
+   * kalıcı bir boşluk. Bir bölüm ancak içine konacak bir kind'la birlikte
+   * gelmeli — `catalog.test.ts` bunu artık test ediyor, yani boş bir bölüm
+   * ikinci kez sessizce eklenemez.
+   */
   {
     id: 'mezzanine',
     label: 'Mezzanine',

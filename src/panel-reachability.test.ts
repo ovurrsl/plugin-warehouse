@@ -10,10 +10,25 @@ import { warehousePlugin } from './index'
  * gruba girer, ya aşağıdaki kayıtlı istisnalardan birine gerekçesiyle
  * yazılır — yoksa bu test onu ERİŞİLEMEZ diye düşürür.
  *
+ * ## Neden şema ağacı, ayrıştırılmış nesne değil
+ *
+ * Test önceden `Object.keys(schema.parse({id}))` geziyordu — yani YALNIZ ÜST
+ * SEVİYE anahtarları. `tiers` bir kez CUSTOM muafiyeti alınca içindeki her şey
+ * denetim dışı kalıyordu, ve mezzanine'in yedi alanı tam olarak orada
+ * saklanıyordu: merdivenin `widthM`/`landing`/`railings`'i, üç kapı türünün
+ * `widthM`'i, `tier.elevationM`. Hepsi şemada tanımlı, hepsi geometriyi
+ * sürüyor, hiçbirinin kontrolü yoktu.
+ *
+ * Ayrıştırılmış nesneyi özyinelemeli gezmek de yetmezdi: `accessories`
+ * varsayılanı BOŞ dizidir, yani `staircases: []` içinden bir eleman şeması
+ * çıkarılamaz. Alanların görünmesinin tek yolu Zod ağacının kendisini
+ * yürümek.
+ *
  * İstisna türleri:
  *   - SYSTEM  — yerleştirme/sistem yazar, kullanıcı alanı değil
- *   - CUSTOM  — trailing panel ya da 3B araçla düzenleniyor (generic alan
- *               tipi onu ifade edemiyor); NEREDE düzenlendiği yazılı
+ *   - CUSTOM  — bir `kind: 'custom'` alan bileşeni, trailing panel ya da 3B
+ *               araç düzenliyor (generic alan tipi onu ifade edemiyor);
+ *               NEREDE düzenlendiği yazılı
  *
  * "Kullanıcıya kapalı" diye bir istisna türü BİLEREK yok.
  */
@@ -47,7 +62,28 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
   ],
   'warehouse:pallet-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
-    { field: 'levelTypes', kind: 'CUSTOM', where: 'trailing panel LevelTypes editörü' },
+    // Dördü de `Levels` grubundaki `LevelsField`'in içinde — kat açıklığının
+    // TEK editörü orası. Üçü ayrı slider olarak iki farklı grupta duruyordu.
+    {
+      field: 'levelTypes',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, kat satırındaki tip anahtarı',
+    },
+    {
+      field: 'firstLevelClear',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, "Zemin" varsayılanı',
+    },
+    {
+      field: 'levelClear',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, "Üst katlar" varsayılanı',
+    },
+    {
+      field: 'pickingLevelClear',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelsField, "Toplama katı" varsayılanı',
+    },
   ],
   'warehouse:route': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
@@ -88,17 +124,222 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       kind: 'SYSTEM',
       where: 'yerleştirme/uzlaştırıcı yazar (zemin çivisi)',
     },
-    { field: 'grid', kind: 'CUSTOM', where: 'auto-fields GridField' },
-    { field: 'tiers', kind: 'CUSTOM', where: 'auto-fields TiersField (aksesuar editörü dahil)' },
     { field: 'polygon', kind: 'CUSTOM', where: 'çizim aracı (D) + seçim tutamakları' },
     { field: 'mainBeamProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },
     { field: 'secondaryBeamProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },
     { field: 'columnProfile', kind: 'CUSTOM', where: 'trailing panel profil seçicisi' },
+
+    // ── grid: GridField'in dört slider'ı ────────────────────────────────────
+    { field: 'grid.baysX', kind: 'CUSTOM', where: 'auto-fields GridField "Bays X"' },
+    { field: 'grid.baysY', kind: 'CUSTOM', where: 'auto-fields GridField "Bays Z"' },
+    { field: 'grid.bayWidthM', kind: 'CUSTOM', where: 'auto-fields GridField "Bay width"' },
+    { field: 'grid.bayDepthM', kind: 'CUSTOM', where: 'auto-fields GridField "Bay depth"' },
+
+    // ── tiers: TiersField ───────────────────────────────────────────────────
+    { field: 'tiers.index', kind: 'SYSTEM', where: 'ekle/sil sırasında yeniden numaralanır' },
+    {
+      field: 'tiers.elevationM',
+      kind: 'CUSTOM',
+      where: 'TiersField "Kot: auto / Elle" + kot slider',
+    },
+    { field: 'tiers.clearHeightM', kind: 'CUSTOM', where: 'TiersField "Net yükseklik" slider' },
+    { field: 'tiers.loadClass', kind: 'CUSTOM', where: 'TiersField "Yük sınıfı" seçicisi' },
+    { field: 'tiers.floorType', kind: 'CUSTOM', where: 'TiersField "Döşeme" seçicisi' },
+
+    // ── tier aksesuarları: AccessoryEditor ──────────────────────────────────
+    {
+      field: 'tiers.accessories.staircases.id',
+      kind: 'SYSTEM',
+      where: '`stair-<tier>-<n>` olarak eklemede üretilir',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.mode',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor ⤢/⊞ kenar↔serbest anahtarı',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.edge',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor kenar seçicisi',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.offsetM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor ofset girdisi',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.xM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor serbest yerleşim X',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.zM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor serbest yerleşim Z',
+    },
+    {
+      field: 'tiers.accessories.staircases.placement.rotationDeg',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor serbest yerleşim dönüşü',
+    },
+    {
+      field: 'tiers.accessories.staircases.widthM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor "800 tek / 1000 çok" segmenti',
+    },
+    {
+      field: 'tiers.accessories.staircases.landing',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor sahanlık seçicisi',
+    },
+    {
+      field: 'tiers.accessories.staircases.railings',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor korkuluk sayısı seçicisi',
+    },
+    {
+      field: 'tiers.accessories.staircases.steps',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor basamak seçicisi',
+    },
+    {
+      field: 'tiers.accessories.swingGates.edge',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor kapı kenar seçicisi',
+    },
+    {
+      field: 'tiers.accessories.swingGates.offsetM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor kapı ofseti',
+    },
+    {
+      field: 'tiers.accessories.swingGates.widthM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor "750 tek / 1500 çift" segmenti',
+    },
+    {
+      field: 'tiers.accessories.upAndOverGates.edge',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor palet kapısı kenar seçicisi',
+    },
+    {
+      field: 'tiers.accessories.upAndOverGates.offsetM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor palet kapısı ofseti',
+    },
+    {
+      field: 'tiers.accessories.upAndOverGates.widthM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor palet kapısı genişlik slider',
+    },
+    {
+      field: 'tiers.accessories.safetyZones.edge',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor bölge kenar seçicisi',
+    },
+    {
+      field: 'tiers.accessories.safetyZones.offsetM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor bölge ofseti',
+    },
+    {
+      field: 'tiers.accessories.safetyZones.widthM',
+      kind: 'CUSTOM',
+      where: 'AccessoryEditor bölge genişlik slider (1.2 m eşiği uyarısıyla)',
+    },
   ],
   'warehouse:live-racking': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'skus', kind: 'CUSTOM', where: 'trailing panel kat başına SKU girdileri' },
   ],
+}
+
+// ─── Zod ağacı yürüyüşü ──────────────────────────────────────────────────────
+
+/** Zod 4'te tanım `._zod.def` altında; `.def` eski erişim yolu olarak kalıyor. */
+function zodDef(schema: unknown): Record<string, unknown> | null {
+  if (!schema || typeof schema !== 'object') return null
+  const holder = schema as { _zod?: { def?: unknown }; def?: unknown }
+  const def = holder._zod?.def ?? holder.def
+  return def && typeof def === 'object' ? (def as Record<string, unknown>) : null
+}
+
+/**
+ * Bir şemanın yaprak alan yollarını `a.b.c` biçiminde toplar.
+ *
+ * Sarmalayıcılar (`default` / `optional` / `nullable`) şeffaf geçilir; dizi
+ * elemanına inilir, yani `tiers` bir kez yazılır ama `tiers.clearHeightM` ayrı
+ * bir yaprak olur. Birleşimlerde HER dalın alanları toplanır: teleskopik
+ * merdiven yerleşimi ayrımlı birleşimdir ve iki dalın alanları da gerçek —
+ * biri gösterilip diğeri gösterilmezse ikinci mod erişilemez kalır.
+ *
+ * `tuple` ve `record` yaprak sayılır: konum/dönüş üçlüleri host'un `vec3`
+ * alanıdır, `slots` gibi kayıtların anahtarı çalışma anında belirlenir.
+ */
+function leafPaths(schema: unknown, prefix = '', depth = 0): string[] {
+  /**
+   * Kaçak özyineleme koruması — ve neden SUSMAK yerine ATIYOR.
+   *
+   * İlk yazımı `if (depth > 8) return [prefix]` idi ve tam olarak bu testin
+   * yakalamak için var olduğu hatayı kendisi yapıyordu: mezzanine'in merdiven
+   * `placement`'ı 8. seviyede duruyor, yani koruma birleşimin ÜSTÜNDE kesip
+   * `…placement`'ı yaprak gibi gösteriyordu. Altı alan yine görünmez kalmıştı,
+   * ve hiçbir şey şikâyet etmiyordu çünkü koruma "geçerli bir cevap" dönüyordu.
+   *
+   * Sessizce kısaltılmış bir kapsam, kapsam yokluğundan beterdir: yeşil test
+   * denetlendiğini söyler. Sınır artık gerçek şemaların iki katı ve aşılırsa
+   * test PATLIYOR.
+   */
+  if (depth > 24) {
+    throw new Error(`Şema ağacı beklenmedik derinlikte — ${prefix || '<kök>'} (derinlik ${depth})`)
+  }
+  const def = zodDef(schema)
+  if (!def) return prefix ? [prefix] : []
+
+  switch (def.type) {
+    case 'default':
+    case 'optional':
+    case 'nullable':
+    case 'readonly':
+    case 'catch':
+      return leafPaths(def.innerType, prefix, depth + 1)
+
+    case 'object': {
+      const shape = (def.shape ?? {}) as Record<string, unknown>
+      return Object.entries(shape).flatMap(([key, child]) =>
+        leafPaths(child, prefix ? `${prefix}.${key}` : key, depth + 1),
+      )
+    }
+
+    case 'array':
+      return leafPaths(def.element, prefix, depth + 1)
+
+    default: {
+      /**
+       * Birleşimler — `type` etiketine DEĞİL, `options` dizisine bakılarak.
+       *
+       * `z.union` `type: 'union'` diyor ama `z.discriminatedUnion` bu Zod
+       * sürümünde başka bir etiket taşıyor, ve ilk yazımda yalnız `'union'`
+       * eşleştiği için merdivenin `placement`'ı YAPRAK sayılıyordu: iki
+       * yerleşim modunun altı alanı da denetimin dışında kalıyordu — testin
+       * kapatmak için yazıldığı deliğin aynısı, bir seviye derinde.
+       */
+      if (Array.isArray(def.options)) {
+        const paths = (def.options as unknown[]).flatMap((option) =>
+          leafPaths(option, prefix, depth + 1),
+        )
+        // Birleşim yalnız ilkellerden oluşuyorsa ("auto" | number) kendisi yaprak.
+        return paths.length > 0 ? [...new Set(paths)] : prefix ? [prefix] : []
+      }
+      return prefix ? [prefix] : []
+    }
+  }
+}
+
+/** `a.b.c` → `['a', 'a.b', 'a.b.c']`; muafiyet bir ALT AĞACI kapatabilsin diye. */
+function ancestry(path: string): string[] {
+  const parts = path.split('.')
+  return parts.map((_, index) => parts.slice(0, index + 1).join('.'))
 }
 
 describe('panel erişilebilirliği — her alan ya grupta ya kayıtlı istisnada', () => {
@@ -107,10 +348,6 @@ describe('panel erişilebilirliği — her alan ya grupta ya kayıtlı istisnada
 
   for (const def of defs) {
     test(def.kind, () => {
-      const parsed = def.schema.parse({ id: `${def.kind.split(':')[1]}_probe` }) as Record<
-        string,
-        unknown
-      >
       const covered = new Set(
         (def.parametrics?.groups ?? []).flatMap((group) =>
           group.fields.map((field) => String(field.key)),
@@ -120,16 +357,27 @@ describe('panel erişilebilirliği — her alan ya grupta ya kayıtlı istisnada
         (EXEMPTIONS[def.kind] ?? []).map((entry) => [entry.field, entry] as const),
       )
 
-      for (const field of Object.keys(parsed)) {
-        if (BASE.has(field)) continue
-        const reachable = covered.has(field) || exempt.has(field)
-        expect(reachable, `${def.kind}.${field} panelden erişilemez ve istisnada yok`).toBe(true)
+      const paths = leafPaths(def.schema)
+      expect(paths.length).toBeGreaterThan(0)
+
+      for (const path of paths) {
+        const head = path.split('.')[0] ?? path
+        if (BASE.has(head)) continue
+        // Üst seviye anahtar bir grupta ise iç yapısı o alanın işi: host'un
+        // `vec3`/`enum` alanları zaten bütünü yazıyor. Muafiyet ise alt ağacı
+        // kapatır — `pickSlot` muafsa `pickSlot.rackId` de muaftır, çünkü o
+        // nesneyi yazan tek kontrol yuva seçicisidir.
+        const reachable =
+          covered.has(head) || ancestry(path).some((ancestor) => exempt.has(ancestor))
+        expect(reachable, `${def.kind}.${path} panelden erişilemez ve istisnada yok`).toBe(true)
       }
 
       // Ters yön: istisna listesi şişmesin — şemadan silinen alanın
-      // istisnası da silinmeli, yoksa liste yalan söylemeye başlar.
+      // istisnası da silinmeli, yoksa liste yalan söylemeye başlar. Bir
+      // muafiyet yaprağın kendisi ya da bir yaprağın atası olabilir.
+      const known = new Set(paths.flatMap(ancestry))
       for (const field of exempt.keys()) {
-        expect(field in parsed, `${def.kind}.${field} istisnada ama şemada yok`).toBe(true)
+        expect(known.has(field), `${def.kind}.${field} istisnada ama şemada yok`).toBe(true)
       }
     })
   }

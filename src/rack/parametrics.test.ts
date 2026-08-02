@@ -155,7 +155,10 @@ describe('coverage', () => {
    * is a setting that exists, is saved, and can only be reached through MCP or
    * by hand-editing the scene.
    */
-  const DELIBERATELY_HIDDEN = new Set([
+  /**
+   * Rack ayarı OLMAYAN alanlar. Kullanıcı bunları düzenlemez, hiçbir yerde.
+   */
+  const NOT_A_SETTING = new Set([
     // `BaseNode` plumbing — identity, tree position, and the runtime handles the
     // host attaches. None of it is a rack setting.
     'object',
@@ -166,12 +169,34 @@ describe('coverage', () => {
     'visible',
     'metadata',
     'camera',
-    // The escape hatch for a rack that is mixed out of order; `pickingLevels`
-    // covers the ordinary case and an array control would be noise.
-    'levelTypes',
     // Elected at placement from the slab under the cursor.
     'supportSlabId',
   ])
+
+  /**
+   * Kendi grup alanı olmayan ama `Levels` grubundaki `LevelsField`'in İÇİNDE
+   * düzenlenen alanlar. "Gizli" değiller — kontrolleri var, yalnız kontrol
+   * kendi anahtarlarıyla değil `levelClears` anahtarıyla kayıtlı.
+   *
+   * Ayrı bir küme, çünkü eski tek küme ikisini karıştırıyordu ve gerekçesi
+   * yanlıştı: `levelTypes` için "bir dizi kontrolü gürültü olurdu" yazıyordu,
+   * oysa dizi kontrolü kat satırlarında ZATEN vardı. Yanlış gerekçe, doğru
+   * sonucu koruduğu için hiçbir testi düşürmemişti — ama bir sonraki okuyucuya
+   * var olan bir kontrolün var olmadığını söylüyordu.
+   */
+  const EDITED_BY_LEVELS_FIELD = new Set([
+    // Kat satırındaki Palet/Toplama anahtarı; türetilmiş desene dönerse dizi
+    // `null`'a düşer ve raf komşularıyla mesh paylaşımına geri döner.
+    'levelTypes',
+    // Kat açıklığının üç varsayılanı. Üçü de ayrı slider'dı ve ikisi `Levels`,
+    // biri `Picking` grubundaydı — aynı sayıyı yöneten kontroller iki bölüme
+    // dağılmıştı. Artık üçü `LevelsField`'in başındaki "Varsayılan açıklıklar".
+    'firstLevelClear',
+    'levelClear',
+    'pickingLevelClear',
+  ])
+
+  const DELIBERATELY_HIDDEN = new Set([...NOT_A_SETTING, ...EDITED_BY_LEVELS_FIELD])
 
   test('every schema field is either shown or listed as hidden', () => {
     const shown = new Set(fields.map(({ field }) => String(field.key)))

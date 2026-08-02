@@ -44,7 +44,7 @@ const worldVec = new Vector3()
  * Mirrors the host's own trigger list, plus this plugin's kinds so a pallet can
  * be placed while the cursor is over another one.
  */
-const CLICK_TRIGGER_KINDS = [
+export const CLICK_TRIGGER_KINDS = [
   'grid',
   'shelf',
   'item',
@@ -86,6 +86,18 @@ const CLICK_TRIGGER_KINDS = [
   // yerin kendisi o.
   'warehouse:mezzanine',
   'warehouse:live-racking',
+  // Üç raf kind'ı da EKSİKTİ ve üçünün de seçim kolideri var — gözün içi hava
+  // olduğu için raflar arasına nişan alan bir tıklama arkadakini seçmesin diye
+  // konmuş, görünmez bir kutu. Kolider tam olarak imlecin üzerinde durduğu şey:
+  // bir sıra, göz göze yerleştirilerek kuruluyor, yani ikinci gözü koyarken imleç
+  // neredeyse her zaman birincinin üzerinde. Liste dışında kalınca o tıklama
+  // yutuluyor ve mıknatısın var olma sebebi olan jest çalışmıyor.
+  //
+  // `placement.test.ts` artık kaydedilen HER kind'ın burada olmasını istiyor, ki
+  // bu üç kez üst üste yapılan atlama dördüncü kez yapılmasın.
+  'warehouse:drive-in-rack',
+  'warehouse:longspan',
+  'warehouse:m3-shelving',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

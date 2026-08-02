@@ -37,12 +37,34 @@ import {
 
 // ── Box emitter ─────────────────────────────────────────────────────────────
 
-type Sink = {
+/**
+ * Exported so the other **racking** kinds build into the same buffers.
+ *
+ * Drive-in racking is the first: it is steel of the same family, drawn with the
+ * same material and reading the same atlas, so giving it its own emitter would
+ * mean two copies of the box-to-triangles maths and two copies of the atlas
+ * constants — agreeing exactly until one of them is edited.
+ *
+ * The conveyor package exports a sibling emitter that eleven kinds already
+ * share; this one is separate because the *atlas* differs (punched slots and
+ * wire mesh here, rollers there), not because the maths does.
+ */
+export type Sink = {
   positions: number[]
   normals: number[]
   colors: number[]
   uvs: number[]
   indices: number[]
+}
+
+/** A part shaped enough for the emitter. Structural rather than `RackPart`, so
+ *  a kind with its own role union can emit through it without this file having
+ *  to hear about that union. */
+export type EmittablePart = {
+  center: readonly [number, number, number]
+  size: readonly [number, number, number]
+  tiltX?: number
+  pattern?: 'slots' | 'mesh'
 }
 
 /**
@@ -135,7 +157,11 @@ const FACES: Array<{ n: [number, number, number]; c: Array<[number, number, numb
  * Flat normals need four vertices per face, which is why corners are not
  * shared. `tiltX` is folded in here so bracing needs no separate path.
  */
-function emitPart(sink: Sink, part: RackPart, color: readonly [number, number, number]): void {
+export function emitRackPart(
+  sink: Sink,
+  part: EmittablePart,
+  color: readonly [number, number, number],
+): void {
   const [cx, cy, cz] = part.center
   const [hx, hy, hz] = [part.size[0] / 2, part.size[1] / 2, part.size[2] / 2]
   const tilt = part.tiltX ?? 0
@@ -199,7 +225,7 @@ const colorCache = new Map<string, [number, number, number]>()
  * colour. Writing the raw hex bytes straight into the attribute — the obvious
  * shortcut — renders every part visibly too bright.
  */
-function toLinear(hex: string): [number, number, number] {
+export function toLinear(hex: string): [number, number, number] {
   const cached = colorCache.get(hex)
   if (cached) return cached
   const color = new THREE.Color(hex)
@@ -266,7 +292,7 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
           : part.role === 'shelf'
             ? toLinear(DECK_COLORS[part.finish ?? 'picking'])
             : toLinear(ROLE_COLORS[part.role])
-    emitPart(sink, part, color)
+    emitRackPart(sink, part, color)
   }
 
   const geometry = new THREE.BufferGeometry()

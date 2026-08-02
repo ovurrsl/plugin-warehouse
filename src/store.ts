@@ -1,6 +1,7 @@
 import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
+import type { DriveInRackNode } from './drivein/schema'
 import type { LiveRackingNode } from './live-racking/schema'
 import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
@@ -184,6 +185,9 @@ type WarehouseStore = {
    */
   liveRackingBrush: LiveRackingBrush
   setLiveRackingBrush: (patch: Partial<LiveRackingBrush>) => void
+
+  driveInBrush: DriveInBrush
+  setDriveInBrush: (patch: Partial<DriveInBrush>) => void
 }
 
 export type PalletBrush = Pick<
@@ -203,6 +207,18 @@ export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth'
 export type LiveRackingBrush = Pick<
   LiveRackingNode,
   'variant' | 'palletPreset' | 'palletsDeep' | 'levels' | 'withRetainers'
+>
+
+/**
+ * Drive-in yerleştirme fırçası.
+ *
+ * Derinlik burada duruyor çünkü köşeli parantez tuşlarıyla yerleştirme
+ * SIRASINDA ayarlanıyor ve arka arkaya iki şerit koyan kullanıcı ikisini de
+ * aynı derinlikte ister — canlı rafın kanal derinliğiyle aynı gerekçe.
+ */
+export type DriveInBrush = Pick<
+  DriveInRackNode,
+  'laneClearWidth' | 'palletsDeep' | 'levels' | 'railType' | 'entryMode' | 'palletPreset'
 >
 
 export type MezzanineBrush = Pick<
@@ -388,4 +404,15 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setLiveRackingBrush: (patch) =>
     set((state) => ({ liveRackingBrush: { ...state.liveRackingBrush, ...patch } })),
+
+  driveInBrush: {
+    laneClearWidth: 1.35,
+    palletsDeep: 4,
+    levels: 3,
+    railType: 'gp',
+    entryMode: 'drive-in',
+    palletPreset: 'epal-1',
+  },
+  setDriveInBrush: (patch) =>
+    set((state) => ({ driveInBrush: { ...state.driveInBrush, ...patch } })),
 }))

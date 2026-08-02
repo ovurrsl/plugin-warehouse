@@ -43,6 +43,16 @@ export type CatalogItem = {
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
     | {
+        kind: 'drive-in'
+        patch: {
+          laneClearWidth: number
+          palletsDeep: number
+          levels: number
+          railType: 'gp' | 'c'
+          entryMode: 'drive-in' | 'drive-through'
+        }
+      }
+    | {
         kind: 'live-racking'
         patch: {
           variant: 'FIFO' | 'LIFO'
@@ -331,6 +341,44 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
     icon: 'lucide:split',
+  },
+  {
+    id: 'drive-in-rack',
+    kind: 'warehouse:drive-in-rack',
+    label: 'Drive-in Rack',
+    sectionId: 'storage',
+    description:
+      'Biriktirerek depolama: araç şeridin içine girer, paletler derinlemesine istiflenir. Şerit başına tek SKU, tek koridor yüzünden LIFO. [ ve ] ile derinliği ayarlayın.',
+    icon: 'lucide:rows-4',
+    brush: {
+      kind: 'drive-in',
+      patch: {
+        laneClearWidth: 1.35,
+        palletsDeep: 4,
+        levels: 3,
+        railType: 'gp',
+        entryMode: 'drive-in',
+      },
+    },
+  },
+  {
+    id: 'drive-through-rack',
+    kind: 'warehouse:drive-in-rack',
+    label: 'Drive-through Rack',
+    sectionId: 'storage',
+    description:
+      'İki ucu da açık şerit: bir yüzden yükle, öbüründen al — FIFO. Katalog bu düzenle CS3 çaprazlamasını yasaklıyor (s.13).',
+    icon: 'lucide:move-horizontal',
+    brush: {
+      kind: 'drive-in',
+      patch: {
+        laneClearWidth: 1.35,
+        palletsDeep: 6,
+        levels: 3,
+        railType: 'gp',
+        entryMode: 'drive-through',
+      },
+    },
   },
   {
     id: 'live-racking-fifo',

@@ -85,6 +85,22 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       where: 'Levels → LevelsField, "Toplama katı" varsayılanı',
     },
   ],
+  'warehouse:drive-in-rack': [
+    { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    // Kat açıklığının TEK editörü `LevelClearsField`. Seçici rafta üç slider
+    // iki farklı gruba dağılmıştı ve bu turda birleştirildi; yeni kind aynı
+    // hatayı baştan yapmıyor.
+    {
+      field: 'levelClear',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelClearsField, "Kat açıklığı" varsayılanı',
+    },
+    {
+      field: 'topClear',
+      kind: 'CUSTOM',
+      where: 'Levels → LevelClearsField, "Üst boşluk" varsayılanı',
+    },
+  ],
   'warehouse:route': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'points', kind: 'CUSTOM', where: 'çizim aracı; nokta listesi generic alan değil' },

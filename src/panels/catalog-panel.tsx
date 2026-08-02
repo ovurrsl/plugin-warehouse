@@ -384,6 +384,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'mezzanine') {
       useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
     }
+    if (item.brush?.kind === 'drive-in') {
+      useWarehouseStore.getState().setDriveInBrush(item.brush.patch)
+    }
     if (item.brush?.kind === 'live-racking') {
       useWarehouseStore.getState().setLiveRackingBrush(item.brush.patch)
     }

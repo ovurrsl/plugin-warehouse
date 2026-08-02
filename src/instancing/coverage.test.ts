@@ -36,6 +36,7 @@ function source(relative: string): string {
 /** Kolektif çiziciye kayıtlı olması GEREKEN renderer'lar. */
 const INSTANCED = [
   'rack/renderer.tsx',
+  'drivein/renderer.tsx',
   'pallet/renderer.tsx',
   'mezzanine/renderer.tsx',
   'live-racking/renderer.tsx',

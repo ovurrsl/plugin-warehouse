@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`314df04`](https://github.com/ovurrsl/plugin-warehouse/commit/314df04e52e3f0d1fb2a9f8d5363073985fa1dfa))
 - Refresh generated README blocks [skip ci] ([`fed18af`](https://github.com/ovurrsl/plugin-warehouse/commit/fed18afd12276c30da8e5ed8d039764541a5ebdc))
 - Refresh generated README blocks [skip ci] ([`1d773a4`](https://github.com/ovurrsl/plugin-warehouse/commit/1d773a485f065b5b054a0a5e5775c558a271bf7d))
 - Refresh generated README blocks [skip ci] ([`5a447ef`](https://github.com/ovurrsl/plugin-warehouse/commit/5a447ef0a39cebcffbd5980456fc47464498c19e))
@@ -247,6 +248,10 @@ index to it, not a replacement for it.
 - The collider fix the rack already had, applied to the other three ([`77f3393`](https://github.com/ovurrsl/plugin-warehouse/commit/77f3393380d4a0ca773021e8f570996f2759c128))
 - Stop recomposing static nodes' matrices every frame ([`8044114`](https://github.com/ovurrsl/plugin-warehouse/commit/80441140b17d3b1c06d35080c2ed4e680b06752f))
 - The deck gets a far tier — measured against a real scene ([`653a590`](https://github.com/ovurrsl/plugin-warehouse/commit/653a5907c942958ebbfc756366a35e4407d12785))
+
+### Refactors
+
+- Host primitiflerine geçiş + iç içe giren ayarların birleştirilmesi ([`519e2ff`](https://github.com/ovurrsl/plugin-warehouse/commit/519e2fffca9a7748bb889ee43ec71e92123a90ff))
 
 ### Tests
 

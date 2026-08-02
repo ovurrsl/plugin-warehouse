@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`88e51d0`](https://github.com/ovurrsl/plugin-warehouse/commit/88e51d0f3fedf9a1ba5d225df51839ff2bc11eb2))
 - Refresh generated README blocks [skip ci] ([`be935ff`](https://github.com/ovurrsl/plugin-warehouse/commit/be935ffa0c89997e5444880695801f93ddd39178))
 - Refresh generated README blocks [skip ci] ([`540d5df`](https://github.com/ovurrsl/plugin-warehouse/commit/540d5dff7e3b3e25517a24c82610c70f8cbf23af))
 - Refresh generated README blocks [skip ci] ([`314df04`](https://github.com/ovurrsl/plugin-warehouse/commit/314df04e52e3f0d1fb2a9f8d5363073985fa1dfa))
@@ -117,6 +118,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- M3 picking shelving — no beams, one 25 mm grid, published loads ([`527519c`](https://github.com/ovurrsl/plugin-warehouse/commit/527519ca9e5c983eacdd20dd8d09420316c6e539))
 - M7 Longspan shelving — levels that do not have to match ([`e8e99c6`](https://github.com/ovurrsl/plugin-warehouse/commit/e8e99c68db5e503f5c07347dbfeb32d93f7e0e2c))
 - Drive-in pallet racking — one node is one lane ([`aef0de0`](https://github.com/ovurrsl/plugin-warehouse/commit/aef0de0ed494414aaa5f3fa412835fa7c05245ad))
 - PickSlot/dropSlot geri — kullanıcı sabitlemesi kurayı geçersiz kılıyor ([`938518f`](https://github.com/ovurrsl/plugin-warehouse/commit/938518f95b3005037ef7eca35c6b4745f56e2a37))

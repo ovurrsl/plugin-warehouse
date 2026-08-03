@@ -415,6 +415,191 @@ function envelopeOf(node: unknown): ClashBox | null {
   return footprintBox(node) ?? occupiedVolumes(node)[0] ?? null
 }
 
+// ── The scene, indexed ──────────────────────────────────────────────────────
+
+/**
+ * Every candidate, bucketed in plan — built once per store write.
+ *
+ * ## The cost this replaces
+ *
+ * `clashesWith` scanned `Object.values(nodes)` and rebuilt each candidate's
+ * envelope from scratch, **per call**. The rack tool calls it once per bay of
+ * the run being placed, and the host emits `grid:move` from a raw
+ * `pointermove` listener — so a twenty-bay run in a five-thousand-node
+ * warehouse cost about a hundred thousand envelope constructions *per mouse
+ * move*, and a two-hundred-bay run a million. None of that work changes while
+ * the mouse moves: the scene is identical between two pointer events.
+ *
+ * ## Why keying on the `nodes` object is sound
+ *
+ * The host replaces `nodes` on every write — the same property `occupancy.ts`
+ * and `line-index.ts` already index against, and the reason a drag (which does
+ * not touch the store) never invalidates any of them.
+ *
+ * ## Why a uniform grid rather than a tree
+ *
+ * A warehouse is a flat plane of similarly-sized boxes, which is the one
+ * distribution a uniform grid is exactly right for; a BVH would pay for
+ * rebalancing it cannot use. Anything too large to bucket usefully — a route
+ * painted down a whole hall — goes in `oversized` and is simply always tested,
+ * because there are a handful of those and pretending otherwise is how a
+ * spatial index quietly starts missing collisions.
+ */
+const CELL_M = 8
+
+/** How many cells one node may occupy before it is treated as oversized. */
+const MAX_CELLS_PER_NODE = 64
+
+/** Cell coordinates are folded into one integer key: a string key per queried
+ *  cell would allocate inside the hot loop this exists to make cheap. */
+const GRID_ORIGIN = 32768
+const GRID_SPAN = 65536
+
+function cellKey(gx: number, gz: number): number {
+  return (gx + GRID_ORIGIN) * GRID_SPAN + (gz + GRID_ORIGIN)
+}
+
+type IndexedNode = {
+  /** Position in `Object.values(nodes)`, so reported hits keep scene order
+   *  however the grid happens to visit them. */
+  order: number
+  id: string
+  type: string
+  node: unknown
+  envelope: ClashBox
+  /** Derived on demand — only what survives the envelope test pays for it, and
+   *  then only once for the whole life of this `nodes` object. */
+  volumes?: ClashBox[]
+  footprint?: ClashBox | null
+  /** Dedupe stamp: one node reached through four cells is tested once. */
+  seen: number
+}
+
+type SceneIndex = {
+  cells: Map<number, IndexedNode[]>
+  oversized: IndexedNode[]
+}
+
+/** Plan-space bounds of an oriented box. */
+function planBounds(box: ClashBox): { minX: number; maxX: number; minZ: number; maxZ: number } {
+  const cos = Math.abs(Math.cos(box.rotationY))
+  const sin = Math.abs(Math.sin(box.rotationY))
+  const ax = box.hx * cos + box.hz * sin
+  const az = box.hx * sin + box.hz * cos
+  return { minX: box.cx - ax, maxX: box.cx + ax, minZ: box.cz - az, maxZ: box.cz + az }
+}
+
+function buildSceneIndex(nodes: Readonly<Record<string, unknown>>): SceneIndex {
+  const cells = new Map<number, IndexedNode[]>()
+  const oversized: IndexedNode[] = []
+  let order = 0
+
+  for (const node of Object.values(nodes)) {
+    const placement = placementOf(node)
+    if (!placement) {
+      order++
+      continue
+    }
+    const envelope = envelopeOf(node)
+    if (!envelope) {
+      order++
+      continue
+    }
+    const indexed: IndexedNode = {
+      order: order++,
+      id: placement.id,
+      type: placement.type,
+      node,
+      envelope,
+      seen: 0,
+    }
+
+    const bounds = planBounds(envelope)
+    const minGx = Math.floor(bounds.minX / CELL_M)
+    const maxGx = Math.floor(bounds.maxX / CELL_M)
+    const minGz = Math.floor(bounds.minZ / CELL_M)
+    const maxGz = Math.floor(bounds.maxZ / CELL_M)
+    const spread = (maxGx - minGx + 1) * (maxGz - minGz + 1)
+    if (
+      !Number.isFinite(spread) ||
+      spread > MAX_CELLS_PER_NODE ||
+      Math.abs(minGx) >= GRID_ORIGIN ||
+      Math.abs(minGz) >= GRID_ORIGIN ||
+      Math.abs(maxGx) >= GRID_ORIGIN ||
+      Math.abs(maxGz) >= GRID_ORIGIN
+    ) {
+      oversized.push(indexed)
+      continue
+    }
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      for (let gz = minGz; gz <= maxGz; gz++) {
+        const key = cellKey(gx, gz)
+        const bucket = cells.get(key)
+        if (bucket) bucket.push(indexed)
+        else cells.set(key, [indexed])
+      }
+    }
+  }
+
+  return { cells, oversized }
+}
+
+let indexedFrom: Readonly<Record<string, unknown>> | null = null
+let sceneIndexCache: SceneIndex | null = null
+
+function sceneIndexFor(nodes: Readonly<Record<string, unknown>>): SceneIndex {
+  if (indexedFrom === nodes && sceneIndexCache) return sceneIndexCache
+  sceneIndexCache = buildSceneIndex(nodes)
+  indexedFrom = nodes
+  return sceneIndexCache
+}
+
+/** Test hook and escape hatch: forget the index. */
+export function resetClashIndex(): void {
+  indexedFrom = null
+  sceneIndexCache = null
+}
+
+function volumesOf(indexed: IndexedNode): ClashBox[] {
+  indexed.volumes ??= occupiedVolumes(indexed.node)
+  return indexed.volumes
+}
+
+function footprintOf(indexed: IndexedNode): ClashBox | null {
+  if (indexed.footprint === undefined) indexed.footprint = footprintBox(indexed.node)
+  return indexed.footprint
+}
+
+/** Monotonic stamp for the dedupe pass — never reset, so a stale mark from an
+ *  earlier scan can never be mistaken for this one's. */
+let scanStamp = 0
+
+function candidatesNear(index: SceneIndex, envelope: ClashBox, into: IndexedNode[]): void {
+  into.length = 0
+  const stamp = ++scanStamp
+  const bounds = planBounds(envelope)
+  const minGx = Math.floor(bounds.minX / CELL_M)
+  const maxGx = Math.floor(bounds.maxX / CELL_M)
+  const minGz = Math.floor(bounds.minZ / CELL_M)
+  const maxGz = Math.floor(bounds.maxZ / CELL_M)
+  for (let gx = minGx; gx <= maxGx; gx++) {
+    for (let gz = minGz; gz <= maxGz; gz++) {
+      const bucket = index.cells.get(cellKey(gx, gz))
+      if (!bucket) continue
+      for (const candidate of bucket) {
+        if (candidate.seen === stamp) continue
+        candidate.seen = stamp
+        into.push(candidate)
+      }
+    }
+  }
+  for (const candidate of index.oversized) {
+    if (candidate.seen === stamp) continue
+    candidate.seen = stamp
+    into.push(candidate)
+  }
+}
+
 // ── The question ────────────────────────────────────────────────────────────
 
 export type ClashQuery = {
@@ -435,56 +620,183 @@ function movedTo(node: unknown, position: readonly [number, number, number], rot
   return { ...record, position: [...position], rotation }
 }
 
+/** What the moving object looks like, so a run of them is described once. */
+type Moving = {
+  type: string | undefined
+  envelope: ClashBox
+  volumes: ClashBox[]
+  footprint: ClashBox | null
+  ignore: Set<string>
+}
+
+function describeMoving(
+  node: unknown,
+  position: readonly [number, number, number],
+  rotationY: number,
+  ignore: readonly string[] | undefined,
+): Moving | null {
+  const moved = movedTo(node, position, rotationY)
+  const volumes = occupiedVolumes(moved)
+  const envelope = envelopeOf(moved)
+  if (!envelope || volumes.length === 0) return null
+  const skip = new Set(ignore ?? [])
+  const movingId = (moved as { id?: string }).id
+  if (typeof movingId === 'string') skip.add(movingId)
+  return {
+    type: (moved as { type?: string }).type,
+    envelope,
+    volumes,
+    // Same-kind comparison needs it; hoisted out of the candidate loop, where
+    // it was rebuilt once per candidate for an answer that never varied.
+    footprint: footprintBox(moved),
+    ignore: skip,
+  }
+}
+
 /**
- * Ids of everything in the way.
+ * Everything in the way of one placement.
  *
  * Two passes on purpose. The envelope comparison is one oriented-box test per
  * candidate and rejects everything not within a few metres; only what survives
- * pays for a volume list. At two thousand racks with a pointer moving, that
- * difference is the whole cost of the feature.
+ * pays for a volume list. The candidates themselves now come from the plan
+ * index rather than from the whole scene, so "not within a few metres" costs
+ * a grid lookup instead of a full scan.
+ *
+ * @param collect when given, every hit is appended in scene order; otherwise
+ * the scan stops at the first hit, which is all a validity check needs.
  */
-export function clashesWith(query: ClashQuery): string[] {
-  const moving = movedTo(query.node, query.position, query.rotationY)
-  const movingType = (moving as { type?: string }).type
-  const movingVolumes = occupiedVolumes(moving)
-  const movingEnvelope = envelopeOf(moving)
-  if (!movingEnvelope || movingVolumes.length === 0) return []
+function scan(
+  nodes: Readonly<Record<string, unknown>>,
+  moving: Moving,
+  collect: string[] | null,
+): boolean {
+  const index = sceneIndexFor(nodes)
+  candidatesNear(index, moving.envelope, candidateScratch)
+  if (collect) candidateScratch.sort((a, b) => a.order - b.order)
 
-  const ignore = new Set(query.ignore ?? [])
-  const movingId = (moving as { id?: string }).id
-  if (typeof movingId === 'string') ignore.add(movingId)
-
-  const hits: string[] = []
-  for (const candidate of Object.values(query.nodes)) {
-    const placement = placementOf(candidate)
-    if (!placement || ignore.has(placement.id)) continue
-
-    const envelope = envelopeOf(candidate)
-    if (!envelope || !boxesOverlap(movingEnvelope, envelope)) continue
+  let hit = false
+  for (const candidate of candidateScratch) {
+    if (moving.ignore.has(candidate.id)) continue
+    if (!boxesOverlap(moving.envelope, candidate.envelope)) continue
 
     // Same kind: compare footprints, because a kind's footprint *is* its tiling
     // unit. Two rack bays at the sharing pitch overlap by design — each builds
     // both frames until it learns it has a neighbour — so comparing their steel
     // would reject the one gesture that kind exists for. Their footprints touch
     // exactly, which is what they are for.
-    if (placement.type === movingType) {
-      const a = footprintBox(moving)
-      const b = footprintBox(candidate)
-      if (a && b && boxesOverlap(a, b)) hits.push(placement.id)
-      continue
+    let clashed: boolean
+    if (candidate.type === moving.type) {
+      const theirs = footprintOf(candidate)
+      clashed =
+        moving.footprint !== null && theirs !== null && boxesOverlap(moving.footprint, theirs)
+    } else {
+      // Different kinds: compare what each actually occupies.
+      const theirs = volumesOf(candidate)
+      clashed = moving.volumes.some((mine) => theirs.some((other) => boxesOverlap(mine, other)))
     }
-
-    // Different kinds: compare what each actually occupies.
-    const volumes = occupiedVolumes(candidate)
-    const clashed = movingVolumes.some((mine) =>
-      volumes.some((theirs) => boxesOverlap(mine, theirs)),
-    )
-    if (clashed) hits.push(placement.id)
+    if (!clashed) continue
+    hit = true
+    if (!collect) break
+    collect.push(candidate.id)
   }
+  return hit
+}
+
+/** Reused across positions of a run — the scan never outlives one call. */
+const candidateScratch: IndexedNode[] = []
+
+/**
+ * Ids of everything in the way.
+ */
+export function clashesWith(query: ClashQuery): string[] {
+  const moving = describeMoving(query.node, query.position, query.rotationY, query.ignore)
+  if (!moving) return []
+  const hits: string[] = []
+  scan(query.nodes, moving, hits)
   return hits
 }
 
 /** Whether a candidate transform is clear of everything else in the scene. */
 export function isClearAt(query: ClashQuery): boolean {
-  return clashesWith(query).length === 0
+  const moving = describeMoving(query.node, query.position, query.rotationY, query.ignore)
+  if (!moving) return true
+  return !scan(query.nodes, moving, null)
 }
+
+function translateInto(
+  source: ClashBox,
+  position: readonly [number, number, number],
+  into: ClashBox,
+): ClashBox {
+  into.cx = source.cx + position[0]
+  into.cz = source.cz + position[2]
+  into.hx = source.hx
+  into.hz = source.hz
+  into.minY = source.minY + position[1]
+  into.maxY = source.maxY + position[1]
+  into.rotationY = source.rotationY
+  return into
+}
+
+function blankBox(): ClashBox {
+  return { cx: 0, cz: 0, hx: 0, hz: 0, minY: 0, maxY: 0, rotationY: 0 }
+}
+
+export type RunClashQuery = {
+  /** The node being placed. Every position carries this same shape. */
+  node: unknown
+  positions: readonly (readonly [number, number, number])[]
+  rotationY: number
+  nodes: Readonly<Record<string, unknown>>
+  ignore?: readonly string[]
+}
+
+/**
+ * Is every position of a run clear?
+ *
+ * ## Why this is not just a loop over `isClearAt`
+ *
+ * That is what the rack and conveyor tools did, and it re-derived the moving
+ * object's whole description — a full `rackParts` build, every part turned into
+ * a world box — once per bay, once per mouse move. For a two-hundred-bay run
+ * that is two hundred identical part lists per pointer event.
+ *
+ * **The description is identical apart from where it sits.** `toWorldBox` takes
+ * the node's position only as `origin`, and adds it to the box centre and
+ * height interval without touching extents or rotation — so the run's bays are
+ * one description translated, exactly. The bays of a run also share a rotation,
+ * which is the other half of what would have varied. `clash.test.ts` pins that
+ * equivalence rather than leaving it to be believed.
+ *
+ * Stops at the first blocked position: a run is placeable or it is not, and
+ * which bay refused it is not a question any caller asks.
+ */
+export function areClearAt(query: RunClashQuery): boolean {
+  const moving = describeMoving(query.node, ORIGIN, query.rotationY, query.ignore)
+  if (!moving) return true
+
+  const envelope = blankBox()
+  const volumes = moving.volumes.map(blankBox)
+  const footprint = moving.footprint ? blankBox() : null
+  const placed: Moving = {
+    type: moving.type,
+    envelope,
+    volumes,
+    footprint,
+    ignore: moving.ignore,
+  }
+
+  for (const position of query.positions) {
+    translateInto(moving.envelope, position, envelope)
+    for (let index = 0; index < volumes.length; index++) {
+      const source = moving.volumes[index]
+      const target = volumes[index]
+      if (source && target) translateInto(source, position, target)
+    }
+    if (moving.footprint && footprint) translateInto(moving.footprint, position, footprint)
+    if (scan(query.nodes, placed, null)) return false
+  }
+  return true
+}
+
+const ORIGIN: readonly [number, number, number] = [0, 0, 0]

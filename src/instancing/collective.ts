@@ -88,18 +88,84 @@ export type InstanceEntry = {
   tier: InstanceTier
 }
 
-const entries = new Map<string, InstanceEntry>()
+/**
+ * Kaydın havuz tarafındaki hâli — şekil anahtarı ÖNBELLEKLENMİŞ.
+ *
+ * `keyFor` ucuz bir okuma değil: rafınki `rackGeometryKey`, yani şekli
+ * betimleyen bir dizge kuruyor. Yeniden inşa her girdi için bunu çağırıyordu,
+ * dolayısıyla beş bin raflık bir sahnede tek bir katman geçişi beş bin dizge
+ * inşası demekti — hepsi de bir önceki karedekiyle aynı çıkan.
+ *
+ * Anahtar yalnız iki olayda değişebilir: kayıt ve `refreshInstance`. İkisinde
+ * de bir kez basılıyor ve yeniden inşa artık yalnız okuyor.
+ */
+type PooledEntry = InstanceEntry & {
+  /** `keyFor(tier)::materialKeyFor(tier)`, katman başına. */
+  shapeKey: Record<InstanceTier, string>
+}
+
+function shapeKeysOf(entry: InstanceEntry): Record<InstanceTier, string> {
+  return {
+    full: `${entry.keyFor('full')}::${entry.materialKeyFor('full')}`,
+    simple: `${entry.keyFor('simple')}::${entry.materialKeyFor('simple')}`,
+  }
+}
+
+const entries = new Map<string, PooledEntry>()
 
 /** Sistem bunu okur; herhangi bir değişiklikte artırılır. */
 let generation = 0
 
+/**
+ * Yalnız ÜYELİK değişince artar — kayıt ve kayıt silme.
+ *
+ * `generation` bundan fazlasını sayıyor (dışlama, tazeleme), ve düz liste
+ * yalnız üyelik değiştiğinde yeniden kurulmalı. İkisini ayırmak, bir sürükleme
+ * başlangıcının listeyi baştan kopyalamasını önlüyor.
+ */
+let membershipVersion = 0
+
+/**
+ * Girdilerin düz listesi — `evaluateTiers`'ın adımlayarak gezdiği dizi.
+ *
+ * Map üstünde gezip sekizde birini işlemek, işlenmeyen yedi katı da ziyaret
+ * etmek demekti. Dizide `i += 8` ile yalnız sırası gelenler ziyaret ediliyor.
+ * Liste üyelikle birlikte tazeleniyor; girdi nesneleri yerinde güncellendiği
+ * için (`refreshInstance`, `setInstanceExcluded`) referanslar hep güncel.
+ */
+let cachedList: PooledEntry[] = []
+let cachedListVersion = -1
+
+function entryList(): PooledEntry[] {
+  if (cachedListVersion !== membershipVersion) {
+    cachedList = Array.from(entries.values())
+    cachedListVersion = membershipVersion
+  }
+  return cachedList
+}
+
 export function registerInstance(entry: InstanceEntry): void {
-  entries.set(entry.nodeId, entry)
+  /**
+   * Kopyalanmaz, YERİNDE damgalanır.
+   *
+   * Kaydın kimliği çağıranınkiyle aynı kalmalı: `evaluateTiers` katmanı
+   * girdinin üstüne yazıyor ve bunu çağıranın elindeki nesneden okuyan kod
+   * (ve test) var. Spread ile kopyalamak o bağı sessizce koparırdı — havuz
+   * doğru çalışmaya devam eder, ama dışarıdan bakan katmanın hiç değişmediğini
+   * görürdü.
+   */
+  const pooled = entry as PooledEntry
+  pooled.shapeKey = shapeKeysOf(entry)
+  entries.set(entry.nodeId, pooled)
   generation++
+  membershipVersion++
 }
 
 export function unregisterInstance(nodeId: string): void {
-  if (entries.delete(nodeId)) generation++
+  if (entries.delete(nodeId)) {
+    generation++
+    membershipVersion++
+  }
 }
 
 /** Seçim/sürükleme durumu değişti — düğüm havuzdan çıkar ya da girer. */
@@ -122,6 +188,9 @@ export function refreshInstance(
   const entry = entries.get(nodeId)
   if (!entry) return
   Object.assign(entry, patch)
+  // Anahtar yamadan TÜRER: yamayı uygulayıp anahtarı eski bırakmak, şekli
+  // değişmiş bir düğümü eski havuzda tutardı.
+  entry.shapeKey = shapeKeysOf(entry)
   generation++
 }
 
@@ -141,12 +210,16 @@ export function instanceCount(): number {
 export function resetInstances(): void {
   entries.clear()
   generation = 0
+  membershipVersion++
 }
 
 // ── Havuz ───────────────────────────────────────────────────────────────
 
 const worldPosition = new THREE.Vector3()
 const scratchMatrix = new THREE.Matrix4()
+
+/** Katman değerlendirmesi kaç kareye yayılıyor. */
+const TIER_PHASES = 8
 
 /**
  * Katman değerlendirmesi — histerezisli, faz dağıtımlı.
@@ -155,15 +228,24 @@ const scratchMatrix = new THREE.Matrix4()
  * tane. Faz dağıtımı korunur (aynı karede hepsi yeniden değerlendirilmesin),
  * ama artık tek bir sayaçtan okunur.
  *
+ * Adımlayarak: `i += TIER_PHASES` yalnız sırası gelen girdiye uğrar. Önceki hâl
+ * bütün haritayı gezip yedide altısını `continue` ile atıyordu — sekiz kat
+ * fazla ziyaret, ve depo ölçeğinde ölçülebilir.
+ *
+ * Hangi girdinin hangi karede değerlendiği AYNEN korunuyor: başlangıç indisi
+ * eski `(frame + index) % 8 === 0` koşulunun (index 1'den başlıyordu) ilk
+ * çözümü. Bu bir hız değişikliği; bir düğümün katmanının ne zaman
+ * güncellendiğini değiştirmek onun işi değil.
+ *
  * @returns katman değişen düğüm oldu mu
  */
 export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boolean {
   let changed = false
-  let index = 0
-  for (const entry of entries.values()) {
-    index++
-    // Faz: her karede toplamın 1/8'i değerlendirilir.
-    if ((frame + index) % 8 !== 0) continue
+  const list = entryList()
+  const start = (TIER_PHASES - ((frame + 1) % TIER_PHASES)) % TIER_PHASES
+  for (let index = start; index < list.length; index += TIER_PHASES) {
+    const entry = list[index]
+    if (!entry) continue
     const { elements } = entry.object.matrixWorld
     const distanceSq = cameraPosition.distanceToSquared(
       worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
@@ -210,9 +292,30 @@ function isEffectivelyVisible(object: THREE.Object3D): boolean {
 type Pool = {
   mesh: THREE.InstancedMesh
   capacity: number
+  /** Tampona en son YAZILAN nesneler, yuva sırasıyla. Üyelik karşılaştırması
+   *  bunun üstünden yapılır; eşitse matris yazımı da yükleme de atlanır. */
+  members: THREE.Object3D[]
+}
+
+type Bucket = {
+  poolKey: string
+  geometry: THREE.BufferGeometry
+  material: THREE.Material
+  castShadow: boolean
+  layersMask: number
+  objects: THREE.Object3D[]
 }
 
 const pools = new Map<string, Pool>()
+
+/** İki üyelik listesi aynı nesneleri aynı sırada mı taşıyor. */
+function sameMembers(a: readonly THREE.Object3D[], b: readonly THREE.Object3D[]): boolean {
+  if (a.length !== b.length) return false
+  for (let index = 0; index < a.length; index++) {
+    if (a[index] !== b[index]) return false
+  }
+  return true
+}
 
 /**
  * Havuzları yeniden kurar. YALNIZ sahne ya da katman değiştiğinde çağrılır.
@@ -220,24 +323,38 @@ const pools = new Map<string, Pool>()
  * `InstancedMesh` kapasitesi sabittir; büyümesi gerekiyorsa mesh değişir ve
  * eskisi atılır. Kapasite iki katına yuvarlanıyor ki bir palet eklemek her
  * seferinde yeniden tahsis ettirmesin.
+ *
+ * @param matricesDirty Dünya matrisleri son yeniden inşadan bu yana değişmiş
+ * OLABİLİR mi. Sahne yazımı, kat hareketi ve kaymış dönüşüm rebake'i `true`
+ * der. Kamera hareketinin tetiklediği SALT KATMAN geçişi `false` der — ve fark
+ * bu dosyanın en pahalı hatasının çaresi:
+ *
+ * Tek bir raf 70 m bandını geçtiğinde bütün havuzlar yeniden kuruluyor,
+ * her havuzun kapasite boyu `instanceMatrix` tamponu baştan yazılıp GPU'ya
+ * yeniden yükleniyordu. Kamera gezerken bu neredeyse her kare oluyor: on bin
+ * örneklik bir sahnede kare başına ~1 MB, değişmemiş veriyi tekrar tekrar
+ * yüklemek. Paylaşımlı bellekli tümleşik GPU'da bu yükleme rasterizer'ın
+ * bant genişliğiyle yarışıyor; ANGLE üzerinden tam tampon yazımı GPU'nun hâlâ
+ * okuduğu tamponu kopyalatıyor. `false` iken üyeliği değişmeyen havuz hiç
+ * dokunulmadan geçiliyor — katman geçişinde bu, iki havuz dışındaki HEPSİ.
  */
-export function rebuildPools(root: THREE.Object3D): void {
-  // Anahtar başına örnekleri topla.
-  const buckets = new Map<
-    string,
-    {
-      geometry: THREE.BufferGeometry
-      material: THREE.Material
-      castShadow: boolean
-      layersMask: number
-      objects: THREE.Object3D[]
-    }
-  >()
+export function rebuildPools(root: THREE.Object3D, matricesDirty = true): void {
+  /**
+   * İki kademeli gruplama — şekil anahtarı, sonra katman maskesi.
+   *
+   * Tek düz anahtarla gruplamak, girdi BAŞINA bir dizge birleştirme demekti
+   * (`${shape}::L${mask}`) — beş bin raf, kare başına beş bin çöp dizge. İç içe
+   * harita ile dizge yalnız kova YARATILIRKEN basılıyor, yani sahnedeki farklı
+   * (şekil × maske) çifti kadar: onlarca, binlerce değil.
+   */
+  const byShape = new Map<string, Map<number, Bucket>>()
+  const buckets: Bucket[] = []
 
-  for (const entry of entries.values()) {
+  for (const entry of entryList()) {
     if (entry.excluded) continue
     if (!isEffectivelyVisible(entry.object)) continue
     const tier = entry.tier
+    const shapeKey = entry.shapeKey[tier]
     /**
      * Katman maskesi HAVUZ ANAHTARININ parçası — solo kipinin öteki yarısı.
      *
@@ -257,42 +374,70 @@ export function rebuildPools(root: THREE.Object3D): void {
      * damgalarsa havuz onu da bedavaya izler.
      */
     const layersMask = entry.object.layers.mask
-    const poolKey = `${entry.keyFor(tier)}::${entry.materialKeyFor(tier)}::L${layersMask}`
-    let bucket = buckets.get(poolKey)
+    let byMask = byShape.get(shapeKey)
+    if (!byMask) {
+      byMask = new Map()
+      byShape.set(shapeKey, byMask)
+    }
+    let bucket = byMask.get(layersMask)
     if (!bucket) {
       bucket = {
+        poolKey: `${shapeKey}::L${layersMask}`,
         geometry: entry.geometryFor(tier),
         material: entry.materialFor(tier),
         castShadow: entry.castsShadow,
         layersMask,
         objects: [],
       }
-      buckets.set(poolKey, bucket)
+      byMask.set(layersMask, bucket)
+      buckets.push(bucket)
     }
     bucket.objects.push(entry.object)
   }
 
   // Kullanılmayan havuzları düşür.
+  const liveKeys = new Set<string>()
+  for (const bucket of buckets) liveKeys.add(bucket.poolKey)
   for (const [poolKey, pool] of pools) {
-    if (buckets.has(poolKey)) continue
+    if (liveKeys.has(poolKey)) continue
     pool.mesh.removeFromParent()
     // Geometri PAYLAŞIMLI — asla dispose edilmez; yalnız örnek tamponu.
     pool.mesh.dispose()
     pools.delete(poolKey)
   }
 
-  for (const [poolKey, bucket] of buckets) {
+  for (const bucket of buckets) {
     const needed = bucket.objects.length
-    let pool = pools.get(poolKey)
-    if (pool && (pool.capacity < needed || pool.mesh.geometry !== bucket.geometry)) {
+    let pool = pools.get(bucket.poolKey)
+    /**
+     * Yeniden tahsis YALNIZ kapasite yetmediğinde.
+     *
+     * Eskiden geometri nesnesi değiştiğinde de mesh atılıp yenisi kuruluyordu.
+     * Geometri önbelleği bir kaydırıcı sürtmesi boyunca aynı anahtar için
+     * yeni tampon basabiliyor, yani o sürtme kare başına bir `InstancedMesh`
+     * imhası + yaratımı ediyordu — D3D11'de sürücünün en pahalı işlemlerinden
+     * ikisi. Geometri canlı mesh üstünde takas edilebilir ve `instanceMatrix`
+     * tamponu sağ kalır; kapasite ise sabittir, o yüzden tek gerçek sebep odur.
+     */
+    if (pool && pool.capacity < needed) {
       pool.mesh.removeFromParent()
       pool.mesh.dispose()
       pool = undefined
-      pools.delete(poolKey)
+      pools.delete(bucket.poolKey)
     }
     if (!pool) {
       const capacity = Math.max(16, 1 << Math.ceil(Math.log2(needed || 1)))
       const mesh = new THREE.InstancedMesh(bucket.geometry, bucket.material, capacity)
+      /**
+       * Frustum kırpma KAPALI, ve sınır küresi hiç hesaplanmıyor.
+       *
+       * Bir havuzun örnekleri tek bir şeklin bütün kopyaları, yani binanın
+       * tamamına dağılmış: onları saran küre binayı sarar ve kırpma hiçbir
+       * zaman ateşlemez. Kapalı bırakmak doğru karar — ama `computeBoundingSphere`
+       * yine de her yeniden inşada çağrılıyordu: örnek başına bir matris
+       * okuma + küre dönüşümü, on bin örnekte yeniden inşanın en büyük tek
+       * kalemi, ve sonucu okuyan kimse yok (`raycast` da boş).
+       */
       mesh.frustumCulled = false
       mesh.receiveShadow = true
       // Örnekler kendi kayıtlı gruplarından tıklanır; kolektif mesh ışın
@@ -300,8 +445,8 @@ export function rebuildPools(root: THREE.Object3D): void {
       mesh.raycast = () => {}
       mesh.matrixAutoUpdate = false
       root.add(mesh)
-      pool = { mesh, capacity }
-      pools.set(poolKey, pool)
+      pool = { mesh, capacity, members: [] }
+      pools.set(bucket.poolKey, pool)
     }
     /**
      * Havuz modül kapsamında yaşıyor, `root` ise sistem örneğine ait —
@@ -314,12 +459,19 @@ export function rebuildPools(root: THREE.Object3D): void {
      * düşüyor, yakındaki `full` anahtarı yeni olduğu için görünüyordu.
      */
     if (pool.mesh.parent !== root) root.add(pool.mesh)
-    // Gölge kararı ve katman maskesi her yeniden kuruluşta yazılır: aynı
-    // havuz anahtarı farklı bir bucket'a denk gelirse yaratım anındaki değere
-    // saplanıp kalırdı. Maske kaynağın kopyası — solo'da üst katların
-    // yalnız-gölge damgası böylece kolektif mesh'e de işler.
+    // Gölge kararı, katman maskesi, geometri ve materyal her yeniden kuruluşta
+    // yazılır: aynı havuz anahtarı farklı bir bucket'a denk gelirse yaratım
+    // anındaki değere saplanıp kalırdı. Maske kaynağın kopyası — solo'da üst
+    // katların yalnız-gölge damgası böylece kolektif mesh'e de işler.
     pool.mesh.castShadow = bucket.castShadow
     pool.mesh.layers.mask = bucket.layersMask
+    pool.mesh.geometry = bucket.geometry
+    pool.mesh.material = bucket.material
+    pool.mesh.count = needed
+
+    // Üyelik aynı ve hiçbir şey kımıldamadıysa tampon zaten doğru: ne yazılır
+    // ne yüklenir. Katman geçişinde bu, iki havuz dışındaki her havuz.
+    if (!matricesDirty && sameMembers(pool.members, bucket.objects)) continue
 
     for (let index = 0; index < needed; index++) {
       const object = bucket.objects[index]
@@ -330,9 +482,8 @@ export function rebuildPools(root: THREE.Object3D): void {
       scratchMatrix.copy(object.matrixWorld)
       pool.mesh.setMatrixAt(index, scratchMatrix)
     }
-    pool.mesh.count = needed
+    pool.members = bucket.objects
     pool.mesh.instanceMatrix.needsUpdate = true
-    pool.mesh.computeBoundingSphere()
   }
 }
 

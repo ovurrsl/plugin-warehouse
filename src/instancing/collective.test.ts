@@ -460,3 +460,115 @@ describe('kat imzası maskeyi de ölçüyor', () => {
     })
   })
 })
+
+/**
+ * Yeniden inşanın MALİYETİ — ve maliyeti kısmanın sessizce bozabileceği şey.
+ *
+ * Bu blok bir hızlanmayı değil, o hızlanmanın ödünç aldığı doğruluğu ölçüyor.
+ * Havuz artık üyeliği değişmemiş bir havuzun tamponuna dokunmuyor; kazanç
+ * gerçek (kamera gezerken tek bir raf bant geçtiğinde eskiden HER havuzun
+ * kapasite boyu tamponu yeniden yükleniyordu), ama atlamanın yanlış anda
+ * yapılması hiçbir hata vermeden yanlış yerde çizilen raflar demek.
+ */
+describe('yeniden inşa — değişmeyen havuza dokunulmaz, değişene dokunulur', () => {
+  /** Tampon yüklemesinin tek dürüst göstergesi: `needsUpdate` sürümü artırır. */
+  function versions(): number[] {
+    return root.children.map((child) => (child as THREE.InstancedMesh).instanceMatrix.version)
+  }
+
+  /** Her havuzun 0. yuvasındaki X — kimin nerede çizildiği. */
+  function slotZeroXs(): number[] {
+    const matrix = new THREE.Matrix4()
+    return root.children
+      .map((child) => {
+        ;(child as THREE.InstancedMesh).getMatrixAt(0, matrix)
+        return matrix.elements[12] ?? Number.NaN
+      })
+      .sort((a, b) => a - b)
+  }
+
+  test('salt katman geçişi, üyeliği aynı kalan havuzu YENİDEN YÜKLEMEZ', () => {
+    // İki ayrı şekil: 'a' katman değiştirecek, 'b' hiç kımıldamayacak.
+    const a = entry('a', 0, 'a')
+    registerInstance(a)
+    registerInstance(entry('b', 10, 'b'))
+    rebuildPools(root, true)
+
+    const untouched = root.children.find(
+      (child) => (child as THREE.InstancedMesh).geometry === GEOM_B,
+    ) as THREE.InstancedMesh
+    const before = untouched.instanceMatrix.version
+
+    a.tier = 'simple'
+    rebuildPools(root, false)
+
+    expect(untouched.instanceMatrix.version).toBe(before)
+  })
+
+  test('matrisler kirliyken üyelik aynı olsa da tampon YENİDEN YAZILIR', () => {
+    // Atlamanın tehlikeli yarısı. Bir düğüm kımıldadığında havuz üyeliği
+    // değişmez — yazım o yüzden atlanırsa raf eski yerinde çizilmeye devam
+    // eder ve hiçbir şey hata vermez.
+    const a = entry('a', 0)
+    registerInstance(a)
+    rebuildPools(root, true)
+
+    a.object.position.set(42, 0, 0)
+    a.object.updateMatrix()
+    a.object.updateMatrixWorld(true)
+    rebuildPools(root, true)
+
+    expect(slotZeroXs()).toEqual([42])
+  })
+
+  test('bir örnek havuzdan ayrılınca KALANIN yuvası yeniden yazılır', () => {
+    // Aynı şekilden iki düğüm tek havuzda, 'a' 0. yuvada. 'a' uzaklaşıp kendi
+    // havuzuna geçince 'b' 0. yuvaya kaymalı. Yazım atlanırsa o yuvada hâlâ
+    // 'a'nın matrisi durur: iki raf üst üste çizilir, 'b' ortadan kaybolur.
+    const a = entry('a', 0)
+    registerInstance(a)
+    registerInstance(entry('b', 10))
+    rebuildPools(root, true)
+    expect(poolCount()).toBe(1)
+
+    a.tier = 'simple'
+    rebuildPools(root, false)
+
+    expect(poolCount()).toBe(2)
+    expect(slotZeroXs()).toEqual([0, 10])
+  })
+
+  test('atlanan kare tamponu bozmaz — sürüm artmasa da içerik doğru', () => {
+    const a = entry('a', 0)
+    registerInstance(a)
+    registerInstance(entry('b', 10, 'b'))
+    rebuildPools(root, true)
+    const before = versions()
+
+    // Hiçbir şey değişmedi: iki havuz da atlanmalı.
+    rebuildPools(root, false)
+    expect(versions()).toEqual(before)
+    expect(slotZeroXs()).toEqual([0, 10])
+  })
+})
+
+describe('şekil anahtarı önbelleği', () => {
+  test('refreshInstance anahtarı da tazeler — iki şekil tek havuzu paylaşamaz', () => {
+    // Anahtar artık kayıt anında bir kez basılıp saklanıyor (yeniden inşa
+    // başına binlerce dizge kurmamak için). Tazelenmezse şekli değişmiş bir
+    // düğüm eski havuzda kalır ve BAŞKA bir geometriyle çizilir — görünür
+    // biçimde yanlış, ve hiçbir hata vermez.
+    registerInstance(entry('a', 0, 'a'))
+    registerInstance(entry('b', 10, 'a'))
+    rebuildPools(root, true)
+    expect(poolCount()).toBe(1)
+
+    refreshInstance('b', {
+      keyFor: (tier: InstanceTier) => `b:${tier}`,
+      geometryFor: () => GEOM_B,
+    })
+    rebuildPools(root, true)
+
+    expect(poolCount()).toBe(2)
+  })
+})

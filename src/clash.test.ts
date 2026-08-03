@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
 import { registerNode } from '@pascal-app/core'
-import { clashesWith } from './clash'
+import { areClearAt, clashesWith, isClearAt, occupiedVolumes } from './clash'
 import { conveyorRollerDefinition } from './conveyor/definition'
 import { ConveyorRollerNode } from './conveyor/schema'
 import { palletDefinition } from './pallet/definition'
@@ -218,5 +218,138 @@ describe('a kind this package has never heard of still obstructs', () => {
     // every placement invalid the moment a scene had a parent node in it.
     const level = { id: 'level_1', type: 'level', position: [0, 0, 0], rotation: [0, 0, 0] }
     expect(hits(conveyor(), [0, 0, 0], 0, scene(level as never))).toEqual([])
+  })
+})
+
+/**
+ * İndeksin ve koşu testinin sessizce verebileceği YANLIŞ cevaplar.
+ *
+ * Çakışma taraması artık sahneyi baştan sona gezmiyor: adaylar plan
+ * ızgarasından geliyor ve bir koşunun bütün gözleri tek bir betimlemeden
+ * öteleniyor. İkisi de hızlandırma, ikisi de aynı biçimde bozulur — "temiz"
+ * diyerek. Bu blok o cevabı arıyor.
+ */
+describe('plan indeksi bir engeli kaçırmaz', () => {
+  test('hücre sınırına oturan engel de bulunur', () => {
+    // Bir ızgara indeksinin tek gerçek arıza biçimi: nesnenin sorgulanan
+    // hücreye hiç yazılmaması. Sınırın tam üstü ve iki yanı.
+    for (const x of [0, 8, 16, -8, 7.9, 8.1, -0.1]) {
+      const belt = conveyor({ id: 'conveyor_roller_edge', position: [x, 0, 0] })
+      expect({ x, hits: hits(pallet(), [x, 0, 0], 0, scene(belt)) }).toEqual({
+        x,
+        hits: ['conveyor_roller_edge'],
+      })
+    }
+  })
+
+  test('ızgaraya sığmayacak kadar büyük bir engel yine de yakalanır', () => {
+    // Bir kilometrekarelik güverte hiçbir kovaya makul biçimde yazılamaz, o
+    // yüzden "her zaman sınananlar" listesine düşer. Listeyi unutmak, dev
+    // nesnelerin üstüne her şeyin konabilmesi demekti.
+    registerNode({
+      kind: 'test:hall',
+      schemaVersion: 1,
+      schema: PalletNode,
+      category: 'furnish',
+      defaults: () => ({}),
+      capabilities: {
+        floorPlaced: {
+          footprint: () => ({ dimensions: [1000, 4, 1000], rotation: [0, 0, 0] }),
+          applies: () => true,
+          collides: true,
+        },
+      },
+    } as never)
+
+    const hall = { id: 'test_hall_1', type: 'test:hall', position: [0, 0, 0], rotation: [0, 0, 0] }
+    expect(hits(conveyor(), [300, 0, 300], 0, scene(hall as never))).toEqual(['test_hall_1'])
+  })
+
+  test('sahne değişince indeks yenilenir — az önce konan raf görünmez olmaz', () => {
+    // İndeks `nodes` nesnesinin kimliğine bağlı. Host her yazışta yeni bir
+    // nesne veriyor; vermeseydi, bir koşuyu yerleştirdikten sonra ikincisi
+    // birincinin üstüne konabilirdi.
+    const moving = rack({ id: 'pallet_rack_moving' })
+    expect(hits(moving, [0, 0, 0], 0, scene())).toEqual([])
+    expect(hits(moving, [0, 0, 0], 0, scene(rack({ id: 'pallet_rack_placed' })))).toEqual([
+      'pallet_rack_placed',
+    ])
+  })
+})
+
+describe('bir koşu, tek betimlemeden ötelenir', () => {
+  test('bir düğümün hacimleri konumla YALNIZCA ötelenir', () => {
+    // `areClearAt`'in dayandığı özellik, ve tek satırlık gerekçesi: `toWorldBox`
+    // konumu yalnız `origin` olarak alıyor, merkez ile yükseklik aralığına
+    // ekliyor, uzanımlara ve dönüşe hiç dokunmuyor. Bir kind konumunu parça
+    // listesine karıştırırsa koşu testi sessizce yanlış cevap verir.
+    const offset: [number, number, number] = [7, 2, -3]
+    for (const node of [rack(), conveyor(), pallet({ cargo: 'carton' })]) {
+      const rotation: [number, number, number] = [0, 0.4, 0]
+      const atOrigin = occupiedVolumes({ ...node, position: [0, 0, 0], rotation })
+      const moved = occupiedVolumes({ ...node, position: offset, rotation })
+      expect(moved.length).toBe(atOrigin.length)
+
+      /**
+       * Yakınlık, eşitlik değil — ve fark anlamlı olduğu için değil.
+       *
+       * `toWorldBox` `origin + c·cos + c·sin` diye topluyor; öteleme ise aynı
+       * toplamı başka sırada yapıyor, yani son bit farklı çıkabiliyor. Ölçülen
+       * sapma ~2·10⁻¹⁵ m: `CLASH_EPSILON`in (5 mm) on iki mertebe altında,
+       * yani hiçbir çakışma kararını çeviremez. Bit eşitliği istemek, ölçtüğü
+       * şeyle ilgisi olmayan bir gerekçeyle kırılan bir test olurdu.
+       */
+      atOrigin.forEach((box, index) => {
+        const actual = moved[index]
+        expect(actual).toBeDefined()
+        if (!actual) return
+        expect(actual.cx).toBeCloseTo(box.cx + offset[0], 9)
+        expect(actual.cz).toBeCloseTo(box.cz + offset[2], 9)
+        expect(actual.minY).toBeCloseTo(box.minY + offset[1], 9)
+        expect(actual.maxY).toBeCloseTo(box.maxY + offset[1], 9)
+        // Uzanımlar ve dönüş konumdan HİÇ etkilenmemeli: öteleme iddiasının
+        // asıl yarısı bu.
+        expect(actual.hx).toBe(box.hx)
+        expect(actual.hz).toBe(box.hz)
+        expect(actual.rotationY).toBe(box.rotationY)
+      })
+    }
+  })
+
+  test('areClearAt, gözleri tek tek sınamakla AYNI cevabı verir', () => {
+    const belt = conveyor({ id: 'conveyor_roller_a', position: [0, 0, 0] })
+    const world = scene(belt)
+    const moving = rack()
+    const pitch = bayPitch(moving)
+
+    for (const start of [0, 1, 2, 3]) {
+      const positions: Array<[number, number, number]> = [0, 1, 2, 3, 4].map((bay) => [
+        (start + bay) * pitch,
+        0,
+        0,
+      ])
+      const oneByOne = positions.every((position) =>
+        isClearAt({ node: moving, position, rotationY: 0, nodes: world }),
+      )
+      expect({
+        start,
+        clear: areClearAt({ node: moving, positions, rotationY: 0, nodes: world }),
+      }).toEqual({ start, clear: oneByOne })
+    }
+  })
+
+  test('koşunun SON gözü engelliyse de reddedilir', () => {
+    // Yalnız ilk gözü sınayan bir kısayolun geçeceği test. Yirmi gözlük bir
+    // koşunun ucu duvara dayanıyorsa koşu yerleşmez.
+    const moving = rack()
+    const pitch = bayPitch(moving)
+    const positions: Array<[number, number, number]> = Array.from({ length: 20 }, (_, bay) => [
+      bay * pitch,
+      0,
+      0,
+    ])
+    const far = conveyor({ id: 'conveyor_roller_far', position: [19 * pitch, 0, 0] })
+    expect(areClearAt({ node: moving, positions, rotationY: 0, nodes: scene(far) })).toBe(false)
+    expect(areClearAt({ node: moving, positions, rotationY: 0, nodes: scene() })).toBe(true)
   })
 })

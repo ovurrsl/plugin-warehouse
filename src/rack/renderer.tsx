@@ -319,6 +319,26 @@ function GhostStock({ node }: { node: PalletRackNode }) {
     })
     pallets.instanceMatrix.needsUpdate = true
     loads.instanceMatrix.needsUpdate = true
+    /**
+     * Sınır küresi, yerleşimler yazıldığı AN tazelenir — ve frustum kırpmayı
+     * geri veren şey bu.
+     *
+     * three bir `InstancedMesh`'in küresini ilk frustum testinde bir kez
+     * hesaplar ve `setMatrixAt` onu geçersiz KILMAZ; bu yüzden buradaki iki
+     * mesh kırpmayı tümden kapatmıştı ve hayaletli her raf, binanın öbür
+     * ucunda kalsa bile her kare hem renk hem gölge geçidine gönderiliyordu.
+     * Depo ölçeğinde bu, ekranda hiç olmayan raflar için kare başına binlerce
+     * çizim çağrısı — ve çizim çağrısı başına sürücü maliyeti, tümleşik
+     * GPU'daki ANGLE yolunda Metal'dekinin kat kat üstünde.
+     *
+     * Bayat küre tehlikesini kapatmanın doğru yolu kırpmayı kapatmak değil,
+     * küreyi yerleşimlerle birlikte tazelemek. Uzanımı değiştirebilecek tek
+     * öteki olay geometri takası; o da katman döngüsünde aynı şeyi yapıyor.
+     */
+    pallets.count = placements.length
+    loads.count = placements.length
+    pallets.computeBoundingSphere()
+    loads.computeBoundingSphere()
   }, [placements, spec.height, turned, alongRun, intoDepth])
 
   /**
@@ -363,6 +383,9 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         ? getPalletFarGeometry(node.palletPreset)
         : getPalletGeometry(node.palletPreset)
     pallets.material = next === 'far' ? getPalletFarMaterial() : getPalletMaterial()
+    // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
+    // bir öncekinin ölçüsüyle yapmak olurdu.
+    pallets.computeBoundingSphere()
   })
 
   if (placements.length === 0) return null
@@ -384,19 +407,32 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         `key`'in yaptığı gibi ama bedelsiz engelliyor.
       */}
       {/*
-        `frustumCulled={false}` ŞART — kuralı bu paket başka bir dosyasında
-        zaten yazmış (`conveyor/flow-system.tsx`): three bir `InstancedMesh`'in
-        sınır küresini İLK frustum testinde bir kez hesaplar ve `setMatrixAt`
-        onu geçersiz kılmaz. Yerleşimler `ghostFill`, doluluk ve kat düzeni
-        değiştikçe yeniden yazılıyor; küre ilk hâline saplanıp kalıyor ve
-        hayalet paletler görüş alanındayken kırpılıyordu.
+        Kırpma AÇIK, ve bayat küre tehlikesi kaynağında kapatıldı: yerleşimler
+        her yazıldığında (yukarıdaki `useLayoutEffect`) ve geometri her takas
+        edildiğinde (katman döngüsü) küre yeniden hesaplanıyor. Bu iki olay,
+        uzanımı değiştirebilecek olanların tamamı.
+
+        Kapatmak kolay yoldu ve pahalıya geliyordu: hayaletli bir raf, binanın
+        öbür ucunda kalsa bile her kare hem renk hem gölge geçidine giriyordu.
+        Bir havuz mesh'i için kapatmak doğrudur (örnekleri bütün binaya
+        dağılmıştır, küre binayı sarar), ama buradaki mesh TEK bir rafa ait:
+        küresi bir gözün ayak izi kadar ve kırpma gerçekten ateşliyor.
       */}
       <instancedMesh
         args={[geometry, material, capacity]}
-        castShadow
+        /**
+         * Hayalet güverte gölge DÜŞÜRMEZ.
+         *
+         * Gölge haritası binaya sığdırılmış 1024²; bir palet güvertesi orada
+         * birkaç texel eder, yani ödediği şey görünmeyen bir gölge için ikinci
+         * bir çizim çağrısı. Yük kutusu gölgesini korur: dolu bir gözün dolu
+         * göründüğü yer orası. Statik bir seçim — host'un `castShadow`'u
+         * çalışma zamanında çevirmeme sözleşmesine uyuyor, tıpkı paletin film
+         * mesh'i gibi.
+         */
+        castShadow={false}
         count={placements.length}
         dispose={null}
-        frustumCulled={false}
         raycast={NO_RAYCAST}
         ref={palletRef}
       />
@@ -405,7 +441,6 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         castShadow
         count={placements.length}
         dispose={null}
-        frustumCulled={false}
         raycast={NO_RAYCAST}
         ref={loadRef}
       />

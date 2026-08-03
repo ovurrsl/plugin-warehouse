@@ -20,10 +20,11 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
-import { isClearAt } from '../clash'
+import { areClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
+  samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
@@ -70,6 +71,8 @@ export default function ConveyorRollerTool() {
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
+  /** En son React'e bildirilen kutu merkezi — tekrarını yazmamak için. */
+  const cursorPositionRef = useRef<[number, number, number] | null>(null)
 
   const previewNode = useMemo(
     () => ConveyorRollerNode.parse({ position: [0, 0, 0], rotation: [0, 0, 0] }),
@@ -94,6 +97,24 @@ export default function ConveyorRollerTool() {
   const ghosts = useMemo(
     () => moduleOffsets(previewNode, Math.min(modules, GHOST_LIMIT)),
     [previewNode, modules],
+  )
+
+  /**
+   * Hayalet ağacı ELEMAN olarak önbelleklenir — rafın aynı gerekçesi.
+   *
+   * İmleç kımıldadıkça bu bileşen yeniden render oluyor ve `ghosts.map(...)`
+   * her seferinde altmış yeni React elemanı üretiyordu. Dizi `useMemo` ile
+   * sabitlenince React alt ağacı referans eşitliğinden tanıyıp hiç
+   * uzlaştırmıyor.
+   */
+  const ghostTree = useMemo(
+    () =>
+      ghosts.map((offset) => (
+        <group key={`${offset[0]}:${offset[2]}`} position={offset}>
+          <ConveyorRollerPreview node={previewNode} />
+        </group>
+      )),
+    [ghosts, previewNode],
   )
 
   // Read through refs so growing the run with `[` / `]` adjusts the box in
@@ -151,9 +172,11 @@ export default function ConveyorRollerTool() {
         rotation: [0, rotationY, 0],
       })
       const positions = [visual, ...moduleOffsets(placed, modulesRef.current)]
-      const clear = positions.every((position) =>
-        isClearAt({ node: placed, position, rotationY, nodes }),
-      )
+      // Tek çağrı, tek betimleme: modülün kapladığı hacim bir kez kuruluyor ve
+      // her modül konumu için ötelenip sınanıyor. Konum başına `isClearAt`
+      // çağırmak aynı hacim listesini fare olayı başına modül sayısı kadar
+      // yeniden kuruyordu.
+      const clear = areClearAt({ node: placed, positions, rotationY, nodes })
       validRef.current = clear
       setValid(clear)
     }
@@ -167,7 +190,14 @@ export default function ConveyorRollerTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      setCursorPosition(runCenter(visual, rotationRef.current))
+      // Rafın aynı gerekçesi: taze dizi kimliği her harekette kaçınılmaz bir
+      // render ettiriyordu, ızgaraya oturmuş imleç için çoğu aynı kareyi üretmek
+      // üzere.
+      const center = runCenter(visual, rotationRef.current)
+      if (!samePlacementPoint(cursorPositionRef.current, center)) {
+        cursorPositionRef.current = center
+        setCursorPosition(center)
+      }
       lastPositionRef.current = position
       recomputeValidity(visual)
 
@@ -308,11 +338,7 @@ export default function ConveyorRollerTool() {
     <>
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
         <ConveyorRollerPreview node={previewNode} />
-        {ghosts.map((offset) => (
-          <group key={`${offset[0]}:${offset[2]}`} position={offset}>
-            <ConveyorRollerPreview node={previewNode} />
-          </group>
-        ))}
+        {ghostTree}
       </group>
       {cursorVisible && (
         <PlacementBox

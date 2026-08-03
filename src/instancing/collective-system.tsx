@@ -110,7 +110,16 @@ export default function CollectiveInstancingSystem() {
      * tarafından yutuluyordu. Bu, paketteki tek her-kare döngüsü olduğu için
      * kontrol buraya asılı; erken çıkışların ÜSTÜNDE durması bilinçli.
      */
-    rebakeDriftedStaticTransforms()
+    /**
+     * Kaç düğüm yeniden basıldı — havuzun matris tazeliği için de bir sinyal.
+     *
+     * Rebake, host'un kayıtlı nesneye DOĞRUDAN yazdığı Y'yi (slab lifti) ve
+     * imperatif sürüklemeyi yakalıyor: ikisi de sahne store'una dokunmuyor,
+     * kat konumunu değiştirmiyor, yani havuzun bildiği hiçbir tetikleyici
+     * bunları duymuyor. Sayı sıfırdan büyükse en az bir dünya matrisi kaymış
+     * demektir ve havuz o kareyi "matrisler kirli" sayarak yeniden yazmalı.
+     */
+    const rebaked = rebakeDriftedStaticTransforms()
 
     const root = rootRef.current
     if (!root) return
@@ -126,11 +135,28 @@ export default function CollectiveInstancingSystem() {
     const generation = instanceGeneration()
     const levelsMoved = pollLevelPositions(levelYRef.current)
 
-    if (tierChanged || levelsMoved || dirtyRef.current || generation !== generationRef.current) {
+    /**
+     * Matrisleri kımıldatabilecek olanlar — ve KATMAN GEÇİŞİ bunlardan değil.
+     *
+     * Ayrım bu sistemin en pahalı davranışının çaresi. Kamera gezerken eşik
+     * küreleri sürekli düğüm kesiyor, yani `tierChanged` neredeyse her kare
+     * doğru; ama o karede sahnede hiçbir şey KIMILDAMIYOR — yalnız iki havuzun
+     * üyeliği değişiyor. Eskiden bu, her havuzun tam `instanceMatrix`
+     * tamponunun baştan yazılıp GPU'ya yeniden yüklenmesi demekti.
+     *
+     * Kirli değilken `rebuildPools` üyeliği değişmeyen havuza hiç dokunmuyor,
+     * ve kat alt ağaçlarının dünya matrisleri de zorlanmıyor: onları tazelemek
+     * yalnız gerçekten kımıldadıklarında anlamlı, çünkü R3F zaten her çizimde
+     * güncelliyor.
+     */
+    const matricesDirty =
+      levelsMoved || dirtyRef.current || generation !== generationRef.current || rebaked > 0
+
+    if (tierChanged || matricesDirty) {
       generationRef.current = generation
       dirtyRef.current = false
-      refreshLevelWorldMatrices()
-      rebuildPools(root)
+      if (matricesDirty) refreshLevelWorldMatrices()
+      rebuildPools(root, matricesDirty)
     }
   }, FRAME_PRIORITY)
 

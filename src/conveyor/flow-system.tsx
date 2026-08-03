@@ -141,7 +141,17 @@ export default function ConveyorFlowSystem() {
   return (
     <instancedMesh
       args={[geometry, material, CAPACITY]}
-      castShadow
+      /**
+       * Kutular gölge DÜŞÜRMEZ — aşağıdaki gerekçenin devamı.
+       *
+       * "Kutular bir simülasyon, sahne içeriği değil": tıklanamaz olmalarının
+       * sebebi buysa, gölge haritasına girmemelerinin sebebi de aynı. Altı yüz
+       * örnek her kare hareket ediyor, yani gölge geçidine her kare yeniden
+       * rasterize edilen, binaya sığdırılmış 1024² haritada birkaç titrek
+       * texel eden bir yük. Statik bir seçim — filmin `castShadow={false}`'u
+       * gibi, host'un çalışma zamanında çevirmeme sözleşmesine uygun.
+       */
+      castShadow={false}
       // Boxes are a simulation, not scene content: they must never be pickable,
       // or a click meant for the conveyor under them lands on a box that will
       // not be there next frame.

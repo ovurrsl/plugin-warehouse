@@ -153,6 +153,10 @@ export function subscribePlacementClicks(
 ): () => void {
   const guarded = (event: PlacementClickEvent) => {
     if (isFollowUpOfSameClick(event)) return
+    // Bekleyen hareket ÖNCE işlenir: tıklama, son hareketin bıraktığı konuma
+    // yerleştiriyor ve o hareket bu karenin rAF'ını beklemiş olabilir.
+    // Boşaltmadan çağırmak, imlecin bir kare geride kalan yerine koyardı.
+    flushPendingGridMoves()
     handler(event)
   }
   const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
@@ -178,6 +182,9 @@ export function subscribeGridClicks(
   handler: (event: GridEvent, detail: number) => void,
 ): () => void {
   const onClick = (event: GridEvent) => {
+    // `subscribePlacementClicks` ile aynı sebeple: çok noktalı araçlar köşeyi
+    // son hareketin bıraktığı imleçten okuyor.
+    flushPendingGridMoves()
     const native = event.nativeEvent as unknown as { detail?: number } | undefined
     handler(event, native?.detail ?? 1)
   }
@@ -363,6 +370,53 @@ export function collectSlabs(
 export type GridMoveHandler = (rawLevelLocal: [number, number, number], event: GridEvent) => void
 
 /**
+ * Aynı noktayı iki kez bildirmemek için eşik, metre.
+ *
+ * Onda bir milimetre: yerleştirme kutusunun çizimini hiçbir ekranda
+ * değiştiremez, ama ızgaraya oturmuş bir imleç için ardışık karelerin
+ * çoğunda "değişmedi" cevabı verir — ve o cevap bir React render'ını
+ * tamamen atlatır.
+ */
+const CURSOR_SETTLED_M = 1e-4
+
+/**
+ * İki yerleştirme noktası görünür biçimde aynı mı.
+ *
+ * `setState`'e her harekette TAZE bir dizi vermek, React'in kaçamayacağı bir
+ * render demek: dizi kimliği hep yeni olduğu için eşitlik kontrolü hep
+ * başarısız. Izgara açıkken imleç çoğu karede aynı hücrede duruyor, yani o
+ * render'ların çoğu birebir aynı kareyi üretiyordu.
+ */
+export function samePlacementPoint(
+  previous: readonly [number, number, number] | null,
+  next: readonly [number, number, number],
+): boolean {
+  if (!previous) return false
+  return (
+    Math.abs(previous[0] - next[0]) <= CURSOR_SETTLED_M &&
+    Math.abs(previous[1] - next[1]) <= CURSOR_SETTLED_M &&
+    Math.abs(previous[2] - next[2]) <= CURSOR_SETTLED_M
+  )
+}
+
+/**
+ * Bekleyen hareketleri şimdi işleyen kapanışlar — her etkin abonelik için bir
+ * tane. Tıklama yolları bunu senkron çağırıyor.
+ */
+const pendingFlushes = new Set<() => void>()
+
+/**
+ * Bu karede birikmiş hareketleri hemen işler.
+ *
+ * Yerleştirme tıklaması, imleci son hareketin bıraktığı yerden okuyor. Hareket
+ * bir sonraki kareye ertelendiği için, boşaltma olmadan tıklama bir kare eski
+ * konuma yerleştirirdi — hızlı bir "sürükle ve bırak"ta gözle görülür.
+ */
+export function flushPendingGridMoves(): void {
+  for (const flush of pendingFlushes) flush()
+}
+
+/**
  * Subscribe to cursor movement over the grid, **unsnapped**.
  *
  * Snapping is left to the caller because grid quantize and alignment have to be
@@ -373,12 +427,58 @@ export type GridMoveHandler = (rawLevelLocal: [number, number, number], event: G
  * Commits elsewhere use the position from the last move rather than the click
  * event's own: a click reports the ray's hit point, which on a vertical face is
  * somewhere up a wall rather than on the floor the user was aiming at.
+ *
+ * ## Kare başına bir kez — ve neden bu tek değişiklik on altı aracı birden
+ * ilgilendiriyor
+ *
+ * Host `grid:move`'u ham `pointermove` dinleyicisinden yayınlıyor, düğme
+ * koşulu olmadan: yani fare tuval üzerinde GEZİNİRKEN bile akıyor. Bir oyun
+ * faresi saniyede 1000 olay üretir, ekran 50 kare çizer. Her olay tam
+ * yerleştirme hattını koşturuyordu — hizalama çözümü, şema ayrıştırma, host'un
+ * ızgara sorgusu, paketin üç boyutlu çakışma taraması ve birkaç React
+ * `setState`'i — yani işin yirmide on dokuzu, çizilmeyen bir kare için.
+ *
+ * Bu, masaüstü ile dokunmatik arasındaki en keskin fark: iPhone parmak değene
+ * kadar tek bir `pointermove` üretmez, üstelik sürüklerken de 60 Hz'i geçmez.
+ * Aynı hat orada hiç koşmuyordu.
+ *
+ * Son olay kazanır, çünkü on altı abonenin hepsi imleci TAKİP ediyor — hiçbiri
+ * ara noktaları biriktirmiyor. Tek görünür yan etki, hızlı bir harekette
+ * atlanan ızgara-tık sesleri; kare başına birden fazlası zaten duyulmuyordu.
  */
 export function subscribeGridMove(handler: GridMoveHandler): () => void {
+  let pending: { position: [number, number, number]; event: GridEvent } | null = null
+  let frame: number | null = null
+
+  const flush = () => {
+    if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
+    frame = null
+    const latest = pending
+    pending = null
+    if (latest) handler(latest.position, latest.event)
+  }
+
   const onMove = (event: GridEvent) => {
     const [lx, , lz] = event.localPosition
-    handler([lx, 0, lz], event)
+    pending = { position: [lx, 0, lz], event }
+    // Sunucu ön-render'ında `requestAnimationFrame` yok; orada eski davranış
+    // (senkron) doğru olanı, çünkü ertelenecek bir kare de yok.
+    if (typeof requestAnimationFrame !== 'function') {
+      flush()
+      return
+    }
+    if (frame === null) frame = requestAnimationFrame(flush)
   }
+
   emitter.on('grid:move', onMove)
-  return () => emitter.off('grid:move', onMove)
+  pendingFlushes.add(flush)
+  return () => {
+    emitter.off('grid:move', onMove)
+    pendingFlushes.delete(flush)
+    if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
+    frame = null
+    // Araç sökülürken bekleyen hareket ÇALIŞTIRILMAZ: kapanış artık var olmayan
+    // bir aracın state'ine yazardı.
+    pending = null
+  }
 }

@@ -21,10 +21,11 @@ import {
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
-import { isClearAt } from '../clash'
+import { areClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
+  samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
@@ -75,6 +76,8 @@ export default function PalletRackTool() {
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
+  /** En son React'e bildirilen kutu merkezi — tekrarını yazmamak için. */
+  const cursorPositionRef = useRef<[number, number, number] | null>(null)
 
   const spec = useWarehouseStore((s) => s.multiply)
 
@@ -116,6 +119,33 @@ export default function PalletRackTool() {
   const ghosts = useMemo(
     () => multiplyPlacements(previewNode, spec).slice(0, GHOST_LIMIT),
     [previewNode, spec],
+  )
+
+  /**
+   * Hayalet ağacı ELEMAN olarak önbelleklenir, veri olarak değil.
+   *
+   * İmleç her kımıldadığında bu bileşen yeniden render oluyor (yerleştirme
+   * kutusunun konumu state'te), ve `ghosts.map(...)` her seferinde iki yüz
+   * yeni React elemanı üretiyordu — iki yüz `<group>` artı iki yüz
+   * `PalletRackPreview`, hepsi de bir öncekiyle aynı. React bir elemanı bir
+   * öncekiyle REFERANSTAN eşit görürse o alt ağacı hiç uzlaştırmıyor; dizi
+   * `useMemo` ile sabitlenince kutu hareket ederken hayaletler tamamen atlanır.
+   *
+   * Bağımlılıklar, ağacın gerçekten değişebileceği iki şey: koşunun uzunluğu
+   * (`ghosts`) ve gözün şekli (`previewNode`).
+   */
+  const ghostTree = useMemo(
+    () =>
+      ghosts.map((ghost) => (
+        <group
+          key={`${ghost.position[0]}:${ghost.position[2]}`}
+          position={ghost.position}
+          rotation={ghost.rotation}
+        >
+          <PalletRackPreview node={previewNode} />
+        </group>
+      )),
+    [ghosts, previewNode],
   )
 
   /**
@@ -191,9 +221,16 @@ export default function PalletRackTool() {
           useWarehouseStore.getState().multiply,
         ).map((placement) => placement.position),
       ]
-      const clear = positions.every((position) =>
-        isClearAt({ node: bay, position, rotationY, nodes }),
-      )
+      /**
+       * Tek çağrı, tek parça listesi.
+       *
+       * Göz başına `isClearAt` çağırmak, gözün `rackParts('full')` listesini
+       * ve ondan türeyen dünya kutularını FARE OLAYI BAŞINA göz sayısı kadar
+       * yeniden kuruyordu — iki yüz gözlük bir koşuda iki yüz özdeş liste,
+       * saniyede yüzlerce kez. `areClearAt` listeyi bir kez kurup her göz için
+       * öteliyor ve ilk engelde duruyor.
+       */
+      const clear = areClearAt({ node: bay, positions, rotationY, nodes })
       validRef.current = placeable && clear
       setValid(placeable && clear)
     }
@@ -207,7 +244,14 @@ export default function PalletRackTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      setCursorPosition(runCenter(visual, rotationRef.current))
+      // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
+      // her harekette kaçamayacağı bir render ettiriyordu; ızgaraya oturmuş
+      // imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
+      const center = runCenter(visual, rotationRef.current)
+      if (!samePlacementPoint(cursorPositionRef.current, center)) {
+        cursorPositionRef.current = center
+        setCursorPosition(center)
+      }
       lastPositionRef.current = position
       recomputeValidity(visual)
 
@@ -349,15 +393,7 @@ export default function PalletRackTool() {
           already built rather than twenty builds. */}
       <group layers={EDITOR_LAYER} ref={cursorRef} visible={cursorVisible}>
         <PalletRackPreview node={previewNode} />
-        {ghosts.map((ghost) => (
-          <group
-            key={`${ghost.position[0]}:${ghost.position[2]}`}
-            position={ghost.position}
-            rotation={ghost.rotation}
-          >
-            <PalletRackPreview node={previewNode} />
-          </group>
-        ))}
+        {ghostTree}
       </group>
       {cursorVisible && (
         <PlacementBox

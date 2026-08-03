@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { emitter } from '@pascal-app/core'
 import { warehousePlugin } from './index'
-import { CLICK_TRIGGER_KINDS } from './placement'
+import {
+  CLICK_TRIGGER_KINDS,
+  samePlacementPoint,
+  subscribeGridMove,
+  subscribePlacementClicks,
+} from './placement'
 
 /**
  * BEKÇİ: kaydedilen her kind yerleştirme tıklamasını TETİKLEMELİ.
@@ -57,5 +63,140 @@ describe('yerleştirme tıklaması', () => {
     // Bir kind iki kez yazılırsa her tıklama iki kez abone olur ve tek tıkla iki
     // nesne yerleşir — bu dosyanın kendi başındaki çift-tetikleme hikâyesi.
     expect(new Set(CLICK_TRIGGER_KINDS).size).toBe(CLICK_TRIGGER_KINDS.length)
+  })
+})
+
+/**
+ * BEKÇİ: hareket kare başına bir kez işlenir — ama tıklama ASLA bayat konuma
+ * yerleştirmez.
+ *
+ * Host `grid:move`'u ham `pointermove` dinleyicisinden yayınlıyor, düğme
+ * koşulu olmadan: fare tuval üzerinde yalnızca gezinirken bile akıyor ve bir
+ * oyun faresi saniyede 1000 olay üretebiliyor. Her olayda tam yerleştirme
+ * hattını koşturmak (hizalama, şema ayrıştırma, çakışma taraması, React
+ * `setState`'leri) işin yirmide on dokuzunu çizilmeyen kareler için harcamaktı.
+ *
+ * Birleştirmenin bedeli, dikkat edilmezse, gerçek bir hata: tıklama imleci son
+ * hareketin bıraktığı yerden okuyor, yani bekleyen hareket işlenmeden gelen bir
+ * tıklama nesneyi BİR KARE ESKİ konuma koyar. Hızlı bir "sürükle ve bırak"ta
+ * gözle görülür ve hiçbir hata vermez. Bu blok ikisini birden tutuyor.
+ */
+describe('ızgara hareketi kareye kilitlenir', () => {
+  const frames = new Map<number, () => void>()
+  let nextFrameId = 1
+
+  const installFakeFrames = () => {
+    frames.clear()
+    nextFrameId = 1
+    ;(globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = (
+      callback: () => void,
+    ) => {
+      const id = nextFrameId++
+      frames.set(id, callback)
+      return id
+    }
+    ;(globalThis as { cancelAnimationFrame?: unknown }).cancelAnimationFrame = (id: number) => {
+      frames.delete(id)
+    }
+  }
+
+  const removeFakeFrames = () => {
+    ;(globalThis as { requestAnimationFrame?: unknown }).requestAnimationFrame = undefined
+    ;(globalThis as { cancelAnimationFrame?: unknown }).cancelAnimationFrame = undefined
+  }
+
+  const runFrame = () => {
+    const due = [...frames.values()]
+    frames.clear()
+    for (const callback of due) callback()
+  }
+
+  const move = (x: number, z: number) =>
+    emitter.emit('grid:move', {
+      position: [x, 0, z],
+      localPosition: [x, 0, z],
+      nativeEvent: {} as never,
+    } as never)
+
+  test('bir karedeki üç hareket TEK kez işlenir, ve SON konumla', () => {
+    installFakeFrames()
+    const seen: number[] = []
+    const unsubscribe = subscribeGridMove(([x]) => seen.push(x))
+
+    move(1, 0)
+    move(2, 0)
+    move(3, 0)
+    // Kare henüz dönmedi: hiçbiri işlenmemiş olmalı.
+    expect(seen).toEqual([])
+
+    runFrame()
+    expect(seen).toEqual([3])
+
+    unsubscribe()
+    removeFakeFrames()
+  })
+
+  test('tıklama, bekleyen hareketi ÖNCE işler — bir kare eski konuma yerleşmez', () => {
+    installFakeFrames()
+    const seen: number[] = []
+    const committed: number[] = []
+    let last = Number.NaN
+    const unsubscribeMove = subscribeGridMove(([x]) => {
+      last = x
+      seen.push(x)
+    })
+    const unsubscribeClicks = subscribePlacementClicks(() => committed.push(last))
+
+    move(1, 0)
+    runFrame()
+    // İmleç yeni bir yere gitti ve kullanıcı kareyi beklemeden tıkladı.
+    move(9, 0)
+    emitter.emit('grid:click', {
+      position: [9, 0, 0],
+      localPosition: [9, 0, 0],
+      nativeEvent: {} as never,
+    } as never)
+
+    expect(seen).toEqual([1, 9])
+    expect(committed).toEqual([9])
+
+    unsubscribeMove()
+    unsubscribeClicks()
+    removeFakeFrames()
+  })
+
+  test('abonelik sökülünce bekleyen hareket ÇALIŞMAZ', () => {
+    installFakeFrames()
+    const seen: number[] = []
+    const unsubscribe = subscribeGridMove(([x]) => seen.push(x))
+
+    move(5, 0)
+    unsubscribe()
+    runFrame()
+
+    expect(seen).toEqual([])
+    removeFakeFrames()
+  })
+
+  test('rAF olmayan ortamda (sunucu ön-render) senkron kalır', () => {
+    // Ertelenecek bir kare yoksa ertelemek, olayı hiç işlememek olurdu.
+    removeFakeFrames()
+    const seen: number[] = []
+    const unsubscribe = subscribeGridMove(([x]) => seen.push(x))
+    move(7, 0)
+    expect(seen).toEqual([7])
+    unsubscribe()
+  })
+})
+
+describe('aynı noktayı iki kez bildirmemek', () => {
+  test('ızgaraya oturmuş imleç "değişmedi" der, gerçekten kımıldayan demez', () => {
+    // Tek amacı bir React render'ını atlatmak; eşiği görünür bir mesafeye
+    // çekmek, yerleştirme kutusunun imlecin gerisinde kalması demek olurdu.
+    expect(samePlacementPoint([1, 0, 2], [1, 0, 2])).toBe(true)
+    expect(samePlacementPoint(null, [1, 0, 2])).toBe(false)
+    expect(samePlacementPoint([1, 0, 2], [1.00001, 0, 2])).toBe(true)
+    expect(samePlacementPoint([1, 0, 2], [1.001, 0, 2])).toBe(false)
+    expect(samePlacementPoint([1, 0, 2], [1, 0.001, 2])).toBe(false)
   })
 })

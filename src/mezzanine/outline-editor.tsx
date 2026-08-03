@@ -176,9 +176,26 @@ export default function MezzanineOutlineEditor() {
           }}
           position={[px, handleY - 0.02, pz]}
           rotation={[-Math.PI / 2, 0, 0]}
+          /**
+           * `visible={false}`, `opacity={0}` değil.
+           *
+           * Sıfır alfalı saydam bir yüzey yine de ÇİZİLİYOR: 600×600 m'lik bu
+           * düzlem saydam kuyruğa giriyor, ekranı baştan sona kaplıyor ve her
+           * pikselinde harmanlama yapıyor — hiçbir şey göstermemek için tam
+           * dolum oranı bedeli, üstelik tam da kullanıcının sürüklediği anda.
+           * Paylaşımlı bellekli tümleşik GPU'da ekran dolusu harmanlama
+           * doğrudan bant genişliği; Apple'ın TBDR'ında aynı iş tile
+           * belleğinde kalıyor ve neredeyse görünmüyor.
+           *
+           * `visible = false` nesneyi `projectObject`'ten tümden çıkarıyor,
+           * ama three'nin ışın testi ve R3F'in olay katmanı görünürlüğe
+           * BAKMIYOR — yani yakalama görevi aynen sürüyor. Paketin kendi
+           * kolider deseni (`collider.ts`) zaten bu.
+           */
+          visible={false}
         >
           <planeGeometry args={[600, 600]} />
-          <meshBasicMaterial depthWrite={false} opacity={0} transparent />
+          <meshBasicMaterial depthWrite={false} />
         </mesh>
       )}
     </group>

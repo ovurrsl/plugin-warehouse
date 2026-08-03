@@ -428,12 +428,16 @@ export function getOrCreateCargoAtlas(): CargoAtlas {
     withRegion(orm.ctx, rect, (ctx, w, h) => drawOrmRegion(ctx, w, h, id))
   }
 
+  // Anizotropi: renkte 4, ORM'de 1 — gerekçe `epal-textures.ts`'te. ORM iki
+  // yuvaya birden bağlı (`roughnessMap` ve `metalnessMap`), yani oradaki her
+  // tap iki kez ödeniyor ve karşılığında yayvan açıda yumuşayan bir yüzey
+  // verisinden başka bir şey vermiyor.
   const map = new THREE.CanvasTexture(albedo.canvas)
   map.colorSpace = THREE.SRGBColorSpace
-  map.anisotropy = 16
+  map.anisotropy = 4
 
   const ormTexture = new THREE.CanvasTexture(orm.canvas)
-  ormTexture.anisotropy = 8
+  ormTexture.anisotropy = 1
 
   cached = { map, orm: ormTexture }
   return cached

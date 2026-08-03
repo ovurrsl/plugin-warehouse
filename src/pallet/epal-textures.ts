@@ -193,15 +193,35 @@ export function getOrCreateEPALTextureAtlas(): EPALTextureAtlas {
   metal.ctx.arc(nailX, nailY, nailR, 0, Math.PI * 2)
   metal.ctx.fill()
 
+  /**
+   * Anizotropi: renkte 4, yüzey verisinde 1.
+   *
+   * Anizotropik filtreleme örnek başına doku okumasını KATLIYOR — 16x'te tek
+   * bir örnekleme on altı bilineer sondaya kadar çıkabilir. `MeshStandardMaterial`
+   * bir palet fragmanında üç harita birden örnekliyor, yani 16 üç kez ödeniyordu.
+   * Ve palet sahnenin en kalabalık yüzeyi.
+   *
+   * Depoda kamera açıları tam da bunun ateşlendiği açılar: uzun koridorlar,
+   * yayvan görülen paletler. Tümleşik GPU'da bu, gizlenen fragmanlar için de
+   * ödeniyor — immediate-mode rasterizer derinlik testini kaybedecek fragmanı
+   * da gölgeliyor ve dokusunu okuyor. Apple TBDR'da gizli yüzey elemesi
+   * gölgelemeden önce olduğu için aynı ayar orada neredeyse bedava; farkın
+   * yaşandığı yer tam olarak burası.
+   *
+   * 4, rafın kendi dokusunun zaten kullandığı değer (`rack/upright-texture.ts`).
+   * Pürüzlülük ve metaliklik RENK değil, yüzey verisi: yayvan bir açıda
+   * yumuşamaları görünür bir şey değiştirmiyor, tap sayısını ikiye katlaması
+   * ise ölçülebilir.
+   */
   const map = new THREE.CanvasTexture(albedo.canvas)
   map.colorSpace = THREE.SRGBColorSpace
-  map.anisotropy = 16
+  map.anisotropy = 4
 
   const roughnessMap = new THREE.CanvasTexture(rough.canvas)
-  roughnessMap.anisotropy = 16
+  roughnessMap.anisotropy = 1
 
   const metalnessMap = new THREE.CanvasTexture(metal.canvas)
-  metalnessMap.anisotropy = 16
+  metalnessMap.anisotropy = 1
 
   cachedAtlas = { map, roughnessMap, metalnessMap }
   return cachedAtlas

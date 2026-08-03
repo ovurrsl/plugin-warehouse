@@ -538,3 +538,69 @@ describe('the cache never frees what it is about to hand out', () => {
     expect(getCargoGeometry(lastInput)).toBe(last)
   })
 })
+
+/**
+ * BEKÇİ: yük artık kolektif havuza giriyor, ve o kararın dayandığı iki varsayım.
+ *
+ * Yük, güverte havuza alındıktan sonra sahnede kalan en kalabalık çizim çağrısı
+ * kaynağıydı: palet başına bir renk çizimi, artı gölge geçidinde bir tane daha.
+ * Havuza almanın ön koşulu, iki paletin yükünün gerçekten AYNI tampona
+ * çözülebilmesi — çözülemiyorsa havuz başına tek örnek düşer ve `InstancedMesh`
+ * ek yükü net kayıp olur.
+ */
+describe('yük havuzlanabilir mi — anahtarın paylaşması ve ayırması', () => {
+  test('kimliği farklı iki palet aynı yüke çözülür', () => {
+    // Havuzun tamamı buna bağlı. `resolveVariant` kimliği okuyor, yani iki
+    // paletin dolumu farklı çıkabilir — ama anahtar varyantı DEĞİL, varyantın
+    // yuvarlandığı kat/adet sayısını taşıyor. Sabit bir dolum aralığında ikisi
+    // aynı yerleşime düşer ve tek havuzda buluşur.
+    const a = PalletNode.parse({ id: 'pallet_a', cargo: 'carton', fillRange: [1, 1] })
+    const b = PalletNode.parse({ id: 'pallet_zzz_9', cargo: 'carton', fillRange: [1, 1] })
+    const inputA = cargoInputOf(a, 'full')
+    const inputB = cargoInputOf(b, 'full')
+    expect(inputA).not.toBeNull()
+    expect(inputB).not.toBeNull()
+    if (!inputA || !inputB) return
+    expect(cargoCacheKey(inputA)).toBe(cargoCacheKey(inputB))
+  })
+
+  test('rengi farklı iki palet AYRI havuza düşer', () => {
+    // Ayırmanın da doğru olması şart: tek materyal ve köşe renkleri kullanılıyor,
+    // yani renk geometride. Aynı havuza düşselerdi mavi bir yük kraft çizilirdi.
+    const kraft = PalletNode.parse({ id: 'pallet_k', cargo: 'carton', cargoColor: 'kraft' })
+    const blue = PalletNode.parse({ id: 'pallet_k', cargo: 'carton', cargoColor: 'blue' })
+    const inputKraft = cargoInputOf(kraft, 'full')
+    const inputBlue = cargoInputOf(blue, 'full')
+    if (!inputKraft || !inputBlue) throw new Error('yük girdisi kurulamadı')
+    expect(cargoCacheKey(inputKraft)).not.toBe(cargoCacheKey(inputBlue))
+  })
+
+  test('iki katman AYRI havuza düşer', () => {
+    // Katman anahtara girmeseydi uzak katmandaki paletler tam detay çizilirdi —
+    // ya da tersi, ve ikisi de sessiz.
+    const node = PalletNode.parse({ id: 'pallet_t', cargo: 'carton' })
+    const full = cargoInputOf(node, 'full')
+    const simple = cargoInputOf(node, 'simple')
+    if (!full || !simple) throw new Error('yük girdisi kurulamadı')
+    expect(cargoCacheKey(full)).not.toBe(cargoCacheKey(simple))
+  })
+
+  test('güverteye sığma kararı KATMANDAN bağımsız — mount kapısının dayanağı', () => {
+    // `PalletRenderer` yükü mount edip etmeyeceğine `full` girdisine bakarak
+    // karar veriyor ve `CargoLoad` ondan sonra iki katmanı da `null` kontrolü
+    // yapmadan kullanıyor. Sığma kararı bir gün katmana bağlanırsa, o kapı
+    // yanlış katmanda sessizce yükü düşürür ya da olmayan bir girdiyi kullanır.
+    for (const cargo of ['carton', 'drum'] as const) {
+      for (const preset of PALLET_PRESET_IDS) {
+        const node = PalletNode.parse({ id: 'pallet_fit', cargo, preset })
+        const full = cargoInputOf(node, 'full')
+        const simple = cargoInputOf(node, 'simple')
+        expect({ cargo, preset, agrees: (full === null) === (simple === null) }).toEqual({
+          cargo,
+          preset,
+          agrees: true,
+        })
+      }
+    }
+  })
+})

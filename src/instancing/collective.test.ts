@@ -572,3 +572,62 @@ describe('şekil anahtarı önbelleği', () => {
     expect(poolCount()).toBe(2)
   })
 })
+
+/**
+ * BEKÇİ: havuz, kayıtlı nesnenin DÜNYA matrisini taşır — yerel konumunu değil.
+ *
+ * Palet yükü bunun üstüne kurulu. Yük paletin kökünde değil, güvertenin
+ * üstünde duruyor; havuza kaydolan da paletin grubu değil, güvertenin
+ * yüksekliğinde duran boş bir çapa grubu. Çapanın `matrixWorld`'ü zaten
+ * "paletin dünyası × öteleme" olduğu için havuza ofset alanı eklemek
+ * gerekmedi — ama bu, yalnız havuz dünya matrisini okumaya devam ettiği sürece
+ * doğru. `object.position` okumaya dönen bir değişiklik, sahnedeki her yükü
+ * paletin içine gömerdi ve hiçbir hata vermezdi.
+ */
+describe('havuz dünya matrisini taşır — yükün çapası buna dayanıyor', () => {
+  test('ata altında ötelenmiş bir çocuk, ÖTELENMİŞ hâliyle çizilir', () => {
+    const parent = new THREE.Object3D()
+    parent.position.set(4, 0, 7)
+
+    // Paletin güvertesinin üstündeki çapa: yerel Y'si 0.144 (EPAL güverte
+    // yüksekliği mertebesinde), yerel X/Z'si sıfır.
+    const anchor = new THREE.Object3D()
+    anchor.position.set(0, 0.144, 0)
+    parent.add(anchor)
+    parent.updateMatrixWorld(true)
+
+    const e = entry('cargo', 0)
+    e.object = anchor
+    registerInstance(e)
+    rebuildPools(root, true)
+
+    const matrix = new THREE.Matrix4()
+    ;(root.children[0] as THREE.InstancedMesh).getMatrixAt(0, matrix)
+    /**
+     * Hassasiyet 6, 9 değil — ve sebebi ölçüm değil, tamponun kendisi.
+     *
+     * `instanceMatrix` bir `Float32Array`: 0.144 oraya yazılıp geri okununca
+     * ~6·10⁻⁹ kayarak dönüyor. Float64 hassasiyeti istemek, ölçtüğü şeyle ilgisi
+     * olmayan bir gerekçeyle kırılan bir test olurdu. 10⁻⁶ m bir mikron; bu
+     * paketin en küçük gerçek ölçüsü 1,5 mm'lik z-savaşı payı.
+     */
+    // Atanın konumu VE çapanın ötelemesi, ikisi birden.
+    expect(matrix.elements[12]).toBeCloseTo(4, 6)
+    expect(matrix.elements[13]).toBeCloseTo(0.144, 6)
+    expect(matrix.elements[14]).toBeCloseTo(7, 6)
+  })
+
+  test('aynı kimlikle iki kayıt tek kayda iner — yükün ayrı bir kimliğe ihtiyacı bu', () => {
+    // Palet güvertesi `node.id` altında kayıtlı; yük aynı kimliği kullansaydı
+    // biri ötekini sessizce ezerdi ve sahnede ya bütün yükler ya bütün
+    // güverteler kaybolurdu. `:cargo` soneki bunun için var.
+    registerInstance(entry('pallet_1', 0))
+    registerInstance(entry('pallet_1', 10))
+    expect(instanceCount()).toBe(1)
+
+    resetInstances()
+    registerInstance(entry('pallet_1', 0))
+    registerInstance(entry('pallet_1:cargo', 10))
+    expect(instanceCount()).toBe(2)
+  })
+})

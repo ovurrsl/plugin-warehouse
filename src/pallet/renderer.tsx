@@ -9,15 +9,20 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
-import type { Mesh, Object3D } from 'three'
+import type { BufferGeometry, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { colliderProps } from '../collider'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
-import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
-import { type CargoDetail, cargoInputOf } from './cargo-parts'
+import {
+  cargoCacheKey,
+  getCargoGeometry,
+  releaseCargoGeometry,
+  retainCargoGeometry,
+} from './cargo-geometry'
+import { type CargoDetail, type CargoInput, cargoInputOf } from './cargo-parts'
 import { unitLoadHeightOf } from './cargo-types'
 import { getFilmGeometry, releaseFilmGeometry, retainFilmGeometry } from './film'
 import { getPalletFarGeometry, getPalletGeometry } from './geometry-builder'
@@ -126,15 +131,31 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
   /**
    * Güverte kolektif çiziciye girer — sahnedeki en kalabalık mesh bu.
    *
-   * Yalnız GÜVERTE: yük ve film düğüm başına farklı (fill, renk, tip) ve
-   * kendi cache'leri var; onları da havuza almak, anahtar başına birer
-   * örneklik havuzlar üretip hiçbir şey kazandırmazdı.
-   *
    * Uzak katman materyali FARKLI (`getPalletFarMaterial`) — bu yüzden
    * materyal anahtarı katmanla değişir ve havuz ikiye ayrılır; ikisi
    * karışırsa uzak paletler ahşap dokusunu kaybeder.
+   *
+   * **Yük de girer** (`CargoLoad`), film girmez. Burada bir zamanlar ikisinin
+   * de dışarıda kaldığı ve gerekçesinin "düğüm başına farklı, havuz başına tek
+   * örnek düşer" olduğu yazıyordu. Yükün girdisi öyle değil: `cargoCacheKey`
+   * tipi, yerleşimi, rengi ve katmanı okuyor — varyantı DEĞİL, çünkü varyant
+   * zaten bir kat sayısına yuvarlanıyor. İki tip, altı renk ve bir avuç
+   * yerleşim, gerçekçi bir depoda onlarca anahtar eder, binlerce değil; yani
+   * yük havuza girmediği sürece sahnedeki en kalabalık ÇİZİM ÇAĞRISI kaynağıydı.
+   *
+   * Film gerçekten dışarıda kalır ve sebebi sayı değil: saydam, kendi sıralama
+   * düzenini istiyor ve görünürlüğü düğüm başına mesafeyle açılıp kapanıyor —
+   * bir örnek tamponunda ifade edilemeyecek üç şey.
    */
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  /**
+   * Havuzdan çıkma koşulu — güverte ve yük İÇİN AYNI ifade, tek yerde.
+   *
+   * İkisi ayrı yazıldığında ayrışabilirlerdi, ve ayrıştıkları hâl görünür:
+   * seçili bir palet güvertesini kendi çizerken yükünü havuza bırakırsa,
+   * sürüklerken yük geride kalır.
+   */
+  const excluded = selected || live !== undefined || override !== undefined || isExporting
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -146,8 +167,23 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
-    excluded: selected || live !== undefined || override !== undefined || isExporting,
+    excluded,
   })
+
+  /**
+   * Yükün iki katmanlık girdisi — ve yükün ÇİZİLİP çizilmeyeceği kararı.
+   *
+   * `cargoInputOf` güverteye sığmayan bir yükü reddediyor, ve o reddin katmanla
+   * hiçbir ilgisi yok (`fitsOnDeck` tipi ve preseti okuyor, detayı değil). Yani
+   * bu bir MOUNT kararı, `CargoLoad`'un kancalarını çalıştırdıktan sonra
+   * keşfedeceği bir şey değil — ve mount sınırına çekilmesi, aşağıdaki bileşenin
+   * her yerde `null` kontrolü taşımadan kolektif çiziciye kaydolmasını sağlıyor.
+   */
+  const cargo = useMemo(() => {
+    const full = cargoInputOf(node, 'full')
+    const simple = cargoInputOf(node, 'simple')
+    return full && simple ? { full, simple } : null
+  }, [node])
 
   /**
    * Güvertenin katman döngüsü `SelfDrawnBody`'ye taşındı.
@@ -211,8 +247,14 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
             used to be drawn when `cargo` was `'none'` and a typed height was
             non-zero is gone, and with it the empty pallets that carried what
             looked like cartons. */}
-        {node.cargo !== 'none' && (
-          <CargoLoad isExporting={isExporting} node={node} y={spec.height} />
+        {cargo && (
+          <CargoLoad
+            cargo={cargo}
+            excluded={excluded}
+            isExporting={isExporting}
+            node={node}
+            y={spec.height}
+          />
         )}
       </group>
     </group>
@@ -227,56 +269,128 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
  * per distinct type, layout, fill, colour and tier. Merging the two would
  * multiply the pallet's eight by every load in the building.
  */
+/**
+ * Yükün havuz kimliği — paletin kendi kimliğinden AYRI olmak zorunda.
+ *
+ * Güverte `node.id` altında kayıtlı; yük aynı kimliği kullansaydı ikisinden
+ * biri ötekinin kaydını ezerdi ve sahnede ya yükler ya güverteler kaybolurdu.
+ */
+const CARGO_INSTANCE_SUFFIX = ':cargo'
+
 function CargoLoad({
+  cargo,
+  excluded,
   node,
   y,
   isExporting,
 }: {
+  /** İki katmanın girdisi, mount sınırında `null` olmadığı doğrulanmış. */
+  cargo: Record<CargoDetail, CargoInput>
+  excluded: boolean
   node: PalletNode
   y: number
   isExporting: boolean
 }) {
-  const meshRef = useRef<Mesh>(null)
-  const filmRef = useRef<Mesh>(null)
   /**
-   * The tier this load is drawing. Owned by the frame loop, and the mounted
-   * geometry is read *from* it rather than hardcoded — the rack shipped the
-   * hardcoded version and the two paths fought over which tier was current.
+   * Yükün çapası — ve kolektif havuzun yükü hiçbir sözleşme değişikliği
+   * olmadan taşıyabilmesinin sebebi.
+   *
+   * Havuz kayıtlı nesnenin `matrixWorld`'ünü OLDUĞU GİBİ kopyalıyor; yük ise
+   * paletin kökünde değil, güvertenin üstünde duruyor. Kayıt için paletin
+   * grubunu verip aradaki yükseklik farkını havuza bir ofset alanı olarak
+   * eklemek olurdu — ama üç'ün kendisi bu işi zaten yapıyor: `[0, y, 0]`'da
+   * duran boş bir grubun `matrixWorld`'ü tam olarak `paletin dünyası × öteleme`.
+   * Döndürülmüş ya da yatırılmış bir palette bile doğru, çünkü hesabı biz
+   * yapmıyoruz.
+   *
+   * Grup, yük havuzda çizilirken bile mount kalıyor: matrisin kaynağı o.
    */
-  const detailRef = useRef<CargoDetail>('full')
+  const anchorRef = useRef<Object3D>(null)
 
-  const input = useMemo(
-    () => cargoInputOf(node, isExporting ? 'full' : detailRef.current),
-    [node, isExporting],
-  )
-  const geometry = useMemo(() => (input ? getCargoGeometry(input) : null), [input])
+  const drawsSelf = useCollective({
+    nodeId: `${node.id}${CARGO_INSTANCE_SUFFIX}`,
+    objectRef: anchorRef,
+    geometryFor: (tier) => getCargoGeometry(cargo[tier]),
+    // Havuz anahtarı geometri önbelleğinin anahtarının TA KENDİSİ: aynı tampona
+    // çözülen iki yük aynı havuza düşer, farklı çözülenler düşmez. İkinci bir
+    // anahtar yazmak, ikisinin ayrışabileceği bir yer daha açardı.
+    keyFor: (tier) => cargoCacheKey(cargo[tier]),
+    materialFor: () => getCargoMaterial(),
+    // Tek paylaşımlı materyal — renk atlastan ve köşe renklerinden geliyor.
+    materialKeyFor: () => 'cargo',
+    castsShadow: true,
+    farSq: LOD_FAR_SQ,
+    nearSq: LOD_NEAR_SQ,
+    excluded,
+  })
+
   // One sleeve fits both tiers: `loadExtent` reads type, preset and variant and
   // never the tier, so the far tier's single box has exactly the near tier's
   // extent.
   const wrapped = node.wrapped && node.cargo !== 'none'
   const filmGeometry = useMemo(
-    () => (input && wrapped ? getFilmGeometry(input) : null),
-    [input, wrapped],
+    () => (wrapped ? getFilmGeometry(cargo.full) : null),
+    [cargo, wrapped],
   )
 
   // Tell the cache both tiers are on screen. Eviction must never free a buffer
-  // something is drawing, and a tier switch must not have to build one.
+  // something is drawing, and a tier switch must not have to build one. Havuz
+  // da bu tutamağa güveniyor: kolektif mesh geometriyi doğrudan tutuyor ve
+  // altından tahliye edilmesi onu boş çizdirirdi.
   useEffect(() => {
-    const near = cargoInputOf(node, 'full')
-    const far = cargoInputOf(node, 'simple')
-    if (!near || !far) return
-    const nearKey = retainCargoGeometry(near)
-    const farKey = retainCargoGeometry(far)
-    const filmKey = wrapped ? retainFilmGeometry(near) : null
+    const nearKey = retainCargoGeometry(cargo.full)
+    const farKey = retainCargoGeometry(cargo.simple)
+    const filmKey = wrapped ? retainFilmGeometry(cargo.full) : null
     return () => {
       releaseCargoGeometry(nearKey)
       releaseCargoGeometry(farKey)
       if (filmKey) releaseFilmGeometry(filmKey)
     }
-  }, [node, wrapped])
+  }, [cargo, wrapped])
 
+  return (
+    <group position={[0, y, 0]} ref={anchorRef}>
+      {/* Kolektif kapalıyken ya da bu palet seçili/sürükleniyorken yükünü
+          kendi çizer; açıkken aynı yüke çözülen bütün paletleri tek
+          `InstancedMesh` çiziyor. */}
+      {drawsSelf && (
+        <SelfDrawnBody
+          farSq={LOD_FAR_SQ}
+          geometryFor={(tier) => getCargoGeometry(cargo[tier])}
+          isExporting={isExporting}
+          materialFor={() => getCargoMaterial()}
+          nearSq={LOD_NEAR_SQ}
+          nodeId={`${node.id}${CARGO_INSTANCE_SUFFIX}`}
+        />
+      )}
+      {filmGeometry && (
+        <FilmVeil geometry={filmGeometry} isExporting={isExporting} nodeId={node.id} />
+      )}
+    </group>
+  )
+}
+
+/**
+ * Streç film — kendi bileşeni, ve kendi kare döngüsü.
+ *
+ * Döngü eskiden `CargoLoad`'un gövdesindeydi ve yükün katmanıyla filmin kesme
+ * mesafesini aynı hesaptan sürüyordu. Katman artık kolektif çizicinin merkezî
+ * döngüsüne ait, geriye yalnız film kaldı — ve film sarılı OLMAYAN palette hiç
+ * yok. Ayrı bir bileşen, aboneliğin de yalnız sarılı paletlerde kurulması
+ * demek: `useFrame` koşullu çağrılamaz ama bir bileşen koşullu MOUNT edilebilir.
+ */
+function FilmVeil({
+  geometry,
+  isExporting,
+  nodeId,
+}: {
+  geometry: BufferGeometry
+  isExporting: boolean
+  nodeId: string
+}) {
+  const meshRef = useRef<Mesh>(null)
   const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
+  const phase = useMemo(() => hashPhase(nodeId), [nodeId])
 
   useFrame(({ camera }) => {
     const mesh = meshRef.current
@@ -288,83 +402,34 @@ function CargoLoad({
     const distanceSq = camera.position.distanceToSquared(
       worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
     )
-
-    // Same distance, both decisions. A second frame loop would compute the same
-    // number again on every pallet in the building.
-    const film = filmRef.current
-    if (film) film.visible = distanceSq <= FILM_CUT_SQ
-
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    const swapped = cargoInputOf(node, next)
-    if (!swapped) return
-    mesh.geometry = getCargoGeometry(swapped)
-    /**
-     * `mesh.castShadow = next === 'full'` BURADAYDI ve kaldırıldı.
-     *
-     * Aşama 1'de raf, asma kat ve konveyörden temizlenen hatanın bu dosyada
-     * kalan kopyası: gölge, mesafeye bağlı katmana bağlanmıştı, yani uzaktaki
-     * hiçbir yük — sistem gölgesi AÇIK olsa bile — gölge düşürmüyordu.
-     *
-     * Host'un sözleşmesi bunu ayrıca açıkça yasaklıyor: `castShadow`'u runtime'da
-     * çevirmek three r184'ün WebGPU node cache'ini bozuyor, o yüzden gölge
-     * yalnız `renderer.shadowMap.enabled` üzerinden, kullanıcının anahtarıyla
-     * açılıp kapanıyor ve built-in kind'ların hepsi bayrağı koşulsuz bırakıyor.
-     */
+    mesh.visible = distanceSq <= FILM_CUT_SQ
   })
 
-  if (!geometry) return null
-
   return (
-    <>
-      <mesh
-        castShadow
-        // Never dispose: shared by every pallet that resolved to the same load.
-        dispose={null}
-        geometry={geometry}
-        material={getCargoMaterial()}
-        position={[0, y, 0]}
-        raycast={NO_RAYCAST}
-        receiveShadow
-        ref={meshRef}
-      />
-      {filmGeometry && (
-        <mesh
-          /**
-           * Casts no shadow, and could not cast a correct one if it wanted to:
-           * this host's shadow pass sets `scene.overrideMaterial` to one shared
-           * material that reads nothing off the object's own, so a transparent
-           * caster would lay down a fully solid shadow. Adding `alphaTest` or an
-           * `alphaMap` would not save it either — worth writing down, because
-           * that is the obvious thing to reach for next.
-           */
-          castShadow={false}
-          dispose={null}
-          geometry={filmGeometry}
-          material={getFilmMaterial()}
-          position={[0, y, 0]}
-          raycast={NO_RAYCAST}
-          receiveShadow={false}
-          ref={filmRef}
-          // After every default-0 opaque, so a blended veil is sorted and drawn
-          // against a depth buffer that has already been laid down.
-          renderOrder={1}
-          // Off until the frame loop has judged the distance. Mounted visible,
-          // a pallet placed at forty metres would draw a full sleeve for up to
-          // eight frames — and an export, which never runs the loop, would draw
-          // one at any distance.
-          visible={isExporting}
-        />
-      )}
-    </>
+    <mesh
+      /**
+       * Casts no shadow, and could not cast a correct one if it wanted to:
+       * this host's shadow pass sets `scene.overrideMaterial` to one shared
+       * material that reads nothing off the object's own, so a transparent
+       * caster would lay down a fully solid shadow. Adding `alphaTest` or an
+       * `alphaMap` would not save it either — worth writing down, because
+       * that is the obvious thing to reach for next.
+       */
+      castShadow={false}
+      dispose={null}
+      geometry={geometry}
+      material={getFilmMaterial()}
+      raycast={NO_RAYCAST}
+      receiveShadow={false}
+      ref={meshRef}
+      // After every default-0 opaque, so a blended veil is sorted and drawn
+      // against a depth buffer that has already been laid down.
+      renderOrder={1}
+      // Off until the frame loop has judged the distance. Mounted visible,
+      // a pallet placed at forty metres would draw a full sleeve for up to
+      // eight frames — and an export, which never runs the loop, would draw
+      // one at any distance.
+      visible={isExporting}
+    />
   )
 }

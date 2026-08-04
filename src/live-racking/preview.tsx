@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import {
   getLiveRackingGeometry,
   liveRackingGeometryKey,
@@ -24,7 +25,8 @@ const NO_RAYCAST = () => {}
 export default function LiveRackingPreview({ node }: { node: LiveRackingNode }) {
   const ref = useRef<Group>(null)
   const geometry = getLiveRackingGeometry(node, 'full')
-  const material = getLiveRackingPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getLiveRackingPreviewMaterial(appearance)
 
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))

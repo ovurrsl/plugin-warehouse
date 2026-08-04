@@ -10,6 +10,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { releaseGeometry } from './geometry-builder'
@@ -58,7 +59,8 @@ export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqu
 
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const material = getConveyorMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorMaterial(appearance)
 
   // Kolektif çiziciye katılım ve gerekçesi `./renderer.tsx`'te; eşikler oradan.
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
@@ -68,7 +70,7 @@ export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqu
     geometryFor: (tier) => getObliqueGeometry(node, tier, abutted),
     keyFor: (tier) => obliqueGeometryKey(node, tier, abutted),
     materialFor: () => material,
-    materialKeyFor: () => 'conveyor',
+    materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

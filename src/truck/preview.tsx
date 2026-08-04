@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getTruckGeometry } from './geometry'
 import { mastPose } from './kinematics'
 import { getTruckPreviewMaterial } from './materials'
@@ -22,7 +23,8 @@ export default function TruckPreview({ node }: { node: TruckNode }) {
   const model = modelOf(node.model)
   const mastRow = mastRowOf(node.mastRowId)
   const pose = mastPose(mastRow, node.forkHeight)
-  const material = getTruckPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getTruckPreviewMaterial(appearance)
 
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))

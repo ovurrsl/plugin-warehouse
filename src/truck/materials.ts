@@ -1,4 +1,5 @@
-import * as THREE from 'three'
+import type * as THREE from 'three'
+import { type Appearance, previewMaterial, surfaceMaterial } from '../appearance'
 
 /**
  * TEK materyal, iki katman — kasten.
@@ -11,28 +12,24 @@ import * as THREE from 'three'
  *
  * Renk vertex'te taşınır (rol paleti), bu yüzden bütün filo tek programla
  * çizilir ve katman geçişi bir uniform yüklemesi bile değildir.
+ *
+ * "Tek örnek" artık ayar başına tek örnek — bkz. `../appearance`. İki katmanın
+ * AYNI örneği paylaşması bozulmuyor: ikisi de aynı `Appearance`'ı okuyor.
  */
 
-let cachedMaterial: THREE.MeshStandardMaterial | null = null
-let cachedPreviewMaterial: THREE.MeshStandardMaterial | null = null
+const SPEC = {
+  family: 'truck',
+  vertexColors: true,
+  roughness: 0.82,
+  metalness: 0.18,
+} as const
 
-export function getTruckMaterial(): THREE.MeshStandardMaterial {
-  if (cachedMaterial) return cachedMaterial
-  cachedMaterial = new THREE.MeshStandardMaterial({
-    vertexColors: true,
-    roughness: 0.82,
-    metalness: 0.18,
-  })
-  return cachedMaterial
+export function getTruckMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(SPEC, appearance)
 }
 
 /** Yerleştirme hayaleti. Paylaşılan örneğin mutasyonu değil, ayrı önbellekli
- *  klon — şeffaflık sahnedeki her araca sızardı. */
-export function getTruckPreviewMaterial(): THREE.MeshStandardMaterial {
-  if (cachedPreviewMaterial) return cachedPreviewMaterial
-  cachedPreviewMaterial = getTruckMaterial().clone()
-  cachedPreviewMaterial.transparent = true
-  cachedPreviewMaterial.opacity = 0.55
-  cachedPreviewMaterial.depthWrite = false
-  return cachedPreviewMaterial
+ *  örnek — şeffaflık sahnedeki her araca sızardı. */
+export function getTruckPreviewMaterial(appearance: Appearance): THREE.Material {
+  return previewMaterial(SPEC, appearance)
 }

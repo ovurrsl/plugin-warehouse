@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getRackPreviewMaterial } from '../rack/materials'
 import { getM3Geometry, releaseM3Geometry, retainM3Geometry } from './geometry-builder'
 import type { M3ShelvingNode } from './schema'
@@ -24,7 +25,8 @@ export default function M3Preview({ node }: { node: M3ShelvingNode }) {
   // preview that dropped detail at distance would show a different thing from
   // what the click commits.
   const geometry = getM3Geometry(node, 'full')
-  const material = getRackPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getRackPreviewMaterial(appearance)
 
   useLayoutEffect(() => {
     ref.current?.traverse((object) => object.layers.set(EDITOR_LAYER))

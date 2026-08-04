@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { type Appearance, previewMaterial, type SurfaceSpec, surfaceMaterial } from '../appearance'
 import { getOrCreateCargoAtlas } from './cargo-atlas'
 import { FILM_OPACITY } from './cargo-constants'
 import { getOrCreateEPALTextureAtlas } from './epal-textures'
@@ -12,30 +13,34 @@ import { getOrCreateEPALTextureAtlas } from './epal-textures'
  * shared the same three textures, so three.js compiled one program and the cost
  * was uniform uploads rather than shader churn, but it directly contradicted
  * the file's own "single material" comment.
+ *
+ * Tekillik artık AYAR başına — bkz. `../appearance`. Host'un Display menüsü
+ * (Render, Textures, Theme) materyali değiştirerek çalışıyor ve bu dosya onu
+ * okumadığı için paletler, bütün bina düzleşirken ya da kile dönerken, EPAL
+ * damgalarını göstermeye devam ediyordu.
  */
 
-let cachedMaterial: THREE.MeshStandardMaterial | null = null
-let cachedPreviewMaterial: THREE.MeshStandardMaterial | null = null
-
-export function getPalletMaterial(): THREE.MeshStandardMaterial {
-  if (cachedMaterial) return cachedMaterial
+function deckSpec(): SurfaceSpec {
   const atlas = getOrCreateEPALTextureAtlas()
-
-  cachedMaterial = new THREE.MeshStandardMaterial({
+  return {
+    family: 'pallet-deck',
     map: atlas.map,
-    roughnessMap: atlas.roughnessMap,
-    metalnessMap: atlas.metalnessMap,
     // three multiplies these scalars into the map channels. The earlier version
     // set 0.75 / 0.2, which meant the control nail — authored as pure white in
     // the metalness map, i.e. steel — rendered at 0.2 metalness and read as
     // shiny grey plastic, and the wood came out around 0.5 roughness, glossier
     // than raw pine. Leave them at 1.0 and let the maps carry the values.
+    roughnessMap: atlas.roughnessMap,
+    metalnessMap: atlas.metalnessMap,
     roughness: 1,
     metalness: 1,
     // Multiplies in the baked occlusion the geometry builder writes.
     vertexColors: true,
-  })
-  return cachedMaterial
+  }
+}
+
+export function getPalletMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(deckSpec(), appearance)
 }
 
 /**
@@ -44,17 +49,9 @@ export function getPalletMaterial(): THREE.MeshStandardMaterial {
  * setting `transparent`/`opacity` on the shared instance would leak the
  * translucency into every committed pallet in the scene.
  */
-export function getPalletPreviewMaterial(): THREE.MeshStandardMaterial {
-  if (cachedPreviewMaterial) return cachedPreviewMaterial
-  cachedPreviewMaterial = getPalletMaterial().clone()
-  cachedPreviewMaterial.transparent = true
-  cachedPreviewMaterial.opacity = 0.55
-  cachedPreviewMaterial.depthWrite = false
-  return cachedPreviewMaterial
+export function getPalletPreviewMaterial(appearance: Appearance): THREE.Material {
+  return previewMaterial(deckSpec(), appearance)
 }
-
-let cachedCargoMaterial: THREE.MeshStandardMaterial | null = null
-let cachedCargoPreviewMaterial: THREE.MeshStandardMaterial | null = null
 
 /**
  * One material for everything a pallet carries — cartons, drums, straps, corner
@@ -70,11 +67,10 @@ let cachedCargoPreviewMaterial: THREE.MeshStandardMaterial | null = null
  * kraft carton share one mesh, and it is why a per-instance tint is left to do
  * only the small per-pallet variation it is good at.
  */
-export function getCargoMaterial(): THREE.MeshStandardMaterial {
-  if (cachedCargoMaterial) return cachedCargoMaterial
+function cargoSpec(): SurfaceSpec {
   const atlas = getOrCreateCargoAtlas()
-
-  cachedCargoMaterial = new THREE.MeshStandardMaterial({
+  return {
+    family: 'cargo',
     map: atlas.map,
     roughnessMap: atlas.orm,
     metalnessMap: atlas.orm,
@@ -84,11 +80,16 @@ export function getCargoMaterial(): THREE.MeshStandardMaterial {
     roughness: 1,
     metalness: 1,
     vertexColors: true,
-  })
-  return cachedCargoMaterial
+  }
 }
 
-let cachedFilmMaterial: THREE.MeshStandardMaterial | null = null
+export function getCargoMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(cargoSpec(), appearance)
+}
+
+export function getCargoPreviewMaterial(appearance: Appearance): THREE.Material {
+  return previewMaterial(cargoSpec(), appearance)
+}
 
 /**
  * Stretch film: **blended, and writing no depth.**
@@ -112,12 +113,18 @@ let cachedFilmMaterial: THREE.MeshStandardMaterial | null = null
  * `FrontSide`, because three sorts objects and never triangles within a mesh:
  * a double-sided sleeve would have to order its own far wall against its near
  * one, which nothing can do.
+ *
+ * Üç harmanlama alanı da HER görünüm modunda korunuyor (`../appearance`
+ * bunları gölgelemeden bağımsız tutuyor). Dokular kapalıyken film düz bir
+ * saydam veile dönüyor ama saydam KALIYOR — opaklaşsaydı sarılı paletin yükü
+ * kilin altında tamamen kaybolurdu. Kaybolan tek şey eteğin incelen alfası:
+ * o da vertex renk attribute'unun dördüncü bileşeninde ve düz renk modu o
+ * attribute'u zaten bırakıyor.
  */
-export function getFilmMaterial(): THREE.MeshStandardMaterial {
-  if (cachedFilmMaterial) return cachedFilmMaterial
+function filmSpec(): SurfaceSpec {
   const atlas = getOrCreateCargoAtlas()
-
-  cachedFilmMaterial = new THREE.MeshStandardMaterial({
+  return {
+    family: 'film',
     map: atlas.map,
     roughnessMap: atlas.orm,
     metalnessMap: atlas.orm,
@@ -130,20 +137,12 @@ export function getFilmMaterial(): THREE.MeshStandardMaterial {
     opacity: FILM_OPACITY,
     depthWrite: false,
     side: THREE.FrontSide,
-  })
-  return cachedFilmMaterial
+  }
 }
 
-export function getCargoPreviewMaterial(): THREE.MeshStandardMaterial {
-  if (cachedCargoPreviewMaterial) return cachedCargoPreviewMaterial
-  cachedCargoPreviewMaterial = getCargoMaterial().clone()
-  cachedCargoPreviewMaterial.transparent = true
-  cachedCargoPreviewMaterial.opacity = 0.55
-  cachedCargoPreviewMaterial.depthWrite = false
-  return cachedCargoPreviewMaterial
+export function getFilmMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(filmSpec(), appearance)
 }
-
-let cachedFarMaterial: THREE.MeshStandardMaterial | null = null
 
 /**
  * The deck at distance: flat wood, no maps, no vertex colours.
@@ -153,12 +152,9 @@ let cachedFarMaterial: THREE.MeshStandardMaterial | null = null
  * smear the EPAL stamps across a twelve-triangle slab. At the range this tier
  * exists for, a flat colour and the atlas are indistinguishable.
  */
-export function getPalletFarMaterial(): THREE.MeshStandardMaterial {
-  if (cachedFarMaterial) return cachedFarMaterial
-  cachedFarMaterial = new THREE.MeshStandardMaterial({
-    color: 0xb99a6b,
-    metalness: 0,
-    roughness: 0.9,
-  })
-  return cachedFarMaterial
+export function getPalletFarMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(
+    { family: 'pallet-far', color: 0xb99a6b, metalness: 0, roughness: 0.9 },
+    appearance,
+  )
 }

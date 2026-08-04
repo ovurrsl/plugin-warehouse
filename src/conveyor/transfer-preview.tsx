@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getConveyorPreviewMaterial } from './materials'
 import { getTransferGeometry } from './transfer-geometry'
 import type { ConveyorTransferNode } from './transfer-schema'
@@ -25,7 +26,8 @@ const NO_RAYCAST = () => {}
 export default function ConveyorTransferPreview({ node }: { node: ConveyorTransferNode }) {
   const ref = useRef<Group>(null)
   const geometry = useMemo(() => getTransferGeometry(node, 'full'), [node])
-  const material = getConveyorPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorPreviewMaterial(appearance)
 
   // The overlay layer keeps the ghost out of export and snapshot passes.
   // Layers do not inherit, so every object in the subtree needs it set.

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { type Appearance, appearanceKey, type SurfaceSpec, surfaceMaterial } from '../appearance'
 import { DEPTH_BIAS } from './constants'
 import type { RouteRole } from './schema'
 
@@ -49,23 +50,22 @@ const STRIPE_COLOURS: Record<RouteRole, number> = {
 /** Arrows and the lane divider, dark so they read against either stripe. */
 const CONTRAST_COLOUR = 0x1e293b
 
-const cache = new Map<RouteRole, THREE.Material[]>()
+const cache = new Map<string, THREE.Material[]>()
 
-function build(role: RouteRole): THREE.Material[] {
-  const units = role === 'pedestrian' ? DEPTH_BIAS.pedestrianUnits : DEPTH_BIAS.vehicleUnits
-  const common = {
+function specFor(role: RouteRole, part: 'stripe' | 'contrast'): SurfaceSpec {
+  return {
+    family: `route:${role}:${part}`,
+    color: part === 'stripe' ? STRIPE_COLOURS[role] : CONTRAST_COLOUR,
     roughness: 0.85,
     metalness: 0,
+    // Her modda korunur — bkz. `../appearance`. Gölgeleme modunun eş düzlem
+    // sorunuyla ilgisi yok; offset düşerse rota slab ile z-savaşına girer.
     polygonOffset: true,
     polygonOffsetFactor: DEPTH_BIAS.factor,
-    polygonOffsetUnits: units,
+    polygonOffsetUnits:
+      role === 'pedestrian' ? DEPTH_BIAS.pedestrianUnits : DEPTH_BIAS.vehicleUnits,
     side: THREE.FrontSide,
-  } as const
-
-  return [
-    new THREE.MeshStandardMaterial({ ...common, color: STRIPE_COLOURS[role] }),
-    new THREE.MeshStandardMaterial({ ...common, color: CONTRAST_COLOUR }),
-  ]
+  }
 }
 
 /**
@@ -76,11 +76,20 @@ function build(role: RouteRole): THREE.Material[] {
  * can arise — within a single route nothing overlaps anything, because the
  * stripes sit at the edges and the arrows and divider are mutually exclusive on
  * the axis.
+ *
+ * Dokular kapalıyken şeritler de tema rengine çöküyor — sarı/yeşil ayrımı o
+ * modda kayboluyor. İstenmeyen ama tutarlı: monokrom mod host'un kendi zemin
+ * ve duvar renklerini de aynı şekilde siliyor, ve rotayı ayrıcalıklı kılmak
+ * "bazı nesneler ayarı dinliyor" hâline geri dönmek olurdu.
  */
-export function getRouteMaterials(role: RouteRole): THREE.Material[] {
-  const hit = cache.get(role)
+export function getRouteMaterials(role: RouteRole, appearance: Appearance): THREE.Material[] {
+  const key = `${role}|${appearanceKey(appearance)}`
+  const hit = cache.get(key)
   if (hit) return hit
-  const built = build(role)
-  cache.set(role, built)
+  const built = [
+    surfaceMaterial(specFor(role, 'stripe'), appearance),
+    surfaceMaterial(specFor(role, 'contrast'), appearance),
+  ]
+  cache.set(key, built)
   return built
 }

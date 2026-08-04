@@ -3,6 +3,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type * as THREE from 'three'
+import { useAppearance } from '../appearance'
 import { getMezzanineTierGeometry } from './geometry'
 import { getMezzanineMaterial } from './materials'
 import type { MezzanineNode } from './schema'
@@ -57,7 +58,8 @@ export default function ExplodedTiers({
   tierCount: number
 }) {
   const groupsRef = useRef<Array<THREE.Group | null>>([])
-  const material = getMezzanineMaterial()
+  const appearance = useAppearance()
+  const material = getMezzanineMaterial(appearance)
   const gap = tierGapFor(tierCount)
 
   useFrame((_, delta) => {

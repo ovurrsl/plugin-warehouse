@@ -4,6 +4,7 @@ import { type AnyNodeId, useLiveTransforms, useRegistry } from '@pascal-app/core
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
+import { useAppearance } from '../appearance'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
 import { getRouteMaterials } from './materials'
@@ -43,7 +44,8 @@ export default function RouteRenderer({ node }: { node: RouteNode }) {
   const rotation = live?.rotation ?? node.rotation
 
   const geometry = useMemo(() => getRouteGeometry(node), [node])
-  const materials = getRouteMaterials(node.role)
+  const appearance = useAppearance()
+  const materials = getRouteMaterials(node.role, appearance)
 
   // Claim the buffer while it is on screen. Eviction must never free a shape
   // something is drawing, and this is the only place that knows.

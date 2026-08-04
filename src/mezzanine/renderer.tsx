@@ -9,6 +9,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
@@ -77,7 +78,8 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
   )
 
   const geometry = getMezzanineGeometry(node)
-  const material = getMezzanineMaterial()
+  const appearance = useAppearance()
+  const material = getMezzanineMaterial(appearance)
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
   const drawsSelf = useCollective({
@@ -86,7 +88,7 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
     geometryFor: () => getMezzanineGeometry(node),
     keyFor: () => mezzanineGeometryKey(node),
     materialFor: () => material,
-    materialKeyFor: () => 'mezzanine',
+    materialKeyFor: () => `mezzanine:${appearanceKey(appearance)}`,
     castsShadow: true,
     /**
      * Bu kind'ın LOD'u YOK — ve eşikleri sonsuz yapmak bir ihmal değil, bir

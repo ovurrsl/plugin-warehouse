@@ -127,7 +127,11 @@ describe('T19 — attribute paritesi yapısaldır', () => {
   })
 
   test('tek materyal, iki katman — uzak katman materyali yok', () => {
-    expect(materials.getTruckMaterial()).toBe(materials.getTruckMaterial())
+    // Ayar başına tek örnek: aynı `Appearance` iki kez sorulduğunda aynı
+    // nesneyi vermeli, yoksa "iki katman aynı materyali paylaşır" iddiası
+    // düğüm başına bir materyale dönerdi.
+    const appearance = { shading: 'rendered', textures: true, colorPreset: 'clay' } as const
+    expect(materials.getTruckMaterial(appearance)).toBe(materials.getTruckMaterial(appearance))
     expect(Object.keys(materials).sort()).toEqual(['getTruckMaterial', 'getTruckPreviewMaterial'])
   })
 })

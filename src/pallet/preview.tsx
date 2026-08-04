@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getCargoGeometry, releaseCargoGeometry, retainCargoGeometry } from './cargo-geometry'
 import { cargoInputOf } from './cargo-parts'
 import { getFilmGeometry } from './film'
@@ -28,7 +29,8 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
   const ref = useRef<Group>(null)
   const spec = specOf(node.preset)
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
-  const material = getPalletPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getPalletPreviewMaterial(appearance)
   /**
    * The real load, at the real fill — **safe only because the tool now hands
    * this node's id to the pallet it creates.**
@@ -76,7 +78,7 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
           <mesh
             dispose={null}
             geometry={cargo.geometry}
-            material={getCargoPreviewMaterial()}
+            material={getCargoPreviewMaterial(appearance)}
             position={[0, spec.height, 0]}
             raycast={NO_RAYCAST}
           />
@@ -84,7 +86,7 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
             <mesh
               dispose={null}
               geometry={cargo.film}
-              material={getCargoPreviewMaterial()}
+              material={getCargoPreviewMaterial(appearance)}
               position={[0, spec.height, 0]}
               raycast={NO_RAYCAST}
               renderOrder={1}

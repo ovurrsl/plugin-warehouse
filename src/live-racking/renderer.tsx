@@ -9,6 +9,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -75,7 +76,8 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     live !== undefined || override !== undefined,
   )
 
-  const material = getLiveRackingMaterial()
+  const appearance = useAppearance()
+  const material = getLiveRackingMaterial(appearance)
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
   const drawsSelf = useCollective({
@@ -84,7 +86,7 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     geometryFor: (tier) => getLiveRackingGeometry(node, tier === 'full' ? 'full' : 'simple'),
     keyFor: (tier) => liveRackingGeometryKey(node, tier === 'full' ? 'full' : 'simple'),
     materialFor: () => material,
-    materialKeyFor: () => 'live-racking',
+    materialKeyFor: () => `live-racking:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

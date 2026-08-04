@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getRackPreviewMaterial } from '../rack/materials'
 import {
   getDriveInGeometry,
@@ -30,7 +31,8 @@ export default function DriveInPreview({ node }: { node: DriveInRackNode }) {
   // neighbours yet, and a placement preview that dropped detail at distance
   // would be showing the user a different thing from what the click commits.
   const geometry = getDriveInGeometry(node, 'full')
-  const material = getRackPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getRackPreviewMaterial(appearance)
 
   useLayoutEffect(() => {
     ref.current?.traverse((object) => object.layers.set(EDITOR_LAYER))

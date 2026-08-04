@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
 import { useStaticTransform } from '../static-transform'
 import { getTruckGeometry, releaseTruckGeometry, retainTruckGeometry } from './geometry'
@@ -92,7 +93,8 @@ export default function TruckRenderer({ node }: { node: TruckNode }) {
   const detailRef = useRef<TruckDetail>('full')
   const frameRef = useRef(0)
   const phase = useMemo(() => hashPhase(node.id), [node.id])
-  const material = getTruckMaterial()
+  const appearance = useAppearance()
+  const material = getTruckMaterial(appearance)
 
   // Her gövdenin İKİ katmanı da ekranda sayılır: tahliye çizileni boşaltamaz
   // ve katman geçişi inşa beklemez.

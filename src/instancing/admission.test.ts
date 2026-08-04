@@ -1,0 +1,105 @@
+import { afterEach, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  admitAllNow,
+  pendingAdmissions,
+  resetAdmission,
+  resumeProgressiveAdmission,
+} from './admission'
+
+afterEach(() => {
+  resetAdmission()
+})
+
+/**
+ * Kademeli mount'un iki yanlış hâli de SESSİZ: kuyruk hiç boşalmazsa raflar
+ * görünmez ve hiçbir hata çıkmaz; kuyruk bir seferde boşalırsa yükleme yine
+ * kilitlenir ve yine hiçbir hata çıkmaz. Testler ikisini de hedefliyor.
+ */
+describe('kademeli mount kabulü', () => {
+  test('dışa aktarım kuyruğu SENKRON boşaltır — yarım sahne aktarılamaz', () => {
+    admitAllNow()
+    expect(pendingAdmissions()).toBe(0)
+
+    // Senkronluk sözleşmenin kendisi: bir kare beklemek, dışa aktarımın aynı
+    // tick'te anlık görüntü aldığı hâlde rafları eksik bırakırdı. `await` ya da
+    // `requestAnimationFrame` üstünden boşaltmak bunu sessizce bozar.
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    const body = source.slice(source.indexOf('export function admitAllNow'))
+    const fn = body.slice(0, body.indexOf('\n}'))
+    expect(fn).not.toContain('requestAnimationFrame')
+    expect(fn).not.toContain('await')
+    expect(fn).toContain('waiting.clear()')
+  })
+
+  test('dışa aktarım bitince bütçe geri devreye girer', () => {
+    admitAllNow()
+    resumeProgressiveAdmission()
+    // Bayrak sıfırlanmazsa sonraki büyük yükleme kademeli yola HİÇ girmez ve
+    // ilk sahnedeki kilitlenme geri gelir — sessizce.
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    expect(source).toContain('draining = false')
+  })
+
+  test('bütçe tek başına bırakılmamış — taban ilerlemeyi garanti ediyor', () => {
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    // Yalnız süreye bakan bir kuyruk, tek mount'u bütçeyi aşan bir makinede
+    // kare başına bir düğüm ilerler; beş bin raf dakikalar sürerdi.
+    expect(source).toContain('MIN_PER_FRAME')
+    const min = source.match(/const MIN_PER_FRAME = (\d+)/)
+    expect(Number(min?.[1])).toBeGreaterThan(0)
+  })
+
+  test('kabul edilen düğüm yeniden mount’ta kuyruğa GİRMEZ', () => {
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    // Girseydi: kat görünürlüğü açılıp kapandığında zaten görünen raflar bir
+    // kare kaybolur, kullanıcıya titreme olarak görünürdü.
+    expect(source).toContain('const admitted = new Set<string>()')
+    expect(source).toContain('admitted.has(nodeId)')
+  })
+
+  test('kuyruk boşalınca döngü kendini durdurur', () => {
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    // `schedule()` koşulsuz yeniden kurulsaydı, sahne dolduktan sonra da her
+    // kare boş bir rAF geri çağrısı koşardı — ölü döngü.
+    expect(source).toContain('if (waiting.size > 0) schedule()')
+  })
+
+  test('kapı kolektif sisteme BAĞLI DEĞİL', () => {
+    const source = readFileSync(join(import.meta.dir, 'admission.ts'), 'utf8')
+    // Bağlı olsaydı: kullanıcı instancing'i kapattığında (donmayı teşhis etmek
+    // için önerilen ilk adım) hiçbir raf hiç mount olmazdı — performans ayarı
+    // sahneyi boşaltan bir hataya dönüşürdü.
+    //
+    // Kontrol import SATIRLARI üstünden: modülün gerekçesi bu bağımlılığın
+    // neden kurulmadığını anlatıyor, yani düz metin araması kendi yorumunu
+    // yakalar ve testi işe yaramaz kılardı.
+    const imports = source
+      .split('\n')
+      .filter((line) => line.startsWith('import '))
+      .join('\n')
+    expect(imports).not.toContain('../store')
+    expect(imports).not.toContain('./collective')
+    expect(imports).not.toContain('@react-three/fiber')
+    expect(source).toContain('requestAnimationFrame')
+  })
+
+  test('raf renderer’ı kapıyı kullanıyor ve gövde ayrı bileşende', () => {
+    const source = readFileSync(join(import.meta.dir, '..', 'rack', 'renderer.tsx'), 'utf8')
+    expect(source).toContain('useAdmitted')
+    // Gövde aynı bileşende kalsaydı kancalar yine koşardı ve kapı hiçbir şey
+    // kazandırmazdı — tipler bunu ifade edemiyor, o yüzden burada bekçilik.
+    expect(source).toContain('function PalletRackBody')
+    const gate = source.indexOf('const admitted = useAdmitted')
+    const bail = source.indexOf('if (!admitted) return null')
+    expect(gate).toBeGreaterThan(-1)
+    expect(bail).toBeGreaterThan(gate)
+  })
+
+  test('dışa aktarım kapısı kolektif sistemde bağlı', () => {
+    const source = readFileSync(join(import.meta.dir, 'collective-system.tsx'), 'utf8')
+    expect(source).toContain('admitAllNow()')
+    expect(source).toContain('resumeProgressiveAdmission()')
+  })
+})

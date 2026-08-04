@@ -9,6 +9,7 @@ import { kindOf } from '../host-adapter'
 import { KIND_PREFIX } from '../plugin-id'
 import { rebakeDriftedStaticTransforms } from '../static-transform'
 import { useWarehouseStore } from '../store'
+import { admitAllNow, resumeProgressiveAdmission } from './admission'
 import {
   clearPools,
   evaluateTiers,
@@ -125,6 +126,22 @@ export default function CollectiveInstancingSystem() {
     generationRef.current = -1
     dirtyRef.current = true
   }, [enabled, isExporting])
+
+  /**
+   * Dışa aktarımda kademeli mount kuyruğu ŞİMDİ boşaltılır.
+   *
+   * Dışa aktarma her zaman dosyadaki sahnedir: kuyruğun ortasında alınan bir
+   * anlık görüntüde rafların bir kısmı henüz mount olmamış olurdu ve dosyadan
+   * sessizce eksik çıkardı. Efekt boyamadan önce koştuğu için bekleyenler aynı
+   * commit'te mount ediliyor.
+   *
+   * Abonelik burada, kapıda değil: `isExporting`'i her rafın ayrı ayrı
+   * dinlemesi binlerce abonelik demekti, bu sistem ise sahnede zaten tek.
+   */
+  useEffect(() => {
+    if (isExporting) admitAllNow()
+    else resumeProgressiveAdmission()
+  }, [isExporting])
 
   /**
    * Unmount temizliği — Canvas yeniden mount edildiğinde ŞART.

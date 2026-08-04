@@ -3,7 +3,7 @@
 <!-- BADGES:START -->
 [![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
-![Version](https://img.shields.io/badge/version-0.1.1-blue)
+![Version](https://img.shields.io/badge/version-0.1.2-blue)
 ![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
 ![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
 ![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b7ea211`](https://github.com/ovurrsl/plugin-warehouse/commit/b7ea211b704a7e0bd7af451662957986dc1485a1))
 - Refresh generated README blocks [skip ci] ([`1c73ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/1c73ce29f6f5994346c742b6c79f08e5c1e82d14))
 - Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
 - Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`0b936a0`](https://github.com/ovurrsl/plugin-warehouse/commit/0b936a0c33f4086e309f1438286f6ddde4bc7714))
 - Refresh generated README blocks [skip ci] ([`9a022c4`](https://github.com/ovurrsl/plugin-warehouse/commit/9a022c4776d65b82d4152ad32d456ba686d11c18))
 - Refresh generated README blocks [skip ci] ([`e57fd9e`](https://github.com/ovurrsl/plugin-warehouse/commit/e57fd9ec2124387002354b2ee6cea1e5d27d54aa))
-- Refresh generated README blocks [skip ci] ([`7b052d6`](https://github.com/ovurrsl/plugin-warehouse/commit/7b052d6dd8cfe7391213dda68d6bc5897eb12a96))
 
 …
 

@@ -172,7 +172,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'frameHeight',
           severity: 'warning',
-          msg: `${(node.frameHeight * 1000).toFixed(0)} mm yalnız İSPANYOLCA katalogda listeli; İngilizce baskıda yok. Gerçek bir boy, ama teklifte doğrulayın.`,
+          msg: `${millimetreLabel(node.frameHeight, unit)} yalnız İSPANYOLCA katalogda listeli; İngilizce baskıda yok. Gerçek bir boy, ama teklifte doğrulayın.`,
         })
       } else if (heightSeries === 'unlisted') {
         issues.push({

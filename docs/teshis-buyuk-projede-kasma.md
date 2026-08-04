@@ -1,5 +1,13 @@
 # Büyük projede kasmanın teşhisi — kusur eklentide değil, host'un otomatik kaydetmesinde
 
+> ⚠️ **BU BELGENİN BİRİNCİL SONUCU GEÇERSİZDİR.** Buradaki autosave bulgusu
+> gerçek ama *düzenleme başına* bir maliyettir ve kullanıcının "dosyayı sadece
+> açıyorum, kilitleniyor" belirtisini açıklamaz. Gerçek neden
+> `DUZELTME-kirli-bayragi.md`'de. Ayrıca aşağıdaki kare süresi / çizim
+> ölçümleri geçersizdir: ölçüm ortamında render bozuktu (R3F çift kopyası,
+> havuzlar hiç kurulmuyordu), yani "çizim masum" sonucu ölçülmemiş sayılmalıdır.
+
+
 *4 Ağustos 2026. Ölçümler, kullanıcının 3.011 düğümlük gerçek proje dosyasıyla
 (2.708 × `warehouse:pallet-rack`), dağıtımdakiyle aynı editör sürümü (incele
 dalı, `3840a0c`) ve bu eklentinin v0.1.2'siyle, başsız Chromium'da alındı.

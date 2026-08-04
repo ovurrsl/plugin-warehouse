@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
 - Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
 - Refresh generated README blocks [skip ci] ([`0b936a0`](https://github.com/ovurrsl/plugin-warehouse/commit/0b936a0c33f4086e309f1438286f6ddde4bc7714))
 - Refresh generated README blocks [skip ci] ([`9a022c4`](https://github.com/ovurrsl/plugin-warehouse/commit/9a022c4776d65b82d4152ad32d456ba686d11c18))
@@ -123,6 +124,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Follow the host's Render, Textures and Theme settings ([`8b675e9`](https://github.com/ovurrsl/plugin-warehouse/commit/8b675e91998f790c11215248ee30f30d57176305))
 - Its own tier system — exploded view, tier duplication ([`584e000`](https://github.com/ovurrsl/plugin-warehouse/commit/584e000577c65f36de7cce253e80dc013e3f2f65))
 - Draw the area to place it, and make the size controls real ([`040ff68`](https://github.com/ovurrsl/plugin-warehouse/commit/040ff68a36fdf6f7fb5b42499ee999cf3f468893))
 - M3 picking shelving — no beams, one 25 mm grid, published loads ([`527519c`](https://github.com/ovurrsl/plugin-warehouse/commit/527519ca9e5c983eacdd20dd8d09420316c6e539))
@@ -213,6 +215,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Keep each node's collider inside its registered group ([`ab2edca`](https://github.com/ovurrsl/plugin-warehouse/commit/ab2edca98959c9b1e7ad9ddc3107da774d766ca2))
 - Solo mode — copy the level's layer mask into the pool ([`8148267`](https://github.com/ovurrsl/plugin-warehouse/commit/8148267fb1b74d5e561aa730fc9742d679deed53))
 - The three new racking kinds never triggered a placement click ([`41546b8`](https://github.com/ovurrsl/plugin-warehouse/commit/41546b82ce43d91476ae6d56829e59c759868b99))
 - Patlatma, preview kaybolması, gölge ve teleskopik mıknatıs ([`0944920`](https://github.com/ovurrsl/plugin-warehouse/commit/0944920c07d93f164973135ed2daa62d9a699041))
@@ -259,6 +262,8 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Draw cargo loads from the collective pool ([`ffc995c`](https://github.com/ovurrsl/plugin-warehouse/commit/ffc995c9dcb7f44a35fadca124a0f087e0fa78c5))
+- Cut the per-frame and per-pointer-event work that stalls integrated GPUs ([`fe641cf`](https://github.com/ovurrsl/plugin-warehouse/commit/fe641cf3186df6e6fb72e06fe6f4871a2f6a9e8e))
 - Konveyör ailesi kolektife girdi, ölü kare döngüleri kalktı ([`1cc0a41`](https://github.com/ovurrsl/plugin-warehouse/commit/1cc0a419a7428ebc62cc859fd7a5dcadc09fabae))
 - Collective instancing — 10,300 draw calls measured down to ~11 ([`336d7e6`](https://github.com/ovurrsl/plugin-warehouse/commit/336d7e6e2aa9a4941d6f29d57f0cb0f16c1c9dc5))
 - The collider fix the rack already had, applied to the other three ([`77f3393`](https://github.com/ovurrsl/plugin-warehouse/commit/77f3393380d4a0ca773021e8f570996f2759c128))

@@ -167,24 +167,57 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
 
   return (
     <group visible={node.visible !== false} {...handlers}>
-      {/* Selection collider. A rack is mostly air — clicks aimed at it fall
-          between the beams and hit whatever is behind. An invisible box over
-          the whole frame is what the user is actually pointing at. Outside the
-          registered group so the selection outline still traces the real
-          silhouette rather than this box. */}
-      {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
-          position={[position[0], position[1] + node.uprightHeight / 2, position[2]]}
-          rotation={rotation}
-          scale={[width, node.uprightHeight, depth]}
-          visible={false}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {/*
+          Selection collider. A rack is mostly air — clicks aimed at it fall
+          between the beams and hit whatever is behind. An invisible box over
+          the whole frame is what the user is actually pointing at.
+
+          ## İÇERİDE, ve bu gölgelerin doğru çalışmasının koşulu
+
+          Bir zamanlar kayıtlı grubun KARDEŞİYDİ, gerekçesi de "seçim ana hattı
+          bu kutuyu değil gerçek siluetı çizsin"di. Gerekçe görünür bir kutu
+          için doğru, bunun için değil: ana hat geçişi maskesini sıradan bir
+          `renderer.render(scene, camera)` sırasında `renderObject`'i devralarak
+          topluyor (`merged-outline-node.ts:355-395`), üç ise `visible = false`
+          alt ağacını `projectObject`'te tümden eliyor — yani bu mesh oraya hiç
+          ulaşmıyor ve maskeye giremiyor.
+
+          Dışarıda durmasının BEDELİ ise ölçülebilirdi. Host, yönlü ışığın gölge
+          frustum'unu KAYITLI düğümlerin birleşimine oturtuyor
+          (`lights.tsx:124-131`: `for (const [id, obj] of sceneRegistry.nodes)
+          box.expandByObject(obj)`). Kolektif çizici açıkken bu grubun içi
+          BOŞ — gövde sahne kökündeki havuz mesh'inden çiziliyor ve o mesh
+          kayıt defterinde yok. Yani depo ekipmanı gölge sınırlarına hiç
+          katkı vermiyordu:
+
+            · Sahnede host binası yoksa birleşim boş kalıyor, `lights.tsx:143`
+              yedeğe düşüyor ve frustum dünya merkezinde ~37,5 m yarı-genişlikte
+              kalıyor. 120 m'lik bir holün büyük kısmı dışarıda: oradaki
+              rafların gölgesi hiç çizilmiyor, merkeze yakın olanlarınki
+              çiziliyor ve Display menüsünde bu farkı açıklayan hiçbir şey yok.
+            · Bir rafı SEÇMEK onu `excluded` yapıp kendi çizmesine döndürüyor,
+              yani grubun içi bir anda doluyor ve birleşim büyüyor — 0,4 sn
+              içinde bütün binanın gölgeleri kabalaşıyor, uzaktakiler gölge
+              kazanıyor. Bırakınca geri dönüyor.
+
+          Kullanıcının "gölgeler kafasına göre" dediği şey tam olarak bu ikisi.
+
+          `Box3.expandByObject` görünürlüğe BAKMIYOR, `projectObject` bakıyor:
+          bu yüzden kutu içeri alınınca gölge sınırları düzeliyor ve karşılığında
+          tek bir çizim çağrısı bile eklenmiyor. Konum artık yerel — kayıtlı
+          grup konumu ve dönüşü zaten taşıyor.
+        */}
+        {!isExporting && (
+          <mesh
+            dispose={null}
+            geometry={UNIT_COLLIDER}
+            material={COLLIDER_MATERIAL}
+            position={[0, node.uprightHeight / 2, 0]}
+            scale={[width, node.uprightHeight, depth]}
+            visible={false}
+          />
+        )}
         {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken
             kendi mesh'ini çizer; açıkken tek `InstancedMesh` onun yerine
             çizer ve bu boş kalır. İkisi birden çizerse z-savaşı olur. */}

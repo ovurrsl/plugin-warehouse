@@ -144,19 +144,17 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
 
   return (
     <group visible={node.visible !== false} {...handlers}>
-      {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
-          position={[position[0], position[1] + colliderHeight / 2, position[2]]}
-          rotation={rotation}
-          scale={[length, colliderHeight, width]}
-          visible={false}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh
+            dispose={null}
+            geometry={UNIT_COLLIDER}
+            material={COLLIDER_MATERIAL}
+            position={[0, colliderHeight / 2, 0]}
+            scale={[length, colliderHeight, width]}
+            visible={false}
+          />
+        )}
         {/* Kolektif kapalıyken ya da bu düğüm seçili/sürükleniyorken kendi
             mesh'ini çizer; açıkken tek `InstancedMesh` onun yerine çizer ve
             burası boş kalır. İkisi birden çizerse z-savaşı olur. */}

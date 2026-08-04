@@ -135,15 +135,10 @@ export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
 
   return (
     <group visible={node.visible !== false} {...handlers}>
-      {!isExporting && (
-        <mesh
-          position={[position[0], position[1] + height / 2, position[2]]}
-          rotation={rotation}
-          {...colliderProps([width, height, depth])}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh position={[0, height / 2, 0]} {...colliderProps([width, height, depth])} />
+        )}
         {/*
           Patlatılmışken kat başına bir grup, kapalıyken tek birleşik mesh —
           ama İKİSİ DE `drawsSelf`in altında, ve bu bir tekrar değil bir

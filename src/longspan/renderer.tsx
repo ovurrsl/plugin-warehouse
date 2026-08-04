@@ -114,19 +114,17 @@ export default function LongspanRenderer({ node }: { node: LongspanNode }) {
       {/* Selection collider. A shelving bay is mostly air; without one a click
           aimed between the shelves selects whatever is behind. Outside the
           registered group so the outline still traces the real silhouette. */}
-      {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
-          position={[position[0], position[1] + node.frameHeight / 2, position[2]]}
-          rotation={rotation}
-          scale={[width, node.frameHeight, depth]}
-          visible={false}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh
+            dispose={null}
+            geometry={UNIT_COLLIDER}
+            material={COLLIDER_MATERIAL}
+            position={[0, node.frameHeight / 2, 0]}
+            scale={[width, node.frameHeight, depth]}
+            visible={false}
+          />
+        )}
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}

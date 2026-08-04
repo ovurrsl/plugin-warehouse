@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1c73ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/1c73ce29f6f5994346c742b6c79f08e5c1e82d14))
 - Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
 - Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
 - Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
@@ -216,6 +217,9 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Call useUnit above the early return, and convert the ES-only height ([`2e3640d`](https://github.com/ovurrsl/plugin-warehouse/commit/2e3640dd73d2ab47f70b2a5a44b8f3d5cedd0f40))
+- Follow the host's Units setting across every readout ([`ac732ef`](https://github.com/ovurrsl/plugin-warehouse/commit/ac732ef48e6b424fb242b48f7f789e0057666cb8))
+- Convert the catalog panel's slab elevation, and stop copying the host's conversion ([`e5d08f9`](https://github.com/ovurrsl/plugin-warehouse/commit/e5d08f900282e1a3d635ef41ba7495a8920f41d4))
 - Keep each node's collider inside its registered group ([`ab2edca`](https://github.com/ovurrsl/plugin-warehouse/commit/ab2edca98959c9b1e7ad9ddc3107da774d766ca2))
 - Solo mode — copy the level's layer mask into the pool ([`8148267`](https://github.com/ovurrsl/plugin-warehouse/commit/8148267fb1b74d5e561aa730fc9742d679deed53))
 - The three new racking kinds never triggered a placement click ([`41546b8`](https://github.com/ovurrsl/plugin-warehouse/commit/41546b82ce43d91476ae6d56829e59c759868b99))

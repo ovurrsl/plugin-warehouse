@@ -3,7 +3,7 @@
 <!-- BADGES:START -->
 [![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-0.1.1-blue)
 ![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
 ![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
 ![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
@@ -212,22 +212,17 @@ bunx git-cliff --output CHANGELOG.md
 ## Recent changes
 
 <!-- CHANGELOG:START -->
-## Unreleased
+## 0.1.1 — 2026-08-04
 
-
-### Build and CI
-
-- Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
-- CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
 
 ### Chores
 
 - Kullanılmayan rectsOverlap importunu düşür ([`3f0d924`](https://github.com/ovurrsl/plugin-warehouse/commit/3f0d9247cc79b17182f8ce51fbf6974990425c6a))
 - Obsidian gitignore girdilerini geri al ([`e80016a`](https://github.com/ovurrsl/plugin-warehouse/commit/e80016a9dd165ed0bcedc01a9832f5b493834b5b))
-- Obsidian kasasını ve yerel notları gitignore'a al ([`c54aaf5`](https://github.com/ovurrsl/plugin-warehouse/commit/c54aaf59ed19ee8e3cd7c8bcac055090ba0e6b98))
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
 - Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
 - Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
 - Refresh generated README blocks [skip ci] ([`0b936a0`](https://github.com/ovurrsl/plugin-warehouse/commit/0b936a0c33f4086e309f1438286f6ddde4bc7714))
@@ -236,6 +231,11 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`7b052d6`](https://github.com/ovurrsl/plugin-warehouse/commit/7b052d6dd8cfe7391213dda68d6bc5897eb12a96))
 - Refresh generated README blocks [skip ci] ([`88e51d0`](https://github.com/ovurrsl/plugin-warehouse/commit/88e51d0f3fedf9a1ba5d225df51839ff2bc11eb2))
 - Refresh generated README blocks [skip ci] ([`be935ff`](https://github.com/ovurrsl/plugin-warehouse/commit/be935ffa0c89997e5444880695801f93ddd39178))
+- Refresh generated README blocks [skip ci] ([`540d5df`](https://github.com/ovurrsl/plugin-warehouse/commit/540d5dff7e3b3e25517a24c82610c70f8cbf23af))
+- Refresh generated README blocks [skip ci] ([`314df04`](https://github.com/ovurrsl/plugin-warehouse/commit/314df04e52e3f0d1fb2a9f8d5363073985fa1dfa))
+- Refresh generated README blocks [skip ci] ([`fed18af`](https://github.com/ovurrsl/plugin-warehouse/commit/fed18afd12276c30da8e5ed8d039764541a5ebdc))
+- Refresh generated README blocks [skip ci] ([`1d773a4`](https://github.com/ovurrsl/plugin-warehouse/commit/1d773a485f065b5b054a0a5e5775c558a271bf7d))
+- Refresh generated README blocks [skip ci] ([`5a447ef`](https://github.com/ovurrsl/plugin-warehouse/commit/5a447ef0a39cebcffbd5980456fc47464498c19e))
 
 …
 

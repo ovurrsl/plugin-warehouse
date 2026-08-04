@@ -1,6 +1,6 @@
 {
   "name": "@ovurrsl/plugin-warehouse",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Warehouse & logistics equipment plugin for the Pascal editor — pallets, racking, handling equipment, and a capacity readout.",
   "type": "module",
   "main": "./src/index.ts",

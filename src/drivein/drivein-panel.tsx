@@ -43,6 +43,7 @@ function useInspected(provided?: DriveInRackNode): DriveInRackNode | null {
 
 export default function DriveInPanel({ node: provided }: { node?: DriveInRackNode }) {
   const node = useInspected(provided)
+  const unit = useUnit()
   if (!node) return null
 
   const issues = driveInParametrics.invariants?.flatMap((check) => check(node)) ?? []
@@ -52,7 +53,6 @@ export default function DriveInPanel({ node: provided }: { node?: DriveInRackNod
   const envelope = forkliftEnvelope(node)
   const bearing = railBearingEachSide(node)
   const rail = RAIL_PROFILES[node.railType]
-  const unit = useUnit()
 
   return (
     <>

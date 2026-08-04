@@ -215,6 +215,49 @@ describe('alıntı figürü ile ölçülmüş figür ayrı', () => {
   })
 })
 
+/**
+ * BEKÇİ: `useUnit()` erken `return`'ün ÜSTÜNDE.
+ *
+ * Bu bir birim hatası değil, bir ÇÖKME — ve tam olarak bu değişiklikte bir kez
+ * gerçekten oldu (`drivein-panel.tsx`). Panellerin hepsi aynı kalıpta:
+ *
+ *     const node = useInspected(provided)
+ *     if (!node) return null        // müfettiş başka bir şey için açık
+ *     ...
+ *
+ * Kancayı bu `return`'ün altına koymak, düğüm seçili DEĞİLKEN bir, seçiliyken
+ * iki kanca çağırmak demek. React kanca sırasını konuma göre eşliyor, sayı
+ * artınca "Rendered more hooks than during the previous render" fırlatıyor: yani
+ * panel boş açılıp sonra bir raf seçildiğinde müfettiş çöküyor. Tipler sessiz,
+ * testler yeşil, hata yalnız o sırada görülüyor.
+ *
+ * Kontrol fonksiyon fonksiyon yapılıyor: bir dosyada A bileşeninde koruma, B
+ * bileşeninde kanca olması tamamen meşru ve yanlış alarm vermemeli.
+ */
+describe('kanca sırası', () => {
+  const FUNCTION_START = /^(?:export\s+)?(?:default\s+)?function\s/
+  const EARLY_RETURN = /^\s{0,4}if\s*\([^)]*\)\s*return\b/
+  const HOOK = /\buseUnit\(\)/
+
+  test('hiçbir bileşende useUnit() erken return’ün altında değil', () => {
+    const offenders: string[] = []
+    for (const file of sourceFiles()) {
+      if (!file.endsWith('.tsx')) continue
+      const lines = readFileSync(file, 'utf8').split('\n')
+      let guardAt = -1
+      for (const [index, line] of lines.entries()) {
+        if (FUNCTION_START.test(line))
+          guardAt = -1 // yeni bileşen, sayaç sıfırlanır
+        else if (guardAt < 0 && EARLY_RETURN.test(line)) guardAt = index + 1
+        else if (HOOK.test(line) && guardAt > 0) {
+          offenders.push(`${file}:${index + 1} — useUnit() satır ${guardAt}'deki return'ün altında`)
+        }
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+})
+
 /** `src` altındaki her `.ts` / `.tsx` — testler dahil, `node_modules` hariç. */
 function sourceFiles(): string[] {
   const out: string[] = []

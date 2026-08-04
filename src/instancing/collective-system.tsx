@@ -1,10 +1,12 @@
 'use client'
 
-import { useScene } from '@pascal-app/core'
+import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
+import { kindOf } from '../host-adapter'
+import { KIND_PREFIX } from '../plugin-id'
 import { rebakeDriftedStaticTransforms } from '../static-transform'
 import { useWarehouseStore } from '../store'
 import {
@@ -25,6 +27,47 @@ import {
  * kare geride kalırdı. 6, "kat sistemi işini bitirdikten hemen sonra".
  */
 const FRAME_PRIORITY = 6
+
+/**
+ * Bu paketin düğümlerinin KİRLİ BAYRAĞINI TÜKET.
+ *
+ * ## Sözleşmenin bu paketin yerine getirmediği yarısı
+ *
+ * `<FloorElevationSystem>` (öncelik 1) kirli düğümleri işliyor ama bayrağı
+ * yalnız `!(def.geometry || def.system)` olan kind'lar için düşürüyor: geometri
+ * ya da sistem bildiren bir kind kendi bayrağını KENDİ tüketmek zorunda, çünkü
+ * onu asıl işleyen kendi sistemidir. Host'un yerleşik sistemlerinin hepsi
+ * (ceiling, door, window, fence, wall, roof, stair, item, geometry) işini
+ * bitirince `clearDirty` çağırıyor. Bu paketin kind'ları `def.system` bildirip
+ * hiçbir yerde çağırmıyordu.
+ *
+ * ## Neden bu, ölçülebilir bir donma
+ *
+ * Sahne yüklenirken her slab `markNodesOverlappingSlab` taramasını koşuyor ve
+ * ayak izine değen her `capabilities.floorPlaced` düğümünü kirletiyor — yani
+ * bir depoda RAFLARIN TAMAMI, tek bir kullanıcı eylemi olmadan. Bayrak hiç
+ * düşmediği için küme bir daha boşalmıyor.
+ *
+ * `dirtyNodes.size === 0` on iki host sisteminin ORTAK erken çıkışı. Küme boş
+ * kalmayınca hepsi kümenin tamamını her karede geziyor, ve
+ * `<FloorElevationSystem>` ayrıca kirli düğüm BAŞINA uzamsal yükseklik çözümü
+ * koşuyor. Maliyet raf sayısıyla büyüyor ve kalıcı: sahneyi açıp hiçbir şeye
+ * dokunmamak yetiyor.
+ *
+ * ## Neden öncelik 6, daha erken değil
+ *
+ * Kaldırma işi öncelik 1'de zaten yapıldı; burada yalnız bayrak düşürülüyor.
+ * Daha erken temizlemek, asma kat güvertesine konmuş bir rafın kaldırmasını
+ * hiç uygulanmadan iptal eder ve rafı zemine düşürürdü.
+ */
+function consumeOwnDirtyNodes(): void {
+  const state = useScene.getState()
+  if (state.dirtyNodes.size === 0) return
+  const nodes = state.nodes as Readonly<Record<string, unknown>>
+  for (const id of state.dirtyNodes) {
+    if (kindOf(nodes[id])?.startsWith(KIND_PREFIX)) state.clearDirty(id as AnyNodeId)
+  }
+}
 
 /**
  * Sahne başına BİR kolektif çizici.
@@ -120,6 +163,15 @@ export default function CollectiveInstancingSystem() {
      * demektir ve havuz o kareyi "matrisler kirli" sayarak yeniden yazmalı.
      */
     const rebaked = rebakeDriftedStaticTransforms()
+
+    /**
+     * Erken çıkışların ÜSTÜNDE, `rebake` ile aynı gerekçeyle: kirli bayrağının
+     * birikmesi kolektif çizimle ilgili değil. Instancing kapalıyken de,
+     * dışa aktarım sırasında da, sahnede tek bir raf bile yokken de — bu
+     * paketin herhangi bir düğümü kirli kaldıysa on iki host sistemi her karede
+     * onu geziyor.
+     */
+    consumeOwnDirtyNodes()
 
     const root = rootRef.current
     if (!root) return

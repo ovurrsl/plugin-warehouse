@@ -10,6 +10,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getRackMaterial } from '../rack/materials'
@@ -99,7 +100,8 @@ export default function DriveInRackRenderer({ node }: { node: DriveInRackNode })
   const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
   const omission = useMemo(() => ({ omitRight: abutted }), [abutted])
 
-  const material = getRackMaterial()
+  const appearance = useAppearance()
+  const material = getRackMaterial(appearance)
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
   const drawsSelf = useCollective({
@@ -110,7 +112,7 @@ export default function DriveInRackRenderer({ node }: { node: DriveInRackNode })
     materialFor: () => material,
     // The same pool as the selective rack: identical material, and splitting
     // them would double the draw calls of a scene holding both.
-    materialKeyFor: () => 'rack',
+    materialKeyFor: () => `rack:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

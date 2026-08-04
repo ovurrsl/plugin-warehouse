@@ -10,6 +10,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import {
@@ -100,7 +101,8 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
    */
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const material = getConveyorMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorMaterial(appearance)
 
   /**
    * Seçili ya da sürükleniyorsa kendi çizer: ana hat geçişi yalnız GÖRÜNÜR
@@ -114,7 +116,7 @@ export default function ConveyorRollerRenderer({ node }: { node: ConveyorRollerN
     geometryFor: (tier) => getConveyorGeometry(node, tier, abutted),
     keyFor: (tier) => conveyorGeometryKey(node, tier, abutted),
     materialFor: () => material,
-    materialKeyFor: () => 'conveyor',
+    materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

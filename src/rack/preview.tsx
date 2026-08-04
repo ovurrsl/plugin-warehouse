@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getRackGeometry } from './geometry-builder'
 import { getRackPreviewMaterial } from './materials'
 import type { PalletRackNode } from './schema'
@@ -24,7 +25,8 @@ const NO_RAYCAST = () => {}
 export default function PalletRackPreview({ node }: { node: PalletRackNode }) {
   const ref = useRef<Group>(null)
   const geometry = useMemo(() => getRackGeometry(node, 'full'), [node])
-  const material = getRackPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getRackPreviewMaterial(appearance)
 
   // The overlay layer keeps the ghost out of export and snapshot passes.
   // Layers do not inherit, so every object in the subtree needs it set.

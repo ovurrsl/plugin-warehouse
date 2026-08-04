@@ -1,4 +1,5 @@
-import * as THREE from 'three'
+import type * as THREE from 'three'
+import { type Appearance, previewMaterial, surfaceMaterial } from '../appearance'
 import { getConveyorTexture } from './conveyor-texture'
 
 /**
@@ -18,26 +19,31 @@ import { getConveyorTexture } from './conveyor-texture'
  * Sharing one material to save a shader compile would make one of the two
  * wrong, and the one it would make wrong is the one this kind is mostly made
  * of.
+ *
+ * Bu ayrım `rendered` modda ifade edilebiliyor ve orada korunuyor. `solid`'de
+ * Lambert'in pürüzlülüğü ve metalikliği yok, yani zinc-boya farkı düşüyor —
+ * host'un kendi metallerine olan da bu, ve modun anlamı zaten o. Kayıp burada
+ * yazılı ki biri sonradan sahte bir parlaklık ekleyerek "düzeltmesin".
  */
 
-let cached: THREE.MeshStandardMaterial | null = null
-let cachedPreview: THREE.MeshStandardMaterial | null = null
-
-export function getConveyorMaterial(): THREE.MeshStandardMaterial {
-  if (cached) return cached
-  cached = new THREE.MeshStandardMaterial({
+function spec() {
+  return {
+    family: 'conveyor',
     // A two-column atlas: blank for the steelwork, a roller stripe for the bed.
     // The geometry picks a column per part through its UVs, which is what lets
     // eight thousand rollers exist without a second material — and so without a
     // second draw call on every module in the building.
     map: getConveyorTexture(),
+    vertexColors: true,
     // Between the rack's painted steel and a mirror: galvanised roller shells
     // and mill-finish profiles, which read as metal but are far from polished.
     metalness: 0.55,
     roughness: 0.38,
-    vertexColors: true,
-  })
-  return cached
+  }
+}
+
+export function getConveyorMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(spec(), appearance)
 }
 
 /**
@@ -46,11 +52,6 @@ export function getConveyorMaterial(): THREE.MeshStandardMaterial {
  * `transparent` on it would make every committed conveyor in the scene
  * translucent.
  */
-export function getConveyorPreviewMaterial(): THREE.MeshStandardMaterial {
-  if (cachedPreview) return cachedPreview
-  cachedPreview = getConveyorMaterial().clone()
-  cachedPreview.transparent = true
-  cachedPreview.opacity = 0.55
-  cachedPreview.depthWrite = false
-  return cachedPreview
+export function getConveyorPreviewMaterial(appearance: Appearance): THREE.Material {
+  return previewMaterial(spec(), appearance)
 }

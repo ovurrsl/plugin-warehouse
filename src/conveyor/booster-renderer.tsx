@@ -10,6 +10,7 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { boosterGeometryKey, getBoosterGeometry, retainBoosterGeometry } from './booster-geometry'
@@ -74,7 +75,8 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
    */
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const material = getConveyorMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorMaterial(appearance)
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
   const drawsSelf = useCollective({
@@ -83,7 +85,7 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
     geometryFor: (tier) => getBoosterGeometry(node, tier, abutted),
     keyFor: (tier) => boosterGeometryKey(node, tier, abutted),
     materialFor: () => material,
-    materialKeyFor: () => 'conveyor',
+    materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

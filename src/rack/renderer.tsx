@@ -11,6 +11,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-builder'
@@ -117,7 +118,8 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
    */
   const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
 
-  const material = getRackMaterial()
+  const appearance = useAppearance()
+  const material = getRackMaterial(appearance)
 
   /**
    * Kolektif çizici — bu düğümü havuza kaydeder ve kendi mesh'ini çizip
@@ -134,7 +136,7 @@ export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
     geometryFor: (tier) => getRackGeometry(node, tier, abutted),
     keyFor: (tier) => rackGeometryKey(node, tier, abutted),
     materialFor: () => material,
-    materialKeyFor: () => 'rack',
+    materialKeyFor: () => `rack:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
@@ -289,7 +291,8 @@ function GhostStock({ node }: { node: PalletRackNode }) {
 
   const spec = specOf(node.palletPreset)
   const geometry = useMemo(() => getPalletGeometry(node.palletPreset), [node.palletPreset])
-  const material = getPalletMaterial()
+  const appearance = useAppearance()
+  const material = getPalletMaterial(appearance)
 
   /**
    * The pallet mesh is built with its **length along local X**, and the slot
@@ -415,7 +418,8 @@ function GhostStock({ node }: { node: PalletRackNode }) {
       next === 'far'
         ? getPalletFarGeometry(node.palletPreset)
         : getPalletGeometry(node.palletPreset)
-    pallets.material = next === 'far' ? getPalletFarMaterial() : getPalletMaterial()
+    pallets.material =
+      next === 'far' ? getPalletFarMaterial(appearance) : getPalletMaterial(appearance)
     // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
     // bir öncekinin ölçüsüyle yapmak olurdu.
     pallets.computeBoundingSphere()
@@ -470,7 +474,7 @@ function GhostStock({ node }: { node: PalletRackNode }) {
         ref={palletRef}
       />
       <instancedMesh
-        args={[UNIT_BOX, LOAD_MATERIAL, capacity]}
+        args={[UNIT_BOX, getGhostLoadMaterial(appearance), capacity]}
         castShadow
         count={placements.length}
         dispose={null}
@@ -487,8 +491,16 @@ const QUARTER_TURN = new THREE.Matrix4().makeRotationY(Math.PI / 2)
 
 /** Unit cube scaled per instance, so every ghost load shares one buffer. */
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
-const LOAD_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#c8b394',
-  metalness: 0,
-  roughness: 0.85,
-})
+/**
+ * Hayalet yükün kutusu — ayara duyarlı, çünkü sahnedeki her şey öyle.
+ *
+ * Modül düzeyinde sabit bir `MeshStandardMaterial` idi: Render Solid'e
+ * alındığında bütün bina düzleşirken bu kutular PBR kalıyordu. `surfaceMaterial`
+ * önbelleği aile × ayar başına tuttuğu için tekillik bozulmuyor.
+ */
+function getGhostLoadMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(
+    { family: 'ghost-load', color: 0xc8b394, metalness: 0, roughness: 0.85 },
+    appearance,
+  )
+}

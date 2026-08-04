@@ -11,6 +11,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { MTR_STRIP_STROKE_M } from './constants'
@@ -92,7 +93,8 @@ export default function ConveyorTransferRenderer({ node }: { node: ConveyorTrans
    */
   const abutted = useScene((s) => hasDownstreamNeighbour(s.nodes as Record<string, unknown>, node))
 
-  const material = getConveyorMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorMaterial(appearance)
 
   const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
   const drawsSelf = useCollective({
@@ -101,7 +103,7 @@ export default function ConveyorTransferRenderer({ node }: { node: ConveyorTrans
     geometryFor: (tier) => getTransferGeometry(node, tier, abutted),
     keyFor: (tier) => transferGeometryKey(node, tier, abutted),
     materialFor: () => material,
-    materialKeyFor: () => 'conveyor',
+    materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,

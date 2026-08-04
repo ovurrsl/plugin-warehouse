@@ -3,6 +3,7 @@
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
+import { useAppearance } from '../appearance'
 import { getCurveGeometry } from './curve-geometry'
 import type { ConveyorCurveNode } from './curve-schema'
 import { getConveyorPreviewMaterial } from './materials'
@@ -25,7 +26,8 @@ const NO_RAYCAST = () => {}
 export default function ConveyorCurvePreview({ node }: { node: ConveyorCurveNode }) {
   const ref = useRef<Group>(null)
   const geometry = useMemo(() => getCurveGeometry(node, 'full'), [node])
-  const material = getConveyorPreviewMaterial()
+  const appearance = useAppearance()
+  const material = getConveyorPreviewMaterial(appearance)
 
   // The overlay layer keeps the ghost out of export and snapshot passes.
   // Layers do not inherit, so every object in the subtree needs it set.

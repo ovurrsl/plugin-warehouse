@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import type { BufferGeometry, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
+import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -156,14 +157,16 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
    * sürüklerken yük geride kalır.
    */
   const excluded = selected || live !== undefined || override !== undefined || isExporting
+  const appearance = useAppearance()
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
     geometryFor: (tier) =>
       tier === 'full' ? getPalletGeometry(node.preset) : getPalletFarGeometry(node.preset),
     keyFor: (tier) => `pallet-deck:${node.preset}:${tier}`,
-    materialFor: (tier) => (tier === 'full' ? getPalletMaterial() : getPalletFarMaterial()),
-    materialKeyFor: (tier) => `pallet-deck:${tier}`,
+    materialFor: (tier) =>
+      tier === 'full' ? getPalletMaterial(appearance) : getPalletFarMaterial(appearance),
+    materialKeyFor: (tier) => `pallet-deck:${tier}:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
@@ -243,7 +246,9 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
              * yolun `materialFor`'uyla birebir aynı ifade — iki yolun farklı
              * görünmesi imkânsız olsun diye.
              */
-            materialFor={(tier) => (tier === 'full' ? getPalletMaterial() : getPalletFarMaterial())}
+            materialFor={(tier) =>
+              tier === 'full' ? getPalletMaterial(appearance) : getPalletFarMaterial(appearance)
+            }
             nearSq={LOD_NEAR_SQ}
             nodeId={node.id}
           />
@@ -311,6 +316,7 @@ function CargoLoad({
    * Grup, yük havuzda çizilirken bile mount kalıyor: matrisin kaynağı o.
    */
   const anchorRef = useRef<Object3D>(null)
+  const appearance = useAppearance()
 
   const drawsSelf = useCollective({
     nodeId: `${node.id}${CARGO_INSTANCE_SUFFIX}`,
@@ -320,9 +326,9 @@ function CargoLoad({
     // çözülen iki yük aynı havuza düşer, farklı çözülenler düşmez. İkinci bir
     // anahtar yazmak, ikisinin ayrışabileceği bir yer daha açardı.
     keyFor: (tier) => cargoCacheKey(cargo[tier]),
-    materialFor: () => getCargoMaterial(),
+    materialFor: () => getCargoMaterial(appearance),
     // Tek paylaşımlı materyal — renk atlastan ve köşe renklerinden geliyor.
-    materialKeyFor: () => 'cargo',
+    materialKeyFor: () => `cargo:${appearanceKey(appearance)}`,
     castsShadow: true,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
@@ -363,7 +369,7 @@ function CargoLoad({
           farSq={LOD_FAR_SQ}
           geometryFor={(tier) => getCargoGeometry(cargo[tier])}
           isExporting={isExporting}
-          materialFor={() => getCargoMaterial()}
+          materialFor={() => getCargoMaterial(appearance)}
           nearSq={LOD_NEAR_SQ}
           nodeId={`${node.id}${CARGO_INSTANCE_SUFFIX}`}
         />
@@ -396,6 +402,7 @@ function FilmVeil({
   const meshRef = useRef<Mesh>(null)
   const frameRef = useRef(0)
   const phase = useMemo(() => hashPhase(nodeId), [nodeId])
+  const appearance = useAppearance()
 
   useFrame(({ camera }) => {
     const mesh = meshRef.current
@@ -423,7 +430,7 @@ function FilmVeil({
       castShadow={false}
       dispose={null}
       geometry={geometry}
-      material={getFilmMaterial()}
+      material={getFilmMaterial(appearance)}
       raycast={NO_RAYCAST}
       receiveShadow={false}
       ref={meshRef}

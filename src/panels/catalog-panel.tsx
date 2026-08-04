@@ -18,6 +18,7 @@ import {
 } from '../stats'
 import { type PanelTab, useWarehouseStore } from '../store'
 import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
+import { areaLabel, type LinearUnit, lengthLabel } from '../units'
 import { checkbox, listRow, tile, tokens } from './styles'
 
 /**
@@ -678,7 +679,10 @@ function SlabRow({
       <span style={checkbox(checked)}>{checked ? '✓' : ''}</span>
       <span>{slab.label}</span>
       {slab.elevation !== undefined && slab.elevation !== 0 && (
-        <span style={tokens.figureUnit}>{`+${slab.elevation.toFixed(2)} m`}</span>
+        /* Kot da çevriliyor. Aynı satırın alanı `formatArea` ile çevriliyordu
+           ama kot ham metre yazıyordu: Imperial'a geçen kullanıcı tek bir
+           satırda bir sayıyı feet, yanındakini metre okuyordu. */
+        <span style={tokens.figureUnit}>{`+${lengthLabel(slab.elevation, unit)}`}</span>
       )}
       <span style={tokens.rowArea}>{formatArea(slab.area, unit, 0)}</span>
     </button>
@@ -705,14 +709,17 @@ function storageNote(report: StatsReport): string | undefined {
   return parts.length > 0 ? parts.join(' · ') : undefined
 }
 
-const SQUARE_FEET_PER_SQUARE_METRE = 10.7639
-
-function formatArea(area: number, unit: 'metric' | 'imperial', digits: number): string {
-  if (!Number.isFinite(area)) return '––'
-  if (unit === 'imperial') {
-    return `${(area * SQUARE_FEET_PER_SQUARE_METRE).toFixed(digits)} ft²`
-  }
-  return `${area.toFixed(digits)} m²`
+/**
+ * Alan biçimlendirmesi host'un çevirisine devredildi.
+ *
+ * Burada `SQUARE_FEET_PER_SQUARE_METRE = 10.7639` yazıyordu. Host aynı sayıyı
+ * `1 / 0.3048`ten türetiyor (`measurements.ts`), yani ikisi altıncı anlamlı
+ * basamakta ayrılıyordu: aynı ekranda, aynı slab için, host'un panelinin
+ * yazdığından farklı bir alan. Sayının kendisi görünür biçimde yanlış değildi —
+ * sessizce farklıydı, ki fark edilmesi daha zor olanı budur.
+ */
+function formatArea(area: number, unit: LinearUnit, digits: number): string {
+  return areaLabel(area, unit, digits)
 }
 
 function qualificationText(entry: Qualification, unit: 'metric' | 'imperial'): string {

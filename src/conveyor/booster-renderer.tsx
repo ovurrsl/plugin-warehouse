@@ -113,19 +113,17 @@ export default function ConveyorBoosterRenderer({ node }: { node: ConveyorBooste
 
   return (
     <group visible={node.visible !== false} {...handlers}>
-      {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
-          position={[position[0], position[1] + colliderHeight / 2, position[2]]}
-          rotation={rotation}
-          scale={[length, colliderHeight, width]}
-          visible={false}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh
+            dispose={null}
+            geometry={UNIT_COLLIDER}
+            material={COLLIDER_MATERIAL}
+            position={[0, colliderHeight / 2, 0]}
+            scale={[length, colliderHeight, width]}
+            visible={false}
+          />
+        )}
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}

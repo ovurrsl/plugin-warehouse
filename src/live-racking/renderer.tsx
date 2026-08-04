@@ -110,15 +110,10 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
     <group visible={node.visible !== false} {...handlers}>
       {/* Seçim kolideri: bir kanal neredeyse tamamen hava, tıklamalar
           makaraların arasından geçip arkadakini seçerdi. */}
-      {!isExporting && (
-        <mesh
-          position={[position[0], position[1] + height / 2, position[2]]}
-          rotation={rotation}
-          {...colliderProps([width, height, depth])}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh position={[0, height / 2, 0]} {...colliderProps([width, height, depth])} />
+        )}
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}

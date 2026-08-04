@@ -208,20 +208,25 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
 
   return (
     <group visible={node.visible !== false} {...handlers}>
-      {/* Selection collider. The deck has 41 mm gaps between boards and open
-          fork tunnels, so raycasting the real mesh would let clicks fall
-          straight through the pallet. An invisible box spanning the unit load
-          is what the user is actually aiming at. Kept outside the registered
-          group so the selection outline traces the true silhouette. */}
-      {!isExporting && (
-        <mesh
-          {...colliderProps([spec.length, totalHeight, spec.width])}
-          position={[position[0], position[1] + totalHeight / 2, position[2]]}
-          rotation={rotation}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {/* Selection collider. The deck has 41 mm gaps between boards and open
+            fork tunnels, so raycasting the real mesh would let clicks fall
+            straight through the pallet. An invisible box spanning the unit load
+            is what the user is actually aiming at.
+
+            Kayıtlı grubun İÇİNDE — gerekçesi `rack/renderer.tsx`'te uzun uzun
+            yazılı: kolektif çizici açıkken bu grubun içi boş kalıyor ve host
+            gölge frustum'unu kayıtlı düğümlerin birleşimine oturttuğu için
+            depo ekipmanı gölge sınırlarına hiç katkı vermiyordu. Görünmez bir
+            kutu `projectObject`'te elendiği için ne renk ne gölge geçidine
+            çizim ekliyor, ama `Box3.expandByObject` görünürlüğe bakmadığı için
+            düğümün gerçek zarfını bildiriyor. */}
+        {!isExporting && (
+          <mesh
+            {...colliderProps([spec.length, totalHeight, spec.width])}
+            position={[0, totalHeight / 2, 0]}
+          />
+        )}
         {/* Kolektif kapalıyken ya da bu palet seçili/sürükleniyorken kendi
             güvertesini çizer; açıkken tek `InstancedMesh` preset başına
             hepsini birden çizer. */}

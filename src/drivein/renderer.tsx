@@ -138,19 +138,17 @@ export default function DriveInRackRenderer({ node }: { node: DriveInRackNode })
       {/* Selection collider. A lane is mostly air — a click aimed at it falls
           between the rails and hits whatever is behind. Outside the registered
           group so the selection outline still traces the real silhouette. */}
-      {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
-          position={[position[0], position[1] + node.uprightHeight / 2, position[2]]}
-          rotation={rotation}
-          scale={[width, node.uprightHeight, depth]}
-          visible={false}
-        />
-      )}
-
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {!isExporting && (
+          <mesh
+            dispose={null}
+            geometry={UNIT_COLLIDER}
+            material={COLLIDER_MATERIAL}
+            position={[0, node.uprightHeight / 2, 0]}
+            scale={[width, node.uprightHeight, depth]}
+            visible={false}
+          />
+        )}
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}

@@ -5,6 +5,7 @@ import { PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { Figures, Note } from '../panels/kit'
+import { areaLabel, lengthLabel, useUnit } from '../units'
 import {
   bayPitch,
   fittedLevels,
@@ -37,6 +38,7 @@ function useInspected(provided?: LongspanNode): LongspanNode | null {
 
 export default function LongspanPanel({ node: provided }: { node?: LongspanNode }) {
   const node = useInspected(provided)
+  const unit = useUnit()
   if (!node) return null
 
   const issues = longspanParametrics.invariants?.flatMap((check) => check(node)) ?? []
@@ -55,9 +57,9 @@ export default function LongspanPanel({ node: provided }: { node?: LongspanNode 
         <Figures
           rows={[
             ['Kat', `${levels.length}`],
-            ['Raf alanı', `${shelfAreaM2(node).toFixed(2)} m²`],
-            hangingLengthM(node) > 0 && ['Askı boyu', `${hangingLengthM(node).toFixed(2)} m`],
-            ['Göz adımı', `${bayPitch(node).toFixed(3)} m`],
+            ['Raf alanı', areaLabel(shelfAreaM2(node), unit, 2)],
+            hangingLengthM(node) > 0 && ['Askı boyu', lengthLabel(hangingLengthM(node), unit)],
+            ['Göz adımı', lengthLabel(bayPitch(node), unit, 3)],
             [
               'Katalog boyu',
               Math.abs(nearest - node.bayLength) < 1e-6
@@ -77,7 +79,7 @@ export default function LongspanPanel({ node: provided }: { node?: LongspanNode 
           rows={levels.map(
             (level, index) =>
               [
-                `#${index + 1} · ${levelElevation(level).toFixed(3)} m`,
+                `#${index + 1} · ${lengthLabel(levelElevation(level), unit, 3)}`,
                 level.structure === 'beam-only'
                   ? 'yalnız kiriş'
                   : level.structure === 'hanging'

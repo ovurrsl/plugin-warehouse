@@ -2,9 +2,11 @@
 
 import {
   formatAreaLabel,
+  formatLinearMeasurement,
   getAreaUnitLabel,
   getLinearUnitLabel,
   type LinearUnit,
+  linearUnitToMeters,
   metersToLinearUnit,
   squareMetersToAreaUnit,
 } from '@pascal-app/editor'
@@ -29,13 +31,23 @@ import { useViewer } from '@pascal-app/viewer'
  * yazdığından farklı bir alan. Sabiti kopyalamak yerine çeviriyi tek kaynaktan
  * çağırmak bu ayrışmayı imkânsız kılıyor.
  *
- * ## Neden `@pascal-app/editor` import'u SSR'ı bozmuyor
+ * ## Neden bu import'lar SSR'ı bozmuyor — ölçüldü, varsayılmadı
  *
- * `src/index.ts` eager yükleniyor ve oradan erişilen her şeyin SSR-güvenli
- * olması gerekiyor. Bu modül o grafiğe giriyor (parametrics → auto-fields →
- * definition → index), ama YENİ bir yüzey açmıyor: `auto-fields.tsx` zaten
- * `@pascal-app/editor`'dan DEĞER import ediyor (`SegmentedControl`,
- * `SliderControl`), yani paket eager grafikte hâlihazırda var ve çalışıyor.
+ * `src/index.ts` eager yükleniyor ve CLAUDE.md oradan erişilen hiçbir şeyin
+ * modül kapsamında Three.js'e dokunmamasını istiyor. Bu modül o grafikte:
+ * `index → rack/definition → rack/parametrics → units`.
+ *
+ * `@pascal-app/viewer` import'u YENİ bir yüzey açmıyor, ve gerekçe analoji
+ * değil zincirin kendisi: `rack/parametrics` zaten `./auto-fields`'i import
+ * ediyor, o da `@pascal-app/editor`'dan DEĞER alıyor (`SegmentedControl`),
+ * ve editor'ün kendi barrel'ı (`@pascal-app/editor/src/index.tsx`)
+ * `@pascal-app/viewer`'dan yeniden dışa aktarıyor. Yani viewer bu değişiklikten
+ * ÖNCE de eager grafikteydi ve paket çalışıyor.
+ *
+ * Buna güvenen tek şey `useUnit`/`unitNow`. Saf biçimlendiriciler yalnız
+ * `@pascal-app/editor`'ın ölçüm yardımcılarına dayanıyor, o yüzden saflık iddiası
+ * olan modüller (`mezzanine/stairs.ts`) buradan yalnız onları alıp birimi
+ * PARAMETRE olarak isteyebiliyor — mağazayı okumadan.
  */
 
 export type { LinearUnit }
@@ -99,6 +111,65 @@ export function lengthValue(metres: number, unit: LinearUnit, digits = 2): strin
 /** Uzunluk birimi etiketi tek başına. */
 export function lengthUnit(unit: LinearUnit): string {
   return getLinearUnitLabel(unit)
+}
+
+/**
+ * `<input type="number">` ÇİFTİ — ve neden ikisi birden yazılmak zorunda.
+ *
+ * `metresToField` sahnedeki metreyi alanın göstereceği sayıya, `fieldToMetres`
+ * kullanıcının yazdığını geri metreye çeviriyor. Biri olmadan diğeri sessiz bir
+ * VERİ hatası, sadece bir okuma hatası değil:
+ *
+ * - yalnız gösterim çevrilirse: Imperial kullanıcı 8.53 görür, 9 yazar, sahneye
+ *   9 METRE girer ve alan bir sonraki render'da 29.5 gösterir;
+ * - yalnız ayrıştırma çevrilirse: 2,6 m'lik dikme alanda 2.6 görünür, kullanıcı
+ *   dokunmadan bırakır, ilk düzenlemede 0,79 m'ye düşer.
+ *
+ * İkisi de hata vermez. Bu yüzden tek bir yorumun altında, yan yana duruyorlar.
+ *
+ * Metrik yol her ikisinde de KİMLİK: metrik kullanıcı için davranış bitine
+ * kadar eskisiyle aynı kalıyor. Imperial'da üç ondalık, çünkü alanların metrik
+ * adımı 0,05 m = 0,164 ft — iki ondalık bunu gidiş-dönüşte kaydırırdı.
+ */
+export function metresToField(metres: number, unit: LinearUnit): number {
+  if (unit !== 'imperial') return metres
+  return Number(metersToLinearUnit(metres, unit).toFixed(3))
+}
+
+/** `metresToField`'in tersi. Yorum için oraya bakın — ikisi bir çift. */
+export function fieldToMetres(value: number, unit: LinearUnit): number {
+  return linearUnitToMeters(value, unit)
+}
+
+/**
+ * Bir sayı alanının adımı.
+ *
+ * Imperial'da `'any'`, çünkü çevrilmiş bir değer metrik adımın katı olmuyor
+ * (2,60 m → 8.53 ft, 0,05'in katı değil) ve tarayıcı alanı `:invalid`
+ * işaretliyor: kullanıcıya doğru sayıyı yazdığı hâlde kırmızı bir alan.
+ */
+export function fieldStep(metricStep: number, unit: LinearUnit): number | 'any' {
+  return unit === 'imperial' ? 'any' : metricStep
+}
+
+/**
+ * MİLİMETRE ölçeğindeki bir uzunluk — ve neden ayrı bir fonksiyon.
+ *
+ * Bu paket iki ayrı ölçekte yazıyor: raf yüksekliği metre (`2.60 m`), oturma
+ * payı milimetre (`75 mm`). İkisini tek fonksiyona indirmek metrik kullanıcıya
+ * `0.075 m` yazdırmak demek — çeviri "doğru" ama okunaklılık kaybı bir
+ * gerileme, çünkü bu sayılar sektörde milimetre konuşuluyor.
+ *
+ * Bu yüzden sabit olan BİRİM değil ÖLÇEK: metrikte mm, Imperial'da host'un
+ * kendi feet-inches yazımı (`0'3"`). Imperial'da mm'de ısrar etmek, host'un
+ * ölçüm baloncuğu inç yazarken panelin milimetre yazması olurdu.
+ *
+ * Alıntı bir figür için bu DEĞİL, `publishedMillimetres` kullanılır.
+ */
+export function millimetreLabel(metres: number, unit: LinearUnit): string {
+  if (!Number.isFinite(metres)) return '––'
+  if (unit === 'imperial') return formatLinearMeasurement(metres, unit)
+  return `${(metres * 1000).toFixed(0)} mm`
 }
 
 /**

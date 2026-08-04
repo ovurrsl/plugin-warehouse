@@ -1,4 +1,5 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { lengthLabel, unitOf } from '../units'
 import { markingGates } from './geometry'
 import { routeReading } from './metrics'
 import type { RouteNode } from './schema'
@@ -24,6 +25,7 @@ export function buildRouteFloorplan(
   if (node.points.length < 2) return null
 
   const view = ctx.viewState
+  const unit = unitOf(view)
   const selected = view?.selected ?? false
   const origin = node.points[0] ?? [0, 0]
   const points: Point[] = node.points.map((p) => [p[0] - origin[0], p[1] - origin[1]])
@@ -83,7 +85,7 @@ export function buildRouteFloorplan(
       kind: 'text',
       x: mid[0],
       y: mid[1],
-      text: `${reading.widthM.toFixed(2)} m`,
+      text: lengthLabel(reading.widthM, unit),
       fontSize: 0.32,
       fill: stroke,
       textAnchor: 'middle',

@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { millimetreLabel, useUnit } from '../units'
 import { LNC } from './catalog'
 import { describeLine } from './conveyor-panel'
 import {
@@ -42,13 +43,14 @@ function useInspectedLauncher(provided?: ConveyorLauncherNode): ConveyorLauncher
 
 export default function ConveyorLauncherPanel({ node: provided }: { node?: ConveyorLauncherNode }) {
   const node = useInspectedLauncher(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
 
   const issues = [
     ...(conveyorLauncherParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   return (
@@ -65,7 +67,7 @@ export default function ConveyorLauncherPanel({ node: provided }: { node?: Conve
         ],
         [
           'Launch',
-          `${node.launchSide} · reaches ${(lateralOuterZM(node) * 1000).toFixed(0)} mm from the centreline`,
+          `${node.launchSide} · reaches ${millimetreLabel(lateralOuterZM(node), unit)} from the centreline`,
         ],
         // Not a field: the type is built at one speed and around one box.
         ['Speed', `${LNC.speedMPerMin} m/min · ${speedMPerSec(node).toFixed(2)} m/s — fixed`],
@@ -74,7 +76,7 @@ export default function ConveyorLauncherPanel({ node: provided }: { node?: Conve
           `${(LNC.boxLengthM * 1000).toFixed(0)} mm, ≤ ${LNC.loadKg} kg — both fixed by the type`,
         ],
         ['Throughput', `≤ ${maxThroughputPerHour(node).toLocaleString()} boxes/h`],
-        ['Line', describeLine(node, nodes)],
+        ['Line', describeLine(node, nodes, unit)],
       ]}
       title="This launcher"
     >

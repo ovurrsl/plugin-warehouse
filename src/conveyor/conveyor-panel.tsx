@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { type LinearUnit, lengthLabel, millimetreLabel, useUnit } from '../units'
 import { CAR } from './catalog'
 import { hasDownstreamNeighbour, hasUpstreamNeighbour, lineOf } from './line-index'
 import {
@@ -49,6 +50,7 @@ function useInspectedConveyor(provided?: ConveyorRollerNode): ConveyorRollerNode
 
 export default function ConveyorPanel({ node: provided }: { node?: ConveyorRollerNode }) {
   const node = useInspectedConveyor(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
@@ -58,11 +60,11 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
   // invariants can see it.
   const issues = [
     ...(conveyorRollerParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   return (
-    <ModuleReadout issues={issues} rows={rowsFor(node, nodes)} title="This module">
+    <ModuleReadout issues={issues} rows={rowsFor(node, nodes, unit)} title="This module">
       <Note>
         Her modül kendi nesnesi; ayrı ayrı seçilir, taşınır, kopyalanır, silinir. Araç kuşanmışken{' '}
         <strong>[</strong> ve <strong>]</strong> ile bir hat döşeyin, ya da bir modülü başka birinin
@@ -76,24 +78,25 @@ export default function ConveyorPanel({ node: provided }: { node?: ConveyorRolle
 function rowsFor(
   node: ConveyorRollerNode,
   nodes: Record<string, unknown>,
+  unit: LinearUnit,
 ): ReadonlyArray<readonly [string, string]> {
   return [
     [
       'Bed',
-      `${moduleLengthM(node).toFixed(3)} m · ${node.rollers} rollers @ ${rollerPitchMm(node)} mm`,
+      `${lengthLabel(moduleLengthM(node), unit, 3)} · ${node.rollers} rollers @ ${rollerPitchMm(node)} mm`,
     ],
     ['Frame', `${(frameWidthM(node) * 1000).toFixed(0)} mm over a ${usefulWidthMm(node)} mm lane`],
     ['Supports', `${supportOffsetsX(node).length} stations`],
     ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
     [
       'Throughput',
-      `≤ ${maxThroughputPerHour(node).toLocaleString()} boxes/h at ${(node.shortestBox * 1000).toFixed(0)} mm`,
+      `≤ ${maxThroughputPerHour(node).toLocaleString()} boxes/h at ${millimetreLabel(node.shortestBox, unit)}`,
     ],
     ['Rated load', `${CAR.loadKgPerMetre} kg/m · ${ratedLoadKg(node).toFixed(0)} kg on this bed`],
     // What a joint bought. A line is not stored anywhere — it is the set of
     // modules whose ends meet, read back from their ports — so this figure
     // cannot disagree with what is drawn.
-    ['Line', describeLine(node, nodes)],
+    ['Line', describeLine(node, nodes, unit)],
   ]
 }
 
@@ -104,7 +107,11 @@ function rowsFor(
  * deleted out of the middle splits the line the instant the store writes, with
  * nothing to heal.
  */
-export function describeLine(node: ConveyorModule, nodes: Record<string, unknown>): string {
+export function describeLine(
+  node: ConveyorModule,
+  nodes: Record<string, unknown>,
+  unit: LinearUnit,
+): string {
   const line = lineOf(nodes, node.id)
   if (line.length <= 1) return 'on its own'
 
@@ -119,5 +126,5 @@ export function describeLine(node: ConveyorModule, nodes: Record<string, unknown
   if (!hasUpstreamNeighbour(nodes, node)) ends.push('head')
   if (!hasDownstreamNeighbour(nodes, node)) ends.push('tail')
   const place = ends.length === 2 ? 'alone' : ends.length ? `at the ${ends[0]}` : 'mid-line'
-  return `${line.length} modules · ${length.toFixed(2)} m · this one ${place}`
+  return `${line.length} modules · ${lengthLabel(length, unit)} · this one ${place}`
 }

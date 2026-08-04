@@ -1,4 +1,5 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { lengthLabel, unitOf } from '../units'
 import { TELESCOPIC_MODELS } from './telescopic-catalog'
 import { beltWidthM, boomSections, boomTipX, frameWidthM } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
@@ -26,6 +27,7 @@ export function buildTelescopicFloorplan(
   const belt = beltWidthM(node)
   const halfA = model.fixedM / 2
   const view = ctx.viewState
+  const unit = unitOf(view)
   const selected = view?.selected ?? false
 
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#1e56a0'
@@ -107,7 +109,7 @@ export function buildTelescopicFloorplan(
       kind: 'dimension-label',
       cx: -halfA + model.totalM / 2,
       cy: -width / 2 - 0.5,
-      text: `Tam açık ${model.totalM.toFixed(1)} m · sabit ${model.fixedM.toFixed(1)} m`,
+      text: `Tam açık ${lengthLabel(model.totalM, unit, 1)} · sabit ${lengthLabel(model.fixedM, unit, 1)}`,
       angle: 0,
       screenUpright: true,
     })

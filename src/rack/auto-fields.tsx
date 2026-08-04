@@ -3,6 +3,7 @@
 import { SegmentedControl, SliderControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { Caption, Field, Note } from '../panels/kit'
+import { fieldStep, fieldToMetres, lengthLabel, lengthUnit, metresToField, useUnit } from '../units'
 import type { PalletRackNode } from './schema'
 import {
   autoPalletSupportBars,
@@ -206,6 +207,7 @@ export function PickingBoxesDeepField({ node, onUpdate }: CustomField) {
  *     2'ye inip tekrar 5'e çıkınca eski geçersiz kılmalar geri geliyordu.
  */
 export function LevelsField({ node, onUpdate }: CustomField) {
+  const unit = useUnit()
   // Kullanıcının İSTEDİĞİ kat sayısı — sığan değil. Zemin açıklığı da bir
   // satır, o yüzden `levels + 1`.
   const rows = node.levels + 1
@@ -219,7 +221,7 @@ export function LevelsField({ node, onUpdate }: CustomField) {
 
   const setClear = (level: number, raw: string) => {
     const next = sized<number | null>(clears, () => null)
-    next[level] = raw === '' ? null : Number(raw)
+    next[level] = raw === '' ? null : fieldToMetres(Number(raw), unit)
     // Hepsi null'a dönerse alan şemadaki "hiç geçersiz kılma yok" hâline
     // döner — kaydedilmiş sahne, hiç dokunulmamış sahneyle aynı okunur.
     onUpdate({ levelClears: next.every((v) => v == null) ? null : next })
@@ -296,13 +298,16 @@ export function LevelsField({ node, onUpdate }: CustomField) {
             <input
               inputMode="decimal"
               onChange={(event) => setClear(level, event.target.value)}
-              placeholder={levelClearOpening({ ...node, levelClears: null }, level).toFixed(2)}
-              step={0.05}
+              placeholder={metresToField(
+                levelClearOpening({ ...node, levelClears: null }, level),
+                unit,
+              ).toFixed(2)}
+              step={fieldStep(0.05, unit)}
               style={styles.levelInput}
               type="number"
-              value={clears[level] ?? ''}
+              value={clears[level] == null ? '' : metresToField(clears[level] as number, unit)}
             />
-            <span style={styles.levelUnit}>m</span>
+            <span style={styles.levelUnit}>{lengthUnit(unit)}</span>
             {/* Zemin katının TİPİ yok: `levelTypeOf` kiriş katlarını
                 adlandırıyor, zemin açıklığı yalnız ilk kirişe kadar boşluk. */}
             {level > 0 && (
@@ -320,7 +325,7 @@ export function LevelsField({ node, onUpdate }: CustomField) {
       })}
       {node.levels > fitted && (
         <Note>
-          {node.levels - fitted} kat {node.uprightHeight.toFixed(2)} m dikmeye sığmıyor —
+          {node.levels - fitted} kat {lengthLabel(node.uprightHeight, unit)} dikmeye sığmıyor —
           açıklıkları küçültün ya da dikmeyi yükseltin.
         </Note>
       )}

@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { millimetreLabel, useUnit } from '../units'
 import { OBQ } from './catalog'
 import { describeLine } from './conveyor-panel'
 import { jointIssues, ModuleReadout } from './module-panel'
@@ -44,13 +45,14 @@ function useInspectedOblique(provided?: ConveyorObliqueNode): ConveyorObliqueNod
 
 export default function ConveyorObliquePanel({ node: provided }: { node?: ConveyorObliqueNode }) {
   const node = useInspectedOblique(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
 
   const issues = [
     ...(conveyorObliqueParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   return (
@@ -69,19 +71,19 @@ export default function ConveyorObliquePanel({ node: provided }: { node?: Convey
         ],
         [
           'Branch',
-          `${angleDeg(node)}° ${node.branchSide} · ${node.branchMode} · ${(branchLengthM(node) * 1000).toFixed(0)} mm of bed`,
+          `${angleDeg(node)}° ${node.branchSide} · ${node.branchMode} · ${millimetreLabel(branchLengthM(node), unit)} of bed`,
         ],
         // Derived, and nothing else on screen says it.
         [
           'Splits at',
-          `${(divergeXM(node) * 1000).toFixed(0)} mm from the middle — set by the angle`,
+          `${millimetreLabel(divergeXM(node), unit)} from the middle — set by the angle`,
         ],
         ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
         [
           'Rated',
           `≤ ${OBQ.loadKg} kg per box · ${(mainWidthM(node) * 1000).toFixed(0)} mm main frame`,
         ],
-        ['Line', describeLine(node, nodes)],
+        ['Line', describeLine(node, nodes, unit)],
       ]}
       title="This branch"
     >

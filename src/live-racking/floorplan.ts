@@ -1,4 +1,5 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { lengthLabel, millimetreLabel, unitOf } from '../units'
 import { PALETTE } from './catalog'
 import {
   assignedSkuCount,
@@ -34,6 +35,7 @@ export function buildLiveRackingFloorplan(
   const depth = channelDepthM(node)
   const view = ctx.viewState
   const selected = view?.selected ?? false
+  const unit = unitOf(view)
 
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : PALETTE.upright
   const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#dbe4f0'
@@ -172,7 +174,7 @@ export function buildLiveRackingFloorplan(
       kind: 'dimension-label',
       cx: 0,
       cy: -halfDepth - 0.6,
-      text: `${node.variant} · ${node.levels}×${node.palletsDeep} palet · E ${(width * 1000).toFixed(0)} mm · X ${depth.toFixed(2)} m · SKU ${assigned}/${node.levels}`,
+      text: `${node.variant} · ${node.levels}×${node.palletsDeep} palet · E ${millimetreLabel(width, unit)} · X ${lengthLabel(depth, unit)} · SKU ${assigned}/${node.levels}`,
       angle: 0,
       screenUpright: true,
     })

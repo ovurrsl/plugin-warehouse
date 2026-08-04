@@ -9,6 +9,7 @@ import { aisleBandForVariant, aisleFigureForModel } from '../handling/metrics'
 import { TRUCK_MODELS, TRUCK_VARIANT_LABEL } from '../handling/models'
 import { IssueList } from '../panels/issue-list'
 import { Figures, Note, SelectRow } from '../panels/kit'
+import { lengthLabel, useUnit } from '../units'
 import { COMMIT_REFUSAL_TEXT, planCommit } from './commit-move'
 import { ALIGN_BASIS_NOTE, cycleSeconds } from './duty'
 import { bindTruck, buildFleet } from './fleet'
@@ -17,6 +18,14 @@ import { parsePinTag, pinTag } from './pin-tag'
 import { claimRoute } from './route-binding'
 import type { TruckNode } from './schema'
 import { stationsAlong } from './stations'
+
+/**
+ * Bağla düğmesinin arama yarıçapı.
+ *
+ * Sabit, çünkü etiketle davranış aynı sayıyı okumalı: metin çevrilirken sayı
+ * `claimRoute`'a ayrı bir literal olarak gitseydi, ikisi sessizce ayrışabilirdi.
+ */
+const CLAIM_RADIUS_M = 6
 
 /**
  * Aracın okuma paneli: model figürü enstrümanıyla, sınıf bandı, ve boşluk
@@ -48,6 +57,7 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
   const node = useInspectedTruck(provided)
   const allNodes = useSceneNodes()
   const [commitNote, setCommitNote] = useState<string | null>(null)
+  const unit = useUnit()
   if (!node) return null
 
   const model = TRUCK_MODELS[node.model]
@@ -167,14 +177,14 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
             />
           ) : (
             <ActionButton
-              label="En yakın araç koridoruna bağla (≤ 6 m)"
+              label={`En yakın araç koridoruna bağla (≤ ${lengthLabel(CLAIM_RADIUS_M, unit, 0)})`}
               onClick={() => {
                 const found = claimRoute(
                   useScene.getState().nodes as Readonly<Record<string, unknown>>,
                   node.parentId ?? null,
                   node.position?.[0] ?? 0,
                   node.position?.[2] ?? 0,
-                  6,
+                  CLAIM_RADIUS_M,
                 )
                 if (found) {
                   useScene

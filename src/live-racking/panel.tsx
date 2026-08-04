@@ -5,6 +5,7 @@ import { PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { Figure, Figures, Note, TextRow } from '../panels/kit'
+import { lengthLabel, millimetreLabel, useUnit } from '../units'
 import { LIVE_RACKING_UNPUBLISHED_NOTE } from './catalog'
 import {
   assignedSkuCount,
@@ -63,6 +64,7 @@ function useInspected(provided?: LiveRackingNode): LiveRackingNode | null {
 
 export default function LiveRackingPanel({ node: provided }: { node?: LiveRackingNode }) {
   const node = useInspected(provided)
+  const unit = useUnit()
   if (!node) return null
 
   const issues = liveRackingParametrics.invariants?.flatMap((check) => check(node)) ?? []
@@ -77,10 +79,10 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
             ['Palet ağzı · A', `${(palletFaceWidthM(node) * 1000).toFixed(0)} mm`],
             ['Bay genişliği · E = A + 160', `${(bayWidthM(node) * 1000).toFixed(0)} mm`],
             ['Makara boyu · D = A + 30', `${(rollerLengthM(node) * 1000).toFixed(0)} mm`],
-            ['Kanal derinliği · X', `${channelDepthM(node).toFixed(2)} m`],
+            ['Kanal derinliği · X', lengthLabel(channelDepthM(node), unit)],
             [
               `Düşüş (%${(node.gradient * 100).toFixed(1)})`,
-              `${(channelDropM(node) * 1000).toFixed(0)} mm`,
+              millimetreLabel(channelDropM(node), unit),
             ],
           ]}
         />
@@ -123,15 +125,15 @@ export default function LiveRackingPanel({ node: provided }: { node?: LiveRackin
               'Alt kat',
               node.floorSetPalletTruckLevel
                 ? 'zemin seviyesi · transpalet'
-                : `${(node.firstLevelClear * 1000).toFixed(0)} mm açıklık`,
+                : `${millimetreLabel(node.firstLevelClear, unit)} açıklık`,
             ],
             ['Yapı', node.cladRack ? 'giydirme raf · çatıyı taşır' : 'serbest duran'],
             [
               'Çerçeve yüksekliği',
-              `${(frameHeightM(node) * 1000).toFixed(0)} mm${
+              `${millimetreLabel(frameHeightM(node), unit)}${
                 frameHeightIsValid(node)
                   ? ''
-                  : ` → ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)}`
+                  : ` → ${millimetreLabel(nearestValidFrameHeightM(node), unit)}`
               }`,
             ],
           ]}

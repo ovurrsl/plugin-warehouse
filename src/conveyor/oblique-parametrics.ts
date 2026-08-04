@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { millimetreLabel, unitNow } from '../units'
 import { OBQ, SPEEDS_M_PER_MIN, STANDARD_TRANSPORT_HEIGHTS_M } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, OBLIQUE_BRANCH_ANGLES_DEG, ROLLER_PITCHES_MM } from './constants'
 import {
@@ -105,6 +106,7 @@ export const conveyorObliqueParametrics: ParametricDescriptor<ConveyorObliqueNod
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // The one only this shape can have: a shallow branch has to start further
       // back to clear the main frame by the module's end, and the body is fixed.
@@ -114,7 +116,7 @@ export const conveyorObliqueParametrics: ParametricDescriptor<ConveyorObliqueNod
         issues.push({
           field: 'angle',
           severity: 'warning',
-          msg: `At ${node.angle}° the branch would have to leave ${((-diverge - half) * 1000).toFixed(0)} mm before this ${(moduleLengthM(node) * 1000).toFixed(0)} mm body starts to clear the main frame by its end. Steepen the branch.`,
+          msg: `At ${node.angle}° the branch would have to leave ${millimetreLabel(-diverge - half, unit)} before this ${millimetreLabel(moduleLengthM(node), unit)} body starts to clear the main frame by its end. Steepen the branch.`,
         })
       }
 
@@ -123,7 +125,7 @@ export const conveyorObliqueParametrics: ParametricDescriptor<ConveyorObliqueNod
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
+          msg: `A ${millimetreLabel(node.shortestBox, unit)} box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
         })
       }
 
@@ -145,7 +147,7 @@ export const conveyorObliqueParametrics: ParametricDescriptor<ConveyorObliqueNod
         issues.push({
           field: 'transportHeight',
           severity: 'warning',
-          msg: `${(node.transportHeight * 1000).toFixed(0)} mm is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
+          msg: `${millimetreLabel(node.transportHeight, unit)} is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
         })
       }
 

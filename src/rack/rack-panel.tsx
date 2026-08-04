@@ -13,6 +13,7 @@ import { type CSSProperties, useState } from 'react'
 import { IssueList } from '../panels/issue-list'
 import { Field, Figures, Note } from '../panels/kit'
 import { useWarehouseStore } from '../store'
+import { lengthLabel, millimetreLabel, useUnit } from '../units'
 import { runExtent } from './multiply'
 import { multiplyRack, pendingPlacements } from './multiply-command'
 import { occupiedSlots } from './occupancy'
@@ -91,6 +92,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
   const setMultiply = useWarehouseStore((s) => s.setMultiply)
   const node = useInspectedRack(provided)
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const unit = useUnit()
   const [confirming, setConfirming] = useState(false)
 
   // The inspector is open for something that is not a rack — or for nothing.
@@ -149,7 +151,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
           step={1}
           value={spec.bays}
         />
-        <Note>{extent.width.toFixed(2)} m genişlik</Note>
+        <Note>{lengthLabel(extent.width, unit)} genişlik</Note>
 
         <SliderControl
           label="Rows"
@@ -164,7 +166,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
           step={1}
           value={spec.rows}
         />
-        {spec.rows > 1 && <Note>{extent.depth.toFixed(2)} m derinlik</Note>}
+        {spec.rows > 1 && <Note>{lengthLabel(extent.depth, unit)} derinlik</Note>}
 
         {spec.rows > 1 ? (
           <>
@@ -188,7 +190,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
               // It had no control at all, while still setting the depth the
               // panel reports and the box the tool collides — an invisible
               // constant governing every back-to-back layout.
-              <Field hint={`${(spec.backToBackGap * 1000).toFixed(0)} mm`} label="Spine gap">
+              <Field hint={millimetreLabel(spec.backToBackGap, unit)} label="Spine gap">
                 <SegmentedControl
                   onChange={(value: string) => setMultiply({ backToBackGap: Number(value) })}
                   options={[
@@ -204,7 +206,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
             {/* The figure that decides how much of a building is racking: a
                 turret truck turns in 1.8 m, a reach truck works 3.2, and a
                 counterbalanced forklift wants 3.5. */}
-            <Field hint={`${spec.aisleWidth.toFixed(2)} m`} label="Aisle">
+            <Field hint={lengthLabel(spec.aisleWidth, unit)} label="Aisle">
               <SegmentedControl
                 onChange={(value: string) => setMultiply({ aisleWidth: Number(value) })}
                 options={[

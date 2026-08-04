@@ -3,6 +3,7 @@
 import { ActionButton, ActionGroup, SegmentedControl, SliderControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { Caption, Note, SelectRow } from '../panels/kit'
+import { lengthLabel, millimetreLabel, useUnit } from '../units'
 import {
   clearAbove,
   dividerHeightAt,
@@ -64,6 +65,7 @@ type CustomField = {
 }
 
 export function LevelsField({ node, onUpdate }: CustomField) {
+  const unit = useUnit()
   const fitted = fittedLevels(node)
   const fittedSet = new Set(fitted)
 
@@ -122,8 +124,8 @@ export function LevelsField({ node, onUpdate }: CustomField) {
                 {doesNotFit ? 'sığmaz' : `#${order + 1}`}
               </span>
               <span style={styles.derived}>
-                {snapped.toFixed(3)} m · {levelLoadKg(level)} kg
-                {!doesNotFit && ` · üstünde ${clear.toFixed(2)} m`}
+                {lengthLabel(snapped, unit, 3)} · {levelLoadKg(level)} kg
+                {!doesNotFit && ` · üstünde ${lengthLabel(clear, unit)}`}
               </span>
               {node.levels.length > 1 && (
                 <button onClick={() => removeLevel(index)} style={styles.chip} type="button">
@@ -179,7 +181,7 @@ export function LevelsField({ node, onUpdate }: CustomField) {
                 {level.dividers > 0 && (
                   <Note>
                     {dividerHeight === null
-                      ? `Üstteki açıklık ${(clear * 1000).toFixed(0)} mm; katalog serisinin en kısası 100 mm, bu yüzden bölücü çizilmiyor.`
+                      ? `Üstteki açıklık ${millimetreLabel(clear, unit)}; katalog serisinin en kısası 100 mm, bu yüzden bölücü çizilmiyor.`
                       : `Bölücü boyu ${(dividerHeight * 1000).toFixed(0)} mm — açıklığa sığan en büyük katalog boyu. Üstteki rafı indirirseniz kendiliğinden kısalır.`}
                   </Note>
                 )}

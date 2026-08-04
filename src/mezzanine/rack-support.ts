@@ -17,6 +17,7 @@
 
 import type { PalletRackNode } from '../rack/schema'
 import { bayPitch, storageLevelsPresent, totalDepth } from '../rack/slots'
+import { areaLabel, DEFAULT_UNIT, type LinearUnit } from '../units'
 import { deckSlabId } from './deck-slabs'
 import { resolveTierElevations } from './metrics'
 import type { MezzanineNode } from './schema'
@@ -108,10 +109,15 @@ export function overloadedRacks(supported: readonly SupportedRack[]): SupportedR
   return supported.filter((entry) => entry.declaredLoadKg > entry.allowanceKg)
 }
 
-/** Panelin gösterdiği cümle — hüküm değil, ölçü ve sebep. */
-export function overloadText(entry: SupportedRack): string {
+/**
+ * Panelin gösterdiği cümle — hüküm değil, ölçü ve sebep.
+ *
+ * Birim PARAMETRE, mağaza okuması değil: bu modül saf ve öyle kalmalı. Kütle
+ * (kg) çevrilmiyor — Units yalnız uzunluk ve alanı yönetiyor, kütleyi değil.
+ */
+export function overloadText(entry: SupportedRack, unit: LinearUnit = DEFAULT_UNIT): string {
   const ratio = entry.declaredLoadKg / Math.max(entry.allowanceKg, 1)
-  return `Tier ${entry.tierIndex}: bir raf ${entry.declaredLoadKg.toFixed(0)} kg beyan ediyor, taban izi (${entry.footprintM2.toFixed(2)} m²) için sınır ${entry.allowanceKg.toFixed(0)} kg — ${ratio.toFixed(1)}× aşım. Yapısal inceleme gerekir (FEM değil, yayılı yük oranı).`
+  return `Tier ${entry.tierIndex}: bir raf ${entry.declaredLoadKg.toFixed(0)} kg beyan ediyor, taban izi (${areaLabel(entry.footprintM2, unit, 2)}) için sınır ${entry.allowanceKg.toFixed(0)} kg — ${ratio.toFixed(1)}× aşım. Yapısal inceleme gerekir (FEM değil, yayılı yük oranı).`
 }
 
 /** Bir tier'in üstündeki toplam beyan edilen yük ve toplam izin, kg. */

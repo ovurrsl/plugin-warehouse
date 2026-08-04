@@ -3,6 +3,15 @@
 import { SegmentedControl, SliderControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { Caption, Note } from '../panels/kit'
+import {
+  fieldStep,
+  fieldToMetres,
+  lengthLabel,
+  lengthUnit,
+  lengthValue,
+  metresToField,
+  useUnit,
+} from '../units'
 import { clearOpening, fittedLevelCount, pitchZ, railHeight, railTopY } from './lanes'
 import type { DriveInRackNode } from './schema'
 
@@ -56,6 +65,7 @@ export function LevelClearsField({ node, onUpdate }: CustomField) {
   const fitted = fittedLevelCount(node)
   const clears = node.levelClears ?? []
   const rail = railHeight(node)
+  const unit = useUnit()
 
   /** Trim to the row count so a lane taken from five levels to two and back
    *  does not resurrect the old overrides. */
@@ -64,7 +74,7 @@ export function LevelClearsField({ node, onUpdate }: CustomField) {
 
   const setClear = (level: number, raw: string) => {
     const next = sized(clears)
-    next[level] = raw === '' ? null : Number(raw)
+    next[level] = raw === '' ? null : fieldToMetres(Number(raw), unit)
     // All-null returns the field to the schema's "no overrides" state, so a
     // saved scene reads identically to one that was never touched.
     onUpdate({ levelClears: next.every((value) => value == null) ? null : next })
@@ -112,13 +122,18 @@ export function LevelClearsField({ node, onUpdate }: CustomField) {
             <input
               inputMode="decimal"
               onChange={(event) => setClear(level, event.target.value)}
-              placeholder={clearOpening({ ...node, levelClears: null }, level).toFixed(2)}
-              step={0.05}
+              placeholder={metresToField(
+                clearOpening({ ...node, levelClears: null }, level),
+                unit,
+              ).toFixed(2)}
+              step={fieldStep(0.05, unit)}
               style={styles.input}
               type="number"
-              value={clears[level] ?? ''}
+              value={clears[level] == null ? '' : metresToField(clears[level] as number, unit)}
             />
-            <span style={styles.derived}>m → adım {pitch.toFixed(2)} m</span>
+            <span style={styles.derived}>
+              {lengthUnit(unit)} → adım {lengthLabel(pitch, unit)}
+            </span>
           </div>
         )
       })}
@@ -129,7 +144,7 @@ export function LevelClearsField({ node, onUpdate }: CustomField) {
       </Note>
       {node.levels > fitted && (
         <Note>
-          {node.levels - fitted} kat {node.uprightHeight.toFixed(2)} m dikmeye sığmıyor.
+          {node.levels - fitted} kat {lengthLabel(node.uprightHeight, unit)} dikmeye sığmıyor.
         </Note>
       )}
     </>
@@ -147,9 +162,10 @@ export function LevelClearsField({ node, onUpdate }: CustomField) {
  */
 export function PostPitchField({ node, onUpdate }: CustomField) {
   const derived = pitchZ(node)
+  const unit = useUnit()
   return (
     <>
-      <Caption hint={node.postPitchZ === null ? `auto — ${derived.toFixed(3)} m` : 'elle'}>
+      <Caption hint={node.postPitchZ === null ? `auto — ${lengthLabel(derived, unit, 3)}` : 'elle'}>
         Dikme aralığı
       </Caption>
       <SegmentedControl
@@ -158,9 +174,14 @@ export function PostPitchField({ node, onUpdate }: CustomField) {
         }
         options={[
           { label: 'Auto', value: 'auto' },
-          { label: '1.0', value: '1' },
-          { label: '1.2', value: '1.2' },
-          { label: '1.5', value: '1.5' },
+          // Etiket çevrilir, `value` ASLA: `value` şemaya yazılan metre ve
+          // `String(node.postPitchZ)` ile karşılaştırılıyor. Bu üç sayı bir
+          // katalog serisi değil — üstteki not tam olarak bunun bir VARSAYIM
+          // olduğunu söylüyor — yani çevrilmemeleri için bir gerekçe yok.
+          ...[1, 1.2, 1.5].map((metres) => ({
+            label: lengthValue(metres, unit, unit === 'imperial' ? 2 : 1),
+            value: String(metres),
+          })),
         ]}
         value={node.postPitchZ === null ? 'auto' : String(node.postPitchZ)}
       />

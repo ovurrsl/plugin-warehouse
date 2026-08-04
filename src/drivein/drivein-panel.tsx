@@ -5,6 +5,7 @@ import { PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { Figures, Note } from '../panels/kit'
+import { lengthLabel, millimetreLabel, publishedMillimetres, useUnit } from '../units'
 import {
   directAccessSlotCount,
   fittedLevelCount,
@@ -51,6 +52,7 @@ export default function DriveInPanel({ node: provided }: { node?: DriveInRackNod
   const envelope = forkliftEnvelope(node)
   const bearing = railBearingEachSide(node)
   const rail = RAIL_PROFILES[node.railType]
+  const unit = useUnit()
 
   return (
     <>
@@ -61,9 +63,9 @@ export default function DriveInPanel({ node: provided }: { node?: DriveInRackNod
           rows={[
             ['Palet pozisyonu', `${positions} · ${direct} doğrudan erişilebilir`],
             ['Kat', `${fitted} ray + zemin`],
-            ['Derinlik', `${totalDepth(node).toFixed(2)} m · ${node.palletsDeep} derin`],
-            ['Şerit adımı', `${lanePitch(node).toFixed(3)} m`],
-            ['Üst ray', `${railTopY(node, fitted).toFixed(2)} m`],
+            ['Derinlik', `${lengthLabel(totalDepth(node), unit)} · ${node.palletsDeep} derin`],
+            ['Şerit adımı', `${lengthLabel(lanePitch(node), unit, 3)}`],
+            ['Üst ray', `${lengthLabel(railTopY(node, fitted), unit)}`],
             [
               'Akış',
               node.entryMode === 'drive-through' ? 'FIFO · iki uç açık' : 'LIFO · tek koridor yüzü',
@@ -81,7 +83,7 @@ export default function DriveInPanel({ node: provided }: { node?: DriveInRackNod
           rows={[
             ['Tip', rail.label],
             ['Kesit', `${(rail.width * 1000).toFixed(0)} × ${(rail.height * 1000).toFixed(0)} mm`],
-            ['Oturma (her yan)', `${(bearing * 1000).toFixed(0)} mm`],
+            ['Oturma (her yan)', millimetreLabel(bearing, unit)],
             rail.clearSpan !== null && [
               'Net açıklık · D',
               `${(rail.clearSpan * 1000).toFixed(0)} mm — sabit (s.18)`,
@@ -94,11 +96,14 @@ export default function DriveInPanel({ node: provided }: { node?: DriveInRackNod
       <PanelSection title="Araç gereksinimi">
         <Figures
           rows={[
-            ['En geniş araç gövdesi', `${envelope.maxTruckWidth.toFixed(3)} m`],
-            ['Gereken mast yüksekliği', `${envelope.requiredLift.toFixed(2)} m`],
+            ['En geniş araç gövdesi', `${lengthLabel(envelope.maxTruckWidth, unit, 3)}`],
+            ['Gereken mast yüksekliği', `${lengthLabel(envelope.requiredLift, unit)}`],
             envelope.guideGap !== null && [
               'Kılavuz açıklığı · Y',
-              `${(envelope.guideGap * 1000).toFixed(0)} mm = X − 110`,
+              // Boşluk bu şeridin kendi ölçüsü, çevriliyor; "− 110" katalogun
+              // sabit içeri çekmesi (s.23) ve kaynağın biriminde kalıyor —
+              // bu yüzden birimi artık açıkça yazılı.
+              `${millimetreLabel(envelope.guideGap, unit)} = X − ${publishedMillimetres(110)}`,
             ],
           ]}
         />

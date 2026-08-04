@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { millimetreLabel, unitNow } from '../units'
 import {
   carriesCatalogueBox,
   carriesShortestBox,
@@ -116,6 +117,7 @@ export const conveyorBoosterParametrics: ParametricDescriptor<ConveyorBoosterNod
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const length = moduleLengthM(node)
 
       // The one the bounds on `rollers` cannot express: the range is a length,
@@ -124,7 +126,7 @@ export const conveyorBoosterParametrics: ParametricDescriptor<ConveyorBoosterNod
         issues.push({
           field: 'rollers',
           severity: 'warning',
-          msg: `${(length * 1000).toFixed(0)} mm is outside the ${(BST.lengthRangeM[0] * 1000).toFixed(0)}–${(BST.lengthRangeM[1] * 1000).toFixed(0)} mm this type is built in. ${length < BST.lengthRangeM[0] ? 'Add rollers or coarsen the pitch' : 'Drop rollers, or use a straight section'}.`,
+          msg: `${millimetreLabel(length, unit)} is outside the ${(BST.lengthRangeM[0] * 1000).toFixed(0)}–${(BST.lengthRangeM[1] * 1000).toFixed(0)} mm this type is built in. ${length < BST.lengthRangeM[0] ? 'Add rollers or coarsen the pitch' : 'Drop rollers, or use a straight section'}.`,
         })
       }
 
@@ -134,7 +136,7 @@ export const conveyorBoosterParametrics: ParametricDescriptor<ConveyorBoosterNod
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
+          msg: `A ${millimetreLabel(node.shortestBox, unit)} box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
         })
       }
 
@@ -155,7 +157,7 @@ export const conveyorBoosterParametrics: ParametricDescriptor<ConveyorBoosterNod
         issues.push({
           field: 'transportHeight',
           severity: 'warning',
-          msg: `${(node.transportHeight * 1000).toFixed(0)} mm is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
+          msg: `${millimetreLabel(node.transportHeight, unit)} is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
         })
       }
 

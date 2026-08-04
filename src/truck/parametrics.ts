@@ -1,6 +1,7 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { MAST_TABLES } from '../handling/masts'
 import { TRUCK_MODELS } from '../handling/models'
+import { lengthLabel, unitNow } from '../units'
 import { MastRowField, ModelField } from './fields'
 import { mastRowOf, modelOf } from './metrics'
 import type { TruckNode } from './schema'
@@ -59,6 +60,7 @@ export const truckParametrics: ParametricDescriptor<TruckNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const model = modelOf(node.model)
       const row = mastRowOf(node.mastRowId)
 
@@ -76,7 +78,7 @@ export const truckParametrics: ParametricDescriptor<TruckNode> = {
         issues.push({
           field: 'forkHeight',
           severity: 'error',
-          msg: `Çatal kotu ${node.forkHeight.toFixed(2)} m, seçili mastın h3'ü ${row.h3.toFixed(2)} m — bu konfigürasyon bu kota çıkamaz.`,
+          msg: `Çatal kotu ${lengthLabel(node.forkHeight, unit)}, seçili mastın h3'ü ${row.h3.toFixed(2)} m — bu konfigürasyon bu kota çıkamaz.`,
         })
       }
       if (!row && node.forkHeight > 0.15) {

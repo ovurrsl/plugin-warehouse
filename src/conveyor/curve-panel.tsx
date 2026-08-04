@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { lengthLabel, millimetreLabel, useUnit } from '../units'
 import { describeLine } from './conveyor-panel'
 import {
   angleDeg,
@@ -48,6 +49,7 @@ function useInspectedCurve(provided?: ConveyorCurveNode): ConveyorCurveNode | nu
 
 export default function ConveyorCurvePanel({ node: provided }: { node?: ConveyorCurveNode }) {
   const node = useInspectedCurve(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
@@ -57,7 +59,7 @@ export default function ConveyorCurvePanel({ node: provided }: { node?: Conveyor
   // can see it.
   const issues = [
     ...(conveyorCurveParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   const lane = laneWidthM(node)
@@ -67,10 +69,13 @@ export default function ConveyorCurvePanel({ node: provided }: { node?: Conveyor
     <ModuleReadout
       issues={issues}
       rows={[
-        ['Arc', `${angleDeg(node)}° ${node.handed} · ${centrelineLengthM(node).toFixed(2)} m`],
+        [
+          'Arc',
+          `${angleDeg(node)}° ${node.handed} · ${lengthLabel(centrelineLengthM(node), unit)}`,
+        ],
         [
           'Radius',
-          `${(node.innerRadius * 1000).toFixed(0)} mm inner · ${(outerRadiusM(node) * 1000).toFixed(0)} mm outer`,
+          `${millimetreLabel(node.innerRadius, unit)} inner · ${millimetreLabel(outerRadiusM(node), unit)} outer`,
         ],
         [
           'Frame',
@@ -82,9 +87,9 @@ export default function ConveyorCurvePanel({ node: provided }: { node?: Conveyor
         // has no equivalent of.
         [
           'Longest box',
-          `${(longest * 1000).toFixed(0)} mm at full ${(lane * 1000).toFixed(0)} mm width`,
+          `${millimetreLabel(longest, unit)} at full ${(lane * 1000).toFixed(0)} mm width`,
         ],
-        ['Line', describeLine(node, nodes)],
+        ['Line', describeLine(node, nodes, unit)],
       ]}
       title="This bend"
     >

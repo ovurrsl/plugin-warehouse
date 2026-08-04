@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, millimetreLabel, unitNow } from '../units'
 import { CAR, SPEEDS_M_PER_MIN, STANDARD_TRANSPORT_HEIGHTS_M } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
 import { BedLengthField } from './length-field'
@@ -140,6 +141,7 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const length = moduleLengthM(node)
 
       // R11 — the catalogue's rule is that a box always sits on at least three
@@ -149,7 +151,7 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
+          msg: `A ${millimetreLabel(node.shortestBox, unit)} box sits on ${rollersUnderShortestBox(node)} rollers at ${rollerPitchMm(node)} mm pitch; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or raise the shortest box.`,
         })
       }
 
@@ -159,7 +161,7 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
         issues.push({
           field: 'rollers',
           severity: 'warning',
-          msg: `${length.toFixed(3)} m is outside the ${CAR.lengthRangeM[0].toFixed(3)}–${CAR.lengthRangeM[1].toFixed(0)} m this type is built in. ${length < CAR.lengthRangeM[0] ? 'Add rollers' : 'Split it into two modules'}.`,
+          msg: `${lengthLabel(length, unit, 3)} is outside the ${CAR.lengthRangeM[0].toFixed(3)}–${CAR.lengthRangeM[1].toFixed(0)} m this type is built in. ${length < CAR.lengthRangeM[0] ? 'Add rollers' : 'Split it into two modules'}.`,
         })
       }
 
@@ -206,7 +208,7 @@ export const conveyorRollerParametrics: ParametricDescriptor<ConveyorRollerNode>
         issues.push({
           field: 'transportHeight',
           severity: 'warning',
-          msg: `${(node.transportHeight * 1000).toFixed(0)} mm is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
+          msg: `${millimetreLabel(node.transportHeight, unit)} is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
         })
       }
 

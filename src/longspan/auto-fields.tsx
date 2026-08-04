@@ -3,6 +3,7 @@
 import { ActionButton, ActionGroup, SegmentedControl, SliderControl } from '@pascal-app/editor'
 import type { CSSProperties } from 'react'
 import { Caption, Note, SelectRow } from '../panels/kit'
+import { lengthLabel, useUnit } from '../units'
 import { clearAbove, fittedLevels, levelElevation, levelNeedsZtam, slotPitchFor } from './levels'
 import type { LongspanLevel, LongspanNode } from './schema'
 import { SHELF_KINDS } from './standards'
@@ -65,6 +66,7 @@ const STRUCTURE_LABEL: Record<LongspanLevel['structure'], string> = {
 }
 
 export function LevelsField({ node, onUpdate }: CustomField) {
+  const unit = useUnit()
   const fitted = fittedLevels(node)
   const fittedSet = new Set(fitted)
 
@@ -122,8 +124,8 @@ export function LevelsField({ node, onUpdate }: CustomField) {
                 {doesNotFit ? 'sığmaz' : `#${order + 1}`}
               </span>
               <span style={styles.derived}>
-                {snapped.toFixed(3)} m · {(pitch * 1000).toFixed(0)} mm yuva
-                {!doesNotFit && ` · üstünde ${clear.toFixed(2)} m`}
+                {lengthLabel(snapped, unit, 3)} · {(pitch * 1000).toFixed(0)} mm yuva
+                {!doesNotFit && ` · üstünde ${lengthLabel(clear, unit)}`}
               </span>
               {node.levels.length > 1 && (
                 <button onClick={() => removeLevel(index)} style={styles.chip} type="button">

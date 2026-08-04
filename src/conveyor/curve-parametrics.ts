@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, millimetreLabel, unitNow } from '../units'
 import { SPEEDS_M_PER_MIN, STANDARD_TRANSPORT_HEIGHTS_M } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
 import {
@@ -139,6 +140,7 @@ export const conveyorCurveParametrics: ParametricDescriptor<ConveyorCurveNode> =
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const lane = laneWidthM(node)
 
       // The one a straight cannot have. A rigid box's outer corners swing wider
@@ -150,7 +152,7 @@ export const conveyorCurveParametrics: ParametricDescriptor<ConveyorCurveNode> =
         issues.push({
           field: 'innerRadius',
           severity: 'warning',
-          msg: `A full-width ${(lane * 1000).toFixed(0)} mm box gets round only up to ${(longest * 1000).toFixed(0)} mm long. Widen the radius or accept shorter cartons.`,
+          msg: `A full-width ${(lane * 1000).toFixed(0)} mm box gets round only up to ${millimetreLabel(longest, unit)} long. Widen the radius or accept shorter cartons.`,
         })
       }
 
@@ -160,7 +162,7 @@ export const conveyorCurveParametrics: ParametricDescriptor<ConveyorCurveNode> =
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `A ${(node.shortestBox * 1000).toFixed(0)} mm box sits on ${rollersUnderShortestBox(node)} rollers at the outer radius; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or widen the bend.`,
+          msg: `A ${millimetreLabel(node.shortestBox, unit)} box sits on ${rollersUnderShortestBox(node)} rollers at the outer radius; the catalogue asks for ${MIN_ROLLERS_UNDER_A_BOX}. Drop the pitch or widen the bend.`,
         })
       }
 
@@ -184,7 +186,7 @@ export const conveyorCurveParametrics: ParametricDescriptor<ConveyorCurveNode> =
           issues.push({
             field: 'zones',
             severity: 'warning',
-            msg: `${zones} zone${zones > 1 ? 's' : ''} over ${centrelineLengthM(node).toFixed(2)} m leaves ${(perZone * 1000).toFixed(0)} mm each — less than two of the ${(node.shortestBox * 1000).toFixed(0)} mm boxes this line carries. A zone needs length to accumulate in.`,
+            msg: `${zones} zone${zones > 1 ? 's' : ''} over ${lengthLabel(centrelineLengthM(node), unit)} leaves ${millimetreLabel(perZone, unit)} each — less than two of the ${millimetreLabel(node.shortestBox, unit)} boxes this line carries. A zone needs length to accumulate in.`,
           })
         }
       }
@@ -200,7 +202,7 @@ export const conveyorCurveParametrics: ParametricDescriptor<ConveyorCurveNode> =
         issues.push({
           field: 'transportHeight',
           severity: 'warning',
-          msg: `${(node.transportHeight * 1000).toFixed(0)} mm is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
+          msg: `${millimetreLabel(node.transportHeight, unit)} is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
         })
       }
 

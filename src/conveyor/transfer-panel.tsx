@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { millimetreLabel, useUnit } from '../units'
 import { MTR } from './catalog'
 import { describeLine } from './conveyor-panel'
 import { jointIssues, ModuleReadout } from './module-panel'
@@ -43,13 +44,14 @@ function useInspectedTransfer(provided?: ConveyorTransferNode): ConveyorTransfer
 
 export default function ConveyorTransferPanel({ node: provided }: { node?: ConveyorTransferNode }) {
   const node = useInspectedTransfer(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
 
   const issues = [
     ...(conveyorTransferParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   return (
@@ -63,18 +65,18 @@ export default function ConveyorTransferPanel({ node: provided }: { node?: Conve
         ['Ports', `${laneMm(node)} mm class on all three — the only one this type is built in`],
         [
           'Strips',
-          `${node.travel} · ${(stripSpanM(node) * 1000).toFixed(0)} mm of travel, discharging ${node.dischargeSide}`,
+          `${node.travel} · ${millimetreLabel(stripSpanM(node), unit)} of travel, discharging ${node.dischargeSide}`,
         ],
         [
           'Rollers',
-          `${rollerOffsetsX(node).length} in the gaps · widest gap ${(widestRollerGapM(node) * 1000).toFixed(0)} mm`,
+          `${rollerOffsetsX(node).length} in the gaps · widest gap ${millimetreLabel(widestRollerGapM(node), unit)}`,
         ],
         ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
         [
           'Shortest box',
-          `${(node.shortestBox * 1000).toFixed(0)} mm on ${rollersUnderShortestBox(node)} rollers · ≤ ${MTR.loadKg} kg`,
+          `${millimetreLabel(node.shortestBox, unit)} on ${rollersUnderShortestBox(node)} rollers · ≤ ${MTR.loadKg} kg`,
         ],
-        ['Line', describeLine(node, nodes)],
+        ['Line', describeLine(node, nodes, unit)],
       ]}
       title="This transfer"
     >

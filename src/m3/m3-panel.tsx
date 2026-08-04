@@ -5,6 +5,7 @@ import { PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { Figures, Note } from '../panels/kit'
+import { areaLabel, lengthLabel, useUnit } from '../units'
 import {
   bayLoadKg,
   bayPitch,
@@ -48,6 +49,7 @@ function useInspected(provided?: M3ShelvingNode): M3ShelvingNode | null {
 
 export default function M3Panel({ node: provided }: { node?: M3ShelvingNode }) {
   const node = useInspected(provided)
+  const unit = useUnit()
   if (!node) return null
 
   const issues = m3Parametrics.invariants?.flatMap((check) => check(node)) ?? []
@@ -65,8 +67,8 @@ export default function M3Panel({ node: provided }: { node?: M3ShelvingNode }) {
         <Figures
           rows={[
             ['Kat', `${levels.length}`],
-            ['Raf alanı', `${shelfAreaM2(node).toFixed(2)} m²`],
-            ['Göz adımı', `${bayPitch(node).toFixed(3)} m`],
+            ['Raf alanı', areaLabel(shelfAreaM2(node), unit, 2)],
+            ['Göz adımı', lengthLabel(bayPitch(node), unit, 3)],
             [
               'Katalog boyu',
               Math.abs(nearest - node.shelfLength) < 1e-6
@@ -140,7 +142,7 @@ export default function M3Panel({ node: provided }: { node?: M3ShelvingNode }) {
                   ? `${SHELF_MODELS[level.model].label} · ${level.dividers} bölücü ${(divider * 1000).toFixed(0)} mm`
                   : SHELF_MODELS[level.model].label
             return [
-              `#${index + 1} · ${levelElevation(level).toFixed(3)} m · ${levelLoadKg(level)} kg`,
+              `#${index + 1} · ${lengthLabel(levelElevation(level), unit, 3)} · ${levelLoadKg(level)} kg`,
               detail,
             ] as const
           })}

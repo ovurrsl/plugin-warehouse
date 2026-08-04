@@ -1,5 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { TRUCK_VARIANTS } from '../handling/catalog'
+import { millimetreLabel, unitNow } from '../units'
 import { PEDESTRIAN_WIDTH_NOTE } from './catalog'
 import { LINE_WIDTH_IDS } from './constants'
 import { routeReading } from './metrics'
@@ -59,6 +60,7 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const reading = routeReading(node)
 
       if (node.role === 'pedestrian') {
@@ -78,7 +80,6 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
       }
 
       const margin = reading.marginM ?? 0
-      const millimetres = Math.round(margin * 1000)
 
       if (reading.band.basis === 'estimate') {
         // A margin against an estimate is still only a number. Colouring it
@@ -91,13 +92,13 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
         issues.push({
           field: 'width',
           severity: 'error',
-          msg: `${reading.band.label} için yayınlanmış en az ${reading.band.min.toFixed(2)} m — bu koridor ${Math.abs(millimetres)} mm dar. (Mecalux / EN 15620, yükler arası; yasal bir sınır değil.)`,
+          msg: `${reading.band.label} için yayınlanmış en az ${reading.band.min.toFixed(2)} m — bu koridor ${millimetreLabel(Math.abs(margin), unit)} dar. (Mecalux / EN 15620, yükler arası; yasal bir sınır değil.)`,
         })
       } else {
         issues.push({
           field: 'width',
           severity: 'warning',
-          msg: `${reading.band.label}: ${reading.band.min.toFixed(2)}–${reading.band.max.toFixed(2)} m. Bu koridorda ${millimetres} mm pay var.`,
+          msg: `${reading.band.label}: ${reading.band.min.toFixed(2)}–${reading.band.max.toFixed(2)} m. Bu koridorda ${millimetreLabel(margin, unit)} pay var.`,
         })
       }
       return issues

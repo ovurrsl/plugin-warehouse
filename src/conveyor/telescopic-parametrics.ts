@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, unitNow } from '../units'
 import { TELESCOPIC_MODELS } from './telescopic-catalog'
 import { currentLengthM } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
@@ -81,6 +82,7 @@ export const conveyorTelescopicParametrics: ParametricDescriptor<ConveyorTelesco
     (node): Issue[] => {
       const model = TELESCOPIC_MODELS[node.model]
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // Tablonun kendi zinciri — katalog satırı bozulursa panel söyler.
       // (`telescopic.test.ts` bunu ayrıca kilitler; buradaki, kullanıcının
@@ -108,7 +110,7 @@ export const conveyorTelescopicParametrics: ParametricDescriptor<ConveyorTelesco
         issues.push({
           field: 'extension',
           severity: 'warning',
-          msg: `Tam açık: ${currentLengthM(node).toFixed(2)} m zemin kaplar. Rampa önündeki manevra alanını kontrol edin.`,
+          msg: `Tam açık: ${lengthLabel(currentLengthM(node), unit)} zemin kaplar. Rampa önündeki manevra alanını kontrol edin.`,
         })
       }
 

@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, millimetreLabel, publishedMillimetres, unitNow } from '../units'
 import { LevelsField } from './auto-fields'
 import {
   collidingLevels,
@@ -71,13 +72,14 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       const dropped = droppedLevelCount(node)
       if (dropped > 0) {
         issues.push({
           field: 'frameHeight',
           severity: 'warning',
-          msg: `${dropped} kat ${node.frameHeight.toFixed(2)} m çerçevenin üstünde kalıyor ve çizilmiyor.`,
+          msg: `${dropped} kat ${lengthLabel(node.frameHeight, unit)} çerçevenin üstünde kalıyor ve çizilmiyor.`,
         })
       }
 
@@ -95,7 +97,7 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
         issues.push({
           field: 'levels',
           severity: 'error',
-          msg: `Kat ${index + 1} (${levelElevation(level).toFixed(3)} m) başka bir katla AYNI yuvaya düşüyor; ikisi üst üste çizilir.`,
+          msg: `Kat ${index + 1} (${lengthLabel(levelElevation(level), unit, 3)}) başka bir katla AYNI yuvaya düşüyor; ikisi üst üste çizilir.`,
         })
       }
 
@@ -104,7 +106,7 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
         issues.push({
           field: 'bayLength',
           severity: 'warning',
-          msg: `HM rafı 1.000 / 1.250 / 1.400 mm boylarında yayımlanıyor; ${(node.bayLength * 1000).toFixed(0)} mm bu seride yok (KATALOG).`,
+          msg: `HM rafı 1.000 / 1.250 / 1.400 mm boylarında yayımlanıyor; ${millimetreLabel(node.bayLength, unit)} bu seride yok (KATALOG).`,
         })
       }
 
@@ -114,7 +116,7 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
         issues.push({
           field: 'crossBracing',
           severity: 'warning',
-          msg: `${node.frameHeight.toFixed(1)} m HM ünitesi koridor yönünde çapraz bağ istiyor (KATALOG). Eşik yayımlanmadığı için karar sizin.`,
+          msg: `${lengthLabel(node.frameHeight, unit, 1)} HM ünitesi koridor yönünde çapraz bağ istiyor (KATALOG). Eşik yayımlanmadığı için karar sizin.`,
         })
       }
 
@@ -131,7 +133,7 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
         issues.push({
           field: 'bayLength',
           severity: 'warning',
-          msg: `${(node.bayLength * 1000).toFixed(0)} mm katalog serisinde yok; en yakını ${(nearest * 1000).toFixed(0)} mm. Duvara kesilen gözlerde olağan.`,
+          msg: `${millimetreLabel(node.bayLength, unit)} katalog serisinde yok; en yakını ${publishedMillimetres(nearest * 1000)}. Duvara kesilen gözlerde olağan.`,
         })
       }
 
@@ -140,7 +142,7 @@ export const longspanParametrics: ParametricDescriptor<LongspanNode> = {
         issues.push({
           field: 'frameDepth',
           severity: 'warning',
-          msg: `${(node.frameDepth * 1000).toFixed(0)} mm derinlik katalog serisinde yok (${FRAME_DEPTHS.map((d) => (d * 1000).toFixed(0)).join(' / ')}).`,
+          msg: `${millimetreLabel(node.frameDepth, unit)} derinlik katalog serisinde yok (${FRAME_DEPTHS.map((d) => (d * 1000).toFixed(0)).join(' / ')} mm).`,
         })
       }
 

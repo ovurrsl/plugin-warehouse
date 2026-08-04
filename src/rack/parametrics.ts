@@ -1,5 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
+import { lengthLabel, millimetreLabel, publishedMillimetres, unitNow } from '../units'
 import {
   LevelsField,
   PalletSupportBarsField,
@@ -283,6 +284,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // Levels silently stop existing when they do not fit the upright, and
       // nothing on screen says so — the rack just has fewer shelves than the
@@ -292,7 +294,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         issues.push({
           field: 'levels',
           severity: 'warning',
-          msg: `Only ${fitted} of ${node.levels} levels fit a ${node.uprightHeight.toFixed(2)} m upright. Raise the height or reduce the clear openings.`,
+          msg: `Only ${fitted} of ${node.levels} levels fit a ${lengthLabel(node.uprightHeight, unit)} upright. Raise the height or reduce the clear openings.`,
         })
       }
 
@@ -326,7 +328,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         issues.push({
           field: 'pickingBoxHeight',
           severity: 'warning',
-          msg: `${(node.pickingBoxHeight * 1000).toFixed(0)} mm kap, kat ${level}'in ${(opening * 1000).toFixed(0)} mm açıklığına sığmıyor.`,
+          msg: `${millimetreLabel(node.pickingBoxHeight, unit)} kap, kat ${level}'in ${millimetreLabel(opening, unit)} açıklığına sığmıyor.`,
         })
         // Bir tane yeter: toplama katlarının açıklığı tek varsayılandan
         // geliyor, yani biri darsa hepsi dardır.
@@ -380,7 +382,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           // no interior opening to be tight, so this cannot fire there.
           field: 'levelClear',
           severity: 'warning',
-          msg: `Level ${level} leaves ${(headroom * 1000).toFixed(0)} mm over a ${(ASSUMED_UNIT_LOAD * 1000).toFixed(0)} mm unit load; EN 15620 asks for ${(required.y * 1000).toFixed(0)} mm at ${surface.toFixed(1)} m.`,
+          msg: `Level ${level} leaves ${millimetreLabel(headroom, unit)} over a ${millimetreLabel(ASSUMED_UNIT_LOAD, unit)} unit load; EN 15620 asks for ${publishedMillimetres(required.y * 1000)} at ${lengthLabel(surface, unit, 1)}.`,
         })
         // One is enough. Every level above a tight one is usually tight too, and
         // a wall of identical warnings buries the rest of the panel.
@@ -392,7 +394,7 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         issues.push({
           field: 'uprightHeight',
           severity: 'warning',
-          msg: `At ${top.toFixed(1)} m the top level is above the range EN 15620 rates for forklifts; it needs a turret truck or a crane.`,
+          msg: `At ${lengthLabel(top, unit, 1)} the top level is above the range EN 15620 rates for forklifts; it needs a turret truck or a crane.`,
         })
       }
 

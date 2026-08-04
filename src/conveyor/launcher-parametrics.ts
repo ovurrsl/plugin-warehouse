@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { millimetreLabel, unitNow } from '../units'
 import { LNC, STANDARD_TRANSPORT_HEIGHTS_M } from './catalog'
 import { ROLLER_PITCHES_MM } from './constants'
 import { rollerPitchMm, usefulWidthMm } from './launcher-metrics'
@@ -89,6 +90,7 @@ export const conveyorLauncherParametrics: ParametricDescriptor<ConveyorLauncherN
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // The rail on the far side is what the launch pushes the box *against*
       // before it clears. Without it the box has nothing to stop it leaving by
@@ -123,7 +125,7 @@ export const conveyorLauncherParametrics: ParametricDescriptor<ConveyorLauncherN
         issues.push({
           field: 'transportHeight',
           severity: 'warning',
-          msg: `${(node.transportHeight * 1000).toFixed(0)} mm is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
+          msg: `${millimetreLabel(node.transportHeight, unit)} is not a catalogue standard (${STANDARD_TRANSPORT_HEIGHTS_M.map((h) => (h * 1000).toFixed(0)).join(' / ')} mm). Anything it joins must match it exactly.`,
         })
       }
 

@@ -1,3 +1,4 @@
+import { DEFAULT_UNIT, type LinearUnit, lengthLabel, millimetreLabel } from '../units'
 import { isPortMated } from './line-index'
 import type { ConveyorModule, ConveyorPortId, PortRole } from './ports'
 import {
@@ -277,6 +278,8 @@ export function mateBlockers(
   position: readonly [number, number, number],
   rotationY: number,
   nodes: Readonly<Record<string, unknown>>,
+  /** Yalnız mesajları etkiler; mıknatısın kendisi metre ile çalışır. */
+  unit: LinearUnit = DEFAULT_UNIT,
 ): string[] {
   const cells = freeEnds(nodes)
   const mine = endsAt(module, position, rotationY)
@@ -305,8 +308,8 @@ export function mateBlockers(
             )
           } else if (rule === 'height') {
             messages.push(
-              `Yakındaki ucun bant kotu ${other.height.toFixed(3)} m, bu makinenin ` +
-                `${mineHeight.toFixed(3)} m — aradaki basamak kutunun takılacağı yerdir.`,
+              `Yakındaki ucun bant kotu ${lengthLabel(other.height, unit, 3)}, bu makinenin ` +
+                `${lengthLabel(mineHeight, unit, 3)} — aradaki basamak kutunun takılacağı yerdir.`,
             )
           } else {
             messages.push(
@@ -324,6 +327,8 @@ export function mateBlockers(
 export function jointProblems(
   module: ConveyorModule,
   nodes: Readonly<Record<string, unknown>>,
+  /** Yalnız mesajları etkiler; teşhisin kendisi metre ile çalışır. */
+  unit: LinearUnit = DEFAULT_UNIT,
 ): string[] {
   const problems: string[] = []
   const mineLocal = new Map(localPorts(module).map((local) => [local.id, local]))
@@ -361,13 +366,18 @@ export function jointProblems(
         // oblique as a mismatch against itself.
         if (theirPort.laneMm !== local.laneMm) {
           problems.push(
-            `Joined to a ${theirPort.laneMm} mm lane; a box wider than ${Math.min(theirPort.laneMm, local.laneMm)} mm cannot cross.`,
+            // Şerit ölçüsü bir SINIF adı (400/600/800) ve öyle kalıyor —
+            // yukarıdaki `mateBlockers` mesajı da sınıfları karşılaştırıyor.
+            // Geçiş sınırı ise bu ekin bu birleşme için HESAPLADIĞI bir
+            // açıklık ve kullanıcının kendi kolileri hakkında bir iddia:
+            // inç'le çalışan biri kolisini inç'le ölçüyor.
+            `Joined to a ${theirPort.laneMm} mm lane; a box wider than ${millimetreLabel(Math.min(theirPort.laneMm, local.laneMm) / 1000, unit)} cannot cross.`,
           )
         }
         const step = Math.abs(transportHeightAt(other, theirId) - transportHeightAt(module, id))
         if (step > 1e-6) {
           problems.push(
-            `A ${(step * 1000).toFixed(0)} mm step at the joint — boxes need an inclined belt or a lift, not a butt joint.`,
+            `A ${millimetreLabel(step, unit)} step at the joint — boxes need an inclined belt or a lift, not a butt joint.`,
           )
         }
       }

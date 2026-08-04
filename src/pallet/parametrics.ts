@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, unitNow } from '../units'
 import { CARGO_COLOR_IDS } from './cargo-constants'
 import { CARGO_TYPE_IDS, CARGO_TYPES, fitsOnDeck, loadHeightOf } from './cargo-types'
 import { PALLET_PRESETS, specOf } from './presets'
@@ -70,6 +71,7 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
     (node): Issue[] => {
       const spec = specOf(node.preset)
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // A unit larger than the deck fits none of it. Said here rather than
       // drawn smaller or drawn overhanging: the footprint and the clash box are
@@ -94,7 +96,7 @@ export const palletParametrics: ParametricDescriptor<PalletNode> = {
         issues.push({
           field: 'cargo',
           severity: 'warning',
-          msg: `Load is ${loadHeight.toFixed(2)} m tall — check clearance to the beam above.`,
+          msg: `Load is ${lengthLabel(loadHeight, unit)} tall — check clearance to the beam above.`,
         })
       }
       if (loadHeight > 0 && !spec.branded && node.preset === 'quarter') {

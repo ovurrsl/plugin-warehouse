@@ -1,5 +1,6 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { useWarehouseStore } from '../store'
+import { lengthLabel, lengthValue, millimetreLabel, unitOf } from '../units'
 import { FLOOR_TYPES } from './catalog'
 import {
   footprintDepthM,
@@ -139,6 +140,7 @@ export function buildMezzanineFloorplan(
   const width = footprintWidthM(node)
   const depth = footprintDepthM(node)
   const view = ctx.viewState
+  const unit = unitOf(view)
   const selected = view?.selected ?? false
 
   const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#004f7c'
@@ -485,7 +487,7 @@ export function buildMezzanineFloorplan(
           kind: 'dimension-label',
           cx: origin.x,
           cy: origin.z,
-          text: `${stair.id} · ${geometry.steps} basamak · ${(geometry.riseM * 1000).toFixed(0)} mm`,
+          text: `${stair.id} · ${geometry.steps} basamak · ${millimetreLabel(geometry.riseM, unit)}`,
           angle: 0,
           screenUpright: true,
         })
@@ -499,7 +501,7 @@ export function buildMezzanineFloorplan(
         cy: -depth / 2 - 0.6,
         // Hangi katın planına bakıldığı etikette — iki katlıda "hangisi bu?"
         // sorusu sorulmamalı.
-        text: `tier ${top.index + 1}/${node.tiers.length} · ${top.deckTopM.toFixed(2)} m · ${FLOOR_TYPES[top.floorType].label}`,
+        text: `tier ${top.index + 1}/${node.tiers.length} · ${lengthLabel(top.deckTopM, unit)} · ${FLOOR_TYPES[top.floorType].label}`,
         angle: 0,
         screenUpright: true,
       })
@@ -509,7 +511,7 @@ export function buildMezzanineFloorplan(
         kind: 'dimension-label',
         cx: 0,
         cy: depth / 2 + 0.5,
-        text: `${width.toFixed(1)} m × ${depth.toFixed(1)} m · göz ${node.grid.bayWidthM.toFixed(1)} × ${node.grid.bayDepthM.toFixed(1)} m`,
+        text: `${lengthValue(width, unit, 1)} × ${lengthLabel(depth, unit, 1)} · göz ${lengthValue(node.grid.bayWidthM, unit, 1)} × ${lengthLabel(node.grid.bayDepthM, unit, 1)}`,
         angle: 0,
         screenUpright: true,
       })

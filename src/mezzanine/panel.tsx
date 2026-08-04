@@ -6,6 +6,7 @@ import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { Figure, Figures, Note, SelectRow } from '../panels/kit'
 import { useWarehouseStore } from '../store'
+import { lengthLabel, lengthValue, millimetreLabel, useUnit } from '../units'
 import { CONSTRUCTIVE_SYSTEMS, HEA_PROFILES, IPE_PROFILES } from './catalog'
 import { effectiveClearHeightM, resolveTierElevations, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
@@ -34,6 +35,7 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
   // Raf yükü sahnenin bir fonksiyonu, düğümün değil — bu yüzden burada
   // okunuyor, invariants'ta değil (invariants yalnız düğümü görür).
   const nodes = useScene((s) => s.nodes)
+  const unit = useUnit()
   const activeDeck = useWarehouseStore((s) => s.activeDeck)
   const setActiveDeck = useWarehouseStore((s) => s.setActiveDeck)
   if (!node) return null
@@ -71,7 +73,7 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
           options={[
             { label: 'Zemin', value: 'ground' },
             ...resolved.map((tier) => ({
-              label: `T${tier.index} · ${tier.deckTopM.toFixed(1)}`,
+              label: `T${tier.index} · ${lengthValue(tier.deckTopM, unit, 1)}`,
               value: `tier-${tier.index}`,
             })),
           ]}
@@ -133,12 +135,12 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
           rows={[
             ['Kurucu sistem', system.label],
             ['Tier', `${node.tiers.length}`],
-            ['Toplam yükseklik', `${totalHeightM(node).toFixed(2)} m`],
+            ['Toplam yükseklik', lengthLabel(totalHeightM(node), unit)],
             ...resolved.map(
               (tier) =>
                 [
                   `Tier ${tier.index} güverte`,
-                  `${tier.deckTopM.toFixed(2)} m · boşluk ${effectiveClearHeightM(node, tier).toFixed(2)} m`,
+                  `${lengthLabel(tier.deckTopM, unit)} · boşluk ${lengthLabel(effectiveClearHeightM(node, tier), unit)}`,
                 ] as const,
             ),
           ]}
@@ -158,7 +160,7 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
                 const { geometry } = resolveSteps(stair, delta)
                 return [
                   `${stair.id} · tier ${tier.index}`,
-                  `${geometry.steps}×${(geometry.riseM * 1000).toFixed(0)}/${(geometry.goingM * 1000).toFixed(0)} mm`,
+                  `${geometry.steps}×${millimetreLabel(geometry.riseM, unit)}/${millimetreLabel(geometry.goingM, unit)}`,
                 ] as const
               }),
             )}
@@ -183,7 +185,7 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
           })}
           {overloaded.map((entry) => (
             <Note key={entry.rackId} tone="danger">
-              {overloadText(entry)}
+              {overloadText(entry, unit)}
             </Note>
           ))}
           <Note>

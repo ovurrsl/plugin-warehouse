@@ -3,6 +3,7 @@
 import { type AnyNodeId, type Issue, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { lengthLabel, useUnit } from '../units'
 import { ModuleReadout } from './module-panel'
 import { jointProblems, mateBlockers } from './port-magnet'
 import { TELESCOPIC_MODELS, TELESCOPIC_UNPUBLISHED_NOTE } from './telescopic-catalog'
@@ -32,6 +33,7 @@ function useInspected(provided?: ConveyorTelescopicNode): ConveyorTelescopicNode
 
 export default function TelescopicPanel({ node: provided }: { node?: ConveyorTelescopicNode }) {
   const node = useInspected(provided)
+  const unit = useUnit()
   // Kancalar koşulsuz çağrılmalı; erken çıkış aşağıda.
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
   if (!node) return null
@@ -49,8 +51,14 @@ export default function TelescopicPanel({ node: provided }: { node?: ConveyorTel
    * ve ayarlanamaz. Panel hangi değerin tutmadığını yazıyor; düzeltmeyi
    * kullanıcı yapıyor — burada hiçbir şey kendiliğinden değişmiyor.
    */
-  const joint = jointProblems(node, nodes)
-  const blockers = mateBlockers(node, node.position ?? [0, 0, 0], node.rotation?.[1] ?? 0, nodes)
+  const joint = jointProblems(node, nodes, unit)
+  const blockers = mateBlockers(
+    node,
+    node.position ?? [0, 0, 0],
+    node.rotation?.[1] ?? 0,
+    nodes,
+    unit,
+  )
   const issues = [
     ...invariantIssues,
     ...[...joint, ...blockers].map(
@@ -66,7 +74,7 @@ export default function TelescopicPanel({ node: provided }: { node?: ConveyorTel
         ['Sabit gövde · A', `${model.fixedM.toFixed(2)} m`],
         ['Uzama · B', `${model.extensionM.toFixed(2)} m`],
         ['Tam açık · C', `${model.totalM.toFixed(2)} m`],
-        ['Şu anki uzunluk', `${currentLengthM(node).toFixed(2)} m`],
+        ['Şu anki uzunluk', lengthLabel(currentLengthM(node), unit)],
         ['Bölüm · bant kotu', `${model.sections} · ${model.heightM.toFixed(2)} m`],
       ]}
       title="Bu teleskopik"

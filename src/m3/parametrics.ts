@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, millimetreLabel, publishedMillimetres, unitNow } from '../units'
 import { LevelsField } from './auto-fields'
 import {
   clearAbove,
@@ -86,13 +87,14 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       const dropped = droppedLevelCount(node)
       if (dropped > 0) {
         issues.push({
           field: 'frameHeight',
           severity: 'warning',
-          msg: `${dropped} kat ${node.frameHeight.toFixed(2)} m çerçevenin üstünde kalıyor ve çizilmiyor.`,
+          msg: `${dropped} kat ${lengthLabel(node.frameHeight, unit)} çerçevenin üstünde kalıyor ve çizilmiyor.`,
         })
       }
 
@@ -110,7 +112,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'levels',
           severity: 'error',
-          msg: `Kat ${index + 1} (${levelElevation(level).toFixed(3)} m) başka bir katla AYNI 25 mm yuvaya düşüyor; ikisi üst üste çizilir.`,
+          msg: `Kat ${index + 1} (${lengthLabel(levelElevation(level), unit, 3)}) başka bir katla AYNI 25 mm yuvaya düşüyor; ikisi üst üste çizilir.`,
         })
       }
 
@@ -125,7 +127,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'door',
           severity: 'error',
-          msg: `Kapı yalnız ${(DOOR_BAY_LENGTH * 1000).toFixed(0)} mm gözde var (KATALOG); bu göz ${(node.shelfLength * 1000).toFixed(0)} mm. Çizilir ama sipariş edilemez.`,
+          msg: `Kapı yalnız ${publishedMillimetres(DOOR_BAY_LENGTH * 1000)} gözde var (KATALOG); bu göz ${millimetreLabel(node.shelfLength, unit)}. Çizilir ama sipariş edilemez.`,
         })
       }
 
@@ -148,7 +150,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'shelfLength',
           severity: 'warning',
-          msg: `${(node.shelfLength * 1000).toFixed(0)} mm katalog serisinde yok; en yakını ${(nearest * 1000).toFixed(0)} mm. Duvara kesilen gözlerde olağan.`,
+          msg: `${millimetreLabel(node.shelfLength, unit)} katalog serisinde yok; en yakını ${publishedMillimetres(nearest * 1000)}. Duvara kesilen gözlerde olağan.`,
         })
       }
 
@@ -156,7 +158,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'shelfDepth',
           severity: 'warning',
-          msg: `${(node.shelfDepth * 1000).toFixed(0)} mm derinlik katalog serisinde yok (${SHELF_DEPTHS.map((d) => (d * 1000).toFixed(0)).join(' / ')}).`,
+          msg: `${millimetreLabel(node.shelfDepth, unit)} derinlik katalog serisinde yok (${SHELF_DEPTHS.map((d) => (d * 1000).toFixed(0)).join(' / ')} mm).`,
         })
       }
 
@@ -176,7 +178,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
         issues.push({
           field: 'frameHeight',
           severity: 'warning',
-          msg: `${(node.frameHeight * 1000).toFixed(0)} mm yayımlanmış serilerde yok (1.500 / 2.000 / 2.500 / 2.750 / 3.000 / 4.000 mm).`,
+          msg: `${millimetreLabel(node.frameHeight, unit)} yayımlanmış serilerde yok (1.500 / 2.000 / 2.500 / 2.750 / 3.000 / 4.000 mm).`,
         })
       }
 
@@ -206,7 +208,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
           issues.push({
             field: 'levels',
             severity: 'warning',
-            msg: `Kat ${index + 1}: üstteki açıklık ${(clearAbove(node, index) * 1000).toFixed(0)} mm, katalogun en kısa bölücüsü 100 mm — bölücü çizilmiyor.`,
+            msg: `Kat ${index + 1}: üstteki açıklık ${millimetreLabel(clearAbove(node, index), unit)}, katalogun en kısa bölücüsü 100 mm — bölücü çizilmiyor.`,
           })
         }
         if (level.structure === 'drawers') {
@@ -215,7 +217,7 @@ export const m3Parametrics: ParametricDescriptor<M3ShelvingNode> = {
             issues.push({
               field: 'levels',
               severity: 'warning',
-              msg: `Kat ${index + 1}: ${(drawerHeightM(level) * 1000).toFixed(0)} mm çekmece ${(opening * 1000).toFixed(0)} mm açıklığa girmiyor — üstteki raf çekmecenin üstüne oturuyor.`,
+              msg: `Kat ${index + 1}: ${millimetreLabel(drawerHeightM(level), unit)} çekmece ${millimetreLabel(opening, unit)} açıklığa girmiyor — üstteki raf çekmecenin üstüne oturuyor.`,
             })
           }
         }

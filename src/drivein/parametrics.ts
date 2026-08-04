@@ -1,5 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
+import { lengthLabel, millimetreLabel, publishedMillimetres, unitNow } from '../units'
 import { LevelClearsField, PostPitchField } from './auto-fields'
 import {
   bearingVerdict,
@@ -131,6 +132,7 @@ export const driveInParametrics: ParametricDescriptor<DriveInRackNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // Levels silently stop existing when they do not fit the post, and
       // nothing on screen says so — the lane just has fewer rails than the
@@ -140,7 +142,7 @@ export const driveInParametrics: ParametricDescriptor<DriveInRackNode> = {
         issues.push({
           field: 'levels',
           severity: 'warning',
-          msg: `${node.levels} kattan yalnız ${fitted}'i ${node.uprightHeight.toFixed(2)} m dikmeye sığıyor. Dikmeyi yükseltin ya da açıklıkları küçültün.`,
+          msg: `${node.levels} kattan yalnız ${fitted}'i ${lengthLabel(node.uprightHeight, unit)} dikmeye sığıyor. Dikmeyi yükseltin ya da açıklıkları küçültün.`,
         })
       }
 
@@ -157,13 +159,13 @@ export const driveInParametrics: ParametricDescriptor<DriveInRackNode> = {
         issues.push({
           field: 'palletOrientation',
           severity: 'error',
-          msg: `Palet raya her yanda yalnız ${(bearing * 1000).toFixed(0)} mm oturuyor; katalog hareket hâlinde bile ${(BEARING_MIN_IN_MOTION * 1000).toFixed(0)} mm istiyor (s.10, s.18).`,
+          msg: `Palet raya her yanda yalnız ${millimetreLabel(bearing, unit)} oturuyor; katalog hareket hâlinde bile ${publishedMillimetres(BEARING_MIN_IN_MOTION * 1000)} istiyor (s.10, s.18).`,
         })
       } else if (verdict === 'in-motion-only') {
         issues.push({
           field: 'palletOrientation',
           severity: 'warning',
-          msg: `Oturma her yanda ${(bearing * 1000).toFixed(0)} mm — yerleşmiş ve kaymış bir palet için istenen ${(BEARING_MIN_DISPLACED * 1000).toFixed(0)} mm'nin altında (s.18 şek.2).`,
+          msg: `Oturma her yanda ${millimetreLabel(bearing, unit)} — yerleşmiş ve kaymış bir palet için istenen ${publishedMillimetres(BEARING_MIN_DISPLACED * 1000)}'nin altında (s.18 şek.2).`,
         })
       }
 
@@ -181,7 +183,7 @@ export const driveInParametrics: ParametricDescriptor<DriveInRackNode> = {
         issues.push({
           field: 'clearanceSide',
           severity: 'warning',
-          msg: `Yan boşluk ${(node.clearanceSide * 1000).toFixed(0)} mm; katalog her yanda en az 75 mm istiyor (s.18).`,
+          msg: `Yan boşluk ${millimetreLabel(node.clearanceSide, unit)}; katalog her yanda en az 75 mm istiyor (s.18).`,
         })
       }
 
@@ -189,7 +191,7 @@ export const driveInParametrics: ParametricDescriptor<DriveInRackNode> = {
         issues.push({
           field: 'depthClearance',
           severity: 'warning',
-          msg: `Derinlik payı ${(node.depthClearance * 1000).toFixed(0)} mm; katalog birim yük başına en az 25 mm istiyor (s.19 şek.4).`,
+          msg: `Derinlik payı ${millimetreLabel(node.depthClearance, unit)}; katalog birim yük başına en az 25 mm istiyor (s.19 şek.4).`,
         })
       }
 

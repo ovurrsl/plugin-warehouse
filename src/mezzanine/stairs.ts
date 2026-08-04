@@ -9,6 +9,13 @@
  * Ölçüler metre; standardın kendisi mm yayınlıyor ve `catalog.ts` çeviriyor.
  */
 
+import {
+  DEFAULT_UNIT,
+  type LinearUnit,
+  lengthLabel,
+  millimetreLabel,
+  publishedMillimetres,
+} from '../units'
 import { RAILING_RULES, STAIRCASE_GEOMETRY, STAIRCASE_STEP_COUNTS } from './catalog'
 import type { StaircaseSpec } from './schema'
 
@@ -101,6 +108,13 @@ function solveGoing(riseM: number): number {
 export function resolveSteps(
   spec: StaircaseSpec,
   elevationDeltaM: number,
+  /**
+   * Yalnız MESAJLARI etkiler, geometriyi değil — ve bir parametre, çünkü bu
+   * modül saf kalmalı (dosya başlığındaki iddia). `issues`'ı gösteren tek
+   * çağıran `parametrics.ts`; geometriyi alan dört çağıran varsayılanı
+   * kullanıyor ve hiçbir mesaj üretmiyor.
+   */
+  unit: LinearUnit = DEFAULT_UNIT,
 ): { geometry: StepGeometry; issues: StairIssue[] } {
   const issues: StairIssue[] = []
   const autoSteps = Math.max(1, Math.ceil(elevationDeltaM / RISER_TARGET_M))
@@ -113,13 +127,13 @@ export function resolveSteps(
   if (riseM > STAIRCASE_GEOMETRY.riserMaxM) {
     issues.push({
       code: 'riser-too-tall',
-      msg: `Rıht ${(riseM * 1000).toFixed(0)} mm — EN ISO 14122-3 en fazla ${(STAIRCASE_GEOMETRY.riserMaxM * 1000).toFixed(0)} mm veriyor. Basamak sayısını artırın (auto: ${autoSteps}).`,
+      msg: `Rıht ${millimetreLabel(riseM, unit)} — EN ISO 14122-3 en fazla ${publishedMillimetres(STAIRCASE_GEOMETRY.riserMaxM * 1000)} veriyor. Basamak sayısını artırın (auto: ${autoSteps}).`,
     })
   }
   if (treadDepthM < STAIRCASE_GEOMETRY.treadDepthMinM) {
     issues.push({
       code: 'tread-too-shallow',
-      msg: `Basamak derinliği ${(treadDepthM * 1000).toFixed(0)} mm — en az ${(STAIRCASE_GEOMETRY.treadDepthMinM * 1000).toFixed(0)} mm gerekiyor.`,
+      msg: `Basamak derinliği ${millimetreLabel(treadDepthM, unit)} — en az ${publishedMillimetres(STAIRCASE_GEOMETRY.treadDepthMinM * 1000)} gerekiyor.`,
     })
   }
   // Kırpma bandı bozduysa söyle: `solveGoing` sessizce uyumlu bir sayı
@@ -128,7 +142,7 @@ export function resolveSteps(
   if (band < 0.6 - 1e-9 || band > 0.66 + 1e-9) {
     issues.push({
       code: 'going-out-of-range',
-      msg: `going + 2·rise = ${(band * 1000).toFixed(0)} mm, standardın 600–660 mm bandının dışında.`,
+      msg: `going + 2·rise = ${millimetreLabel(band, unit)}, standardın 600–660 mm bandının dışında.`,
     })
   }
   /**
@@ -144,13 +158,13 @@ export function resolveSteps(
   if (elevationDeltaM > continuousLimit && spec.landing === 'continuous') {
     issues.push({
       code: 'landing-required',
-      msg: `${elevationDeltaM.toFixed(2)} m tırmanış tek düz kolda çıkılamaz (en fazla ${continuousLimit.toFixed(1)} m); bir sahanlık gerekiyor.`,
+      msg: `${lengthLabel(elevationDeltaM, unit)} tırmanış tek düz kolda çıkılamaz (en fazla ${continuousLimit.toFixed(1)} m); bir sahanlık gerekiyor.`,
     })
   }
   if (spec.steps !== 'auto' && spec.steps !== autoSteps) {
     issues.push({
       code: 'step-count-mismatch',
-      msg: `Seçilen ${spec.steps} basamak bu kot farkına (${elevationDeltaM.toFixed(2)} m) göre ${autoSteps} olmalıydı; rıht ${(riseM * 1000).toFixed(0)} mm çıkıyor.`,
+      msg: `Seçilen ${spec.steps} basamak bu kot farkına (${lengthLabel(elevationDeltaM, unit)}) göre ${autoSteps} olmalıydı; rıht ${millimetreLabel(riseM, unit)} çıkıyor.`,
     })
   }
 

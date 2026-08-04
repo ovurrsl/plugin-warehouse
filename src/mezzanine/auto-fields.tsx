@@ -4,6 +4,16 @@ import { ActionButton, ActionGroup, SegmentedControl, SliderControl } from '@pas
 import type { CSSProperties } from 'react'
 import { Caption, Note, SelectRow } from '../panels/kit'
 import {
+  areaLabel,
+  fieldStep,
+  fieldToMetres,
+  lengthLabel,
+  lengthValue,
+  metresToField,
+  millimetreLabel,
+  useUnit,
+} from '../units'
+import {
   FLOOR_TYPES,
   LOAD_CLASSES,
   NEW_SAFETY_ZONE_WIDTH_M,
@@ -119,6 +129,7 @@ type CustomField = { node: MezzanineNode; onUpdate: (patch: Partial<MezzanineNod
  * ölçek veriliyor ve panel neden öyle olduğunu söylüyor.
  */
 export function OutlineField({ node, onUpdate }: CustomField) {
+  const unit = useUnit()
   const outline = outlinePolygon(node)
   const bounds = outlineBounds(outline)
   const rectangular = isAxisAlignedRectangle(outline)
@@ -135,7 +146,7 @@ export function OutlineField({ node, onUpdate }: CustomField) {
 
   return (
     <>
-      <Caption hint={`${(bounds.widthM * bounds.depthM).toFixed(1)} m² sınır`}>Güverte</Caption>
+      <Caption hint={`${areaLabel(bounds.widthM * bounds.depthM, unit)} sınır`}>Güverte</Caption>
 
       {rectangular ? (
         <>
@@ -177,8 +188,8 @@ export function OutlineField({ node, onUpdate }: CustomField) {
           <Note>
             Bu güverte dikdörtgen değil, o yüzden genişlik/derinlik yerine ölçek var: bir L şekline
             genişlik yazmak, onu sessizce dikdörtgene çevirmek olurdu. Sınır kutusu{' '}
-            {bounds.widthM.toFixed(2)} × {bounds.depthM.toFixed(2)} m. Köşeleri tek tek taşımak için
-            yapıyı seçip anahat düzenleyiciyi kullanın.
+            {lengthValue(bounds.widthM, unit)} × {lengthLabel(bounds.depthM, unit)}. Köşeleri tek
+            tek taşımak için yapıyı seçip anahat düzenleyiciyi kullanın.
           </Note>
         </>
       )}
@@ -264,6 +275,8 @@ function AccessoryEditor({
   onChange: (next: MezzanineTier['accessories']) => void
   tierIndex: number
 }) {
+  const unit = useUnit()
+
   const patch = (part: Partial<MezzanineTier['accessories']>) =>
     onChange({ ...accessories, ...part })
 
@@ -281,13 +294,20 @@ function AccessoryEditor({
     </select>
   )
 
+  /**
+   * Bir METRE alanı — gösterim ve ayrıştırma birlikte çevrilir.
+   *
+   * Aşağıdaki `numberInput` bilerek ayrı: onu x/z ile birlikte DERECE de
+   * kullanıyor (`rotationDeg`), ve bir açıyı feet'e çevirmek sessizce yanlış
+   * bir sayı yazmak olurdu.
+   */
   const offsetInput = (value: number, onSet: (offsetM: number) => void) => (
     <input
-      onChange={(e) => onSet(Number(e.target.value))}
-      step={0.5}
+      onChange={(e) => onSet(fieldToMetres(Number(e.target.value), unit))}
+      step={fieldStep(0.5, unit)}
       style={styles.input}
       type="number"
-      value={value}
+      value={metresToField(value, unit)}
     />
   )
 
@@ -366,7 +386,7 @@ function AccessoryEditor({
                 </>
               ) : (
                 <>
-                  {numberInput(stair.placement.xM, (xM) =>
+                  {offsetInput(stair.placement.xM, (xM) =>
                     editStair({
                       placement:
                         stair.placement.mode === 'xz'
@@ -374,7 +394,7 @@ function AccessoryEditor({
                           : stair.placement,
                     }),
                   )}
-                  {numberInput(stair.placement.zM, (zM) =>
+                  {offsetInput(stair.placement.zM, (zM) =>
                     editStair({
                       placement:
                         stair.placement.mode === 'xz'
@@ -426,9 +446,15 @@ function AccessoryEditor({
                 şemada vardı, üçünün de kontrolü yoktu. */}
             <SegmentedControl
               onChange={(value: string) => editStair({ widthM: Number(value) as 0.8 | 1 })}
+              // `value` şemanın literalleri (0.8 | 1) ve DEĞİŞMEZ; yalnız
+              // etiket çevrilir. Metrikte standardın kendi adlandırması
+              // ("800" / "1000") korunuyor, çünkü EN ISO 14122-3 tek ve çok
+              // kullanıcılı sınıfları bu sayılarla anıyor. Imperial'da o
+              // adlandırma zaten okunmuyor — birimsiz bir "800" hiçbir şey
+              // söylemiyor — o yüzden yerini ölçünün kendisi alıyor.
               options={[
-                { label: '800 tek', value: '0.8' },
-                { label: '1000 çok', value: '1' },
+                { label: `${millimetreLabel(0.8, unit)} tek`, value: '0.8' },
+                { label: `${millimetreLabel(1, unit)} çok`, value: '1' },
               ]}
               value={String(stair.widthM)}
             />
@@ -475,9 +501,11 @@ function AccessoryEditor({
             </div>
             <SegmentedControl
               onChange={(value: string) => editGate({ widthM: Number(value) as 0.75 | 1.5 })}
+              // Üstteki merdiven genişliğiyle aynı gerekçe — ikisi bir arada
+              // karar verilir, yoksa tek panelde iki ayrı yazım olur.
               options={[
-                { label: '750 tek', value: '0.75' },
-                { label: '1500 çift', value: '1.5' },
+                { label: `${millimetreLabel(0.75, unit)} tek`, value: '0.75' },
+                { label: `${millimetreLabel(1.5, unit)} çift`, value: '1.5' },
               ]}
               value={String(gate.widthM)}
             />

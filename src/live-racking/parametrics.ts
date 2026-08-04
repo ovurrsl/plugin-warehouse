@@ -1,5 +1,6 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
 import { PALLET_PRESETS } from '../pallet/presets'
+import { lengthLabel, millimetreLabel, publishedMillimetres, unitNow } from '../units'
 import {
   FRAME_HEIGHT_STEP_M,
   GRADIENT_RANGE,
@@ -120,6 +121,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
 
       // Katalog: makara aralığı (ölçü Y) 75 mm'nin katı. Fren tamburu
       // aralığını da bu belirlediği için serbest bir sayı, sipariş
@@ -128,7 +130,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         issues.push({
           field: 'rollerPitch',
           severity: 'warning',
-          msg: `Makara aralığı ${(node.rollerPitch * 1000).toFixed(0)} mm — katalog ${(ROLLER_PITCH_STEP_M * 1000).toFixed(0)} mm'nin katını istiyor.`,
+          msg: `Makara aralığı ${millimetreLabel(node.rollerPitch, unit)} — katalog ${publishedMillimetres(ROLLER_PITCH_STEP_M * 1000)}'nin katını istiyor.`,
         })
       }
 
@@ -139,7 +141,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         issues.push({
           field: 'firstLevelClear',
           severity: 'error',
-          msg: `İlk kat açıklığı ${(node.firstLevelClear * 1000).toFixed(0)} mm — katalog en az ${(MIN_CLEAR_HEIGHT_M * 1000).toFixed(0)} mm veriyor.`,
+          msg: `İlk kat açıklığı ${millimetreLabel(node.firstLevelClear, unit)} — katalog en az ${publishedMillimetres(MIN_CLEAR_HEIGHT_M * 1000)} veriyor.`,
         })
       }
 
@@ -184,7 +186,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
       if (!frameHeightIsValid(node)) {
         issues.push({
           severity: 'warning',
-          msg: `Çerçeve yüksekliği ${(frameHeightM(node) * 1000).toFixed(0)} mm — katalog ${(FRAME_HEIGHT_STEP_M * 1000).toFixed(0)} mm'nin katını istiyor; en yakını ${(nearestValidFrameHeightM(node) * 1000).toFixed(0)} mm.`,
+          msg: `Çerçeve yüksekliği ${millimetreLabel(frameHeightM(node), unit)} — katalog ${publishedMillimetres(FRAME_HEIGHT_STEP_M * 1000)}'nin katını istiyor; en yakını ${publishedMillimetres(nearestValidFrameHeightM(node) * 1000)}.`,
         })
       }
 
@@ -193,7 +195,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         issues.push({
           field: 'palletsDeep',
           severity: 'warning',
-          msg: `Kanal ${channelDepthM(node).toFixed(1)} m — katalogun ${LANE_LENGTH_DATUM_M} m koridor datumunu aşıyor (kurulabilir, ama standart dışı).`,
+          msg: `Kanal ${lengthLabel(channelDepthM(node), unit, 1)} — katalogun ${LANE_LENGTH_DATUM_M} m koridor datumunu aşıyor (kurulabilir, ama standart dışı).`,
         })
       }
 
@@ -205,7 +207,7 @@ export const liveRackingParametrics: ParametricDescriptor<LiveRackingNode> = {
         issues.push({
           field: 'gradient',
           severity: 'warning',
-          msg: `Kanal ${drop.toFixed(2)} m düşüyor, kat aralığından (${node.levelClear.toFixed(2)} m) fazla — raf belirgin biçimde yükselir.`,
+          msg: `Kanal ${lengthLabel(drop, unit)} düşüyor, kat aralığından (${lengthLabel(node.levelClear, unit)}) fazla — raf belirgin biçimde yükselir.`,
         })
       }
 

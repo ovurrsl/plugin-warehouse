@@ -1,4 +1,5 @@
 import type { Issue, ParametricDescriptor } from '@pascal-app/core'
+import { lengthLabel, unitNow } from '../units'
 import { GridField, OutlineField, TiersField } from './auto-fields'
 import { CONSTRUCTIVE_SYSTEMS, RAILING_RULES } from './catalog'
 import { effectiveClearHeightM, hasCustomOutline, resolveTierElevations } from './metrics'
@@ -72,6 +73,7 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []
+      const unit = unitNow()
       const system = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem]
 
       if (node.tiers.length > 1 && !system.supportsMultiTier) {
@@ -169,7 +171,7 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
           issues.push({
             field: 'tiers',
             severity: 'warning',
-            msg: `Tier ${tier.index}: kirişler döşemenin altına sarkıyor, fiili tavan boşluğu ${effective.toFixed(2)} m (yazılan ${tier.clearHeightM.toFixed(2)} m).`,
+            msg: `Tier ${tier.index}: kirişler döşemenin altına sarkıyor, fiili tavan boşluğu ${lengthLabel(effective, unit)} (yazılan ${lengthLabel(tier.clearHeightM, unit)}).`,
           })
         }
 
@@ -177,7 +179,7 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
         // seçilmiş olsa bile.
         const delta = tier.deckTopM - tier.resolvedElevationM
         for (const stair of tier.accessories.staircases) {
-          for (const issue of resolveSteps(stair, delta).issues) {
+          for (const issue of resolveSteps(stair, delta, unit).issues) {
             issues.push({
               field: 'tiers',
               // Rıht ve basamak derinliği SERT eşikler: uymuyorsa merdiven
@@ -199,7 +201,7 @@ export const mezzanineParametrics: ParametricDescriptor<MezzanineNode> = {
             issues.push({
               field: 'tiers',
               severity: 'warning',
-              msg: `Tier ${tier.index}: ${zone.widthM.toFixed(2)} m'lik güvenlik bölgesi ${RAILING_RULES.openingProtectionM.toFixed(1)} m eşiğini aşıyor — zincir yerine düşme koruması gerekir.`,
+              msg: `Tier ${tier.index}: ${lengthLabel(zone.widthM, unit)}'lik güvenlik bölgesi ${RAILING_RULES.openingProtectionM.toFixed(1)} m eşiğini aşıyor — zincir yerine düşme koruması gerekir.`,
             })
           }
         }

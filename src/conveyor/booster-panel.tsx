@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { Note } from '../panels/kit'
+import { millimetreLabel, useUnit } from '../units'
 import {
   frameWidthM,
   moduleLengthM,
@@ -53,13 +54,14 @@ function useInspectedBooster(provided?: ConveyorBoosterNode): ConveyorBoosterNod
 
 export default function ConveyorBoosterPanel({ node: provided }: { node?: ConveyorBoosterNode }) {
   const node = useInspectedBooster(provided)
+  const unit = useUnit()
   const nodes = useScene((s) => s.nodes as Record<string, unknown>)
 
   if (!node) return null
 
   const issues = [
     ...(conveyorBoosterParametrics.invariants?.flatMap((check) => check(node)) ?? []),
-    ...jointIssues(jointProblems(node, nodes)),
+    ...jointIssues(jointProblems(node, nodes, unit)),
   ]
 
   return (
@@ -68,7 +70,7 @@ export default function ConveyorBoosterPanel({ node: provided }: { node?: Convey
       rows={[
         [
           'Bed',
-          `${(moduleLengthM(node) * 1000).toFixed(0)} mm · ${node.rollers} rollers @ ${rollerPitchMm(node)} mm`,
+          `${millimetreLabel(moduleLengthM(node), unit)} · ${node.rollers} rollers @ ${rollerPitchMm(node)} mm`,
         ],
         [
           'Range',
@@ -82,9 +84,9 @@ export default function ConveyorBoosterPanel({ node: provided }: { node?: Convey
         ['Speed', `${speedMPerMin(node)} m/min · ${speedMPerSec(node).toFixed(2)} m/s`],
         [
           'Shortest box',
-          `${(node.shortestBox * 1000).toFixed(0)} mm on ${rollersUnderShortestBox(node)} rollers · ≤ ${BST.loadKg} kg`,
+          `${millimetreLabel(node.shortestBox, unit)} on ${rollersUnderShortestBox(node)} rollers · ≤ ${BST.loadKg} kg`,
         ],
-        ['Line', describeLine(node, nodes)],
+        ['Line', describeLine(node, nodes, unit)],
       ]}
       title="This booster"
     >

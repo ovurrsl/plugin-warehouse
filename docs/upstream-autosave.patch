@@ -1,30 +1,37 @@
+diff --git a/packages/editor/src/hooks/use-auto-save.ts b/packages/editor/src/hooks/use-auto-save.ts
+index b6e0949..45adae3 100644
 --- a/packages/editor/src/hooks/use-auto-save.ts
 +++ b/packages/editor/src/hooks/use-auto-save.ts
-@@
+@@ -64,7 +64,17 @@ export function useAutoSave({
+ 
+   // Stable subscription to scene changes
+   useEffect(() => {
 -    let lastNodesSnapshot = JSON.stringify(useScene.getState().nodes)
 +    // Change detection is by REFERENCE, not by serialised content. The store
 +    // hands out a new `nodes` object on every write that touches nodes, so a
-+    // reference compare detects every real change. The old
++    // reference compare catches every real change. The previous
 +    // `JSON.stringify(state.nodes)` compare ran synchronously inside the store
-+    // subscription — on EVERY write — and its cost grows with the whole scene:
-+    // a 3 MB scene (≈2,700 racking bays) paid 15–80 ms of main-thread
-+    // serialisation per edit, which is a visible hitch on every wall move,
-+    // slider tick and undo. A false positive here (a write that produced a new
-+    // object with identical content) costs one debounced save at most — and
-+    // hosts that persist remotely already dedupe content-identical saves
-+    // before POSTing (see SceneLoader's signature compare).
++    // subscription — on EVERY write — and its cost is the whole scene's JSON: a
++    // 3 MB scene (~2,700 racking bays) paid 15 ms per edit on a fast desktop,
++    // which is a visible hitch on every wall move, slider tick and undo. A
++    // false positive (a write producing a new object with identical content)
++    // costs one debounced save, and hosts that persist remotely already dedupe
++    // content-identical saves before POSTing.
 +    let lastNodesRef = useScene.getState().nodes
      let lastNodeCount = Object.keys(useScene.getState().nodes).length
-@@
+     // Collections + scene materials are document-level state that persists with
+     // the graph but lives outside `nodes`. Track them by reference (zustand
+@@ -134,7 +144,7 @@ export function useAutoSave({
+ 
+     const unsubscribe = useScene.subscribe((state) => {
        if (isLoadingSceneRef.current) {
 -        lastNodesSnapshot = JSON.stringify(state.nodes)
 +        lastNodesRef = state.nodes
          lastCollectionsRef = state.collections
          lastMaterialsRef = state.materials
          lastInstalledPluginsRef = state.installedPlugins
-         return
-       }
-
+@@ -143,22 +153,21 @@ export function useAutoSave({
+ 
        if (isVersionPreviewModeRef.current) {
          setSaveStatus('paused')
 -        lastNodesSnapshot = JSON.stringify(state.nodes)
@@ -34,7 +41,7 @@
          lastInstalledPluginsRef = state.installedPlugins
          return
        }
-
+ 
 -      const currentNodesSnapshot = JSON.stringify(state.nodes)
        const changed =
 -        currentNodesSnapshot !== lastNodesSnapshot ||
@@ -43,5 +50,9 @@
          state.materials !== lastMaterialsRef ||
          state.installedPlugins !== lastInstalledPluginsRef
        if (!changed) return
+ 
 -      lastNodesSnapshot = currentNodesSnapshot
 +      lastNodesRef = state.nodes
+       lastCollectionsRef = state.collections
+       lastMaterialsRef = state.materials
+       lastInstalledPluginsRef = state.installedPlugins

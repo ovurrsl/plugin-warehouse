@@ -228,14 +228,14 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
+- Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
+- Refresh generated README blocks [skip ci] ([`49b2f16`](https://github.com/ovurrsl/plugin-warehouse/commit/49b2f161a3bd5b07cf9f7417093d49e11e56dd54))
 - Refresh generated README blocks [skip ci] ([`b7ea211`](https://github.com/ovurrsl/plugin-warehouse/commit/b7ea211b704a7e0bd7af451662957986dc1485a1))
 - Refresh generated README blocks [skip ci] ([`1c73ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/1c73ce29f6f5994346c742b6c79f08e5c1e82d14))
 - Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
 - Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
 - Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
-- Refresh generated README blocks [skip ci] ([`0b936a0`](https://github.com/ovurrsl/plugin-warehouse/commit/0b936a0c33f4086e309f1438286f6ddde4bc7714))
-- Refresh generated README blocks [skip ci] ([`9a022c4`](https://github.com/ovurrsl/plugin-warehouse/commit/9a022c4776d65b82d4152ad32d456ba686d11c18))
-- Refresh generated README blocks [skip ci] ([`e57fd9e`](https://github.com/ovurrsl/plugin-warehouse/commit/e57fd9ec2124387002354b2ee6cea1e5d27d54aa))
 
 …
 

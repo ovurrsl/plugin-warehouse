@@ -19,6 +19,9 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
+- Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
+- Refresh generated README blocks [skip ci] ([`49b2f16`](https://github.com/ovurrsl/plugin-warehouse/commit/49b2f161a3bd5b07cf9f7417093d49e11e56dd54))
 - Refresh generated README blocks [skip ci] ([`b7ea211`](https://github.com/ovurrsl/plugin-warehouse/commit/b7ea211b704a7e0bd7af451662957986dc1485a1))
 - Refresh generated README blocks [skip ci] ([`1c73ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/1c73ce29f6f5994346c742b6c79f08e5c1e82d14))
 - Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
@@ -268,6 +271,9 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Kirli bayrağını tüket + rafları kademeli mount et (#6) ([`733ea2c`](https://github.com/ovurrsl/plugin-warehouse/commit/733ea2cd3e07aa8d93e50f359edbbc1996d04731))
+- Rafları kademeli mount et — host'un duvar yolundaki sözleşmenin aynısı ([`f0f313d`](https://github.com/ovurrsl/plugin-warehouse/commit/f0f313d5782f9a9adf98fc54ccabdde3158de19c))
+- Kirli bayrağını tüket — sahne açıkken sonsuza dek koşan kare işi ([`b69642a`](https://github.com/ovurrsl/plugin-warehouse/commit/b69642a54fd204e75b759c8137aa26953a29bd8e))
 - Draw cargo loads from the collective pool ([`ffc995c`](https://github.com/ovurrsl/plugin-warehouse/commit/ffc995c9dcb7f44a35fadca124a0f087e0fa78c5))
 - Cut the per-frame and per-pointer-event work that stalls integrated GPUs ([`fe641cf`](https://github.com/ovurrsl/plugin-warehouse/commit/fe641cf3186df6e6fb72e06fe6f4871a2f6a9e8e))
 - Konveyör ailesi kolektife girdi, ölü kare döngüleri kalktı ([`1cc0a41`](https://github.com/ovurrsl/plugin-warehouse/commit/1cc0a419a7428ebc62cc859fd7a5dcadc09fabae))

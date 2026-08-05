@@ -12,6 +12,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
+import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-builder'
@@ -78,6 +79,24 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
  * keeps React away from the shared buffers.
  */
 export default function PalletRackRenderer({ node }: { node: PalletRackNode }) {
+  /**
+   * Kademeli mount kapısı — gövde AYRI bileşende olmak zorunda.
+   *
+   * Gövdenin pahalı kısmı kancalarında: kayıt defteri, olay bağlama, kolektif
+   * havuza kayıt (iki katman için şekil anahtarı inşası) ve geometri tutma.
+   * Kancalar koşullu çağrılamayacağı için, "henüz sıra bende değil" hâlini
+   * ancak gövdeyi hiç mount ETMEYEREK karşılayabiliriz. Kapının kendi maliyeti
+   * tek `useState` + tek `useEffect`.
+   *
+   * Bekleyen bir raf kayıt defterinde de yok, yani host'un gölge sınırı ve
+   * rebake taramaları da onu görmüyor — kademeli yükün istenen tarafı.
+   */
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <PalletRackBody node={node} />
+}
+
+function PalletRackBody({ node }: { node: PalletRackNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

@@ -1,0 +1,47 @@
+--- a/packages/editor/src/hooks/use-auto-save.ts
++++ b/packages/editor/src/hooks/use-auto-save.ts
+@@
+-    let lastNodesSnapshot = JSON.stringify(useScene.getState().nodes)
++    // Change detection is by REFERENCE, not by serialised content. The store
++    // hands out a new `nodes` object on every write that touches nodes, so a
++    // reference compare detects every real change. The old
++    // `JSON.stringify(state.nodes)` compare ran synchronously inside the store
++    // subscription — on EVERY write — and its cost grows with the whole scene:
++    // a 3 MB scene (≈2,700 racking bays) paid 15–80 ms of main-thread
++    // serialisation per edit, which is a visible hitch on every wall move,
++    // slider tick and undo. A false positive here (a write that produced a new
++    // object with identical content) costs one debounced save at most — and
++    // hosts that persist remotely already dedupe content-identical saves
++    // before POSTing (see SceneLoader's signature compare).
++    let lastNodesRef = useScene.getState().nodes
+     let lastNodeCount = Object.keys(useScene.getState().nodes).length
+@@
+       if (isLoadingSceneRef.current) {
+-        lastNodesSnapshot = JSON.stringify(state.nodes)
++        lastNodesRef = state.nodes
+         lastCollectionsRef = state.collections
+         lastMaterialsRef = state.materials
+         lastInstalledPluginsRef = state.installedPlugins
+         return
+       }
+
+       if (isVersionPreviewModeRef.current) {
+         setSaveStatus('paused')
+-        lastNodesSnapshot = JSON.stringify(state.nodes)
++        lastNodesRef = state.nodes
+         lastCollectionsRef = state.collections
+         lastMaterialsRef = state.materials
+         lastInstalledPluginsRef = state.installedPlugins
+         return
+       }
+
+-      const currentNodesSnapshot = JSON.stringify(state.nodes)
+       const changed =
+-        currentNodesSnapshot !== lastNodesSnapshot ||
++        state.nodes !== lastNodesRef ||
+         state.collections !== lastCollectionsRef ||
+         state.materials !== lastMaterialsRef ||
+         state.installedPlugins !== lastInstalledPluginsRef
+       if (!changed) return
+-      lastNodesSnapshot = currentNodesSnapshot
++      lastNodesRef = state.nodes

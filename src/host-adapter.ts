@@ -353,3 +353,17 @@ export function slabAt(slabs: readonly SlabLike[], x: number, z: number): SlabLi
   }
   return best
 }
+
+/**
+ * The kind of an unknown scene node, or `null` when it does not carry one.
+ *
+ * The narrowest possible read, and deliberately not a full node guard: the one
+ * caller (`instancing/collective-system`) only needs to know whether a node id
+ * pulled out of the host's dirty set belongs to this plugin, and a node that
+ * has drifted far enough to lose its `type` is already unreachable by every
+ * other path here.
+ */
+export function kindOf(node: unknown): string | null {
+  const record = asRecord(node)
+  return typeof record?.type === 'string' ? record.type : null
+}

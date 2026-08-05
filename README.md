@@ -3,7 +3,7 @@
 <!-- BADGES:START -->
 [![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
-![Version](https://img.shields.io/badge/version-0.1.2-blue)
+![Version](https://img.shields.io/badge/version-0.1.3-blue)
 ![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
 ![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
 ![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f4c0f69`](https://github.com/ovurrsl/plugin-warehouse/commit/f4c0f697a144deab93bd68e9c1da8d87287236ff))
 - Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
 - Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
 - Refresh generated README blocks [skip ci] ([`49b2f16`](https://github.com/ovurrsl/plugin-warehouse/commit/49b2f161a3bd5b07cf9f7417093d49e11e56dd54))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`1c73ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/1c73ce29f6f5994346c742b6c79f08e5c1e82d14))
 - Refresh generated README blocks [skip ci] ([`b956c8b`](https://github.com/ovurrsl/plugin-warehouse/commit/b956c8bfa618d85d39dedef77f5d2bef9567d83c))
 - Refresh generated README blocks [skip ci] ([`b16d1c8`](https://github.com/ovurrsl/plugin-warehouse/commit/b16d1c867561a9c0df57f05b9a6f68f2eac48879))
-- Refresh generated README blocks [skip ci] ([`5d287e3`](https://github.com/ovurrsl/plugin-warehouse/commit/5d287e31f5abd9df33843a85c6e5c9a93414c985))
 
 …
 

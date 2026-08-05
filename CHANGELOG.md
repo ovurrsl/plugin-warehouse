@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f4c0f69`](https://github.com/ovurrsl/plugin-warehouse/commit/f4c0f697a144deab93bd68e9c1da8d87287236ff))
 - Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
 - Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
 - Refresh generated README blocks [skip ci] ([`49b2f16`](https://github.com/ovurrsl/plugin-warehouse/commit/49b2f161a3bd5b07cf9f7417093d49e11e56dd54))

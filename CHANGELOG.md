@@ -19,6 +19,9 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Host tarafı için upstream yamaları ve öneri listesi ([`8069bfb`](https://github.com/ovurrsl/plugin-warehouse/commit/8069bfba61bb4e6a6d0b6e7aa4f6d8de27209a4b))
+- Kat çoğaltma / yükleme donmasını ölçen konsol betiği ([`1fea021`](https://github.com/ovurrsl/plugin-warehouse/commit/1fea02173c8766054676a656aec4809b8b7166d1))
+- Refresh generated README blocks [skip ci] ([`3b38942`](https://github.com/ovurrsl/plugin-warehouse/commit/3b389421373faf6c54a73c5141897b68f9e2675c))
 - Refresh generated README blocks [skip ci] ([`f4c0f69`](https://github.com/ovurrsl/plugin-warehouse/commit/f4c0f697a144deab93bd68e9c1da8d87287236ff))
 - Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
 - Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
@@ -272,6 +275,9 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Raf başına tekrarlanan işi kaldır — anahtar memoizasyonu + kademeli mount tüm kind'lara (#7) ([`88b95c4`](https://github.com/ovurrsl/plugin-warehouse/commit/88b95c4ba57efb015270bddfdd58d3101aafc2a5))
+- Kademeli mount kapısını kolektif çizen HER kind'a yay ([`550b507`](https://github.com/ovurrsl/plugin-warehouse/commit/550b50733c1a709480b4567cf4008b00fd85e039))
+- Şekil anahtarını düğüm nesnesine memoize et — 41× ölçüldü ([`28e63c7`](https://github.com/ovurrsl/plugin-warehouse/commit/28e63c78e5cc14293cdc71e3abe934d15c77641a))
 - Kirli bayrağını tüket + rafları kademeli mount et (#6) ([`733ea2c`](https://github.com/ovurrsl/plugin-warehouse/commit/733ea2cd3e07aa8d93e50f359edbbc1996d04731))
 - Rafları kademeli mount et — host'un duvar yolundaki sözleşmenin aynısı ([`f0f313d`](https://github.com/ovurrsl/plugin-warehouse/commit/f0f313d5782f9a9adf98fc54ccabdde3158de19c))
 - Kirli bayrağını tüket — sahne açıkken sonsuza dek koşan kare işi ([`b69642a`](https://github.com/ovurrsl/plugin-warehouse/commit/b69642a54fd204e75b759c8137aa26953a29bd8e))

@@ -447,3 +447,48 @@ describe('cache key coverage', () => {
     expect(rackGeometryKey(r, 'full', true)).not.toBe(rackGeometryKey(r, 'full', false))
   })
 })
+
+/**
+ * The key is memoised on the rack object (`geometryKeys`). Both failure modes
+ * are silent: a memo that over-collapses makes two visibly different racks share
+ * one geometry, and a memo that is quietly removed restores a cost that shows up
+ * only as frame time. These pin both directions.
+ */
+describe('şekil anahtarı memoizasyonu', () => {
+  test('aynı düğüm nesnesi için katman anahtarı hâlâ ayırıyor', () => {
+    // Memo katmanı anahtara katmasaydı, `simple` katman `full`'ün anahtarını
+    // geri alır ve uzaktaki her raf yakın katmanın geometrisini çizerdi.
+    const node = rack({ uprightHeight: 10.3, levels: 8 })
+    expect(rackGeometryKey(node, 'full')).not.toBe(rackGeometryKey(node, 'simple'))
+  })
+
+  test('aynı düğüm nesnesi için komşu bayrağı hâlâ ayırıyor', () => {
+    // Sağında bay olan raf sağ çerçevesini komşusuna bırakır — farklı mesh.
+    // Memo bunu anahtara katmasaydı, bir sıradaki bütün bayların çerçeveleri
+    // ilk hesaplanan hâle saplanır ve dikişte ya çift direk ya boşluk kalırdı.
+    const node = rack()
+    expect(rackGeometryKey(node, 'full', true)).not.toBe(rackGeometryKey(node, 'full', false))
+  })
+
+  test('yapıca aynı iki AYRI düğüm aynı anahtarı alıyor — paylaşım korunuyor', () => {
+    // Memoizasyonun bozmaması gereken şey bu: paylaşım düğüm kimliğine değil,
+    // alanlara bakar. Bozulsaydı depo raf sayısı kadar geometri tahsis ederdi.
+    expect(rackGeometryKey(rack(), 'full')).toBe(rackGeometryKey(rack(), 'full'))
+  })
+
+  test('YERİNDE mutasyon anahtarı tazelemez — önbellek nesne kimliğine bağlı', () => {
+    // Bu testin iki işi var. Birincisi sözleşmeyi sabitlemek: host düğümleri
+    // değiştirmez, yenisiyle DEĞİŞTİRİR (`neighbours.ts` de aynı değişmeze
+    // dayanıyor), ve yerinde mutasyon desteklenmiyor.
+    //
+    // İkincisi memoizasyonun kendisini yakalamak: memo kaldırılırsa anahtar
+    // mutasyondan sonra yeniden kurulur ve DEĞİŞİR, yani bu beklenti düşer.
+    const node = rack({ bayClearWidth: 2.7 })
+    const before = rackGeometryKey(node, 'full')
+    ;(node as unknown as { bayClearWidth: number }).bayClearWidth = 3.6
+    expect(rackGeometryKey(node, 'full')).toBe(before)
+
+    // Yeni nesne = yeni kimlik → yeni anahtar. Host'un gerçekte yaptığı bu.
+    expect(rackGeometryKey(rack({ bayClearWidth: 3.6 }), 'full')).not.toBe(before)
+  })
+})

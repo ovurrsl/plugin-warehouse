@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   admitAllNow,
@@ -7,6 +7,19 @@ import {
   resetAdmission,
   resumeProgressiveAdmission,
 } from './admission'
+
+/** Kolektif çizen renderer sayısı — testin ölçütünün boşa düşmediğinin kanıtı. */
+function collectiveRendererCount(dir: string): number {
+  let n = 0
+  for (const family of readdirSync(dir, { withFileTypes: true })) {
+    if (!family.isDirectory()) continue
+    for (const entry of readdirSync(join(dir, family.name))) {
+      if (!entry.endsWith('renderer.tsx')) continue
+      if (readFileSync(join(dir, family.name, entry), 'utf8').includes('useCollective')) n++
+    }
+  }
+  return n
+}
 
 afterEach(() => {
   resetAdmission()
@@ -85,16 +98,35 @@ describe('kademeli mount kabulü', () => {
     expect(source).toContain('requestAnimationFrame')
   })
 
-  test('raf renderer’ı kapıyı kullanıyor ve gövde ayrı bileşende', () => {
-    const source = readFileSync(join(import.meta.dir, '..', 'rack', 'renderer.tsx'), 'utf8')
-    expect(source).toContain('useAdmitted')
-    // Gövde aynı bileşende kalsaydı kancalar yine koşardı ve kapı hiçbir şey
-    // kazandırmazdı — tipler bunu ifade edemiyor, o yüzden burada bekçilik.
-    expect(source).toContain('function PalletRackBody')
-    const gate = source.indexOf('const admitted = useAdmitted')
-    const bail = source.indexOf('if (!admitted) return null')
-    expect(gate).toBeGreaterThan(-1)
-    expect(bail).toBeGreaterThan(gate)
+  test('KOLEKTİF ÇİZEN HER renderer kapılı ve gövdesi ayrı', () => {
+    // Liste elle tutulmuyor: "useCollective çağıran her renderer" ölçütünden
+    // türetiliyor. Elle tutulsaydı, yeni bir kolektif kind eklendiğinde listeye
+    // yazılmayı unutmak sessizce kapısız bırakırdı — ve kapısız bir kind, o
+    // kind'dan binlerce olan bir sahnede yükleme kilidini geri getirir.
+    const dir = join(import.meta.dir, '..')
+    const offenders: string[] = []
+
+    for (const family of readdirSync(dir, { withFileTypes: true })) {
+      if (!family.isDirectory()) continue
+      for (const entry of readdirSync(join(dir, family.name))) {
+        if (!entry.endsWith('renderer.tsx')) continue
+        const rel = join(family.name, entry)
+        const source = readFileSync(join(dir, rel), 'utf8')
+        if (!source.includes('useCollective')) continue
+
+        const gate = source.indexOf('const admitted = useAdmitted')
+        const bail = source.indexOf('if (!admitted) return null')
+        // Gövde aynı bileşende kalsaydı kancalar yine koşardı ve kapı hiçbir şey
+        // kazandırmazdı — tipler bunu ifade edemiyor, o yüzden burada bekçilik.
+        const body = /function \w+Body\(/.test(source)
+        if (gate === -1 || bail <= gate || !body) offenders.push(rel)
+      }
+    }
+
+    expect(offenders).toEqual([])
+    // Ölçütün gerçekten dosya bulduğunun kanıtı: sıfır dosya taranırsa yukarıdaki
+    // beklenti boş listeyle sessizce geçerdi.
+    expect(collectiveRendererCount(dir)).toBeGreaterThanOrEqual(13)
   })
 
   test('dışa aktarım kapısı kolektif sistemde bağlı', () => {

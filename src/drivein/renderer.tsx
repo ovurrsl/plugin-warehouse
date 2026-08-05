@@ -11,6 +11,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getRackMaterial } from '../rack/materials'
@@ -61,6 +62,16 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
  * both kinds — which is every scene that holds this one.
  */
 export default function DriveInRackRenderer({ node }: { node: DriveInRackNode }) {
+  // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
+  // kancalarında (kayıt, olay bağlama, havuza kayıt, geometri tutma) ve kancalar
+  // koşullu çağrılamıyor, yani "sıra bende değil" hâli ancak gövdeyi hiç mount
+  // etmeyerek karşılanabilir. Gerekçenin tamamı `../instancing/admission`.
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <DriveInRackRendererBody node={node} />
+}
+
+function DriveInRackRendererBody({ node }: { node: DriveInRackNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

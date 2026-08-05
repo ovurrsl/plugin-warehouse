@@ -13,6 +13,7 @@ import type { BufferGeometry, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
+import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
@@ -93,6 +94,16 @@ function hashPhase(id: string): number {
  * 3×1024² atlas per instance — roughly 12 MB of texture memory per pallet.
  */
 export default function PalletRenderer({ node }: { node: PalletNode }) {
+  // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
+  // kancalarında (kayıt, olay bağlama, havuza kayıt, geometri tutma) ve kancalar
+  // koşullu çağrılamıyor, yani "sıra bende değil" hâli ancak gövdeyi hiç mount
+  // etmeyerek karşılanabilir. Gerekçenin tamamı `../instancing/admission`.
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <PalletRendererBody node={node} />
+}
+
+function PalletRendererBody({ node }: { node: PalletNode }) {
   const registeredRef = useRef<Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`2a7ed62`](https://github.com/ovurrsl/plugin-warehouse/commit/2a7ed62c70a94064d6964f0465fa1db99048a11d))
 - Host tarafı için upstream yamaları ve öneri listesi ([`8069bfb`](https://github.com/ovurrsl/plugin-warehouse/commit/8069bfba61bb4e6a6d0b6e7aa4f6d8de27209a4b))
 - Kat çoğaltma / yükleme donmasını ölçen konsol betiği ([`1fea021`](https://github.com/ovurrsl/plugin-warehouse/commit/1fea02173c8766054676a656aec4809b8b7166d1))
 - Refresh generated README blocks [skip ci] ([`3b38942`](https://github.com/ovurrsl/plugin-warehouse/commit/3b389421373faf6c54a73c5141897b68f9e2675c))

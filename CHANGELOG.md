@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`fdff33a`](https://github.com/ovurrsl/plugin-warehouse/commit/fdff33aac6a334abe4200fd92f639a016770741d))
 - V0.1.4 öncesi/sonrası üretim ölçümü ve elenen hipotezler ([`e32a636`](https://github.com/ovurrsl/plugin-warehouse/commit/e32a636f3bea304e9670b3f764755d0cca0cd7a9))
 - Refresh generated README blocks [skip ci] ([`fd22b04`](https://github.com/ovurrsl/plugin-warehouse/commit/fd22b04e8b5793587d87fdfed5e144d7d6ed0a9e))
 - Refresh generated README blocks [skip ci] ([`2a7ed62`](https://github.com/ovurrsl/plugin-warehouse/commit/2a7ed62c70a94064d6964f0465fa1db99048a11d))
@@ -228,6 +229,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- PeerDependencies aralığını host'un gerçek sürümüne aç ([`8051690`](https://github.com/ovurrsl/plugin-warehouse/commit/8051690f6558b5d130abc1e82b241cc0502f2c4e))
 - Call useUnit above the early return, and convert the ES-only height ([`2e3640d`](https://github.com/ovurrsl/plugin-warehouse/commit/2e3640dd73d2ab47f70b2a5a44b8f3d5cedd0f40))
 - Follow the host's Units setting across every readout ([`ac732ef`](https://github.com/ovurrsl/plugin-warehouse/commit/ac732ef48e6b424fb242b48f7f789e0057666cb8))
 - Convert the catalog panel's slab elevation, and stop copying the host's conversion ([`e5d08f9`](https://github.com/ovurrsl/plugin-warehouse/commit/e5d08f900282e1a3d635ef41ba7495a8920f41d4))

@@ -12,6 +12,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { MTR_STRIP_STROKE_M } from './constants'
@@ -65,6 +66,16 @@ const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depth
  * tek fazladan draw call ailenin toplam kazancını değiştirmiyor.
  */
 export default function ConveyorTransferRenderer({ node }: { node: ConveyorTransferNode }) {
+  // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
+  // kancalarında (kayıt, olay bağlama, havuza kayıt, geometri tutma) ve kancalar
+  // koşullu çağrılamıyor, yani "sıra bende değil" hâli ancak gövdeyi hiç mount
+  // etmeyerek karşılanabilir. Gerekçenin tamamı `../instancing/admission`.
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <ConveyorTransferRendererBody node={node} />
+}
+
+function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

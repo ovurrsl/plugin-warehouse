@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
+import { useAdmitted } from '../instancing/admission'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
 import ExplodedTiers from './exploded-tiers'
@@ -37,6 +38,16 @@ const NO_RAYCAST = () => {}
  * bir sahnede bir-iki mezzanine için bu maliyet henüz gerekçesiz.
  */
 export default function MezzanineRenderer({ node }: { node: MezzanineNode }) {
+  // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
+  // kancalarında (kayıt, olay bağlama, havuza kayıt, geometri tutma) ve kancalar
+  // koşullu çağrılamıyor, yani "sıra bende değil" hâli ancak gövdeyi hiç mount
+  // etmeyerek karşılanabilir. Gerekçenin tamamı `../instancing/admission`.
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <MezzanineRendererBody node={node} />
+}
+
+function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const meshRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)

@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
+import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
@@ -49,6 +50,16 @@ function _hashPhase(id: string): number {
 }
 
 export default function LiveRackingRenderer({ node }: { node: LiveRackingNode }) {
+  // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
+  // kancalarında (kayıt, olay bağlama, havuza kayıt, geometri tutma) ve kancalar
+  // koşullu çağrılamıyor, yani "sıra bende değil" hâli ancak gövdeyi hiç mount
+  // etmeyerek karşılanabilir. Gerekçenin tamamı `../instancing/admission`.
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <LiveRackingRendererBody node={node} />
+}
+
+function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const _meshRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)

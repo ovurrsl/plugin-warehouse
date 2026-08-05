@@ -349,11 +349,60 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
  *
  * Id, name, position, rotation, `supportSlabId` and `ghostFill` are all absent
  * on purpose: two racks that look the same must share one geometry.
+ *
+ * ## Memoised on the rack object
+ *
+ * Same invariant, and the same reason, as `./neighbours`' `shapeKeys`: the store
+ * replaces the nodes that changed rather than mutating them, so a node object's
+ * identity already means "these fields have not moved".
+ *
+ * The saving is not incremental. This key is built four times per mount (twice
+ * through `useCollective`'s registration, twice through `retainRackGeometry`)
+ * and twice more on **every** re-render, and each build re-derives the level
+ * structure from zero — `drawnLevels`, `drawnPickingLevels` and
+ * `palletSupportBarsDrawn` each walk `storageLevels`, which is itself O(levels²)
+ * through `levelSurfaceY`. In a warehouse the answer is the same string for
+ * thousands of bays: two thousand racks spend sixteen thousand builds, a couple
+ * of million inner iterations and a few hundred thousand throwaway arrays to
+ * produce **four** distinct strings.
+ *
+ * Keyed by the two things that legitimately vary for one node — the detail tier
+ * and whether the right frame is left to a neighbour — so at most four entries
+ * per node. Appearance is deliberately NOT part of it: this function never reads
+ * `Appearance`, and the colours it does read (`uprightColor`, `beamColor`) are
+ * node fields. The pool composes appearance in separately via `materialKeyFor`.
+ *
+ * The hazard is the one `CLAUDE.md` names: a node mutated in place would hand
+ * back a stale key and let two visibly different racks share one geometry. That
+ * is why the guard tests assert the key still varies with tier and neighbour,
+ * and why the existing coverage test — which has caught five real defects — has
+ * to keep passing over the memoised path.
  */
+const geometryKeys = new WeakMap<object, Map<string, string>>()
+
 export function rackGeometryKey(
   rack: PalletRackNode,
   detail: RackDetail,
   hasRightNeighbour = false,
+): string {
+  const variant = hasRightNeighbour ? `${detail}:L` : `${detail}:LR`
+  let byVariant = geometryKeys.get(rack as object)
+  if (byVariant) {
+    const hit = byVariant.get(variant)
+    if (hit !== undefined) return hit
+  } else {
+    byVariant = new Map()
+    geometryKeys.set(rack as object, byVariant)
+  }
+  const key = buildGeometryKey(rack, detail, hasRightNeighbour)
+  byVariant.set(variant, key)
+  return key
+}
+
+function buildGeometryKey(
+  rack: PalletRackNode,
+  detail: RackDetail,
+  hasRightNeighbour: boolean,
 ): string {
   // Exactly the levels `rackParts` emits: beamed, minus anything the tunnel
   // opens up. Deriving it rather than listing `tunnelLevels` keeps a tunnel that

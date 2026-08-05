@@ -7,6 +7,14 @@ güncellediğinde bunlar hazır olur.
 
 İki maddenin uygulanabilir yaması var; kalanı gerekçe + kaynak konumu.
 
+> **Upstream durumu (`pascalorg/editor@b9d4f7b`, kontrol edildi).**
+> Profilde ortaya çıkan EN BÜYÜK kalem — `getLevelElevations`'ın her çağrıda tüm
+> düğüm haritasını taraması, kare süresinin %32,2'si — upstream'de **zaten
+> düzeltilmiş**: `nodes` kimliğine WeakMap memo, bizim tarif ettiğimizin birebir
+> aynısı. Fork güncellendiğinde kendiliğinden gelecek, burada yapılacak bir şey
+> yok. Aşağıdaki 1 ve 2 numaralı maddeler upstream'de hâlâ duruyor; gönderilecek
+> konu metni `docs/upstream-issue.md`.
+
 | # | ne | nerede | ölçüm | durum |
 |---|---|---|---|---|
 | 1 | Toplu düğüm oluşturma: O(K²) children + boşa doğrulama | `core/store/actions/node-actions.ts` | 64.8 → 4.6 ms / 900 düğüm | **yama hazır** |

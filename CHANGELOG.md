@@ -19,6 +19,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Upstream'e gönderilecek konu metni + upstream durumu ([`e06ad73`](https://github.com/ovurrsl/plugin-warehouse/commit/e06ad734bb9b7aa10772ed43dcbb14c881418cdf))
+- Refresh generated README blocks [skip ci] ([`9883b37`](https://github.com/ovurrsl/plugin-warehouse/commit/9883b37130976d37d733d6bfd4fda8ca330fcb26))
 - Refresh generated README blocks [skip ci] ([`fdff33a`](https://github.com/ovurrsl/plugin-warehouse/commit/fdff33aac6a334abe4200fd92f639a016770741d))
 - V0.1.4 öncesi/sonrası üretim ölçümü ve elenen hipotezler ([`e32a636`](https://github.com/ovurrsl/plugin-warehouse/commit/e32a636f3bea304e9670b3f764755d0cca0cd7a9))
 - Refresh generated README blocks [skip ci] ([`fd22b04`](https://github.com/ovurrsl/plugin-warehouse/commit/fd22b04e8b5793587d87fdfed5e144d7d6ed0a9e))

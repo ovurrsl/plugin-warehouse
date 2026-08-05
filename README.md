@@ -228,14 +228,14 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- V0.1.4 öncesi/sonrası üretim ölçümü ve elenen hipotezler ([`e32a636`](https://github.com/ovurrsl/plugin-warehouse/commit/e32a636f3bea304e9670b3f764755d0cca0cd7a9))
+- Refresh generated README blocks [skip ci] ([`fd22b04`](https://github.com/ovurrsl/plugin-warehouse/commit/fd22b04e8b5793587d87fdfed5e144d7d6ed0a9e))
 - Refresh generated README blocks [skip ci] ([`2a7ed62`](https://github.com/ovurrsl/plugin-warehouse/commit/2a7ed62c70a94064d6964f0465fa1db99048a11d))
 - Host tarafı için upstream yamaları ve öneri listesi ([`8069bfb`](https://github.com/ovurrsl/plugin-warehouse/commit/8069bfba61bb4e6a6d0b6e7aa4f6d8de27209a4b))
 - Kat çoğaltma / yükleme donmasını ölçen konsol betiği ([`1fea021`](https://github.com/ovurrsl/plugin-warehouse/commit/1fea02173c8766054676a656aec4809b8b7166d1))
 - Refresh generated README blocks [skip ci] ([`3b38942`](https://github.com/ovurrsl/plugin-warehouse/commit/3b389421373faf6c54a73c5141897b68f9e2675c))
 - Refresh generated README blocks [skip ci] ([`f4c0f69`](https://github.com/ovurrsl/plugin-warehouse/commit/f4c0f697a144deab93bd68e9c1da8d87287236ff))
 - Teşhisi düzelt — asıl neden kirli bayrağı, autosave ayrı bir sorun ([`cd1c734`](https://github.com/ovurrsl/plugin-warehouse/commit/cd1c73407bf003bda96f6e59762f21570f64be4b))
-- Büyük projede kasmanın teşhisi — kusur host autosave'inde ([`e06cce7`](https://github.com/ovurrsl/plugin-warehouse/commit/e06cce7a69af10d912511666ad178e8c82b935f0))
-- Refresh generated README blocks [skip ci] ([`49b2f16`](https://github.com/ovurrsl/plugin-warehouse/commit/49b2f161a3bd5b07cf9f7417093d49e11e56dd54))
 
 …
 

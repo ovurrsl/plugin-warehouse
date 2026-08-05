@@ -19,6 +19,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Kamera takılması için ölçüm planı ([`d373538`](https://github.com/ovurrsl/plugin-warehouse/commit/d373538332240100c621fd09c554246762afa00b))
+- Refresh generated README blocks [skip ci] ([`b53d9de`](https://github.com/ovurrsl/plugin-warehouse/commit/b53d9dee7623039a89fe3390716e96ad95af7164))
 - Upstream'e gönderilecek konu metni + upstream durumu ([`e06ad73`](https://github.com/ovurrsl/plugin-warehouse/commit/e06ad734bb9b7aa10772ed43dcbb14c881418cdf))
 - Refresh generated README blocks [skip ci] ([`9883b37`](https://github.com/ovurrsl/plugin-warehouse/commit/9883b37130976d37d733d6bfd4fda8ca330fcb26))
 - Refresh generated README blocks [skip ci] ([`fdff33a`](https://github.com/ovurrsl/plugin-warehouse/commit/fdff33aac6a334abe4200fd92f639a016770741d))
@@ -267,6 +269,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #8 from ovurrsl/claude/x86-graphics-performance-issue-9rac6j ([`95b46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/95b46ccb207d76e164769fc6a225191815d511d9))
 - Match built-in placement behaviour when first dropping a pallet ([`e693b0c`](https://github.com/ovurrsl/plugin-warehouse/commit/e693b0c035f03c5f56ea4601b571338b9a91f6ad))
 - Remove geometry and texture caches to fix WebGPU disposal bugs ([`4a3df73`](https://github.com/ovurrsl/plugin-warehouse/commit/4a3df73b9ce10b7be85f18f721a5808b10e29cab))
 - Fix geometry disposal issue causing pallets to disappear ([`03cb106`](https://github.com/ovurrsl/plugin-warehouse/commit/03cb1060dad3d79d3ca2ba44b875ceb1b451f60e))

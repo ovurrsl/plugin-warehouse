@@ -19,6 +19,9 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Gölge geçidini ölç, ?disable merdivenini yordama al ([`41503d6`](https://github.com/ovurrsl/plugin-warehouse/commit/41503d6c87bcb356434ec003bc146e17a5ce3734))
+- T4 sonucunu yaz, ölçüm planını duran kameraya çevir ([`123d478`](https://github.com/ovurrsl/plugin-warehouse/commit/123d47850cdffea0837b0b65a7d05842780bda00))
+- Refresh generated README blocks [skip ci] ([`034a30f`](https://github.com/ovurrsl/plugin-warehouse/commit/034a30f00fcccd5bf3fe4727a86af2ccc59bc86e))
 - Kamera ölçüm planına profil okuma yordamını yaz ([`963d7dc`](https://github.com/ovurrsl/plugin-warehouse/commit/963d7dc2dfdfee6c1887fe5ea76ba5d700a38ce1))
 - Refresh generated README blocks [skip ci] ([`73c26b7`](https://github.com/ovurrsl/plugin-warehouse/commit/73c26b7b237b3759d9b8a434d904fd3056cdda8a))
 - Kamera takılması için ölçüm planı ([`d373538`](https://github.com/ovurrsl/plugin-warehouse/commit/d373538332240100c621fd09c554246762afa00b))
@@ -271,6 +274,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #11 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`2132280`](https://github.com/ovurrsl/plugin-warehouse/commit/21322809f1b6c6fadd75fa444d6880b72e23c032))
 - Merge pull request #9 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`32888cb`](https://github.com/ovurrsl/plugin-warehouse/commit/32888cbaf92fe7465acf178dc8aeeaf20133374d))
 - Merge pull request #8 from ovurrsl/claude/x86-graphics-performance-issue-9rac6j ([`95b46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/95b46ccb207d76e164769fc6a225191815d511d9))
 - Match built-in placement behaviour when first dropping a pallet ([`e693b0c`](https://github.com/ovurrsl/plugin-warehouse/commit/e693b0c035f03c5f56ea4601b571338b9a91f6ad))
@@ -288,6 +292,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Kolektif çizerken raf alt ağacını render gezinişinden düşür ([`fad7a8d`](https://github.com/ovurrsl/plugin-warehouse/commit/fad7a8de72638346d49cfaae5fb52e03d2e9b92f))
 - Raf başına tekrarlanan işi kaldır — anahtar memoizasyonu + kademeli mount tüm kind'lara (#7) ([`88b95c4`](https://github.com/ovurrsl/plugin-warehouse/commit/88b95c4ba57efb015270bddfdd58d3101aafc2a5))
 - Kademeli mount kapısını kolektif çizen HER kind'a yay ([`550b507`](https://github.com/ovurrsl/plugin-warehouse/commit/550b50733c1a709480b4567cf4008b00fd85e039))
 - Şekil anahtarını düğüm nesnesine memoize et — 41× ölçüldü ([`28e63c7`](https://github.com/ovurrsl/plugin-warehouse/commit/28e63c78e5cc14293cdc71e3abe934d15c77641a))

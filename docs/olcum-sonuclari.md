@@ -222,6 +222,113 @@ Temiz koşuda hiç görünmedi, yani 61 ms'lik tabanın kritik yolunda değil.
 Dosya `packages/viewer` altında, yani upstream'in. **Ölçüm bitince ele
 alınacak**, şimdi değil.
 
+## Sahnenin gerçek bileşimi
+
+Kullanıcının proje dosyası okundu. Bu, o ana kadarki bütün "acaba" listesini
+kısalttı:
+
+| | |
+|---|---|
+| toplam düğüm | 3.979 |
+| **raf** | **3.582** (%90) |
+| **farklı raf şekli** | **6** |
+| ortalama paylaşım | 597 raf/şekil |
+| `ghostFill > 0` olan raf | **0** |
+| kat | 4 |
+| duvar / slab / tavan / kapı | 236 / 32 / 32 / 18 |
+
+"Raflar farklı ölçülerde, önbellek bölünüyor olabilir" endişesi **yanlış
+çıktı**: 3.582 raf altı şekle çözülüyor, havuz ~12–24 `InstancedMesh`'e iniyor.
+Katları çoğaltmak da zarar vermiyor — birebir aynı rafları ürettiği için
+paylaşımı artırıyor. Geometri önbelleği tasarlandığı gibi çalışıyor.
+
+## `?disable` merdiveni — gölge geçidi karenin %77'si
+
+Editörün kendi teşhis anahtarları (`post-processing.tsx:62-76`, `lights.tsx:15`)
+maliyeti geçit geçit ayırmaya yarıyor. Beş koşu, hepsi duran kamera, her biri
+temiz tarayıcı oturumunda:
+
+| koşu | fps | p50 | p95 | uzun görev toplam | bloke |
+|---|---|---|---|---|---|
+| T temel | 13,2 | 70,4 ms | 105 ms | 39.558 ms | %78,1 |
+| A `ao,denoise` kapalı | 12,8 | 72,2 ms | 107,8 ms | 39.577 ms | %78,6 |
+| B `outline` kapalı | 13,4 | 68,7 ms | 106,7 ms | 39.508 ms | %77,7 |
+| **C `shadows` kapalı** | **21,7** | **41,7 ms** | **73 ms** | **9.040 ms** | **%17,7** |
+| **D `postFx` kapalı** | **21,7** | **41,1 ms** | **74,9 ms** | **9.702 ms** | **%19,0** |
+
+**Gölge geçidi kare başına ~29 ms.** Tek bir anahtar ana iş parçacığındaki uzun
+görev süresini 40 saniyelik pencerede **39,5 sn'den 9,0 sn'ye** indiriyor — işin
+%77'si.
+
+SSGI/AO, denoise ve kontur **masum**: üçü de gürültü seviyesinde, `ao` kapalıyken
+sonuç hatta biraz daha kötü. Kontur zaten seçim yokken ilk satırda çıkıyor
+(`merged-outline-node.ts:314`), yani duran ölçümde hiç koşmuyordu.
+
+`postFx` kapatmak gölge kapatmakla neredeyse aynı sonucu veriyor (41,1 ↔ 41,7).
+İkisi de bir tam sahne geçidi kadar iş siliyor.
+
+### Ve eklentinin CPU tarafı bedava
+
+Bir önceki turda `?disable=draw` koşuldu — sahne kurulur, bütün sistemler koşar,
+hiçbir şey çizilmez:
+
+| | temel | `draw` kapalı |
+|---|---|---|
+| ortalama fps | 20,7 | **60,0** |
+| p50 | 47,1 ms | **16,7 ms** |
+| kare sayısı | 830 | 2.399 |
+| takılma | 172 | **0** |
+| uzun görev | 168 adet / 9.089 ms | **0 adet / 0 ms** |
+
+React, bütün `useFrame` sistemleri, kolektif instancing, sahne grafiği
+güncellemeleri, kirli bayrak tüketimi — **hepsi birlikte 16,7 ms'nin altında ve
+tek bir uzun görev bile üretmiyor.** Maliyetin tamamı `renderer.render()`
+içinde.
+
+### Kaydedilen yanlış çıkarım
+
+O koşunun temel tablosunda uzun görev oranı %22,7'ydi ve buradan "ana iş
+parçacığı hesaplamıyor, GPU'yu bekliyor" sonucunu çıkardım. **Yanlıştı.** Bu
+turun temel koşusunda oran **%98,6** (39.558 / 40.100 ms) — kare başına tam bir
+uzun görev, ortalama 75 ms. Maliyet CPU-bağımlı.
+
+İki oturum arasındaki fark muhtemelen pencere boyutu ya da o oturumun daha hızlı
+rejimi. Beş koşuluk tur kendi içinde tutarlı olduğu için esas alınan o. Bu satır
+burada duruyor çünkü bu dosyanın işi doğrulananlar kadar **yanlış çıkanları** da
+tutmak.
+
+### Atılan iki koşu — ve 2,5 saniye bandı
+
+İlk `?disable` turunun 3. ve 4. koşusu kullanılamadı: ikisi de 0,4 fps, ve
+p50'leri birbirinin aynı (2479,7 ↔ 2479,0). İki tamamen farklı anahtarın aynı
+sayıyı vermesi gerçek bir etkinin davranışı değil — üstelik `?disable=shadows`,
+`lights.tsx:111-128`'deki `expandByObject` döngüsünü tümden atladığı için o
+koşunun daha **hızlı** olması gerekirdi.
+
+Ortak nokta anahtar değil, oturum: `Preserve log` açıktı, loglar birikimliydi ve
+`WebGPU device ready` sayısı koşudan koşuya 2 → 3 → 4 → 5 gidiyordu. Yani o iki
+koşu aynı sekmedeki dördüncü ve beşinci WebGPU cihazıyla koştu.
+
+Aynı bozulma daha önce de görüldü — önceki oturumun viewer örneği #2 ve #3'ünde
+p50 2796 ve 2700 ms'ydi. **Dört bozuk durumun dördü de 2,5–2,8 sn bandında.**
+Sekmede biriken WebGPU cihazlarına bağlı, ölçülen anahtara değil. Kural
+buradan çıktı: **koşular arası tarayıcı tamamen kapatılır, Preserve log
+kapalıdır.**
+
+### Sıradaki soru
+
+Gölge geçidi ikinci bir tam `renderer.render()` demek, ve her render
+`_projectObject` ile bütün sahne grafiğini özyinelemeli geziyor
+(`three/Renderer.js:3080`). Kolektif instancing açıkken her rafın alt ağacı
+**çizilecek hiçbir şey taşımıyor** — gövde sahne kökündeki havuzdan çiziliyor.
+Geriye kalan raf başına ~3 boş Object3D, toplam ~10.700 nesne, ve iki geçitte de
+baştan sona geziliyor. 29 ms / 10.700 ≈ 2,7 µs/nesne; büyüklük sırası tutuyor.
+
+**Hipotez, kanıt değil.** Ayıran ölçüm: toplu çizim kapatılıp aynı koşu
+tekrarlanır. Çizim çağrısı ~20'den ~3.600'e fırlar, sahne grafiği raf başına bir
+nesne büyür. Sonuç ~13 fps'te kalırsa maliyet geziniştedir; 2–5 fps'e düşerse
+çizim gönderimidir.
+
 ## Düşürülen hipotezler
 
 Bu dosyanın kaydettiği asıl şey, doğrulananlar kadar **elenenler**:
@@ -236,3 +343,10 @@ Bu dosyanın kaydettiği asıl şey, doğrulananlar kadar **elenenler**:
 | Sahne grafiği gezintisi (kamera takılması) | Yukarıda ölçüldü: 32.497 nesnede 5,5 ms. |
 | **Taban maliyetin sebebi kamera hareketi** | T4: duran kamerada p50 60,9 ms, hareketlide 61,5 ms. Girdiye bağlı her şey (kesme, matris güncelleme, katman geçişi, ışın testi) bu tek sayıyla eleniyor — fare tuvalin dışındayken hiçbiri koşmuyor ve kare yine 61 ms. |
 | **İlk A/B koşusu** | Ölçüm değil, kirlenme: viewer arada üç kez yeniden kuruldu. Yukarıda. |
+| **Şekil patlaması** (farklı ölçüdeki raflar önbelleği böler) | Proje dosyası: 3.582 raf → **6 şekil**, 597 raf/şekil. Havuz ~12–24 çizim çağrısı. |
+| **`GhostStock`** (kolektif instancing'in kapsamadığı yol) | Projede `ghostFill > 0` olan raf yok; bileşen hiç mount olmuyor. |
+| **Görünmez seçim çarpıştırıcısı** | `three/Renderer.js:3082` — WebGPU da `visible === false` alt ağacını eliyor. |
+| **SSGI/AO + denoise** | `?disable=ao,denoise`: 12,8 vs 13,2 fps. Gürültü. |
+| **Kontur geçidi** | `?disable=outline`: 13,4 vs 13,2 fps. Zaten seçim yokken erken çıkıyor. |
+| **Eklentinin bütün CPU tarafı** | `?disable=draw`: 60 fps, 2.399 kare, **sıfır uzun görev**. React, sistemler, kolektif instancing, kirli bayrak — hepsi 16,7 ms'nin altında. |
+| **"Ana iş parçacığı GPU'yu bekliyor"** | Benim yanlış çıkarımım. Temel koşuda uzun görev oranı %98,6 — CPU-bağımlı. Yukarıda. |

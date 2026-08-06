@@ -23,9 +23,17 @@ söyleyebilecek veriyi toplamak.
 > Fareyi gezdirmek tipik kareyi değiştirmiyor, yalnızca ölçüme gürültü
 > ekliyor. Koşu sırası, T1 ve bütün test adımları buna göre güncellendi.
 
-**Aceleci okuyucu için:** [T1](#t1--performans-profili--en-önemlisi) — DevTools
-→ Performance → **fareye dokunmadan** 5 sn kayıt → Bottom-Up → Self Time → ilk
-15 satır. Diğer testler birer sayı veriyor; cevabı veren bu.
+> **`?disable` merdiveni de koşuldu ve gölge geçidini işaret etti.** `shadows`
+> kapalıyken p50 70,4 → 41,7 ms, ana iş parçacığı işinin %77'si siliniyor.
+> SSGI/AO, denoise ve kontur gürültü seviyesinde. `?disable=draw` ise 60 fps
+> veriyor — eklentinin bütün CPU tarafı 16,7 ms'nin altında. Tablolar
+> `docs/olcum-sonuclari.md`'de.
+
+**Aceleci okuyucu için:** en keskin araç [`?disable` merdiveni](#disable-merdiveni--en-keskin-araç)
+— DevTools bile gerekmiyor, adrese bir parametre ekleyip normal `olc` koşusu
+yapıyorsun. Profil ([T1](#t1--performans-profili--en-önemlisi)) merdiven bir
+geçidi işaret ettikten **sonra** okunur; hangi geçide bakacağını bilmeden
+Bottom-Up okumak zaman kaybı.
 
 ---
 
@@ -36,9 +44,12 @@ Bunlar olmadan koşulan bir ölçüm sahte sayı üretir ve sahte olduğu belli 
 - **Bilgisayarı prize tak**, Windows güç planını "En iyi performans"a al. Pilde
   Chrome GPU saatini düşürür.
 - Diğer sekmeleri ve ağır uygulamaları kapat. Arka planda video/oynatıcı olmasın.
-- DevTools'u **projeyi açmadan önce** aç (F12), Console → ⚙ → **Preserve log**
-  işaretle. Yükleme sırasındaki `[viewer] WebGPU device ready` satırını
-  kaçırmamak için.
+- DevTools'u **projeyi açmadan önce** aç (F12). Console → ⚙ → **Preserve log
+  KAPALI**. Açık bırakmak logları koşular arasında biriktirir ve `WebGPU device
+  ready` sayımını okunmaz hâle getirir — iki koşu tam bu yüzden çöpe gitti.
+- **Her koşudan önce Chrome tamamen kapatılıp yeniden açılır.** Sekmeyi
+  yenilemek yetmiyor: aynı sekmede biriken WebGPU cihazları ölçümü bozuyor
+  (aşağıdaki "2,5 saniye bandı").
 - Chrome konsola yapıştırmayı engeller: konsola bir kez `allow pasting` yazıp
   Enter'a bas.
 - Performance panelinde ⚙ → **CPU: No throttling**. Açık kalırsa bütün ölçüm
@@ -79,12 +90,24 @@ kendiliğinden üç kez yeniden kurulmuş; A birinci örnekte, B dördüncüde �
 İki tablo karşılaştırılamaz hâle geldi ve bu tablolardan **anlaşılmıyor** —
 yalnızca logdan anlaşılıyor.
 
-O yüzden, ölçümler bittiğinde konsolda `WebGPU device ready` ara:
+O yüzden, **her koşu** bittiğinde konsolda `WebGPU device ready` ara:
 
-- **Tam bir tane** → koşular geçerli, gönder.
+- **Tam bir tane** → koşu geçerli, gönder.
 - **Birden fazla** → ikinci satırın öncesi ve sonrası birbiriyle
-  karşılaştırılamaz. Koşuları at, sayfayı yenile, baştan başla. İkinci satırın
-  **hangi işlemden sonra** belirdiğini not et; o bilgi ölçüm kadar değerli.
+  karşılaştırılamaz. Koşuyu at, Chrome'u kapatıp aç, baştan başla. İkinci
+  satırın **hangi işlemden sonra** belirdiğini not et; o bilgi ölçüm kadar
+  değerli.
+
+### 2,5 saniye bandı — bozulmayı tablodan tanı
+
+Bir koşu **p50 2,4–2,9 sn** ve **~0,4 fps** veriyorsa bu bir ölçüm değil,
+bozulmuş bir viewer. Dört kez görüldü: bir oturumun #2 ve #3 numaralı viewer
+örneklerinde (p50 2796 / 2700 ms) ve `?disable` turunun 3./4. koşusunda
+(2479,7 / 2479,0 ms). Sonuncularda iki **farklı** anahtar birebir aynı p50'yi
+verdi — gerçek bir etkinin davranışı değil.
+
+Ortak sebep sekmede biriken WebGPU cihazları. Böyle bir tablo çıkarsa ölçülen
+anahtar hakkında hiçbir şey söylemez: at, Chrome'u kapatıp aç, tekrarla.
 
 Yanında `[viewer/post-processing] Building pipeline` tekrarları ve `[editor]
 viewer scene readiness timed out` satırları varsa aynı olayın belirtileridir.
@@ -158,8 +181,13 @@ boyutlandırma yok — bunların hepsi ölçümü kirletir, ve T4'ten sonra hiç
 tipik kareyi açıklamıyor.
 
 Her koşudan önce sahne otursun (~30 sn, konsol sussun). Betiği çağır, "HAZIR"
-yazınca sayacı bekle, tablo çıkınca sıradaki koşuya geç. Koşular **arka
-arkaya**, aralarında hiçbir şey yapmadan.
+yazınca sayacı bekle, tablo çıkınca **Chrome'u kapat**, yeniden aç, sıradaki
+koşuya geç.
+
+> Betik `window`'a yazılıyor, yani her yenilemede silinir ve yeniden
+> yapıştırılması gerekir. Yapıştırmanın kendisi ölçüm başlatmaz — ölçüm
+> `olc(...)` çağrıldığı an başlar. Yükleme bitmeden yapıştırma: sayfa bir daha
+> yüklenirse fonksiyon gider ve fark etmeden `olc is not defined` alırsın.
 
 > **`ölçüm süresi` 40'ın üstünde çıkarsa bu bir hata değil.** Betiğin 40.000
 > ms'lik `setTimeout`'u geç ateşlemiştir — yani ana iş parçacığı bir zamanlayıcı
@@ -173,17 +201,45 @@ yaylar çizerek gezdir; hızlı savurmak kareleri atlatır ve ölçüm iyimser �
 
 ---
 
+## `?disable` merdiveni — en keskin araç
+
+Editörde teşhis için yazılmış URL anahtarları var
+(`post-processing.tsx:62-76`, `lights.tsx:15`). DevTools gerekmiyor: adrese
+parametre eklenip sayfa yeniden yükleniyor, geri kalanı normal `olc` koşusu.
+
+| anahtar | ne atlanır |
+|---|---|
+| `draw` | Çizim çağrısı komple. Kareler döner, bütün sistemler koşar, hiçbir şey çizilmez. **Ekran boş görünür — beklenen davranış.** |
+| `postFx` | Bütün post-processing hattı; düz `renderer.render(scene, camera)` |
+| `shadows` | Gölge haritası geçidi |
+| `outline` | Kontur düğümü ve 14 render hedefi |
+| `ao` / `denoise` | SSGI ve gürültü temizleme |
+
+Adreste `?` yoksa `?disable=…`, varsa `&disable=…`. Birden fazlası virgülle:
+`?disable=ao,denoise`. Büyük/küçük harf önemli — `postFx`, `postfx` değil.
+
+**Ölçülen sonuçlar** (`docs/olcum-sonuclari.md`): `shadows` p50'yi 70,4 → 41,7 ms
+düşürüyor ve ana iş parçacığı işinin %77'sini siliyor; `ao,denoise` ve `outline`
+gürültü seviyesinde; `draw` 60 fps'e çıkarıyor, yani eklentinin bütün CPU tarafı
+16,7 ms'nin altında.
+
+`draw` özellikle değerli çünkü problemi ikiye böler: fps fırlarsa maliyet çizim
+yolunda, aynı kalırsa React/sistem tarafında.
+
+---
+
 ## Koşu sırası
 
-T4 koşuldu ve hareketli koşuları gereksizleştirdi. Kalan **dört adım, hepsi
-duran kamerayla**, toplam ~10 dakika:
+T4 koşuldu, hareketli koşular gereksizleşti. Merdiven de koşuldu ve gölgeyi
+işaret etti. Kalan **dört adım, hepsi duran kamerayla**, her biri **temiz
+tarayıcı oturumunda**:
 
 | # | Ne | Neyi ayırır |
 |---|---|---|
-| 1 | **T1 — profil** ⭐ | 5 sn kayıt, fareye dokunmadan. Maliyetin **hangi kod** olduğunu söyler. En başta, makine tazeyken. |
-| 2 | **TEMEL** | `olc('TEMEL duran, tam ekran')`. Tam ekran, 40 sn. Diğer ikisinin karşılaştırma tabanı. |
-| 3 | **T2-B** — küçük pencere | Pencereyi **~480×470**'e küçült. `olc('T2-B duran, kucuk pencere')`. CPU mu, dolgu/piksel mi. |
-| 4 | **T3-B** — toplu çizim kapalı | Önce pencereyi tam ekrana geri al. Depo panelinin en altındaki **"Toplu çizim açık"** düğmesi (şimşek simgesi) → "kapalı". Sekme birkaç saniye donar; **donma geçtikten sonra** `olc('T3-B duran, toplu cizim kapali')`. Kolektif sistemin kendi payı. |
+| 1 | **T3-B — toplu çizim kapalı** ⭐ | Temel URL. Sahne otursun, depo panelinin altındaki **"Toplu çizim açık"** düğmesine (şimşek) bas → "kapalı", **birkaç saniyelik donma geçsin**, sonra `olc('E toplu cizim kapali')`. ~13 fps'te kalırsa maliyet sahne grafiği gezinişinde; 2–5 fps'e düşerse çizim gönderiminde. |
+| 2 | **T1 — profil** | 5 sn kayıt, fareye dokunmadan, **gölge açıkken**. Bottom-Up'ta `_projectObject`, `renderList` ve gölge geçidi satırları aranır. |
+| 3 | **TEMEL** | `olc('TEMEL duran, tam ekran')`. Karşılaştırma tabanı. |
+| 4 | **T2-B** — küçük pencere | Pencereyi **~480×470**'e küçült. `olc('T2-B duran, kucuk pencere')`. CPU mu, dolgu/piksel mi. |
 
 T2-B'nin penceresi gerçekten küçük olmalı. Ölçülen koşu zaten 970×945'te (dpr 1,
 ~917 bin piksel) yapıldı ve kare 61 ms'ydi — "dörtte bir" diye bulanık bir hedef
@@ -203,10 +259,12 @@ kontrol et. Geçmezse dört koşu da atılır.
 
 ---
 
-## T1 — performans profili ⭐ EN ÖNEMLİSİ
+## T1 — performans profili
 
-Diğer testler birer sayı verir; bu test **cevabı** verir. Sadece bunu
-yapabileceksen bunu yap.
+Merdiven hangi **geçidin** ödediğini söyler; profil o geçidin içinde hangi
+**fonksiyonun** ödediğini söyler. Sıra bu: önce merdiven, sonra profil. Şu an
+aranan şey gölge geçidi — Bottom-Up'ta `_projectObject`, `renderList` ve gölge
+haritası satırları.
 
 **Kayıt duran kamerayla alınır.** T4 bunu ölçtü: fare tuvalin dışında park
 hâlindeyken de kare 61 ms, ve 40 saniyenin %98'i uzun görev. Yani profil için

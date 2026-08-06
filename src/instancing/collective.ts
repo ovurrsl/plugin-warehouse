@@ -267,15 +267,42 @@ export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boo
 }
 
 /**
+ * "Bu grup YALNIZ kolektif çizdiği için gizli" — `userData` bayrağı.
+ *
+ * Kayıtlı grubu `visible = false` yapmak, alt ağacını three'nin render
+ * gezinişinden tümden düşürüyor: `_projectObject` ilk satırında dönüyor ve
+ * çocuklara hiç inmiyor (`Renderer.js:3082`). Kolektif çizim açıkken o alt ağaç
+ * zaten hiçbir şey çizmiyor — gövde sahne kökündeki havuz mesh'inden geliyor —
+ * yani gezinmek boşa iş. Ölçülen: 3.582 raflık bir sahnede gezilen nesne 10.746
+ * → 3.582, kare 70 → ~31 ms.
+ *
+ * Bayrak, o gizlemeyi KULLANICININ gizlemesinden ayırmak için var. İkisi de
+ * `visible = false` yazıyor ve aşağıdaki tarama ikisini ayırt edemezse hata iki
+ * yönde de sessiz: bayrak okunmazsa HER raf havuzdan düşer ve sahne boşalır;
+ * bayrak fazla geniş okunursa gizlenen kat çizilmeye devam eder.
+ *
+ * `visible`'ın seçilmesinin sebebi, kesmeyen tek alternatifin olmaması:
+ * `layers` maskesi özyinelemeyi durdurmuyor (`Renderer.js:3228-3234` maske
+ * testi başarısız olsa bile çocukları geziyor). Ve `visible`, ışın testini
+ * (three'nin `Raycaster`'ı ona bakmıyor) ile gölge sınırı birleşimini
+ * (`lights.tsx` `Box3.expandByObject`, o da bakmıyor) etkilemiyor — yani seçme
+ * ve gölgeler bedelsiz çalışmaya devam ediyor.
+ */
+export const HIDDEN_FOR_COLLECTIVE = 'warehouseHiddenForCollective'
+
+/**
  * Düğüm gerçekten görünür mü — ATALARI dâhil.
  *
  * Kolektif mesh sahne KÖKÜNDE duruyor, düğümün kendi ağacında değil. Yani
  * düğümü ya da onu taşıyan katı gizleyen her şey kolektif çiziciyi atlıyordu:
  *
- *  - Renderer'ın dış sarmalayıcısı (`<group visible={node.visible !== false}>`)
- *    kayıtlı grubu sarıyor → bir nesneyi gizlemek onu gizlemiyordu.
+ *  - Renderer'ın kayıtlı grubu `node.visible` taşıyor → bir nesneyi gizlemek
+ *    onu gizlemiyordu.
  *  - `LevelSystem` solo modunda kat grubuna `obj.visible = !hidden` yazıyor →
  *    gizlenen kattaki raflar çizilmeye devam ediyordu.
+ *
+ * `HIDDEN_FOR_COLLECTIVE` taşıyan gizleme bunun dışında: onu havuzdan düşürmek,
+ * havuzun kendi çizdiği şeyi kendi elemesi olurdu.
  *
  * Görünürlük three'de kalıtsal olduğu için ata zincirini yürümek şart; ~5
  * derinlikte bir boolean taraması ve yalnız yeniden inşa sırasında ödeniyor.
@@ -283,7 +310,7 @@ export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boo
 function isEffectivelyVisible(object: THREE.Object3D): boolean {
   let current: THREE.Object3D | null = object
   while (current) {
-    if (!current.visible) return false
+    if (!current.visible && current.userData[HIDDEN_FOR_COLLECTIVE] !== true) return false
     current = current.parent
   }
   return true

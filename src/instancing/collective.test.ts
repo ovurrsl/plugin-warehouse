@@ -5,6 +5,7 @@ import type { InstanceTier, LevelSignature } from './collective'
 import {
   clearPools,
   evaluateTiers,
+  HIDDEN_FOR_COLLECTIVE,
   instanceCount,
   instanceEntries,
   instanceGeneration,
@@ -288,6 +289,40 @@ describe('görünürlük — kolektif mesh kökte durduğu için MİRAS ALMAZ', 
     parent.visible = true
     rebuildPools(root)
     expect((root.children[0] as THREE.InstancedMesh).count).toBe(1)
+  })
+
+  /**
+   * Renderer kayıtlı grubu `visible = false` yapıyor — alt ağacı three'nin
+   * render gezinişinden düşürmek için, ki karenin %82'si oydu. Bu iki test o
+   * gizlemeyi kullanıcının gizlemesinden AYIRAN bayrağı kilitliyor.
+   *
+   * Ayrım yanlış giderse hata iki yönde de sessiz ve yıkıcı, o yüzden ikisi de
+   * ayrı ayrı iddia ediliyor.
+   */
+  test('KOLEKTİF gizlemesi havuzdan düşürmez — yoksa sahne boşalır', () => {
+    const e = entry('a', 0)
+    // Renderer'ın yazdığı hâl: havuz bu rafı çiziyor, o yüzden grup görünmez.
+    e.object.visible = false
+    e.object.userData[HIDDEN_FOR_COLLECTIVE] = true
+    registerInstance(e)
+
+    rebuildPools(root)
+    expect((root.children[0] as THREE.InstancedMesh).count).toBe(1)
+  })
+
+  test('KULLANICI gizlemesi bayrağa rağmen düşürür — gizli kat çizilmemeli', () => {
+    const e = entry('a', 0)
+    e.object.visible = false
+    e.object.userData[HIDDEN_FOR_COLLECTIVE] = true
+    // `LevelSystem` solo kipinde kat grubuna yazıyor; bayrak yalnız kayıtlı
+    // grupta, atada değil — yani bu gizleme okunmaya devam etmeli.
+    const level = new THREE.Object3D()
+    level.visible = false
+    level.add(e.object)
+    registerInstance(e)
+
+    rebuildPools(root)
+    expect(poolCount()).toBe(0)
   })
 })
 

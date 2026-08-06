@@ -19,6 +19,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Kamera ölçüm planına profil okuma yordamını yaz ([`963d7dc`](https://github.com/ovurrsl/plugin-warehouse/commit/963d7dc2dfdfee6c1887fe5ea76ba5d700a38ce1))
+- Refresh generated README blocks [skip ci] ([`73c26b7`](https://github.com/ovurrsl/plugin-warehouse/commit/73c26b7b237b3759d9b8a434d904fd3056cdda8a))
 - Kamera takılması için ölçüm planı ([`d373538`](https://github.com/ovurrsl/plugin-warehouse/commit/d373538332240100c621fd09c554246762afa00b))
 - Refresh generated README blocks [skip ci] ([`b53d9de`](https://github.com/ovurrsl/plugin-warehouse/commit/b53d9dee7623039a89fe3390716e96ad95af7164))
 - Upstream'e gönderilecek konu metni + upstream durumu ([`e06ad73`](https://github.com/ovurrsl/plugin-warehouse/commit/e06ad734bb9b7aa10772ed43dcbb14c881418cdf))
@@ -269,6 +271,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #9 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`32888cb`](https://github.com/ovurrsl/plugin-warehouse/commit/32888cbaf92fe7465acf178dc8aeeaf20133374d))
 - Merge pull request #8 from ovurrsl/claude/x86-graphics-performance-issue-9rac6j ([`95b46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/95b46ccb207d76e164769fc6a225191815d511d9))
 - Match built-in placement behaviour when first dropping a pallet ([`e693b0c`](https://github.com/ovurrsl/plugin-warehouse/commit/e693b0c035f03c5f56ea4601b571338b9a91f6ad))
 - Remove geometry and texture caches to fix WebGPU disposal bugs ([`4a3df73`](https://github.com/ovurrsl/plugin-warehouse/commit/4a3df73b9ce10b7be85f18f721a5808b10e29cab))

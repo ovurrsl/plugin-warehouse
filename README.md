@@ -228,14 +228,14 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Kamera ölçüm planına profil okuma yordamını yaz ([`963d7dc`](https://github.com/ovurrsl/plugin-warehouse/commit/963d7dc2dfdfee6c1887fe5ea76ba5d700a38ce1))
+- Refresh generated README blocks [skip ci] ([`73c26b7`](https://github.com/ovurrsl/plugin-warehouse/commit/73c26b7b237b3759d9b8a434d904fd3056cdda8a))
 - Kamera takılması için ölçüm planı ([`d373538`](https://github.com/ovurrsl/plugin-warehouse/commit/d373538332240100c621fd09c554246762afa00b))
 - Refresh generated README blocks [skip ci] ([`b53d9de`](https://github.com/ovurrsl/plugin-warehouse/commit/b53d9dee7623039a89fe3390716e96ad95af7164))
 - Upstream'e gönderilecek konu metni + upstream durumu ([`e06ad73`](https://github.com/ovurrsl/plugin-warehouse/commit/e06ad734bb9b7aa10772ed43dcbb14c881418cdf))
 - Refresh generated README blocks [skip ci] ([`9883b37`](https://github.com/ovurrsl/plugin-warehouse/commit/9883b37130976d37d733d6bfd4fda8ca330fcb26))
 - Refresh generated README blocks [skip ci] ([`fdff33a`](https://github.com/ovurrsl/plugin-warehouse/commit/fdff33aac6a334abe4200fd92f639a016770741d))
 - V0.1.4 öncesi/sonrası üretim ölçümü ve elenen hipotezler ([`e32a636`](https://github.com/ovurrsl/plugin-warehouse/commit/e32a636f3bea304e9670b3f764755d0cca0cd7a9))
-- Refresh generated README blocks [skip ci] ([`fd22b04`](https://github.com/ovurrsl/plugin-warehouse/commit/fd22b04e8b5793587d87fdfed5e144d7d6ed0a9e))
-- Refresh generated README blocks [skip ci] ([`2a7ed62`](https://github.com/ovurrsl/plugin-warehouse/commit/2a7ed62c70a94064d6964f0465fa1db99048a11d))
 
 …
 

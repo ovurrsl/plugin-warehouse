@@ -13,6 +13,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
 import { useAdmitted } from '../instancing/admission'
+import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-builder'
@@ -186,10 +187,57 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
   const width = totalWidth(node)
   const depth = totalDepth(node)
 
+  /**
+   * Kolektif havuz bu rafı çiziyorken alt ağaç render gezinişinden DÜŞER.
+   *
+   * `_projectObject` özyinelemeyi yalnız `visible === false`'ta kesiyor
+   * (`three/Renderer.js:3082`), ilk satırda, çocuklara inmeden. Havuz açıkken
+   * bu alt ağacın çizdiği hiçbir şey yok — gövde sahne kökündeki
+   * `InstancedMesh`'ten geliyor — yani three'nin her karede, her geçitte
+   * (renk + gölge) buraya inip "çizeyim mi?" diye sorması tamamen boşa iş.
+   *
+   * Ölçüm: 3.582 raflık bir sahnede gezilen nesne sayısı 10.746 → 3.582, ve
+   * kare 70,4 → ~31 ms. Nesne başına ~2,7 µs sabiti beş ayrı `?disable`
+   * koşusundan türedi (`docs/olcum-sonuclari.md`).
+   *
+   * Kaybedilen bir şey yok: three'nin `Raycaster`'ı `visible`'a bakmıyor
+   * (seçme ve fare olayları çalışır — görünmez çarpıştırıcı zaten tam bu
+   * yüzden `visible={false}`), `Box3.expandByObject` de bakmıyor (gölge
+   * frustum birleşimi bozulmaz). `layers` maskesi bu işi göremezdi: maske
+   * testi başarısız olsa bile çocuklar yine geziliyor.
+   *
+   * `drawsSelf` true olduğunda — seçili, sürükleniyor, dışa aktarım, ya da
+   * toplu çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde
+   * hiç çizilmez.
+   */
+  const hidden = !drawsSelf
+  const userHidden = node.visible === false
+
+  /**
+   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
+   * gizledi"den ayırıyor — ayıramazsa her raf havuzdan düşer ve sahne boşalır.
+   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
+   *
+   * JSX prop'u olarak DEĞİL, elle yazılıyor: R3F `userData={{...}}` prop'unu
+   * nesnenin tamamıyla değiştiriyor ve host'un kayıtlı nesneye yazdığı
+   * anahtarlar (`excludeFromBvh` gibi) her renderda silinirdi. `useLayoutEffect`
+   * kolektif sistemin `useFrame`'inden önce koşuyor, yani havuz bayrağı hep
+   * güncel okuyor.
+   */
+  useLayoutEffect(() => {
+    const object = registeredRef.current
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
+  }, [hidden, userHidden])
+
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      <group position={position} ref={registeredRef} rotation={rotation}>
-        {/*
+    <group
+      {...handlers}
+      position={position}
+      ref={registeredRef}
+      rotation={rotation}
+      visible={!userHidden && !hidden}
+    >
+      {/*
           Selection collider. A rack is mostly air — clicks aimed at it fall
           between the beams and hit whatever is behind. An invisible box over
           the whole frame is what the user is actually pointing at.
@@ -229,31 +277,30 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
           tek bir çizim çağrısı bile eklenmiyor. Konum artık yerel — kayıtlı
           grup konumu ve dönüşü zaten taşıyor.
         */}
-        {!isExporting && (
-          <mesh
-            dispose={null}
-            geometry={UNIT_COLLIDER}
-            material={COLLIDER_MATERIAL}
-            position={[0, node.uprightHeight / 2, 0]}
-            scale={[width, node.uprightHeight, depth]}
-            visible={false}
-          />
-        )}
-        {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken
+      {!isExporting && (
+        <mesh
+          dispose={null}
+          geometry={UNIT_COLLIDER}
+          material={COLLIDER_MATERIAL}
+          position={[0, node.uprightHeight / 2, 0]}
+          scale={[width, node.uprightHeight, depth]}
+          visible={false}
+        />
+      )}
+      {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken
             kendi mesh'ini çizer; açıkken tek `InstancedMesh` onun yerine
             çizer ve bu boş kalır. İkisi birden çizerse z-savaşı olur. */}
-        {drawsSelf && (
-          <SelfDrawnBody
-            farSq={LOD_FAR_SQ}
-            geometryFor={(tier) => getRackGeometry(node, tier, abutted)}
-            isExporting={isExporting}
-            materialFor={() => material}
-            nearSq={LOD_NEAR_SQ}
-            nodeId={node.id}
-          />
-        )}
-        {node.ghostFill > 0 && <GhostStock node={node} />}
-      </group>
+      {drawsSelf && (
+        <SelfDrawnBody
+          farSq={LOD_FAR_SQ}
+          geometryFor={(tier) => getRackGeometry(node, tier, abutted)}
+          isExporting={isExporting}
+          materialFor={() => material}
+          nearSq={LOD_NEAR_SQ}
+          nodeId={node.id}
+        />
+      )}
+      {node.ghostFill > 0 && <GhostStock node={node} />}
     </group>
   )
 }

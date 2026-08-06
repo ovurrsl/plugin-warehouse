@@ -108,9 +108,119 @@ Yine doğrusal, yine tek haneli. **Baskın sebep değil.**
 başsız ortamda koşturamadığım kodda: gerçek render yolu (WebGPU pipeline,
 `outline: true` ile post-processing) ve host'un viewer sistemleri.
 
-Bir sonraki adım tahmin değil **profil**: DevTools → Performance, 5 saniye
-kamera gezdirerek kayıt, Bottom-Up → Self Time. Önceki ölçümde sinyal 2
-saniyelik karelerin altında boğuluyordu; 50 ms'lik karede okunur.
+Bir sonraki adım tahmin değil **profil**. Planı `docs/olcum-plani-kamera.md`.
+
+## T4 — duran vs hareketli kamera (ölçüldü, cevap verdi)
+
+Kullanıcının makinesi, tek oturum, viewer tek örnek. Pencere 970×945, dpr 1,
+WebGPU açık, Chrome 150, 8 çekirdek. İki koşu **arka arkaya**, aralarında
+hiçbir şey yapılmadan.
+
+| | A — duran kamera | B — hareketli kamera |
+|---|---|---|
+| ölçüm süresi | 40,1 sn | **47,6 sn** |
+| ortalama fps | 15,3 | 6,4 |
+| **p50 kare** | **60,9 ms** | **61,5 ms** |
+| p95 kare | 92,4 ms | 675,4 ms |
+| en uzun tek blok | 105 ms | 1202 ms |
+| >1 sn bloklar | 0 | 2 |
+| >100 ms kareler | 5 / 612 | 54 / 302 |
+| bloke oranı | %74,5 | %89,3 |
+| uzun görev | 610 adet, 39.333 ms | 317 adet, 41.234 ms |
+
+### p50 aynı, ve bütün sonuç bu
+
+60,9 ↔ 61,5. Tipik kare, kamera dursa da hareket etse de **aynı** maliyette.
+Aranan ~%85 bir kamera maliyeti değil: girdi yokken, her karede koşan sabit
+bir maliyet.
+
+A'da 612 karenin **611'i** takılma. 610 uzun görev — kare başına tam bir tane,
+ortalama 64,5 ms. Uzun görevlerin toplamı 39.333 ms, yani 40,1 saniyelik
+pencerenin **%98'i**. Hiçbir şey olmuyorken ana iş parçacığı boş kalmıyor.
+
+Bu, planın T4 bölümündeki iki okumadan birincisi: *"A zaten kötüyse maliyet
+kameradan bağımsız ve her karede koşan bir şey var."* Kesme (culling), matris
+güncelleme, katman geçişi, işaretçi ışın testi — hepsi girdiye bağlı, hiçbiri
+fare tuvalin dışında park hâlindeyken koşmaz. Hepsi eleniyor.
+
+### Kamera hareketinin gerçek payı: kuyruk
+
+Hareket p50'yi değiştirmiyor, **kuyruğu** büyütüyor: p95 92 → 675 ms, >100 ms
+kareler 5 → 54, ve iki adet >1 sn blok (1202, 1017 ms) — A'da hiç yok.
+
+Yani tek bir "kamera takılması" değil, **iki ayrı iş** var:
+
+1. **16 fps'lik tavan.** Sabit, kameradan bağımsız, her karede. Büyük olan bu.
+2. **Hareketin eklediği saniyelik bloklar.** Ayrı ve daha küçük.
+
+İkincisine bakmadan önce birincisi çözülmeli: 61 ms'lik taban dururken
+kuyruğu ölçmek, zaten dolu olan bir kabın taşmasını ölçmek olur.
+
+### Bir ayrıntı: B'nin penceresi 47,6 saniye sürdü
+
+Betiğin 40.000 ms'lik `setTimeout`'u 47,6 saniyede ateşledi. Bu bir ölçüm
+hatası değil, **bulgunun kendisi**: ana iş parçacığı bir zamanlayıcı geri
+çağrısını 7,6 saniye geciktirecek kadar doymuş. Bundan sonraki tablolarda
+`ölçüm süresi` 40'ın üstündeyse aynı şekilde okunur.
+
+### Bir ayrıntı daha: bu pencere zaten küçüktü
+
+970×945, dpr 1 — yaklaşık 917 bin piksel, tam ekran değil. T2'nin (CPU mu,
+dolgu mu) hipotezi bu sayıyla daha şimdiden zayıflıyor: bu kadar küçük bir
+tuvalde kare hâlâ 61 ms. T2-B koşulacaksa pencere gerçekten küçültülmeli
+(~480×470), yoksa iki koşu arasında anlamlı bir piksel farkı olmaz.
+
+## Atılan koşu — ve neden atıldığını yazmak gerekiyor
+
+Bu A/B çiftinden **önce** bir çift daha ölçüldü ve kullanılamadı. Konsol
+logunda `[viewer] WebGPU device ready` **dört kez** geçiyor, hiç gezinme
+olmadan; yanında 13 × `Building pipeline` ve 3 × `scene readiness timed out`.
+Viewer oturum içinde kendiliğinden üç kez yeniden kuruldu.
+
+Kare aralıkları, `WebGPU device ready` satırlarıyla bölündüğünde:
+
+| viewer örneği | kare p50 | ortalama | en uzun | BVH hatası |
+|---|---|---|---|---|
+| #1 — A burada ölçüldü | 75 ms | 99 ms | 2587 ms | 0 |
+| #2 | 2796 ms | 2094 ms | 2948 ms | 234 |
+| #3 | 2700 ms | 1726 ms | 3260 ms | 233 |
+| #4 — B burada ölçüldü | 67 ms | 120 ms | 2848 ms | 231 |
+
+A birinci örnekte, B dördüncüde. Arada üç tam yeniden kurulum. O koşudaki
+B'nin 2 fps'i kamera hareketinden mi biriken viewer'lardan mı geliyor, **bu
+veriden ayrılamıyor** — geçen ölçümdeki WebGPU karışıklığının aynısı, farklı
+kılıkta. Aynı oturumda alınan 51 saniyelik Performance kaydının bomboş
+çıkması da açıklandı: #2 veya #3 döneminde alınmış, sahne o sırada gerçekten
+çizmiyordu.
+
+Buradan çıkan kural `docs/olcum-plani-kamera.md` hazırlık bölümüne yazıldı:
+**ölçüm bitince `WebGPU device ready` tam bir kez geçmiş olmalı.**
+
+## Açık kusur: BVH kurulumu patlıyor (aralıklı)
+
+Atılan koşunun logunda 698 kez:
+
+```
+[viewer] Skipping BVH for incompatible mesh geometry.
+TypeError: Cannot read properties of undefined (reading 'offset') at nR.init
+```
+
+Kaynağı `ovurrsl/editor` →
+`packages/viewer/src/components/viewer/scene-bvh.tsx:103`; oradaki `try/catch`
+hatayı yutup uyarıya çeviriyor. `:88`'deki `hasBvhCompatibleGeometry` koruması
+yalnızca `position` niteliği var mı ve ≥3 köşe mi diye bakıyor — patlayan şeyi
+yakalayamıyor.
+
+Dağılım kusurun yerini söylüyor: viewer'ın **ilk** örneğinde sıfır hata, her
+yeniden kurulumdan sonra ~233. Yani sorun geometrinin kendisinde değil,
+`useEffect` temizliğinin (`:113-117`, `disposeBoundsTree`) paylaşılan ve
+tasarım gereği **hiç dispose edilmeyen** eklenti geometrisiyle etkileşiminde.
+BVH düşünce ışın testi kaba kuvvete iniyor; yığınlarda `traverse` 4188 kez
+görünüyor.
+
+Temiz koşuda hiç görünmedi, yani 61 ms'lik tabanın kritik yolunda değil.
+Dosya `packages/viewer` altında, yani upstream'in. **Ölçüm bitince ele
+alınacak**, şimdi değil.
 
 ## Düşürülen hipotezler
 
@@ -124,3 +234,5 @@ Bu dosyanın kaydettiği asıl şey, doğrulananlar kadar **elenenler**:
 | `cloneLevelSubtree` düğüm başına JSON | 16,3 vs 15,2 ms toplu — 1,1×, kazanç yok. |
 | Katman geçişi yeniden inşası (kamera takılması) | Yukarıda ölçüldü: 8.124 rafta 3 ms. |
 | Sahne grafiği gezintisi (kamera takılması) | Yukarıda ölçüldü: 32.497 nesnede 5,5 ms. |
+| **Taban maliyetin sebebi kamera hareketi** | T4: duran kamerada p50 60,9 ms, hareketlide 61,5 ms. Girdiye bağlı her şey (kesme, matris güncelleme, katman geçişi, ışın testi) bu tek sayıyla eleniyor — fare tuvalin dışındayken hiçbiri koşmuyor ve kare yine 61 ms. |
+| **İlk A/B koşusu** | Ölçüm değil, kirlenme: viewer arada üç kez yeniden kuruldu. Yukarıda. |

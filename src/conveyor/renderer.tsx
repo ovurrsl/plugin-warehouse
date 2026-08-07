@@ -128,7 +128,7 @@ function ConveyorRollerRendererBody({ node }: { node: ConveyorRollerNode }) {
     keyFor: (tier) => conveyorGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

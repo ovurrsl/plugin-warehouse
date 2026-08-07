@@ -97,11 +97,88 @@ function CatalogTab() {
           </section>
         )
       })}
+      <PerformanceModeSwitch />
       <InstancingSwitch />
       <ShadowThrottleSwitch />
-      <FarShadowCullSwitch />
       <DetailRangeSwitch />
     </div>
+  )
+}
+
+/**
+ * Önceki görüntü ayarları — performans modu kapanınca geri yüklenecek hâl.
+ *
+ * Modül kapsamında, çünkü panel kapanıp açıldığında React durumu sıfırlanır
+ * ama kullanıcının "eski hâlim" hakkı sıfırlanmamalı. `null` = mod kapalı.
+ */
+let savedDisplayState: { shading: string; shadows: boolean } | null = null
+
+/**
+ * Performans modu — kullanıcının KENDİ makinesinde ölçülmüş iki GPU kolunu
+ * tek düğmede toplar (Chrome izleri, 2026-08-07, Güzeller sahnesi):
+ * SSGI/denoise zinciri kapalı **+%44** fps, gölgeler kapalı **+%25**.
+ *
+ * Editöre dokunmuyor: ikisi de host'un ÇALIŞMA ZAMANI anahtarları —
+ * `shading: 'solid'` SSGI'yi `post-processing.tsx`'in kendi kapısından
+ * düşürür (`ssgiEnabled = shading === 'rendered' && …`), `setShadows` da
+ * Display menüsündeki anahtarın ta kendisidir. Düğme yalnız ikisini birden
+ * çevirip eski değerleri saklar; sunum anında tek tıkla geri dönülür.
+ *
+ * Host bu ayarların şeklini değiştirirse düğme sessizce hiçbir şey yapmaz
+ * (bir hızlandırıcının yokluğu hata değildir) — her okuma çalışma zamanı
+ * korumasının arkasında.
+ */
+function PerformanceModeSwitch() {
+  const [active, setActive] = useState(savedDisplayState !== null)
+
+  const toggle = () => {
+    const viewer = useViewer.getState() as unknown as {
+      shading?: string
+      setShading?: (shading: never) => void
+      shadows?: boolean
+      setShadows?: (shadows: boolean) => void
+    }
+    if (typeof viewer.setShading !== 'function' || typeof viewer.setShadows !== 'function') return
+    if (savedDisplayState === null) {
+      savedDisplayState = {
+        shading: viewer.shading ?? 'rendered',
+        shadows: viewer.shadows ?? true,
+      }
+      viewer.setShading('solid' as never)
+      viewer.setShadows(false)
+      setActive(true)
+    } else {
+      viewer.setShading(savedDisplayState.shading as never)
+      viewer.setShadows(savedDisplayState.shadows)
+      savedDisplayState = null
+      setActive(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginTop: '0.5rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: active ? 'var(--accent)' : 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: active ? 'var(--accent-foreground)' : 'var(--muted-foreground)',
+        cursor: 'pointer',
+      }}
+      title="Çalışma seansı için AO/SSGI zincirini ve gölgeleri birlikte kapatır (ölçülü kazanç: +%44 ve +%25 fps). Kapatınca önceki görüntü ayarların geri gelir."
+      type="button"
+    >
+      <Icon height={13} icon={active ? 'lucide:gauge' : 'lucide:gauge-circle'} width={13} />
+      <span>Performans modu {active ? 'açık' : 'kapalı'}</span>
+      <span style={{ marginLeft: 'auto' }}>{active ? 'hız' : 'görsel kalite'}</span>
+    </button>
   )
 }
 
@@ -138,43 +215,6 @@ function ShadowThrottleSwitch() {
       <Icon height={13} icon={enabled ? 'lucide:sun-dim' : 'lucide:sun'} width={13} />
       <span>Gölge kısıcı {enabled ? 'açık' : 'kapalı'}</span>
       <span style={{ marginLeft: 'auto' }}>{enabled ? 'talep üzerine' : 'her kare'}</span>
-    </button>
-  )
-}
-
-/**
- * Uzak gölge kısma anahtarı — diğer iki anahtarla aynı desen ve gerekçe:
- * render yoluna dokunan her şey tek tıkla eski davranışa dönebilmeli.
- * 85 m ötesindeki örnekler gölgesiz havuza taşınıyor; o mesafede gölge
- * binaya-fit 1024²'lik haritada zaten birkaç texel.
- */
-function FarShadowCullSwitch() {
-  const enabled = useWarehouseStore((s) => s.farShadowCullEnabled)
-  const setEnabled = useWarehouseStore((s) => s.setFarShadowCullEnabled)
-
-  return (
-    <button
-      onClick={() => setEnabled(!enabled)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        width: '100%',
-        marginTop: '0.25rem',
-        borderRadius: '0.375rem',
-        border: '1px solid var(--border)',
-        background: 'transparent',
-        padding: '0.375rem 0.5rem',
-        fontSize: '0.6875rem',
-        color: 'var(--muted-foreground)',
-        cursor: 'pointer',
-      }}
-      title="85 m'den uzaktaki raflar gölge düşürmez — o mesafede gölge haritada zaten birkaç texel. Kapatmak herkese gölge verir."
-      type="button"
-    >
-      <Icon height={13} icon={enabled ? 'lucide:cloud-off' : 'lucide:cloud'} width={13} />
-      <span>Uzak gölgeler {enabled ? 'kısık' : 'tam'}</span>
-      <span style={{ marginLeft: 'auto' }}>{enabled ? '>85 m gölgesiz' : 'hepsi gölgeli'}</span>
     </button>
   )
 }

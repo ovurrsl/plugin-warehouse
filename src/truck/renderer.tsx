@@ -185,7 +185,6 @@ function TruckBody({ node }: { node: TruckNode }) {
           return (
             <group key={body} position={[0, offsetY, 0]}>
               <mesh
-                castShadow
                 dispose={null}
                 /**
                  * Katman `detailRef`'ten okunur, SABİTLENMEZ.

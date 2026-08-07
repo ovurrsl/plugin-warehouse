@@ -268,7 +268,6 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
 
       <group position={position} ref={registeredRef} rotation={rotation}>
         <mesh
-          castShadow
           dispose={null}
           geometry={getTelescopicBaseGeometry(node, 'full')}
           material={material}
@@ -278,7 +277,6 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
         />
         {sections.map((section) => (
           <mesh
-            castShadow
             dispose={null}
             geometry={getTelescopicSectionGeometry(node, section.index, 'full')}
             key={section.index}

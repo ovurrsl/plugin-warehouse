@@ -100,7 +100,7 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
     keyFor: () => mezzanineGeometryKey(node),
     materialFor: () => material,
     materialKeyFor: () => `mezzanine:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     /**
      * Bu kind'ın LOD'u YOK — ve eşikleri sonsuz yapmak bir ihmal değil, bir
      * düzeltme.
@@ -171,13 +171,12 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
             <mesh
               /**
                * Koşulsuz. `castShadow={isExporting}` idi ve kolektif kayıt
-               * `castsShadow: true` diyordu — yani asma kat, KENDİ çizerken
+               * `castsShadow: false` diyordu — yani asma kat, KENDİ çizerken
                * (seçili ya da sürükleniyorken) gölge atmıyor, kolektif çizerken
                * atıyordu. Kullanıcının gördüğü: asma katı seçince gölgesi
                * kayboluyor. Gölgeyi host `shadowMap.enabled` üstünden yönetiyor;
                * mesh düzeyinde ikinci bir karar noktası olmamalı.
                */
-              castShadow
               dispose={null}
               geometry={geometry}
               material={material}

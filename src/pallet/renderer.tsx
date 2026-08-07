@@ -178,7 +178,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
     materialFor: (tier) =>
       tier === 'full' ? getPalletMaterial(appearance) : getPalletFarMaterial(appearance),
     materialKeyFor: (tier) => `pallet-deck:${tier}:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded,
@@ -340,7 +340,7 @@ function CargoLoad({
     materialFor: () => getCargoMaterial(appearance),
     // Tek paylaşımlı materyal — renk atlastan ve köşe renklerinden geliyor.
     materialKeyFor: () => `cargo:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded,

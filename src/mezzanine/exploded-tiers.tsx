@@ -84,7 +84,6 @@ export default function ExplodedTiers({
           }}
         >
           <mesh
-            castShadow
             dispose={null}
             geometry={getMezzanineTierGeometry(node, index)}
             material={material}

@@ -109,7 +109,9 @@ function BakeGroupMesh<N extends BakeNode>({ group }: { group: BakeGroup<N> }) {
   return (
     <instancedMesh
       args={[group.geometry, group.material, group.members.length]}
-      castShadow={group.castShadow ?? true}
+      // Eklenti nesneleri gölge düşürmez (kullanıcı kararı, 2026-08-07) —
+      // bake'lenmiş kopya da canlı hâliyle aynı kuralda kalır.
+      castShadow={false}
       dispose={null}
       raycast={NO_RAYCAST}
       receiveShadow

@@ -98,8 +98,46 @@ function CatalogTab() {
         )
       })}
       <InstancingSwitch />
+      <ShadowThrottleSwitch />
       <DetailRangeSwitch />
     </div>
+  )
+}
+
+/**
+ * Gölge kısıcı anahtarı — `InstancingSwitch` deseninin aynısı ve aynı
+ * gerekçeyle: render yolunun ölçülmüş en büyük kalemine dokunuyor (gölge
+ * geçidi eski tabanda ~29 ms/kare), bozulursa tek tıkla eski davranış
+ * geri gelir ve iki hâl yan yana ölçülebilir.
+ */
+function ShadowThrottleSwitch() {
+  const enabled = useWarehouseStore((s) => s.shadowThrottleEnabled)
+  const setEnabled = useWarehouseStore((s) => s.setShadowThrottleEnabled)
+
+  return (
+    <button
+      onClick={() => setEnabled(!enabled)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginTop: '0.25rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--muted-foreground)',
+        cursor: 'pointer',
+      }}
+      title="Gölge haritasını her kare yerine yalnız sahne değişince (+ saniyede ~12 kez) tazeler. Kapatmak three'nin kendi temposuna döner."
+      type="button"
+    >
+      <Icon height={13} icon={enabled ? 'lucide:sun-dim' : 'lucide:sun'} width={13} />
+      <span>Gölge kısıcı {enabled ? 'açık' : 'kapalı'}</span>
+      <span style={{ marginLeft: 'auto' }}>{enabled ? 'talep üzerine' : 'her kare'}</span>
+    </button>
   )
 }
 

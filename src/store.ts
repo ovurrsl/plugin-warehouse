@@ -104,6 +104,18 @@ type WarehouseStore = {
   lodQuality: LodQuality
   setLodQuality: (quality: LodQuality) => void
 
+  /**
+   * Gölge kısıcı — VARSAYILAN AÇIK, `instancingEnabled` gerekçesiyle.
+   *
+   * Gölge geçidi ölçülmüş en büyük kalemdi (eski tabanda ~29 ms/kare) ve
+   * sahne karelerin çoğunda durağan. Kısıcı haritayı talep üzerine +
+   * 4 karelik kalp atışıyla tazeliyor (`instancing/shadow-throttle.ts`).
+   * Kapatınca ışıklar three'nin kendi temposuna geri verilir — iki hâl
+   * yan yana ölçülebilir.
+   */
+  shadowThrottleEnabled: boolean
+  setShadowThrottleEnabled: (enabled: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /**
    * Shape of the next placed pallet, held as a partial node for the same reason
@@ -334,6 +346,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   lodQuality: 'balanced',
   setLodQuality: (lodQuality) => set({ lodQuality }),
+
+  shadowThrottleEnabled: true,
+  setShadowThrottleEnabled: (shadowThrottleEnabled) => set({ shadowThrottleEnabled }),
 
   palletBrush: {
     preset: 'epal-1',

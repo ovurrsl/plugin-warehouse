@@ -253,7 +253,6 @@ export function toLinear(hex: string): [number, number, number] {
 }
 
 const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam' | 'shelf'>, string> = {
-  footplate: '#334155',
   brace: '#94a3b8',
 }
 
@@ -474,10 +473,10 @@ const CACHE_LIMIT = 96
 /**
  * Shared geometry for a rack shape.
  *
- * A placed rack's geometry is never disposed, and that is deliberate rather than
- * a leak: the geometry belongs to the shape, not to any node, so freeing it when
- * one rack is deleted would blank every other rack that shares it — the same
- * trap the pallet renderer documents around `<GeometrySystem>`.
+ * The geometry belongs to the shape, not to any node: freeing it when one rack
+ * is deleted would blank every other rack that shares it — the same trap the
+ * pallet renderer documents around `<GeometrySystem>`. So disposal is governed
+ * by the retain counts alone, never by a node's lifetime.
  *
  * This is what makes one node per bay affordable at all. Two thousand bays in a
  * 15 000 m² building are two thousand *nodes*, but a run is one shape repeated,
@@ -490,10 +489,11 @@ const CACHE_LIMIT = 96
  * `uprightHeight` from 1 to 20 mints a geometry at every value it passes
  * through — hundreds of buffers and tens of megabytes that nothing will ever
  * draw again, in exactly the session where the warehouse is about to be filled.
- * So the cache is bounded: past the limit, the oldest entry **no mounted rack is
- * holding** is disposed. Held entries are skipped, so no rack can be blanked,
- * and a scrub's leftovers are the first things to go because nothing retains
- * them.
+ * Two guards clean that up. The sweep (`sweepRackGeometry`) frees any shape
+ * nothing has held for a grace period — "kullanılmayan şekiller hafızadan
+ * silinsin" (kullanıcı kararı, 2026-08-07; eski "asla dispose edilmez" kuralını
+ * bilinçli yıkar). The bounded eviction below stays as the backstop for a
+ * scrub fast enough to out-mint the sweep.
  */
 export function getRackGeometry(
   rack: PalletRackNode,
@@ -502,12 +502,77 @@ export function getRackGeometry(
 ): THREE.BufferGeometry {
   const key = rackGeometryKey(rack, detail, hasRightNeighbour)
   const cached = cache.get(key)
-  if (cached) return cached
+  if (cached) {
+    if (!retained.has(key)) touchUnretained(key)
+    return cached
+  }
 
   const geometry = buildFrom(rack, rackParts(rack, detail, hasRightNeighbour))
   cache.set(key, geometry)
+  touchUnretained(key)
   evict(key)
   return geometry
+}
+
+// ── Retain-zero sweep ───────────────────────────────────────────────────────
+
+/**
+ * How long a shape may sit unheld before the sweep frees it.
+ *
+ * The window exists for one race and one pattern. The race: a renderer claims
+ * its keys in an effect, which runs a beat after the render that asked for the
+ * geometry — an immediate dispose-at-zero would free the buffer in that gap
+ * (the same commit-gap `evict` documents). The pattern: a LOD flip or remount
+ * releases and re-retains the same key within milliseconds, and rebuilding a
+ * merged buffer on every flip would trade memory for stutter. Five seconds is
+ * far above both and still frees a scrub's leftovers while the session is
+ * young. Bir sayaç değil süre: kaç kare geçtiği makineye göre değişir, ama
+ * "kimse beş saniyedir tutmuyor" her makinede aynı anlama gelir.
+ */
+const SWEEP_GRACE_MS = 5000
+
+/** Key → when its retain count last hit zero (or it was built/handed out
+ *  unheld). Cleared by the next retain; consumed by the sweep. */
+const zeroSince = new Map<string, number>()
+
+let sweepTimer: ReturnType<typeof setTimeout> | null = null
+
+function touchUnretained(key: string): void {
+  zeroSince.set(key, Date.now())
+  scheduleSweep()
+}
+
+function scheduleSweep(): void {
+  if (sweepTimer !== null) return
+  if (typeof setTimeout !== 'function') return
+  sweepTimer = setTimeout(() => {
+    sweepTimer = null
+    sweepRackGeometry()
+  }, SWEEP_GRACE_MS)
+}
+
+/**
+ * Free every shape nothing has held for the grace period.
+ *
+ * `now` is injectable so tests can cross the grace window without waiting in
+ * real time. A key that was re-retained since it was stamped is simply
+ * forgotten — the stamp is a candidacy, not a verdict.
+ */
+export function sweepRackGeometry(now = Date.now()): void {
+  for (const [key, since] of zeroSince) {
+    if ((retained.get(key) ?? 0) > 0) {
+      zeroSince.delete(key)
+      continue
+    }
+    if (now - since < SWEEP_GRACE_MS) continue
+    zeroSince.delete(key)
+    const geometry = cache.get(key)
+    if (geometry) {
+      cache.delete(key)
+      geometry.dispose()
+    }
+  }
+  if (zeroSince.size > 0) scheduleSweep()
 }
 
 /**
@@ -547,13 +612,21 @@ export function retainRackGeometry(
 ): string {
   const key = rackGeometryKey(rack, detail, hasRightNeighbour)
   retained.set(key, (retained.get(key) ?? 0) + 1)
+  zeroSince.delete(key)
   return key
 }
 
 export function releaseRackGeometry(key: string): void {
   const count = (retained.get(key) ?? 0) - 1
-  if (count > 0) retained.set(key, count)
-  else retained.delete(key)
+  if (count > 0) {
+    retained.set(key, count)
+    return
+  }
+  retained.delete(key)
+  // Son tutan bıraktı: şekil süpürme adayı. Hemen değil — bekleme penceresi
+  // LOD takası ve remount'un aynı anahtarı milisaniyeler içinde geri
+  // almasına izin veriyor.
+  touchUnretained(key)
 }
 
 /** Distinct shapes built so far. Test and diagnostic hook for the sharing that
@@ -566,4 +639,9 @@ export function clearRackGeometryCache(): void {
   for (const geometry of new Set(cache.values())) geometry.dispose()
   cache.clear()
   retained.clear()
+  zeroSince.clear()
+  if (sweepTimer !== null) {
+    clearTimeout(sweepTimer)
+    sweepTimer = null
+  }
 }

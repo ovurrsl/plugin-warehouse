@@ -70,13 +70,17 @@ export type InstanceEntry = {
   /** Materyal kimliği — havuz anahtarına girer, iki materyal karışamaz. */
   materialKeyFor: (tier: InstanceTier) => string
   /**
-   * Gölge düşürür mü. Bir zamanlar `castShadowWhenFull` idi ve katmanla
-   * çarpılıyordu; sonuç, 70 m'nin ötesindeki her rafın sistem gölgesi AÇIK
-   * olsa bile gölge düşürmemesiydi. Host gölgeyi mesh düzeyinde değil
-   * `renderer.shadowMap.enabled` üstünden açıp kapatıyor ve built-in
-   * kind'ların hepsi `castShadow`'u koşulsuz bırakıyor — mesafeye göre
-   * kısmak host'un sözleşmesine aykırı. Uzaktaki nesneler gölge haritasında
-   * zaten birkaç texel: frustum binaya fit ve harita 1024².
+   * Gölge düşürür mü — kind'ın beyanı.
+   *
+   * Mesafe kısması BUNUNLA yapılmaz: `castShadow`'u canlı mesh'te çevirmek
+   * hem host sözleşmesine aykırı (host gölgeyi `renderer.shadowMap.enabled`
+   * üstünden yönetir) hem r184 WebGPU node-cache hatasını tetikler. Uzak
+   * gölge kısma bu yüzden HAVUZ AYRIMIYLA çalışıyor: bayrak havuz anahtarının
+   * parçası (`rebuildPools`), yani gölgeli ve gölgesiz örnekler AYRI ve
+   * bayrağı doğumda damgalanmış mesh'lere düşer — hiçbir mesh'in bayrağı
+   * yaşarken değişmez, örnekler mesh'ler arasında taşınır. Host'un genel
+   * anahtarı da etkilenmez: `shadowMap.enabled` kapalıyken `castShadow`
+   * zaten okunmuyor.
    */
   castsShadow: boolean
   /** Katman eşikleri, metre² (kind'ın kendi bandı). */
@@ -102,6 +106,9 @@ export type InstanceEntry = {
 type PooledEntry = InstanceEntry & {
   /** `keyFor(tier)::materialKeyFor(tier)`, katman başına. */
   shapeKey: Record<InstanceTier, string>
+  /** Sistem sürer (`evaluateTiers`): uzak gölge kısma bandının dışında mı.
+   *  `tier` gibi histerezisli; havuz anahtarına girer. */
+  shadowFar: boolean
 }
 
 function shapeKeysOf(entry: InstanceEntry): Record<InstanceTier, string> {
@@ -156,6 +163,7 @@ export function registerInstance(entry: InstanceEntry): void {
    */
   const pooled = entry as PooledEntry
   pooled.shapeKey = shapeKeysOf(entry)
+  pooled.shadowFar = false
   entries.set(entry.nodeId, pooled)
   generation++
   membershipVersion++
@@ -239,6 +247,18 @@ const TIER_PHASES = 8
  *
  * @returns katman değişen düğüm oldu mu
  */
+/**
+ * Uzak gölge kısma bandı, metre² — SEÇİLMİŞ varsayılan, ölçüm değil.
+ *
+ * Gölge haritası binaya fit ve 1024²: 85 m'deki bir göz haritada birkaç
+ * texel, gölgesi zaten seçilemiyor. Histerezis katman bandıyla aynı
+ * gerekçeyle (tek eşik, sınırda duran rafın gölgesini her kamera nefesinde
+ * söndürüp yakardı). Detay koluyla (`scaleSq`) birlikte ölçeklenir —
+ * tek kalite ekseni.
+ */
+const SHADOW_CULL_FAR_SQ = 85 * 85
+const SHADOW_CULL_NEAR_SQ = 70 * 70
+
 export function evaluateTiers(
   cameraPosition: THREE.Vector3,
   frame: number,
@@ -246,6 +266,10 @@ export function evaluateTiers(
    *  Girdide değil burada uygulanıyor: kol değişince kayıtları yenilemek
    *  gerekmiyor, bir sonraki değerlendirme turu yeni bandı kullanıyor. */
   scaleSq = 1,
+  /** Uzak gölge kısma açık mı (`store.farShadowCullEnabled`). Kapalıyken
+   *  bayraklar aynı 1/8'lik turda temizlenir — anahtar kapatıldıktan en çok
+   *  8 kare sonra her örnek yeniden gölgeli havuzda. */
+  cullFarShadows = false,
 ): boolean {
   let changed = false
   const list = entryList()
@@ -268,6 +292,21 @@ export function evaluateTiers(
     if (next !== entry.tier) {
       entry.tier = next
       changed = true
+    }
+
+    // Gölge bandı aynı mesafeyi okur — ek matris okuması yok. Yalnız gölge
+    // düşüren kind'lar için; bayrak değişimi üyelik değişimi demek ve
+    // `changed` üzerinden yeniden inşayı o tetikler.
+    if (entry.castsShadow) {
+      const nextShadowFar = cullFarShadows
+        ? entry.shadowFar
+          ? distanceSq >= SHADOW_CULL_NEAR_SQ * scaleSq
+          : distanceSq > SHADOW_CULL_FAR_SQ * scaleSq
+        : false
+      if (nextShadowFar !== entry.shadowFar) {
+        entry.shadowFar = nextShadowFar
+        changed = true
+      }
     }
   }
   return changed
@@ -408,22 +447,32 @@ export function rebuildPools(root: THREE.Object3D, matricesDirty = true): void {
      * damgalarsa havuz onu da bedavaya izler.
      */
     const layersMask = entry.object.layers.mask
+    /**
+     * Üçüncü boyut: uzak gölge kısması. Bit, maske anahtarına KATLANIYOR —
+     * üçüncü bir harita katmanı ve girdi başına dizge olmadan. Ayrım şart,
+     * çünkü `castShadow` canlı mesh'te asla çevrilemez (r184 + host
+     * sözleşmesi): gölgesiz örnekler bayrağı doğumda `false` damgalanmış
+     * AYRI bir mesh'e düşer, kamera geçişinde örnek mesh'ler arasında
+     * taşınır — bayrak değil üyelik değişir.
+     */
+    const shadowOff = entry.castsShadow && entry.shadowFar
+    const maskKey = layersMask * 2 + (shadowOff ? 1 : 0)
     let byMask = byShape.get(shapeKey)
     if (!byMask) {
       byMask = new Map()
       byShape.set(shapeKey, byMask)
     }
-    let bucket = byMask.get(layersMask)
+    let bucket = byMask.get(maskKey)
     if (!bucket) {
       bucket = {
-        poolKey: `${shapeKey}::L${layersMask}`,
+        poolKey: shadowOff ? `${shapeKey}::L${layersMask}::NS` : `${shapeKey}::L${layersMask}`,
         geometry: entry.geometryFor(tier),
         material: entry.materialFor(tier),
-        castShadow: entry.castsShadow,
+        castShadow: entry.castsShadow && !shadowOff,
         layersMask,
         objects: [],
       }
-      byMask.set(layersMask, bucket)
+      byMask.set(maskKey, bucket)
       buckets.push(bucket)
     }
     bucket.objects.push(entry.object)
@@ -493,10 +542,12 @@ export function rebuildPools(root: THREE.Object3D, matricesDirty = true): void {
      * düşüyor, yakındaki `full` anahtarı yeni olduğu için görünüyordu.
      */
     if (pool.mesh.parent !== root) root.add(pool.mesh)
-    // Gölge kararı, katman maskesi, geometri ve materyal her yeniden kuruluşta
-    // yazılır: aynı havuz anahtarı farklı bir bucket'a denk gelirse yaratım
-    // anındaki değere saplanıp kalırdı. Maske kaynağın kopyası — solo'da üst
-    // katların yalnız-gölge damgası böylece kolektif mesh'e de işler.
+    // Katman maskesi, geometri ve materyal her yeniden kuruluşta yazılır:
+    // aynı havuz anahtarı farklı bir bucket'a denk gelirse yaratım anındaki
+    // değere saplanıp kalırdı. Maske kaynağın kopyası — solo'da üst katların
+    // yalnız-gölge damgası böylece kolektif mesh'e de işler. `castShadow`
+    // yazımı ise HEP AYNI DEĞERİ yazar: gölge biti havuz anahtarının parçası,
+    // yani bir mesh'in bayrağı yaşarken değişemez — r184 güvenliği buradan.
     pool.mesh.castShadow = bucket.castShadow
     pool.mesh.layers.mask = bucket.layersMask
     pool.mesh.geometry = bucket.geometry

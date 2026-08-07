@@ -98,6 +98,7 @@ function consumeOwnDirtyNodes(): void {
 export default function CollectiveInstancingSystem() {
   const enabled = useWarehouseStore((s) => s.instancingEnabled)
   const shadowThrottleOn = useWarehouseStore((s) => s.shadowThrottleEnabled)
+  const farShadowCull = useWarehouseStore((s) => s.farShadowCullEnabled)
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -241,7 +242,12 @@ export default function CollectiveInstancingSystem() {
     if (!enabled || isExporting) return
 
     frameRef.current += 1
-    const tierChanged = evaluateTiers(camera.position, frameRef.current, lodScaleSq())
+    const tierChanged = evaluateTiers(
+      camera.position,
+      frameRef.current,
+      lodScaleSq(),
+      farShadowCull,
+    )
     const generation = instanceGeneration()
     const levelsMoved = pollLevelPositions(levelYRef.current)
 

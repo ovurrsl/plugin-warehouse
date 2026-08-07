@@ -666,3 +666,73 @@ describe('havuz dünya matrisini taşır — yükün çapası buna dayanıyor', 
     expect(instanceCount()).toBe(2)
   })
 })
+
+describe('uzak gölge kısma', () => {
+  const FAR = new THREE.Vector3(300, 0, 0)
+  const NEAR = new THREE.Vector3(0, 0, 0)
+
+  /** Katman bandını devre dışı bırakan girdi — gölge ayrımını tek başına
+   *  sınayabilmek için: katman geçişi de şekil anahtarını değiştirir ve
+   *  havuz sayısını gölgeden bağımsız böler. */
+  function shadowEntry(id: string, x: number) {
+    const e = entry(id, x)
+    e.farSq = 1e9
+    e.nearSq = 1e9 - 1
+    return e
+  }
+
+  function evaluateAll(camera: THREE.Vector3, cull: boolean) {
+    for (let f = 0; f < 8; f++) evaluateTiers(camera, f, 1, cull)
+  }
+
+  test('bant histerezisli; anahtar kapatılınca bayrak temizlenir', () => {
+    /**
+     * İki sessiz hata: bayrağın uzakta hiç kalkmaması kısmanın var oluşunu
+     * geçersiz kılar (herkes gölgeli, kimse fark etmez); anahtar kapatıldığı
+     * hâlde bayrağın temizlenmemesi ise uzak rafları SONSUZA DEK gölgesiz
+     * bırakır — kullanıcı 'kapattım ama gölge gelmedi' der ve hiçbir şey
+     * hata vermez.
+     */
+    registerInstance(shadowEntry('s1', 0))
+    const e = [...instanceEntries()].find((x) => x.nodeId === 's1') as { shadowFar?: boolean }
+
+    evaluateAll(FAR, true)
+    expect(e.shadowFar).toBe(true)
+
+    evaluateAll(NEAR, true)
+    expect(e.shadowFar).toBe(false)
+
+    evaluateAll(FAR, true)
+    expect(e.shadowFar).toBe(true)
+    evaluateAll(FAR, false) // kapat — uzakta dursa bile temizlenmeli
+    expect(e.shadowFar).toBe(false)
+  })
+
+  test('kısılan örnek AYRI gölgesiz mesh’e düşer; mesh bayrağı yaşarken değişmez', () => {
+    /**
+     * r184 bekçisi: mesafe geçişi mesh'in castShadow'unu ÇEVİRMEMELİ —
+     * üyelik taşınmalı. Çevrilirse WebGPU node-cache hatası ancak gerçek
+     * GPU'da patlar; bu test yapısal garantiyi CI'da tutuyor.
+     */
+    registerInstance(shadowEntry('yakin', 0))
+    registerInstance(shadowEntry('uzak', 300))
+    evaluateAll(NEAR, true) // 'uzak' banda takılır, 'yakin' takılmaz
+    rebuildPools(root)
+
+    const meshes = root.children as THREE.InstancedMesh[]
+    expect(meshes.length).toBe(2)
+    const caster = meshes.find((m) => m.castShadow)
+    const shadowless = meshes.find((m) => !m.castShadow)
+    if (!caster || !shadowless) throw new Error('iki havuz da bekleniyordu')
+    expect(caster.count).toBe(1)
+    expect(shadowless.count).toBe(1)
+
+    // Kamera uzağa gider: roller takas olur — BAYRAKLAR DEĞİL, üyelik.
+    evaluateAll(FAR, true)
+    rebuildPools(root)
+    expect(caster.castShadow).toBe(true)
+    expect(shadowless.castShadow).toBe(false)
+    expect(caster.count).toBe(1)
+    expect(shadowless.count).toBe(1)
+  })
+})

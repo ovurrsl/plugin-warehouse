@@ -13,6 +13,7 @@ import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { useAppearance } from '../appearance'
 import { colliderProps } from '../collider'
+import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { getTruckGeometry, releaseTruckGeometry, retainTruckGeometry } from './geometry'
 import { mastPose } from './kinematics'
@@ -54,7 +55,21 @@ function hashPhase(id: string): number {
  * bu ötelemeler sabittir ve React prop'u olarak bir kez uygulanır; filo
  * (dilim 6) aynı gruplara kare döngüsünden yazacak.
  */
+/**
+ * Kademeli mount kapısı — rack'in şablonu (`rack/renderer.tsx`), aynı
+ * gerekçeyle: gövdenin pahalı işi kancalarında ve kancalar koşullu
+ * çağrılamaz; "sıra bende değil" hâli ancak gövdeyi hiç mount etmeyerek
+ * karşılanır. Bu kind düşük adetli, tavan (512) sayesinde normal sahnede
+ * tek karede mount olur — kapı, dev sahnede yükleme dalgasına katılmak
+ * ve "kolektif çizen her kind kapılı" kapsamını tamamlamak için.
+ */
 export default function TruckRenderer({ node }: { node: TruckNode }) {
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <TruckBody node={node} />
+}
+
+function TruckBody({ node }: { node: TruckNode }) {
   const registeredRef = useRef<Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

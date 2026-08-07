@@ -29,7 +29,7 @@ import {
  * cannot physically share space.
  */
 
-export type RackPartRole = 'upright' | 'footplate' | 'brace' | 'beam' | 'shelf'
+export type RackPartRole = 'upright' | 'brace' | 'beam' | 'shelf'
 
 export type RackPart = {
   role: RackPartRole
@@ -64,10 +64,12 @@ export type RackPart = {
 }
 
 /**
- * Baseplate thickness.
- *
- * Named because the ground beam has to clear it: the plate is wider than the
- * post it carries, so a ground beam set from the floor buried its end in it.
+ * Baseplate thickness — the plate itself is NO LONGER DRAWN (kullanıcı kararı,
+ * 2026-08-07: zemindeki koyu parça kalksın), but the constant stays because the
+ * ground beam still clears it: the plate exists on the real equipment, and
+ * moving the ground beam down into its space would shift a beam every saved
+ * scene has already seen. `envelope.ts` likewise keeps guarding the real
+ * plate's floor-level reach for aisle math.
  */
 const FOOTPLATE_HEIGHT = 0.02
 /** Ground beam's clearance above the baseplate — the reach a real beam-end's
@@ -75,6 +77,18 @@ const FOOTPLATE_HEIGHT = 0.02
  *  (see the tier note below) but the clearance it dictated keeps the ground
  *  beam out of the plate. */
 const CONNECTOR_REACH = 0.015
+
+/**
+ * Dikiş payı: bir parçanın ucu bir dikme YÜZEYİNE tam oturmaz, bu kadar geride
+ * durur.
+ *
+ * "Tam oturan" uç, Float32 tamponunda yüzeyle aynı düzleme yuvarlanır ve köşe
+ * köşe bir mikron içeri/dışarı oynar — kamera süzülürken o ek yeri kıvılcım
+ * gibi parıldar ("içe geçer gibi", kullanıcı 2026-08-07). 1,5 mm bu paketin
+ * yerleşik z-savaşı payı (palet güvertesi aynı değeri kullanıyor) ve iki metre
+ * mesafeden görülemez; düzlem çakışmasını ise tamamen bitirir.
+ */
+export const PART_SEAM = 0.0015
 
 export type RackDetail = 'full' | 'simple'
 
@@ -135,29 +149,23 @@ export function rackParts(
 
     frames.forEach((x) => {
       postZ.forEach((z) => {
-        // Tek kutu, iki katmanda da — katlanmış C-profil (web + flanşlar +
-        // dudaklar, beş kutu) sadelik kararıyla düştü. Delik dokusu rafın
-        // imzası ve yakın katmanda kutunun yüzlerinde aynı okunuyor; uzak
-        // katman deseni bırakıyor (alt-piksel tekrar moiré olur).
+        // Tek kutu, iki katmanda da — katlanmış C-profil (beş kutu) sadelik
+        // kararıyla düştü. Delikler GEOMETRİ olarak yok, BOYA olarak var:
+        // atlasın slot kolonu dokudur, tek üçgen eklemez ve ikinci malzeme
+        // istemez (kullanıcı, 2026-08-07: "delik değil de boya gibi olsa" —
+        // zaten öyleydi; desen geri geldi). Uzak katman deseni bırakır:
+        // alt-piksel tekrar moiréye döner.
         parts.push({
           role: 'upright',
           center: [x, uprightHeight / 2, z],
           size: [uprightWidth, uprightHeight, uprightDepth],
-          ...(full ? { pattern: 'slots' as const } : {}),
+          pattern: full ? 'slots' : undefined,
         })
 
-        // Catalogue footplates are wider than the post they carry — 175 x
-        // 119 mm under a 122 x 80 upright — so they overhang it by about
-        // 26 mm a side. Real, and the reason the built mesh is slightly
-        // wider at the floor than the declared footprint.
-        //
-        // Built at both tiers: four boxes, and without them a distant rack
-        // ends in mid-air at the floor line instead of standing on it.
-        parts.push({
-          role: 'footplate',
-          center: [x, FOOTPLATE_HEIGHT / 2, z],
-          size: [uprightWidth + 0.053, FOOTPLATE_HEIGHT, uprightDepth + 0.039],
-        })
+        // Taban plakası çizilmiyor artık (kullanıcı, 2026-08-07: "zemine denk
+        // gelen siyah parçayı kaldır"). Plaka gerçek ekipmanda var olmaya
+        // devam ediyor — zemin kirişinin kotu ve koridor zarfı (`envelope.ts`)
+        // onu saymayı sürdürür; giden yalnız dört koyu kutu.
       })
 
       // Built at both tiers. The diagonal lattice across the frame end is the
@@ -190,10 +198,11 @@ export function rackParts(
         const beamZ = centerZ + sign * (depth / 2 - beamThickness / 2)
         parts.push({
           role: 'beam',
-          // Spans the clear width exactly, so its ends meet the upright
-          // faces instead of running through them.
+          // Spans the clear width minus the seam, so its ends stop a
+          // hair's breadth off the upright faces instead of landing
+          // coplanar with them (see PART_SEAM).
           center: [centerX, beamY, beamZ],
-          size: [rack.bayClearWidth, beamHeight, beamThickness],
+          size: [rack.bayClearWidth - 2 * PART_SEAM, beamHeight, beamThickness],
         })
       }
 
@@ -226,7 +235,14 @@ export function rackParts(
            */
           pattern: full && finish === 'wire-mesh' ? 'mesh' : undefined,
           center: [centerX, beamTop - thickness / 2, centerZ],
-          size: [rack.bayClearWidth, thickness, depth - 2 * beamThickness],
+          // Both spans back off by the seam: the panel's ends would land
+          // coplanar with the upright faces and its edges with the beams'
+          // inner faces (see PART_SEAM).
+          size: [
+            rack.bayClearWidth - 2 * PART_SEAM,
+            thickness,
+            depth - 2 * beamThickness - 2 * PART_SEAM,
+          ],
         })
       }
 

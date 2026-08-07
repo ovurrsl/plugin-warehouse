@@ -18,10 +18,12 @@ import { orientedPalletFootprint } from './slots'
 /**
  * **How far a footplate stands proud of its own post: 19.5 mm.**
  *
- * Derived rather than restated — `parts.ts` builds the plate at
- * `uprightDepth + 0.039`, from the catalogue's 175 × 119 mm plate under a
- * 122 × 80 upright, and its own comment notes the built mesh is wider at the
- * floor than the declared footprint. Half of 39 mm is what reaches each face.
+ * From the catalogue plate `standards.ts` publishes — 175 × 119 mm under a
+ * 122 × 80 upright — 39 mm of depth overhang, half of it reaching each face.
+ * The plate is no longer *drawn* (`parts.ts`, sadelik kararı 2026-08-07), but
+ * this figure guards the aisle against the real equipment, not the mesh: the
+ * steel plate is still bolted to the real floor whether or not we spend four
+ * boxes on it.
  *
  * It matters because it is what governs when the pallet does not: a bay turned
  * long-side-out, or a frame set as deep as its pallet, has no overhang at all,

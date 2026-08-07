@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './constants'
 import {
   frameWidthM,
@@ -305,7 +306,7 @@ export function finish(sink: Sink): THREE.BufferGeometry {
  * `shortestBox` and `inclination` are all absent on purpose: two conveyors that
  * look the same must share one geometry.
  */
-export function conveyorGeometryKey(
+function buildConveyorGeometryKey(
   conveyor: ConveyorRollerNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -451,3 +452,9 @@ export function clearConveyorGeometryCache(): void {
   cache.clear()
   retained.clear()
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildConveyorGeometryKey`. */
+export const conveyorGeometryKey = memoiseGeometryKey(
+  buildConveyorGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

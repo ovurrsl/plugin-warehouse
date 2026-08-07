@@ -98,6 +98,101 @@ function CatalogTab() {
         )
       })}
       <InstancingSwitch />
+      <ShadowThrottleSwitch />
+      <DetailRangeSwitch />
+    </div>
+  )
+}
+
+/**
+ * Gölge kısıcı anahtarı — `InstancingSwitch` deseninin aynısı ve aynı
+ * gerekçeyle: render yolunun ölçülmüş en büyük kalemine dokunuyor (gölge
+ * geçidi eski tabanda ~29 ms/kare), bozulursa tek tıkla eski davranış
+ * geri gelir ve iki hâl yan yana ölçülebilir.
+ */
+function ShadowThrottleSwitch() {
+  const enabled = useWarehouseStore((s) => s.shadowThrottleEnabled)
+  const setEnabled = useWarehouseStore((s) => s.setShadowThrottleEnabled)
+
+  return (
+    <button
+      onClick={() => setEnabled(!enabled)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginTop: '0.25rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--muted-foreground)',
+        cursor: 'pointer',
+      }}
+      title="Gölge haritasını her kare yerine yalnız sahne değişince (+ saniyede ~12 kez) tazeler. Kapatmak three'nin kendi temposuna döner."
+      type="button"
+    >
+      <Icon height={13} icon={enabled ? 'lucide:sun-dim' : 'lucide:sun'} width={13} />
+      <span>Gölge kısıcı {enabled ? 'açık' : 'kapalı'}</span>
+      <span style={{ marginLeft: 'auto' }}>{enabled ? 'talep üzerine' : 'her kare'}</span>
+    </button>
+  )
+}
+
+/**
+ * Detay mesafesi kolu — LOD bantlarının çarpanı (`store.lodQuality`).
+ *
+ * Toplu çizim anahtarının hemen altında, aynı gerekçeyle: bakışın bir
+ * özelliği, herhangi bir düğümün değil. "Yakın" tümleşik GPU'da uzak katmana
+ * erken düşerek çizim maliyetini kısar; "Geniş" güçlü makinede tam detayı
+ * uzağa taşır. Değerler seçilmiş varsayılanlar — bkz. `store.ts`.
+ */
+function DetailRangeSwitch() {
+  const quality = useWarehouseStore((s) => s.lodQuality)
+  const setQuality = useWarehouseStore((s) => s.setLodQuality)
+  const options = [
+    ['near', 'Yakın'],
+    ['balanced', 'Denge'],
+    ['wide', 'Geniş'],
+  ] as const
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.25rem',
+        width: '100%',
+        marginTop: '0.25rem',
+      }}
+      title="Uzak katmana geçiş mesafesi. Yakın: daha hızlı, detay daha erken düşer. Geniş: tam detay daha uzağa taşınır."
+    >
+      {options.map(([value, label]) => (
+        <button
+          key={value}
+          onClick={() => setQuality(value)}
+          style={{
+            flex: 1,
+            borderRadius: '0.375rem',
+            border:
+              quality === value
+                ? '1px solid color-mix(in oklab, var(--foreground) 35%, transparent)'
+                : '1px solid var(--border)',
+            background:
+              quality === value
+                ? 'color-mix(in oklab, var(--foreground) 8%, transparent)'
+                : 'transparent',
+            padding: '0.3125rem 0',
+            fontSize: '0.6875rem',
+            color: quality === value ? 'var(--foreground)' : 'var(--muted-foreground)',
+            cursor: 'pointer',
+          }}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }

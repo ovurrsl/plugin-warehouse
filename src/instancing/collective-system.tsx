@@ -1,6 +1,6 @@
 'use client'
 
-import { type AnyNodeId, useScene } from '@pascal-app/core'
+import { type AnyNodeId, useLiveNodeOverrides, useLiveTransforms, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
@@ -8,7 +8,7 @@ import type * as THREE from 'three'
 import { kindOf } from '../host-adapter'
 import { KIND_PREFIX } from '../plugin-id'
 import { rebakeDriftedStaticTransforms } from '../static-transform'
-import { useWarehouseStore } from '../store'
+import { lodScaleSq, useWarehouseStore } from '../store'
 import { admitAllNow, resumeProgressiveAdmission } from './admission'
 import {
   clearPools,
@@ -19,6 +19,8 @@ import {
   rebuildPools,
   refreshLevelWorldMatrices,
 } from './collective'
+import { tickGhostLod } from './ghost-lod'
+import { releaseShadows, throttleShadows } from './shadow-throttle'
 
 /**
  * Kolektif sistemin kare önceliği.
@@ -95,6 +97,7 @@ function consumeOwnDirtyNodes(): void {
  */
 export default function CollectiveInstancingSystem() {
   const enabled = useWarehouseStore((s) => s.instancingEnabled)
+  const shadowThrottleOn = useWarehouseStore((s) => s.shadowThrottleEnabled)
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -106,6 +109,9 @@ export default function CollectiveInstancingSystem() {
   const frameRef = useRef(0)
   const generationRef = useRef(-1)
   const dirtyRef = useRef(true)
+  /** Gölge kısıcının kendi `nodes` kimlik anlık görüntüsü — `dirtyRef`'ten
+   *  ayrı, çünkü onu havuz tüketip sıfırlıyor. */
+  const shadowNodesRef = useRef<unknown>(null)
   /** Kat kimliği → son görülen (Y, katman maskesi). Patlatma katı taşır,
    *  solo alttakileri gizler ve ÜSTTEKİLERİ yalnız-gölgeye damgalar — üçü de
    *  bu imzada görünür. */
@@ -143,6 +149,13 @@ export default function CollectiveInstancingSystem() {
     else resumeProgressiveAdmission()
   }, [isExporting])
 
+  // Kısıcı kapatıldığında ışıklar three'nin kendi temposuna GERİ verilir —
+  // verilmezse gölgeler sahipsiz donar ve hiçbir şey hata vermez.
+  useEffect(() => {
+    if (!shadowThrottleOn) releaseShadows()
+  }, [shadowThrottleOn])
+  useEffect(() => () => releaseShadows(), [])
+
   /**
    * Unmount temizliği — Canvas yeniden mount edildiğinde ŞART.
    *
@@ -162,7 +175,7 @@ export default function CollectiveInstancingSystem() {
     }
   }, [])
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, scene }) => {
     /**
      * Instancing kapalıyken bile koşar — çünkü düzelttiği şey kolektif
      * çizimle ilgili değil: host'un kayıtlı nesneye doğrudan yazdığı Y
@@ -190,6 +203,34 @@ export default function CollectiveInstancingSystem() {
      */
     consumeOwnDirtyNodes()
 
+    /**
+     * Hayalet katmanları da erken çıkışların üstünde: mount olmuş her hayalet
+     * mesh, kolektif çizim kapalıyken ya da dışa aktarım sırasında da ekranda
+     * ve katmanı kameraya göre doğru kalmalı — kendi `useFrame`'i varken de
+     * bu koşullara bakmıyordu.
+     */
+    tickGhostLod(camera)
+
+    /**
+     * Gölge kısıcı da erken çıkışların üstünde — kıstığı maliyet kolektif
+     * çizimden bağımsız. Kirli sinyalleri zaten elimizde olanlardan: rebake
+     * sayısı, kirli düğüm kümesi, store yazımı (nodes kimliği) ve canlı
+     * sürükleme store'ları. Katman takası gibi geç sinyaller kalp atışına
+     * biner (≤4 kare ≈ 80 ms — görünmez). Kapalıyken hiç dokunmuyoruz;
+     * efekt release'i çağırmış oluyor.
+     */
+    if (shadowThrottleOn) {
+      const sceneState = useScene.getState()
+      const shadowDirty =
+        rebaked > 0 ||
+        sceneState.dirtyNodes.size > 0 ||
+        sceneState.nodes !== shadowNodesRef.current ||
+        useLiveTransforms.getState().transforms.size > 0 ||
+        useLiveNodeOverrides.getState().overrides.size > 0
+      shadowNodesRef.current = sceneState.nodes
+      throttleShadows(scene, shadowDirty)
+    }
+
     const root = rootRef.current
     if (!root) return
     /**
@@ -200,7 +241,7 @@ export default function CollectiveInstancingSystem() {
     if (!enabled || isExporting) return
 
     frameRef.current += 1
-    const tierChanged = evaluateTiers(camera.position, frameRef.current)
+    const tierChanged = evaluateTiers(camera.position, frameRef.current, lodScaleSq())
     const generation = instanceGeneration()
     const levelsMoved = pollLevelPositions(levelYRef.current)
 

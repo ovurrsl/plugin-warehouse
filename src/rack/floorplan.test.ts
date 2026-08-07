@@ -103,3 +103,40 @@ describe('the plan is projected from the model, not recomputed', () => {
     expect(outlined).toHaveLength(3)
   })
 })
+
+describe('plan sembolü host mürekkebiyle çizilir', () => {
+  /**
+   * Renkleri hiçbir test korumuyordu — mavi paletten mimar mürekkebine geçiş
+   * testlerden sessizce geçerdi, geri sürüklenmesi de geçerdi. Bu iki test
+   * o sessizliği kapatıyor: gövde mürekkebi cabinet'in BODY_FILL/BODY_STROKE
+   * değerleriyle AYNI olmalı (host'ta paylaşılan palet modülü yok, sözleşme
+   * literal eşitliği), ve marquee vurgusu seçili kromu üretmeli.
+   */
+  test('gövde cabinet gövdesiyle aynı mürekkep: #ffffff / #7c7468', () => {
+    const geometry = buildPalletRackFloorplan(rack(), ctx)
+    if (geometry?.kind !== 'group') throw new Error('group bekleniyordu')
+    const body = geometry.children[0] as { fill?: string; stroke?: string; strokeWidth?: number }
+    expect(body.fill).toBe('#ffffff')
+    expect(body.stroke).toBe('#7c7468')
+    expect(body.strokeWidth).toBe(0.022)
+  })
+
+  test('highlighted tek başına seçili kromu üretir — marquee paritesi', () => {
+    // Yalnız `selected` okunsaydı kutu seçim rafın üstünden vurgusuz geçerdi
+    // ve hiçbir şey hata vermezdi; kullanıcı yalnızca rafın "seçilmediğini"
+    // görürdü.
+    const highlightedCtx = {
+      viewState: {
+        selected: false,
+        highlighted: true,
+        palette: { selectedStroke: '#123456', selectedFill: '#654321' },
+      },
+    } as never
+    const geometry = buildPalletRackFloorplan(rack(), highlightedCtx)
+    if (geometry?.kind !== 'group') throw new Error('group bekleniyordu')
+    const body = geometry.children[0] as { fill?: string; stroke?: string; strokeWidth?: number }
+    expect(body.stroke).toBe('#123456')
+    expect(body.fill).toBe('#654321')
+    expect(body.strokeWidth).toBe(0.03)
+  })
+})

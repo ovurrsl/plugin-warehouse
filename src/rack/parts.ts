@@ -8,8 +8,6 @@ import {
   frameCentersX,
   levelBeamHeight,
   levelSurfaceY,
-  palletSupportBarCount,
-  slotOffsetsX,
   storageLevelsPresent,
 } from './slots'
 
@@ -31,14 +29,7 @@ import {
  * cannot physically share space.
  */
 
-export type RackPartRole =
-  | 'upright'
-  | 'footplate'
-  | 'brace'
-  | 'beam'
-  | 'connector'
-  | 'shelf'
-  | 'support-bar'
+export type RackPartRole = 'upright' | 'footplate' | 'brace' | 'beam' | 'shelf'
 
 export type RackPart = {
   role: RackPartRole
@@ -72,49 +63,48 @@ export type RackPart = {
   finish?: DeckFinish
 }
 
-/** Wall thickness of the upright's cold-formed section. */
-const SECTION_WALL = 0.003
 /**
  * Baseplate thickness.
  *
  * Named because the ground beam has to clear it: the plate is wider than the
- * post it carries, so it reaches into the bay exactly where a ground beam's end
- * connector comes down.
+ * post it carries, so a ground beam set from the floor buried its end in it.
  */
 const FOOTPLATE_HEIGHT = 0.02
-/** Width a beam's end connector laps onto the upright face. */
-const CONNECTOR_LAP = 0.02
-/** How far the connector's hooks reach past the beam, above and below. */
+/** Ground beam's clearance above the baseplate — the reach a real beam-end's
+ *  hooks take below the section. The connector itself is no longer modelled
+ *  (see the tier note below) but the clearance it dictated keeps the ground
+ *  beam out of the plate. */
 const CONNECTOR_REACH = 0.015
 
 export type RackDetail = 'full' | 'simple'
 
 /**
- * `simple` drops what stops reading at distance — and only that.
+ * İki katman aynı çeliği üretir; fark yalnız DESEN.
  *
- * ## What the first split got wrong
+ * ## Sadelik varsayılan oldu (kullanıcı kararı, 2026-08-07)
  *
- * It kept posts and beams and dropped everything else, which sounds like a
- * silhouette and is actually a skeleton: ten boxes, four uprights and six
- * beams. A rack drawn that way reads as a bundle of sticks, and because the
- * band started at 45 m, almost every rack in a 60,000 m² building was always
- * on the wrong side of it. The user's report was exactly that — "I have to get
- * very close; from a distance it looks like sticks."
+ * `full` bir zamanlar beş kutulu katlanmış dikme profili, kiriş bağlantı
+ * plakaları ve palet destek çubukları taşıyordu — birkaç metreden hiçbiri
+ * seçilemeyen detaylar. "Editörün yerleşikleri gibi sade, kaliteli bir raf"
+ * istendi ve kompozisyon iki katmanda eşitlendi: tek kutulu dikme + kiriş +
+ * güverte + çapraz kafes + taban plakası. Katman farkı desenlerde kaldı:
+ * yakın katman dikmeye delik dokusunu ve tel güverteye mesh desenini basar,
+ * uzak katman ikisini de bırakır (alt-piksel tekrar moiréye döner).
  *
- * The three parts that carry a rack's shape at range are the **deck panels**
- * (the only large flat areas it has), the **frame bracing** (the diagonal
- * lattice that says "racking" rather than "posts"), and the **footplates**
- * (which sit it on the floor instead of floating). Those are now built at both
- * tiers. What `simple` still drops is the sub-pixel work: the folded upright
- * section collapses from five boxes to one, the beam endplates go, and so do
- * the pallet support bars. That is 59 parts down to 31, and none of the
- * difference is visible past a few metres.
+ * ## İskelet tarihine dikkat — geri gidilecek yer orası değil
  *
- * Spending triangles here is the right trade because triangles are not what
- * costs: a CPU profile of the 3,704-bay scene put ~61% of frame time in
- * per-object draw dispatch and ~25% in matrix maths, with geometry complexity
- * nowhere in the profile. One rack costs about the same whether it is 120
- * triangles or 372; what costs is that it is a separate object at all.
+ * İlk sadeleştirme güverteyi ve çaprazı da atmıştı ve "uzaktan çubuk gibi"
+ * diye reddedildi. Şekli menzilde taşıyan üçlü **güverte panelleri** (rafın
+ * tek büyük düz yüzeyi), **çapraz kafes** ("direk" değil "raf" dedirten
+ * örgü) ve **taban plakaları** (yer çizgisine oturtan) — üçü de her iki
+ * katmanda kalır ve kalmalıdır.
+ *
+ * Bu diyetten büyük fps beklenmemeli, ve bu ölçülmüş bir gerçek: 3.704
+ * gözlük sahnenin CPU profili kare süresinin ~%61'ini nesne başına çizim
+ * dispatch'ine, ~%25'ini matris işine yazdı — geometri karmaşıklığı profile
+ * hiç girmedi. 120 üçgenlik raf ile 372 üçgenlik raf aynıya mal oluyordu;
+ * kazanılan şey görsel sadelik, küçük bir gölge-raster payı ve yarıya inen
+ * inşa/bellek maliyeti.
  */
 export function rackParts(
   rack: PalletRackNode,
@@ -144,16 +134,17 @@ export function rackParts(
     const postZ = [centerZ + postOffset, centerZ - postOffset]
 
     frames.forEach((x) => {
-      postZ.forEach((z, side) => {
-        if (full) {
-          pushUprightSection(parts, x, z, rack, side === 0 ? 1 : -1)
-        } else {
-          parts.push({
-            role: 'upright',
-            center: [x, uprightHeight / 2, z],
-            size: [uprightWidth, uprightHeight, uprightDepth],
-          })
-        }
+      postZ.forEach((z) => {
+        // Tek kutu, iki katmanda da — katlanmış C-profil (web + flanşlar +
+        // dudaklar, beş kutu) sadelik kararıyla düştü. Delik dokusu rafın
+        // imzası ve yakın katmanda kutunun yüzlerinde aynı okunuyor; uzak
+        // katman deseni bırakıyor (alt-piksel tekrar moiré olur).
+        parts.push({
+          role: 'upright',
+          center: [x, uprightHeight / 2, z],
+          size: [uprightWidth, uprightHeight, uprightDepth],
+          ...(full ? { pattern: 'slots' as const } : {}),
+        })
 
         // Catalogue footplates are wider than the post they carry — 175 x
         // 119 mm under a 122 x 80 upright — so they overhang it by about
@@ -204,35 +195,6 @@ export function rackParts(
           center: [centerX, beamY, beamZ],
           size: [rack.bayClearWidth, beamHeight, beamThickness],
         })
-
-        if (full) {
-          // The endplate welded to the beam's end, whose hooks engage the
-          // upright's punched face.
-          //
-          // It occupies the beam's own last stretch rather than reaching
-          // past it. Lapping outward — which is what "the plate sits against
-          // the post" suggests — drove it three millimetres into the post's
-          // near flange, the full thickness of the folded section. Nothing
-          // in the model said so, and because the plate carries a beam-ish
-          // colour and sits exactly where a beam ends, what it looked like
-          // on screen was the beam itself running into the upright.
-          for (const end of [-1, 1]) {
-            parts.push({
-              role: 'connector',
-              center: [
-                centerX + (end * (rack.bayClearWidth - CONNECTOR_LAP)) / 2,
-                beamY,
-                // Exactly the beam's thickness and exactly its Z. What makes
-                // the plate legible is its height — the hooks reach above
-                // and below the section, which is what you actually see on a
-                // real beam end. Standing it proud instead put it 4 mm into
-                // the decking, which begins at the beams' inner faces.
-                beamZ,
-              ],
-              size: [CONNECTOR_LAP, beamHeight + 2 * CONNECTOR_REACH, beamThickness],
-            })
-          }
-        }
       }
 
       // `levelHasShelf` already encodes the open-deck rule, and it encodes it
@@ -268,27 +230,10 @@ export function rackParts(
         })
       }
 
-      // Bars and decking are alternatives, not layers. Both mount on top of
-      // the beams, so a decked level fitted with bars had the two occupying
-      // the same six millimetres — and the reason it is a real rule rather
-      // than a drawing tidy-up is that a deck already carries the pallet
-      // whichever way round it sits, which is the entire job of the bars.
-      if (full && !finish) {
-        const bars = palletSupportBarCount(rack)
-        if (bars > 0) {
-          const barHeight = 0.03
-          for (const offset of slotOffsetsX(rack)) {
-            const spread = ((bars - 1) / 2) * 0.25
-            for (let bar = 0; bar < bars; bar++) {
-              parts.push({
-                role: 'support-bar',
-                center: [centerX + offset - spread + bar * 0.25, beamTop - barHeight / 2, centerZ],
-                size: [0.04, barHeight, depth - 2 * beamThickness],
-              })
-            }
-          }
-        }
-      }
+      // Palet destek çubukları sadelik kararıyla düştü: açık gözde palet
+      // görsel olarak zaten iki kirişe oturuyor, çubuklar birkaç metreden
+      // seçilmeyen ara donanımdı. (Yük hesabına hiç girmiyorlardı —
+      // `levelSurfaceY` parçalardan bağımsız.)
     }
   }
 
@@ -351,48 +296,6 @@ const DECK_THICKNESS: Record<PalletRackNode['decking'], number> = {
  *  rather than a catalogue constant. */
 function panelThickness(rack: PalletRackNode, finish: DeckFinish): number {
   return finish === 'picking' ? rack.pickingShelfThickness : DECK_THICKNESS[finish]
-}
-
-/**
- * A lipped C-section post, the shape racking uprights actually are: web on the
- * closed outer face, two flanges reaching inward, and the return lips that
- * stiffen them. Close up you can see through the frame between the lips.
- *
- * `facing` is +1 when the open side looks toward −Z and −1 when it looks toward
- * +Z, so the two posts of a frame mirror each other and both open inward.
- */
-function pushUprightSection(
-  parts: RackPart[],
-  x: number,
-  z: number,
-  rack: PalletRackNode,
-  facing: number,
-): void {
-  const { uprightWidth: width, uprightDepth: depth, uprightHeight: height } = rack
-  const lip = Math.min(0.02, width / 4)
-  const midY = height / 2
-
-  // The web is the face the beam connectors hook into, so it carries the slots.
-  parts.push({
-    role: 'upright',
-    center: [x, midY, z + facing * (depth / 2 - SECTION_WALL / 2)],
-    size: [width, height, SECTION_WALL],
-    pattern: 'slots',
-  })
-
-  for (const side of [-1, 1]) {
-    parts.push({
-      role: 'upright',
-      center: [x + (side * (width - SECTION_WALL)) / 2, midY, z],
-      size: [SECTION_WALL, height, depth - SECTION_WALL],
-      pattern: 'slots',
-    })
-    parts.push({
-      role: 'upright',
-      center: [x + side * (width / 2 - lip / 2), midY, z - facing * (depth / 2 - SECTION_WALL / 2)],
-      size: [lip, height, SECTION_WALL],
-    })
-  }
 }
 
 /**

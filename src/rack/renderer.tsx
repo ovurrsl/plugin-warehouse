@@ -8,18 +8,19 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
 import { useAdmitted } from '../instancing/admission'
 import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
+import { registerGhostLod } from '../instancing/ghost-lod'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-builder'
 import { getPalletFarMaterial, getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
 import { useStaticTransform } from '../static-transform'
+import { lodScaleSq } from '../store'
 import {
   getRackGeometry,
   rackGeometryKey,
@@ -333,22 +334,14 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
  */
 const GHOST_FAR_SQ = 25 * 25
 const GHOST_NEAR_SQ = 18 * 18
-const GHOST_LOD_INTERVAL = 8
 const ghostWorldPosition = new THREE.Vector3()
+const ghostPlacementMatrix = new THREE.Matrix4()
+const ghostLoadSize = new THREE.Vector3()
 
 function GhostStock({ node }: { node: PalletRackNode }) {
   const palletRef = useRef<THREE.InstancedMesh>(null)
   const loadRef = useRef<THREE.InstancedMesh>(null)
   const ghostTierRef = useRef<'full' | 'far'>('full')
-  const ghostFrameRef = useRef(0)
-  const ghostPhase = useMemo(() => {
-    let hash = 0x811c9dc5
-    for (let index = 0; index < node.id.length; index++) {
-      hash ^= node.id.charCodeAt(index)
-      hash = Math.imul(hash, 0x01000193)
-    }
-    return (hash >>> 0) % GHOST_LOD_INTERVAL
-  }, [node.id])
 
   // One shared index for the whole scene rather than a scan per rack — see
   // `occupancy.ts`. Selecting the set here keeps this rack re-rendering only
@@ -377,17 +370,19 @@ function GhostStock({ node }: { node: PalletRackNode }) {
   const turned = Math.abs(alongRun - spec.length) > 1e-9
 
   /**
-   * Tampon tavanı: rafın TÜM palet yuvaları.
+   * Yuvalar BİR kez enumere edilir; tavan da yerleşimler de ondan türer.
    *
-   * `ghostFill` 0→1 gezinirken yerleşim sayısı değişir ama tavan değişmez,
-   * dolayısıyla mesh bir kez kurulur ve kaydırıcı boyunca aynı kalır.
-   * Yalnız rafın şekli değişince (yuva sayısı) yeniden kurulur.
+   * Tampon tavanı rafın TÜM palet yuvaları: `ghostFill` 0→1 gezinirken
+   * yerleşim sayısı değişir ama tavan değişmez, dolayısıyla mesh bir kez
+   * kurulur ve kaydırıcı boyunca aynı kalır. `slots` kimliği `node` ile
+   * birlikte değiştiği için aşağıdaki memo'nun tazeliği de aynen korunur.
    */
-  const capacity = useMemo(() => Math.max(1, palletSlotsOf(node).length), [node])
+  const slots = useMemo(() => palletSlotsOf(node), [node])
+  const capacity = Math.max(1, slots.length)
 
   const placements = useMemo(() => {
     const result: Array<{ position: [number, number, number]; load: number }> = []
-    for (const slot of palletSlotsOf(node)) {
+    for (const slot of slots) {
       if (occupied.has(slot.id)) continue
       if (slotDraw(node.id, slot.id) >= node.ghostFill) continue
       // Leave the top of the opening clear rather than filling it exactly: a
@@ -396,14 +391,16 @@ function GhostStock({ node }: { node: PalletRackNode }) {
       result.push({ position: slot.localPosition, load })
     }
     return result
-  }, [node, occupied, spec.height])
+  }, [node.id, node.ghostFill, slots, occupied, spec.height])
 
   useLayoutEffect(() => {
     const pallets = palletRef.current
     const loads = loadRef.current
     if (!pallets || !loads) return
-    const matrix = new THREE.Matrix4()
-    const loadSize = new THREE.Vector3()
+    // Modül kapsamındaki scratch'ler — `ghostWorldPosition` ile aynı gerekçe:
+    // efekt başına iki tahsis, kaydırıcı sürtmesinde çöpe dönüşüyordu.
+    const matrix = ghostPlacementMatrix
+    const loadSize = ghostLoadSize
     placements.forEach((placement, index) => {
       const [x, y, z] = placement.position
       matrix.makeTranslation(x, y, z)
@@ -456,40 +453,50 @@ function GhostStock({ node }: { node: PalletRackNode }) {
    * Örnek matrisleri korunuyor: yalnız `geometry` ve `material` takas ediliyor,
    * `instanceMatrix` aynı tampon olarak kalıyor.
    *
-   * Bu döngü ÖLÜ DEĞİL — `GhostStock` yalnız `ghostFill > 0` iken mount
-   * ediliyor ve mount olduğunda mesh gerçekten ekranda.
+   * Değerlendirme MERKEZÎ döngüden (`../instancing/ghost-lod`): burası bir
+   * zamanlar kendi `useFrame`'ini kuruyordu — hayaletli düğüm başına bir kare
+   * aboneliği, `self-drawn.tsx`'in ölçüp kaldırdığı maliyetin aynısı. Kayıt
+   * yalnız mount boyunca yaşıyor; `GhostStock` da yalnız `ghostFill > 0`
+   * iken mount ediliyor.
    */
-  useFrame(({ camera }) => {
-    const pallets = palletRef.current
-    if (!pallets) return
-    ghostFrameRef.current += 1
-    if ((ghostFrameRef.current + ghostPhase) % GHOST_LOD_INTERVAL !== 0) return
+  const evaluateGhostTier = useCallback(
+    (camera: THREE.Camera) => {
+      const pallets = palletRef.current
+      if (!pallets) return
 
-    const { elements } = pallets.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      ghostWorldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = ghostTierRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > GHOST_FAR_SQ
-          ? 'far'
-          : 'full'
-        : distanceSq < GHOST_NEAR_SQ
-          ? 'full'
-          : 'far'
-    if (next === current) return
-    ghostTierRef.current = next
-    pallets.geometry =
-      next === 'far'
-        ? getPalletFarGeometry(node.palletPreset)
-        : getPalletGeometry(node.palletPreset)
-    pallets.material =
-      next === 'far' ? getPalletFarMaterial(appearance) : getPalletMaterial(appearance)
-    // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
-    // bir öncekinin ölçüsüyle yapmak olurdu.
-    pallets.computeBoundingSphere()
-  })
+      const { elements } = pallets.matrixWorld
+      const distanceSq = camera.position.distanceToSquared(
+        ghostWorldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+      )
+      // Detay kolu gerçek paletin bandıyla aynı ölçekte — yan yana duran
+      // gerçek ve hayalet paletin farklı mesafede katman değiştirmemesi
+      // bandın kendisiyle aynı gerekçe.
+      const scaleSq = lodScaleSq()
+      const current = ghostTierRef.current
+      const next =
+        current === 'full'
+          ? distanceSq > GHOST_FAR_SQ * scaleSq
+            ? 'far'
+            : 'full'
+          : distanceSq < GHOST_NEAR_SQ * scaleSq
+            ? 'full'
+            : 'far'
+      if (next === current) return
+      ghostTierRef.current = next
+      pallets.geometry =
+        next === 'far'
+          ? getPalletFarGeometry(node.palletPreset)
+          : getPalletGeometry(node.palletPreset)
+      pallets.material =
+        next === 'far' ? getPalletFarMaterial(appearance) : getPalletMaterial(appearance)
+      // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
+      // bir öncekinin ölçüsüyle yapmak olurdu.
+      pallets.computeBoundingSphere()
+    },
+    [node.palletPreset, appearance],
+  )
+
+  useEffect(() => registerGhostLod(node.id, evaluateGhostTier), [node.id, evaluateGhostTier])
 
   if (placements.length === 0) return null
 

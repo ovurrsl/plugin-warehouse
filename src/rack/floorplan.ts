@@ -46,13 +46,33 @@ export function buildPalletRackFloorplan(
   const width = totalWidth(node)
   const depth = totalDepth(node)
   const view = ctx.viewState
-  const selected = view?.selected ?? false
+  /**
+   * `selected || highlighted` — cabinet paritesi. `highlighted` marquee ve
+   * programatik vurgunun bayrağı (`core/registry/types.ts`: "shows selected
+   * chrome without keyboard focus"); yalnız `selected` okumak, kutu seçimin
+   * rafın üstünden vurgusuz geçmesi demekti. Host yerleşiklerinin 29/31'i
+   * bu çifti okuyor.
+   */
+  const selected = (view?.selected || view?.highlighted) ?? false
 
-  const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#1e40af'
-  const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#dbeafe'
-  const palletStroke = selected ? stroke : '#b45309'
-  const steelFill = selected ? stroke : '#1e3a8a'
-  const beamFill = selected ? stroke : '#c2410c'
+  /**
+   * Mimar mürekkebi — host yerleşiklerinin plan dili, kendi dilimiz değil.
+   *
+   * Eski palet doymuş maviydi (#dbeafe/#1e40af gövde, #1e3a8a ayak, #c2410c
+   * kiriş): paftada ev dilinde çizilmemiş tek nesne raftı. Değerler cabinet
+   * ve column'un kendi sabitlerinden (host'ta paylaşılan bir palet modülü
+   * yok, her kind dosya-yerel literal taşıyor — kopyalamak sözleşmenin
+   * kendisi): gövde `cabinet/floorplan.ts` BODY_FILL/BODY_STROKE
+   * (#ffffff/#7c7468), semboller SYMBOL_STROKE (#6f675b), kesilen çelik
+   * column'un kesit mürekkebi (#374151). Kalınlık da cabinet'in gövde
+   * ağırlığı: seçiliyken 0.03, değilken 0.022. Seçim kroması zaten
+   * `viewState.palette`'ten geliyor — tema-duyarlı ve host'la aynı.
+   */
+  const stroke = selected ? (view?.palette.selectedStroke ?? '#e69a47') : '#7c7468'
+  const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#ffffff'
+  const palletStroke = selected ? stroke : '#6f675b'
+  const steelFill = selected ? stroke : '#374151'
+  const beamFill = selected ? stroke : '#6f675b'
 
   const children: FloorplanGeometry[] = [
     {
@@ -66,7 +86,7 @@ export function buildPalletRackFloorplan(
       // `pointer-events: visiblePainted` never hit-tests it and the rack
       // becomes unselectable in plan.
       stroke,
-      strokeWidth: 0.03,
+      strokeWidth: selected ? 0.03 : 0.022,
     },
   ]
 

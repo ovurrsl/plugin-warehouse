@@ -91,18 +91,25 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
   const spec = useWarehouseStore((s) => s.multiply)
   const setMultiply = useWarehouseStore((s) => s.setMultiply)
   const node = useInspectedRack(provided)
-  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
   const unit = useUnit()
   const [confirming, setConfirming] = useState(false)
-
-  // The inspector is open for something that is not a rack — or for nothing.
-  if (!node) return null
 
   // What pressing the button will actually create, not what the spec describes.
   // Bays that already stand where the spec would put one are filtered out, so
   // pressing Multiply on a run that already exists is a no-op rather than a
   // second run stacked invisibly inside the first.
-  const pending = pendingPlacements(node, spec, nodes).length
+  //
+  // SAYIYA abonelik, sözlüğe değil: `s.nodes` kimliği her store yazımında
+  // değişiyor ve panel açıkken alakasız her düzenleme bütün paneli yeniden
+  // çiziyordu. Selector yazım başına yine koşuyor — maliyeti spec boyutunda,
+  // `occupiedPlaces` indeksi yazım başına bir kez ve panelden bağımsız
+  // kuruluyor — ama panel yalnız sayı DEĞİŞTİĞİNDE render oluyor.
+  const pending = useScene((s) =>
+    node ? pendingPlacements(node, spec, s.nodes as Record<string, unknown>).length : 0,
+  )
+
+  // The inspector is open for something that is not a rack — or for nothing.
+  if (!node) return null
   const extent = runExtent(node, spec)
   const issues = palletRackParametrics.invariants?.flatMap((check) => check(node)) ?? []
 
@@ -124,7 +131,7 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
           were being produced and dropped on the floor. */}
       <IssueList issues={issues} />
 
-      <Capacity node={node} nodes={nodes} />
+      <Capacity node={node} />
 
       <PanelSection title="Multiply">
         {/*
@@ -262,11 +269,14 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
  * "positions" number hides: on a double-deep bay half the positions cannot be
  * reached until the pallet in front of them is moved.
  */
-function Capacity({ node, nodes }: { node: PalletRackNode; nodes: Record<string, unknown> }) {
+function Capacity({ node }: { node: PalletRackNode }) {
   const positions = palletSlotCount(node)
   const direct = directAccessSlotCount(node)
   const picking = pickingSlotCount(node)
-  const occupied = occupiedSlots(nodes, node.id).size
+  // Kendi dolulukSAYISINA abonelik — indeks yazım başına bir kez paylaşılan
+  // yoldan kuruluyor (`occupancy.ts`), bu bileşen yalnız sayı değişince
+  // render oluyor.
+  const occupied = useScene((s) => occupiedSlots(s.nodes as Record<string, unknown>, node.id).size)
   const levels = fittedLevelCount(node)
   const load = levels * node.levelCapacity
 

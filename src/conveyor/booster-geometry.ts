@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import {
   frameWidthM,
   hasCrossbar,
@@ -74,7 +75,7 @@ function buildFrom(
  * `speed`, `shortestBox`, position, rotation, id, name and `supportSlabId` are
  * absent on purpose: none of them moves a vertex.
  */
-export function boosterGeometryKey(
+function buildBoosterGeometryKey(
   booster: ConveyorBoosterNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -118,3 +119,9 @@ export function retainBoosterGeometry(
 ): string {
   return retainGeometry(boosterGeometryKey(booster, detail, hasDownstreamNeighbour))
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildBoosterGeometryKey`. */
+export const boosterGeometryKey = memoiseGeometryKey(
+  buildBoosterGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

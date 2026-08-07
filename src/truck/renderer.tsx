@@ -86,7 +86,14 @@ export default function TruckRenderer({ node }: { node: TruckNode }) {
 
   const model = modelOf(node.model)
   const mastRow = mastRowOf(node.mastRowId)
-  const bodies = bodiesOf(model)
+  /**
+   * Memoize, ve sebep tahsis değil: `bodiesOf` her çağrıda taze dizi döndürür
+   * ve aşağıdaki retain efektinin dep'i. Taze kimlik, efekti HER render'da
+   * söküp kuruyordu — render başına ~10 retain + 10 release, ve release
+   * tahliye sayacını sıfıra düşürdüğü için geometri o pencerede tahliyeye
+   * açık kalıyordu. Filo sürerken render ≈ kare demek.
+   */
+  const bodies = useMemo(() => bodiesOf(model), [model])
   const pose = mastPose(mastRow, node.forkHeight)
 
   const meshRefs = useRef<Map<string, Mesh>>(new Map())

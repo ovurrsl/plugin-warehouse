@@ -239,7 +239,14 @@ const TIER_PHASES = 8
  *
  * @returns katman değişen düğüm oldu mu
  */
-export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boolean {
+export function evaluateTiers(
+  cameraPosition: THREE.Vector3,
+  frame: number,
+  /** Detay mesafesi kolu (`store.lodScaleSq`) — kare cinsinden çarpan.
+   *  Girdide değil burada uygulanıyor: kol değişince kayıtları yenilemek
+   *  gerekmiyor, bir sonraki değerlendirme turu yeni bandı kullanıyor. */
+  scaleSq = 1,
+): boolean {
   let changed = false
   const list = entryList()
   const start = (TIER_PHASES - ((frame + 1) % TIER_PHASES)) % TIER_PHASES
@@ -252,10 +259,10 @@ export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boo
     )
     const next: InstanceTier =
       entry.tier === 'full'
-        ? distanceSq > entry.farSq
+        ? distanceSq > entry.farSq * scaleSq
           ? 'simple'
           : 'full'
-        : distanceSq < entry.nearSq
+        : distanceSq < entry.nearSq * scaleSq
           ? 'full'
           : 'simple'
     if (next !== entry.tier) {
@@ -542,9 +549,14 @@ const LEVEL_SETTLED_M = 5e-4
  * Sahnede bir avuç kat vardır; bu, kare başına birkaç karşılaştırma.
  */
 export type LevelSignature = { y: number; mask: number }
+/** Kare başına bir `Set` ayırmamak için modül scratch'i — içerik kat sayısı
+ *  kadar küçük ama tahsis kare yolundaydı. Çağrı tekil (kolektif sistemin
+ *  döngüsü), eşzamanlı iki tarama yok. */
+const aliveLevelsScratch = new Set<string>()
 export function pollLevelPositions(seen: Map<string, LevelSignature>): boolean {
   let moved = false
-  const alive = new Set<string>()
+  const alive = aliveLevelsScratch
+  alive.clear()
   for (const levelId of sceneRegistry.byType.level ?? []) {
     const object = sceneRegistry.nodes.get(levelId)
     if (!object) continue

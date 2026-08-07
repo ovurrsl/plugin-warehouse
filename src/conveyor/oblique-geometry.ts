@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import {
   emitPart,
   finish,
@@ -71,7 +72,7 @@ function buildFrom(
  * a port is not a vertex — two obliques ordered as a divert and as a merge are
  * the same steel.
  */
-export function obliqueGeometryKey(
+function buildObliqueGeometryKey(
   oblique: ConveyorObliqueNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -111,3 +112,9 @@ export function retainObliqueGeometry(
 ): string {
   return retainGeometry(obliqueGeometryKey(oblique, detail, hasDownstreamNeighbour))
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildObliqueGeometryKey`. */
+export const obliqueGeometryKey = memoiseGeometryKey(
+  buildObliqueGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

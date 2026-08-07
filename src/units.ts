@@ -132,12 +132,18 @@ export function lengthUnit(unit: LinearUnit): string {
  * adımı 0,05 m = 0,164 ft — iki ondalık bunu gidiş-dönüşte kaydırırdı.
  */
 export function metresToField(metres: number, unit: LinearUnit): number {
+  // Aynı dosyanın BİÇİMLENDİRME fonksiyonlarının hepsi sonlu-sayı koruyor
+  // ('––' gösteriyorlar); dönüşüm çifti korumuyordu. Fark önemli, çünkü bu
+  // ikisinin çıktısı ekrana değil DÜĞÜM VERİSİNE gidiyor: NaN bir kez yazıldı
+  // mı şema ayrıştırması sessizce düşer ve raf "ölçülemedi" sayılır.
+  if (!Number.isFinite(metres)) return 0
   if (unit !== 'imperial') return metres
   return Number(metersToLinearUnit(metres, unit).toFixed(3))
 }
 
 /** `metresToField`'in tersi. Yorum için oraya bakın — ikisi bir çift. */
 export function fieldToMetres(value: number, unit: LinearUnit): number {
+  if (!Number.isFinite(value)) return 0
   return linearUnitToMeters(value, unit)
 }
 

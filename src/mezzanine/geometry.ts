@@ -21,6 +21,7 @@ import {
   type Sink,
   toLinear,
 } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { type MezzaninePart, mezzanineParts } from './parts'
 import type { MezzanineNode } from './schema'
 
@@ -89,7 +90,7 @@ function buildParts(node: MezzanineNode, parts: readonly MezzaninePart[]): THREE
  * Bunu unutmak, `hasGroundBeam`'in bir kez düştüğü hata sınıfı (bir alan
  * geometriyi değiştirir ama anahtarda yoktur, ve ekranda eski mesh kalır).
  */
-export function mezzanineGeometryKey(node: MezzanineNode): string {
+function buildMezzanineGeometryKey(node: MezzanineNode): string {
   const tierKey = node.tiers
     .map((t) => {
       const stairs = t.accessories.staircases
@@ -155,3 +156,6 @@ export function getMezzanineTierGeometry(node: MezzanineNode, tier: number): THR
 }
 
 export { releaseGeometry, retainGeometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildMezzanineGeometryKey`. */
+export const mezzanineGeometryKey = memoiseGeometryKey(buildMezzanineGeometryKey, () => '')

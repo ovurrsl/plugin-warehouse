@@ -93,6 +93,29 @@ type WarehouseStore = {
   instancingEnabled: boolean
   setInstancingEnabled: (enabled: boolean) => void
 
+  /**
+   * Detay mesafesi — LOD bantlarının çarpanı.
+   *
+   * Raf 70/55 m, palet 25/18 m gibi bantlar sabitti ve tümleşik GPU'da geniş
+   * kalıyordu: uzak katmana daha erken düşmek çizim maliyetini doğrudan kısar,
+   * güçlü makinede ise bandı genişletmek detayı uzağa taşır. Kol üç konumlu;
+   * histerezis mimarisi değişmiyor, yalnız eşikler ölçekleniyor.
+   */
+  lodQuality: LodQuality
+  setLodQuality: (quality: LodQuality) => void
+
+  /**
+   * Gölge kısıcı — VARSAYILAN AÇIK, `instancingEnabled` gerekçesiyle.
+   *
+   * Gölge geçidi ölçülmüş en büyük kalemdi (eski tabanda ~29 ms/kare) ve
+   * sahne karelerin çoğunda durağan. Kısıcı haritayı talep üzerine +
+   * 4 karelik kalp atışıyla tazeliyor (`instancing/shadow-throttle.ts`).
+   * Kapatınca ışıklar three'nin kendi temposuna geri verilir — iki hâl
+   * yan yana ölçülebilir.
+   */
+  shadowThrottleEnabled: boolean
+  setShadowThrottleEnabled: (enabled: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /**
    * Shape of the next placed pallet, held as a partial node for the same reason
@@ -321,6 +344,12 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   instancingEnabled: true,
   setInstancingEnabled: (instancingEnabled) => set({ instancingEnabled }),
 
+  lodQuality: 'balanced',
+  setLodQuality: (lodQuality) => set({ lodQuality }),
+
+  shadowThrottleEnabled: true,
+  setShadowThrottleEnabled: (shadowThrottleEnabled) => set({ shadowThrottleEnabled }),
+
   palletBrush: {
     preset: 'epal-1',
     cargo: 'none',
@@ -487,3 +516,22 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setM3Brush: (patch) => set((state) => ({ m3Brush: { ...state.m3Brush, ...patch } })),
 }))
+
+/** Detay mesafesi kolunun üç konumu. */
+export type LodQuality = 'near' | 'balanced' | 'wide'
+
+/**
+ * SEÇİLMİŞ varsayılanlar, ölçüm değil: 'near' bantları %60'a çeker (raf
+ * 70 m → 42 m), 'wide' %150'ye. İki uç da histerezis oranını korur; doğru
+ * değerler gerçek sahnede ölçülerek ayarlanmalı.
+ */
+const LOD_QUALITY_SCALE: Record<LodQuality, number> = { near: 0.6, balanced: 1, wide: 1.5 }
+
+/**
+ * Mesafe KARESİ ölçeği — bantlar squared karşılaştırıldığı için k².
+ * Kare döngülerinden `getState` ile okunur; abonelik gerektirmez.
+ */
+export function lodScaleSq(): number {
+  const k = LOD_QUALITY_SCALE[useWarehouseStore.getState().lodQuality]
+  return k * k
+}

@@ -101,13 +101,18 @@ describe('beam to upright fit', () => {
     // Diagonals meet the horizontals, and each other, at their end nodes. Real
     // frames bolt or weld there, so the steel genuinely occupies one volume.
     'brace × brace',
-    // A folded section's web and flanges share the corner they are folded from.
-    'upright × upright',
     // A post is welded to its baseplate and stands in its thickness.
     'footplate × upright',
-    // The endplate is welded to the beam's end and wraps it, which is the whole
-    // point of moving it inboard: it now occupies the beam rather than the post.
-    'beam × connector',
+    // Çapraz, dikmeye CIVATALANIR — gerçek çerçevede de tek hacmi paylaşırlar.
+    // Eski beş kutulu C-profilde çaprazın ucu profilin AÇIK tarafına (boşluğa)
+    // uzanıyordu ve çift hiç dokunmuyordu; dikme tek dolu kutuya inince aynı
+    // uzanım kesişme oldu. Kesişmenin sınırı çaprazın kendi kesiti (3 cm) —
+    // bundan büyüğü yine hata olurdu ama AABB testi yönsüz olduğu için burada
+    // yalnız çift bazında muaf tutulabiliyor.
+    'brace × upright',
+    // Kaldırılan rollerin girdileri (upright×upright — katlanmış profilin
+    // kendi kıvrımı; beam×connector — plakanın kirişi sarması) rollerle
+    // birlikte gitti: ölü muafiyet, gerçek bir kesişmeyi sessizce affederdi.
   ])
 
   test('nothing interpenetrates that is not a joint', () => {
@@ -135,17 +140,29 @@ describe('beam to upright fit', () => {
     }
   })
 
-  test('the end connector stops at the upright face', () => {
-    const r = rack()
-    const frames = frameCentersX(r)
-    const faces = frames.flatMap((x) => [x - r.uprightWidth / 2, x + r.uprightWidth / 2])
-    for (const connector of partsOf(r, 'connector')) {
-      const outer = [
-        connector.center[0] - connector.size[0] / 2,
-        connector.center[0] + connector.size[0] / 2,
-      ]
-      // One end lands on a post face; the other is inside the bay.
-      expect(outer.some((edge) => faces.some((face) => Math.abs(face - edge) < 1e-9))).toBe(true)
+  test('katmanlar aynı çeliği üretir — fark yalnız desen', () => {
+    /**
+     * Sadelik kararının kilidi (2026-08-07): full katmana yeniden "yalnız
+     * yakında görünen" bir kutu eklemek (bağlantı plakası, destek çubuğu,
+     * katlanmış profil) bu testi düşürür. Sessiz hata iki yönlü: full'e
+     * eklenen kutu LOD takasında pat diye belirip kaybolur; simple'a
+     * eklenmeyen kutu da kompozisyon eşitliğini kırar.
+     */
+    for (const config of [
+      {},
+      { decking: 'open' },
+      { hasGroundBeam: true },
+      { depthPositions: 2 },
+      { pickingLevels: 1 },
+    ]) {
+      const r = rack(config)
+      const strip = (part: { role: string; center: unknown; size: unknown; finish?: unknown }) => ({
+        role: part.role,
+        center: part.center,
+        size: part.size,
+        finish: part.finish,
+      })
+      expect(rackParts(r, 'full').map(strip)).toEqual(rackParts(r, 'simple').map(strip))
     }
   })
 
@@ -299,11 +316,13 @@ describe('deck finishes', () => {
     }
   })
 
-  test('an open deck builds no panel, and grows support bars instead', () => {
+  test('an open deck builds no panel', () => {
+    // Destek çubukları sadelik kararıyla gitti; açık gözün sözleşmesi artık
+    // yalnız "panel yok". Palet görseli iki kirişe oturmaya devam ediyor —
+    // `levelSurfaceY` parçalardan bağımsız.
     const open = rack({ decking: 'open', palletOrientation: 'long-side-out' })
     const parts = rackParts(open, 'full')
     expect(parts.some((part) => part.role === 'shelf')).toBe(false)
-    expect(parts.some((part) => part.role === 'support-bar')).toBe(true)
   })
 
   test('a picking level keeps its shelf even under an open deck', () => {
@@ -316,18 +335,16 @@ describe('deck finishes', () => {
     for (const shelf of shelves) expect(shelf.finish).toBe('picking')
   })
 
-  test('a ground beam grows support bars under any decking', () => {
-    // A ground beam carries no deck at any setting, so bars belong there whether
-    // or not the levels above are decked. Testing `decking === 'open'` at rack
-    // level missed it, and the cache key inherited the miss.
+  test('a ground beam still carries no deck panel at any decking', () => {
+    // Çubuklar gittiğinde bu senaryonun kalan sözleşmesi: zemin kirişi hangi
+    // decking ayarında olursa olsun panel taşımaz — taşısaydı panel taban
+    // plakasının içinden geçerdi ve hiçbir şey hata vermezdi.
     const r = rack({
       decking: 'wire-mesh',
       hasGroundBeam: true,
       palletOrientation: 'long-side-out',
     })
-    const bars = rackParts(r, 'full').filter((part) => part.role === 'support-bar')
-    expect(bars.length).toBeGreaterThan(0)
-    // All of them at the ground level, none up among the decked ones.
-    for (const bar of bars) expect(bar.center[1]).toBeLessThan(0.3)
+    const shelves = rackParts(r, 'full').filter((part) => part.role === 'shelf')
+    for (const shelf of shelves) expect(shelf.center[1]).toBeGreaterThan(0.3)
   })
 })

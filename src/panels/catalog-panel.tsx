@@ -98,6 +98,63 @@ function CatalogTab() {
         )
       })}
       <InstancingSwitch />
+      <DetailRangeSwitch />
+    </div>
+  )
+}
+
+/**
+ * Detay mesafesi kolu — LOD bantlarının çarpanı (`store.lodQuality`).
+ *
+ * Toplu çizim anahtarının hemen altında, aynı gerekçeyle: bakışın bir
+ * özelliği, herhangi bir düğümün değil. "Yakın" tümleşik GPU'da uzak katmana
+ * erken düşerek çizim maliyetini kısar; "Geniş" güçlü makinede tam detayı
+ * uzağa taşır. Değerler seçilmiş varsayılanlar — bkz. `store.ts`.
+ */
+function DetailRangeSwitch() {
+  const quality = useWarehouseStore((s) => s.lodQuality)
+  const setQuality = useWarehouseStore((s) => s.setLodQuality)
+  const options = [
+    ['near', 'Yakın'],
+    ['balanced', 'Denge'],
+    ['wide', 'Geniş'],
+  ] as const
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.25rem',
+        width: '100%',
+        marginTop: '0.25rem',
+      }}
+      title="Uzak katmana geçiş mesafesi. Yakın: daha hızlı, detay daha erken düşer. Geniş: tam detay daha uzağa taşınır."
+    >
+      {options.map(([value, label]) => (
+        <button
+          key={value}
+          onClick={() => setQuality(value)}
+          style={{
+            flex: 1,
+            borderRadius: '0.375rem',
+            border:
+              quality === value
+                ? '1px solid color-mix(in oklab, var(--foreground) 35%, transparent)'
+                : '1px solid var(--border)',
+            background:
+              quality === value
+                ? 'color-mix(in oklab, var(--foreground) 8%, transparent)'
+                : 'transparent',
+            padding: '0.3125rem 0',
+            fontSize: '0.6875rem',
+            color: quality === value ? 'var(--foreground)' : 'var(--muted-foreground)',
+            cursor: 'pointer',
+          }}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
     </div>
   )
 }

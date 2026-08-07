@@ -239,7 +239,14 @@ const TIER_PHASES = 8
  *
  * @returns katman değişen düğüm oldu mu
  */
-export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boolean {
+export function evaluateTiers(
+  cameraPosition: THREE.Vector3,
+  frame: number,
+  /** Detay mesafesi kolu (`store.lodScaleSq`) — kare cinsinden çarpan.
+   *  Girdide değil burada uygulanıyor: kol değişince kayıtları yenilemek
+   *  gerekmiyor, bir sonraki değerlendirme turu yeni bandı kullanıyor. */
+  scaleSq = 1,
+): boolean {
   let changed = false
   const list = entryList()
   const start = (TIER_PHASES - ((frame + 1) % TIER_PHASES)) % TIER_PHASES
@@ -252,10 +259,10 @@ export function evaluateTiers(cameraPosition: THREE.Vector3, frame: number): boo
     )
     const next: InstanceTier =
       entry.tier === 'full'
-        ? distanceSq > entry.farSq
+        ? distanceSq > entry.farSq * scaleSq
           ? 'simple'
           : 'full'
-        : distanceSq < entry.nearSq
+        : distanceSq < entry.nearSq * scaleSq
           ? 'full'
           : 'simple'
     if (next !== entry.tier) {

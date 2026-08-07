@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import type * as THREE from 'three'
 import { Vector3 } from 'three'
+import { lodScaleSq } from '../store'
 import type { InstanceTier } from './collective'
 
 /**
@@ -79,13 +80,16 @@ export function SelfDrawnBody({
     const distanceSq = camera.position.distanceToSquared(
       worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
     )
+    // Detay kolu kolektif yol ile AYNI ölçeği uygular — iki yolun farklı
+    // mesafede katman değiştirmesi, yan yana iki rafın farklı çizilmesi olurdu.
+    const scaleSq = lodScaleSq()
     const current = tierRef.current
     const next: InstanceTier =
       current === 'full'
-        ? distanceSq > farSq
+        ? distanceSq > farSq * scaleSq
           ? 'simple'
           : 'full'
-        : distanceSq < nearSq
+        : distanceSq < nearSq * scaleSq
           ? 'full'
           : 'simple'
     if (next === current) return

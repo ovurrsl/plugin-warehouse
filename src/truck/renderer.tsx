@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { useAppearance } from '../appearance'
-import { colliderProps } from '../collider'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { getTruckGeometry, releaseTruckGeometry, retainTruckGeometry } from './geometry'
@@ -167,10 +167,10 @@ function TruckBody({ node }: { node: TruckNode }) {
       {/* Seçim kolideri: gövdeler arasında boşluk çok (mast rayları, çatal
           araları) — kullanıcının nişan aldığı şey zarfın kendisi. */}
       {!isExporting && (
-        <mesh
-          {...colliderProps([length, height, width])}
+        <Collider
           position={[position[0], position[1] + height / 2, position[2]]}
           rotation={rotation}
+          size={[length, height, width]}
         />
       )}
 

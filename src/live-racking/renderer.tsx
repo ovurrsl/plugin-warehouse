@@ -10,7 +10,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
-import { colliderProps } from '../collider'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -124,9 +124,7 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
       {/* Seçim kolideri: bir kanal neredeyse tamamen hava, tıklamalar
           makaraların arasından geçip arkadakini seçerdi. */}
       <group position={position} ref={registeredRef} rotation={rotation}>
-        {!isExporting && (
-          <mesh position={[0, height / 2, 0]} {...colliderProps([width, height, depth])} />
-        )}
+        {!isExporting && <Collider position={[0, height / 2, 0]} size={[width, height, depth]} />}
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}

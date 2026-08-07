@@ -9,8 +9,9 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -35,12 +36,6 @@ import type { M3ShelvingNode } from './schema'
  */
 const LOD_FAR_SQ = 70 * 70
 const LOD_NEAR_SQ = 55 * 55
-
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/** Invisible, and deliberately so — `visible = false` takes the collider out of
- *  `projectObject` entirely while the raycaster keeps hitting it. */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 /**
  * Mounted through `def.renderer` rather than `def.geometry`: `<GeometrySystem>`
@@ -129,13 +124,9 @@ function M3RendererBody({ node }: { node: M3ShelvingNode }) {
           registered group so the outline still traces the real silhouette. */}
       <group position={position} ref={registeredRef} rotation={rotation}>
         {!isExporting && (
-          <mesh
-            dispose={null}
-            geometry={UNIT_COLLIDER}
-            material={COLLIDER_MATERIAL}
+          <Collider
             position={[0, node.frameHeight / 2, 0]}
-            scale={[width, node.frameHeight, depth]}
-            visible={false}
+            size={[width, node.frameHeight, depth]}
           />
         )}
         {drawsSelf && (

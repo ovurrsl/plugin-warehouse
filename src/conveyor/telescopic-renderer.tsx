@@ -10,7 +10,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { colliderProps } from '../collider'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { useWarehouseStore } from '../store'
@@ -255,14 +255,14 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
     <group visible={node.visible !== false} {...handlers}>
       {/* Kolider anlık uzamış zarfı kapsar — bomun ucu da seçilebilir. */}
       {!isExporting && (
-        <mesh
+        <Collider
           position={[
             position[0] + Math.cos(rotation[1]) * footprintCenterX(node),
             position[1] + height / 2,
             position[2] - Math.sin(rotation[1]) * footprintCenterX(node),
           ]}
           rotation={rotation}
-          {...colliderProps([currentLengthM(node), height, width])}
+          size={[currentLengthM(node), height, width]}
         />
       )}
 

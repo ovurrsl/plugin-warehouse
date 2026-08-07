@@ -10,7 +10,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
-import { colliderProps } from '../collider'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { useCollective } from '../instancing/use-collective'
 import { useStaticTransform } from '../static-transform'
@@ -149,9 +149,7 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
   return (
     <group visible={node.visible !== false} {...handlers}>
       <group position={position} ref={registeredRef} rotation={rotation}>
-        {!isExporting && (
-          <mesh position={[0, height / 2, 0]} {...colliderProps([width, height, depth])} />
-        )}
+        {!isExporting && <Collider position={[0, height / 2, 0]} size={[width, height, depth]} />}
         {/*
           Patlatılmışken kat başına bir grup, kapalıyken tek birleşik mesh —
           ama İKİSİ DE `drawsSelf`in altında, ve bu bir tekrar değil bir

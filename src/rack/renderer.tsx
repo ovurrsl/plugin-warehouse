@@ -11,6 +11,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { registerGhostLod } from '../instancing/ghost-lod'
@@ -54,21 +55,6 @@ const NO_RAYCAST = () => {}
  */
 const LOD_FAR_SQ = 70 * 70
 const LOD_NEAR_SQ = 55 * 55
-
-/** Shared by every rack's picking collider, scaled per node. A box geometry per
- *  rack is a thousand allocations that all describe the same cube. */
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/**
- * Invisible, and deliberately so.
- *
- * `visible = false` takes the collider out of `WebGLRenderer.projectObject`
- * entirely — no colour pass, no shadow pass — while three's raycaster and R3F's
- * event layer both ignore `visible` and keep hitting it. A `colorWrite: false`
- * material still costs a draw call per rack in both passes, which on a thousand
- * racks is a thousand draws that paint nothing.
- */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 /**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
@@ -283,13 +269,9 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
           grup konumu ve dönüşü zaten taşıyor.
         */}
       {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
+        <Collider
           position={[0, node.uprightHeight / 2, 0]}
-          scale={[width, node.uprightHeight, depth]}
-          visible={false}
+          size={[width, node.uprightHeight, depth]}
         />
       )}
       {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken

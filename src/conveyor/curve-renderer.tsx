@@ -9,8 +9,9 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -21,18 +22,6 @@ import { releaseGeometry } from './geometry-builder'
 import { hasDownstreamNeighbour } from './line-index'
 import { getConveyorMaterial } from './materials'
 import { LOD_FAR_SQ, LOD_NEAR_SQ } from './renderer'
-
-/** Shared by every picking collider, scaled and turned per segment. */
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/**
- * Invisible, and deliberately so. `visible = false` takes a collider out of
- * `WebGLRenderer.projectObject` entirely — no colour pass, no shadow pass —
- * while three's raycaster and R3F's event layer both ignore `visible` and keep
- * hitting it. A `colorWrite: false` material would still cost a draw call per
- * segment in both passes.
- */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 export default function ConveyorCurveRenderer({ node }: { node: ConveyorCurveNode }) {
   // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
@@ -116,15 +105,11 @@ function ConveyorCurveRendererBody({ node }: { node: ConveyorCurveNode }) {
       <group position={position} ref={registeredRef} rotation={rotation}>
         {!isExporting &&
           colliders.map((segment, index) => (
-            <mesh
-              dispose={null}
-              geometry={UNIT_COLLIDER}
+            <Collider
               key={`${segment.rotationY}:${index}`}
-              material={COLLIDER_MATERIAL}
               position={[segment.center[0], colliderHeight / 2, segment.center[1]]}
               rotation={[0, segment.rotationY, 0]}
-              scale={[segment.size[0], colliderHeight, segment.size[1]]}
-              visible={false}
+              size={[segment.size[0], colliderHeight, segment.size[1]]}
             />
           ))}
 

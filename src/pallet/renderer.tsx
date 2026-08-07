@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { BufferGeometry, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
-import { colliderProps } from '../collider'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -236,9 +236,9 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
             çizim ekliyor, ama `Box3.expandByObject` görünürlüğe bakmadığı için
             düğümün gerçek zarfını bildiriyor. */}
         {!isExporting && (
-          <mesh
-            {...colliderProps([spec.length, totalHeight, spec.width])}
+          <Collider
             position={[0, totalHeight / 2, 0]}
+            size={[spec.length, totalHeight, spec.width]}
           />
         )}
         {/* Kolektif kapalıyken ya da bu palet seçili/sürükleniyorken kendi

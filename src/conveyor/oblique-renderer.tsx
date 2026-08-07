@@ -9,8 +9,9 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -28,15 +29,6 @@ import {
 } from './oblique-metrics'
 import type { ConveyorObliqueNode } from './oblique-schema'
 import { LOD_FAR_SQ, LOD_NEAR_SQ } from './renderer'
-
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/**
- * Invisible, and deliberately so. `visible = false` takes a collider out of
- * `WebGLRenderer.projectObject` entirely — no colour pass, no shadow pass —
- * while three's raycaster and R3F's event layer both ignore `visible`.
- */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 export default function ConveyorObliqueRenderer({ node }: { node: ConveyorObliqueNode }) {
   // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
@@ -128,15 +120,11 @@ function ConveyorObliqueRendererBody({ node }: { node: ConveyorObliqueNode }) {
       <group position={position} ref={registeredRef} rotation={rotation}>
         {!isExporting &&
           colliders.boxes.map((box) => (
-            <mesh
-              dispose={null}
-              geometry={UNIT_COLLIDER}
+            <Collider
               key={`${box.center[0]}:${box.center[1]}`}
-              material={COLLIDER_MATERIAL}
               position={[box.center[0], colliders.height / 2, box.center[1]]}
               rotation={[0, box.rotationY, 0]}
-              scale={[box.size[0], colliders.height, box.size[1]]}
-              visible={false}
+              size={[box.size[0], colliders.height, box.size[1]]}
             />
           ))}
 

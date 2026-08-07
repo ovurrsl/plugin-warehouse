@@ -5,6 +5,7 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
 import { useAppearance } from '../appearance'
+import { useAdmitted } from '../instancing/admission'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
 import { getRouteMaterials } from './materials'
@@ -31,7 +32,21 @@ import { outerHalfWidthM } from './stripes'
  * release, so without it a route being moved would sit still until the pointer
  * came up and then jump.
  */
+/**
+ * Kademeli mount kapısı — rack'in şablonu (`rack/renderer.tsx`), aynı
+ * gerekçeyle: gövdenin pahalı işi kancalarında ve kancalar koşullu
+ * çağrılamaz; "sıra bende değil" hâli ancak gövdeyi hiç mount etmeyerek
+ * karşılanır. Bu kind düşük adetli, tavan (512) sayesinde normal sahnede
+ * tek karede mount olur — kapı, dev sahnede yükleme dalgasına katılmak
+ * ve "kolektif çizen her kind kapılı" kapsamını tamamlamak için.
+ */
 export default function RouteRenderer({ node }: { node: RouteNode }) {
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <RouteBody node={node} />
+}
+
+function RouteBody({ node }: { node: RouteNode }) {
   const handlers = useNodeEvents(node as never, node.type as never)
   const isExporting = useViewer((s) => s.isExporting ?? false)
 

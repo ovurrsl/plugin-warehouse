@@ -11,6 +11,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { colliderProps } from '../collider'
+import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { useWarehouseStore } from '../store'
 import { FLOW_BOX_M } from './flow-simulation'
@@ -89,7 +90,21 @@ const boxMatrix = new THREE.Matrix4()
  * yayınlanmadığı için adlandırılmış tahminle sürülür ve panel bunu söyler.
  * Export sırasında kutular çizilmez — çıktı her zaman dosyadaki sahnedir.
  */
+/**
+ * Kademeli mount kapısı — rack'in şablonu (`rack/renderer.tsx`), aynı
+ * gerekçeyle: gövdenin pahalı işi kancalarında ve kancalar koşullu
+ * çağrılamaz; "sıra bende değil" hâli ancak gövdeyi hiç mount etmeyerek
+ * karşılanır. Bu kind düşük adetli, tavan (512) sayesinde normal sahnede
+ * tek karede mount olur — kapı, dev sahnede yükleme dalgasına katılmak
+ * ve "kolektif çizen her kind kapılı" kapsamını tamamlamak için.
+ */
 export default function TelescopicRenderer({ node }: { node: ConveyorTelescopicNode }) {
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <TelescopicBody node={node} />
+}
+
+function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)

@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7297951`](https://github.com/ovurrsl/plugin-warehouse/commit/7297951664d837761f213de9bd5464cf3bc510a6))
 - Refresh generated README blocks [skip ci] ([`60b02f7`](https://github.com/ovurrsl/plugin-warehouse/commit/60b02f793d1b17b56358e2883189283fac002583))
 - Refresh generated README blocks [skip ci] ([`67064b8`](https://github.com/ovurrsl/plugin-warehouse/commit/67064b860c28d72bccf56f51c51688d9282e564c))
 - Refresh generated README blocks [skip ci] ([`f7f8579`](https://github.com/ovurrsl/plugin-warehouse/commit/f7f8579ba2678b0e5150d44f02f4f590db76bafe))
@@ -287,6 +288,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #15 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`5d42057`](https://github.com/ovurrsl/plugin-warehouse/commit/5d420578bfe52c6e6d591191d86ec03c3b019c4c))
 - Revert "Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2" ([`1e208a3`](https://github.com/ovurrsl/plugin-warehouse/commit/1e208a333bb1fd97a117e06b2b189d6fd2260145))
 - Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e9e9876`](https://github.com/ovurrsl/plugin-warehouse/commit/e9e987616ac72e77755d8e9a3219ae67cca5c830))
 - Merge pull request #13 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`c419782`](https://github.com/ovurrsl/plugin-warehouse/commit/c4197828da7dcb9230d6bb5dc8b83f6f1a50746b))
@@ -309,6 +311,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Eklenti nesnelerinin gölgeleri tamamen kalktı + performans modu düğmesi ([`515b47b`](https://github.com/ovurrsl/plugin-warehouse/commit/515b47bc78510bbf0066e63705c79402ae195501))
 - Host döşeme-desteği sorgusuna eklenti-tarafı memo — editöre dokunmadan ([`a2dc544`](https://github.com/ovurrsl/plugin-warehouse/commit/a2dc5445f9b52de76d95fb00f1e9630f1f194978))
 - Deck-slab sistemi mezzanine'siz sahnede uyumasın diye bekçi ([`eff5b3b`](https://github.com/ovurrsl/plugin-warehouse/commit/eff5b3baa5c5e81c5b9aa66935e33ff9b272c5de))
 - Uzak gölge kısma — 85 m ötesi ayrı gölgesiz havuza taşınır ([`2593772`](https://github.com/ovurrsl/plugin-warehouse/commit/2593772548804786777ac322f3d18e225bc7b961))

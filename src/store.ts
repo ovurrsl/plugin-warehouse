@@ -116,6 +116,15 @@ type WarehouseStore = {
   shadowThrottleEnabled: boolean
   setShadowThrottleEnabled: (enabled: boolean) => void
 
+  /**
+   * Uzak gölge kısma — 85 m ötesindeki örnekler gölgesiz havuza taşınır
+   * (`collective.ts`: bayrak havuz anahtarında, canlı mesh'te asla
+   * çevrilmez). VARSAYILAN AÇIK, kullanıcı kararı; kapatınca bayraklar
+   * ≤8 karede temizlenir ve her örnek yeniden gölgeli havuzda.
+   */
+  farShadowCullEnabled: boolean
+  setFarShadowCullEnabled: (enabled: boolean) => void
+
   // ── Placement brush ────────────────────────────────────────────────────
   /**
    * Shape of the next placed pallet, held as a partial node for the same reason
@@ -349,6 +358,9 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   shadowThrottleEnabled: true,
   setShadowThrottleEnabled: (shadowThrottleEnabled) => set({ shadowThrottleEnabled }),
+
+  farShadowCullEnabled: true,
+  setFarShadowCullEnabled: (farShadowCullEnabled) => set({ farShadowCullEnabled }),
 
   palletBrush: {
     preset: 'epal-1',

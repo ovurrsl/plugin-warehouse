@@ -99,6 +99,7 @@ function CatalogTab() {
       })}
       <InstancingSwitch />
       <ShadowThrottleSwitch />
+      <FarShadowCullSwitch />
       <DetailRangeSwitch />
     </div>
   )
@@ -137,6 +138,43 @@ function ShadowThrottleSwitch() {
       <Icon height={13} icon={enabled ? 'lucide:sun-dim' : 'lucide:sun'} width={13} />
       <span>Gölge kısıcı {enabled ? 'açık' : 'kapalı'}</span>
       <span style={{ marginLeft: 'auto' }}>{enabled ? 'talep üzerine' : 'her kare'}</span>
+    </button>
+  )
+}
+
+/**
+ * Uzak gölge kısma anahtarı — diğer iki anahtarla aynı desen ve gerekçe:
+ * render yoluna dokunan her şey tek tıkla eski davranışa dönebilmeli.
+ * 85 m ötesindeki örnekler gölgesiz havuza taşınıyor; o mesafede gölge
+ * binaya-fit 1024²'lik haritada zaten birkaç texel.
+ */
+function FarShadowCullSwitch() {
+  const enabled = useWarehouseStore((s) => s.farShadowCullEnabled)
+  const setEnabled = useWarehouseStore((s) => s.setFarShadowCullEnabled)
+
+  return (
+    <button
+      onClick={() => setEnabled(!enabled)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.375rem',
+        width: '100%',
+        marginTop: '0.25rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: 'transparent',
+        padding: '0.375rem 0.5rem',
+        fontSize: '0.6875rem',
+        color: 'var(--muted-foreground)',
+        cursor: 'pointer',
+      }}
+      title="85 m'den uzaktaki raflar gölge düşürmez — o mesafede gölge haritada zaten birkaç texel. Kapatmak herkese gölge verir."
+      type="button"
+    >
+      <Icon height={13} icon={enabled ? 'lucide:cloud-off' : 'lucide:cloud'} width={13} />
+      <span>Uzak gölgeler {enabled ? 'kısık' : 'tam'}</span>
+      <span style={{ marginLeft: 'auto' }}>{enabled ? '>85 m gölgesiz' : 'hepsi gölgeli'}</span>
     </button>
   )
 }

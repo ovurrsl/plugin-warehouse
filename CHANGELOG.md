@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`71aa813`](https://github.com/ovurrsl/plugin-warehouse/commit/71aa8135be55fdad6751a95a3294d1c11ccef7d3))
 - Gölge geçidini ölç, ?disable merdivenini yordama al ([`41503d6`](https://github.com/ovurrsl/plugin-warehouse/commit/41503d6c87bcb356434ec003bc146e17a5ce3734))
 - T4 sonucunu yaz, ölçüm planını duran kameraya çevir ([`123d478`](https://github.com/ovurrsl/plugin-warehouse/commit/123d47850cdffea0837b0b65a7d05842780bda00))
 - Refresh generated README blocks [skip ci] ([`034a30f`](https://github.com/ovurrsl/plugin-warehouse/commit/034a30f00fcccd5bf3fe4727a86af2ccc59bc86e))
@@ -147,6 +148,10 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Gölge kısıcı — haritayı her kare değil talep üzerine tazele ([`4e5efd1`](https://github.com/ovurrsl/plugin-warehouse/commit/4e5efd1df3cc22d097ea0207206ebc65653a058c))
+- 2D plan sembolü host'un mimar mürekkebine geçti ([`5dac776`](https://github.com/ovurrsl/plugin-warehouse/commit/5dac776e5cc978c021332c08cd94d698e77d640b))
+- Bake 'replace' — baked viewer için seviye-başına statik instancing ([`ed29ef4`](https://github.com/ovurrsl/plugin-warehouse/commit/ed29ef41ae2705ce5d379967e5ef0199d59224fb))
+- Detay mesafesi kolu — LOD bantlarının üç konumlu çarpanı ([`94c4773`](https://github.com/ovurrsl/plugin-warehouse/commit/94c477342f461772f127c5731adf03381d554808))
 - Follow the host's Render, Textures and Theme settings ([`8b675e9`](https://github.com/ovurrsl/plugin-warehouse/commit/8b675e91998f790c11215248ee30f30d57176305))
 - Its own tier system — exploded view, tier duplication ([`584e000`](https://github.com/ovurrsl/plugin-warehouse/commit/584e000577c65f36de7cce253e80dc013e3f2f65))
 - Draw the area to place it, and make the size controls real ([`040ff68`](https://github.com/ovurrsl/plugin-warehouse/commit/040ff68a36fdf6f7fb5b42499ee999cf3f468893))
@@ -238,6 +243,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Doğrulanmış kalan zayıf noktalar — bodiesOf memo, NaN çifti, mezzanine key'leri, kat yoklaması scratch'i ([`519fbb8`](https://github.com/ovurrsl/plugin-warehouse/commit/519fbb884c84fe41de46e8dedb17bd93eef1154a))
 - PeerDependencies aralığını host'un gerçek sürümüne aç ([`8051690`](https://github.com/ovurrsl/plugin-warehouse/commit/8051690f6558b5d130abc1e82b241cc0502f2c4e))
 - Call useUnit above the early return, and convert the ES-only height ([`2e3640d`](https://github.com/ovurrsl/plugin-warehouse/commit/2e3640dd73d2ab47f70b2a5a44b8f3d5cedd0f40))
 - Follow the host's Units setting across every readout ([`ac732ef`](https://github.com/ovurrsl/plugin-warehouse/commit/ac732ef48e6b424fb242b48f7f789e0057666cb8))
@@ -274,6 +280,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #12 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`22477cf`](https://github.com/ovurrsl/plugin-warehouse/commit/22477cf1221d69b07a0725852279d1020f1ef00b))
 - Merge pull request #11 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`2132280`](https://github.com/ovurrsl/plugin-warehouse/commit/21322809f1b6c6fadd75fa444d6880b72e23c032))
 - Merge pull request #9 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`32888cb`](https://github.com/ovurrsl/plugin-warehouse/commit/32888cbaf92fe7465acf178dc8aeeaf20133374d))
 - Merge pull request #8 from ovurrsl/claude/x86-graphics-performance-issue-9rac6j ([`95b46cc`](https://github.com/ovurrsl/plugin-warehouse/commit/95b46ccb207d76e164769fc6a225191815d511d9))
@@ -292,6 +299,9 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Raf paneli sözlüğe değil türetilmiş sayılara abone ([`0b17d00`](https://github.com/ovurrsl/plugin-warehouse/commit/0b17d00cca68bc3188de08b62ae89a0e13f5a184))
+- Geometri anahtarı memoizasyonu kalan on kind'a yayıldı ([`9234d64`](https://github.com/ovurrsl/plugin-warehouse/commit/9234d649a8732eb8ba36694b91c595759f4a684d))
+- Hayalet stok — tek enumerasyon, modül scratch'leri, merkezî LOD sürüşü ([`b400b0a`](https://github.com/ovurrsl/plugin-warehouse/commit/b400b0a7c4c4cacd7206d3c6335f8520a88e578e))
 - Kolektif çizerken raf alt ağacını render gezinişinden düşür ([`fad7a8d`](https://github.com/ovurrsl/plugin-warehouse/commit/fad7a8de72638346d49cfaae5fb52e03d2e9b92f))
 - Raf başına tekrarlanan işi kaldır — anahtar memoizasyonu + kademeli mount tüm kind'lara (#7) ([`88b95c4`](https://github.com/ovurrsl/plugin-warehouse/commit/88b95c4ba57efb015270bddfdd58d3101aafc2a5))
 - Kademeli mount kapısını kolektif çizen HER kind'a yay ([`550b507`](https://github.com/ovurrsl/plugin-warehouse/commit/550b50733c1a709480b4567cf4008b00fd85e039))
@@ -309,6 +319,7 @@ index to it, not a replacement for it.
 
 ### Refactors
 
+- 3B kompozisyon sadeleşti — iki katman aynı çelik, fark yalnız desen ([`253eb38`](https://github.com/ovurrsl/plugin-warehouse/commit/253eb38093cb966b1859bf46ea85c9b563e9b3ec))
 - One naming standard, read off the editor's own kind list ([`7c25751`](https://github.com/ovurrsl/plugin-warehouse/commit/7c2575187203aa7ad62938a45d31d74758909f7f))
 - Host primitiflerine geçiş + iç içe giren ayarların birleştirilmesi ([`519e2ff`](https://github.com/ovurrsl/plugin-warehouse/commit/519e2fffca9a7748bb889ee43ec71e92123a90ff))
 

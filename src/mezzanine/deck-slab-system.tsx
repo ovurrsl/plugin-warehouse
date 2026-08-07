@@ -206,8 +206,38 @@ export function planDeckSlabs(nodes: Readonly<Record<string, unknown>>): DeckSla
   return plan
 }
 
+/**
+ * Bu sahnede uzlaştırılacak bir şey var mı — mezzanine YA DA sahipli slab.
+ *
+ * Sistem `s.nodes`'a abone ve her store yazışında `planDeckSlabs`'ın iki tam
+ * geçişini koşturuyordu; raf-ağırlıklı tipik depoda mezzanine hiç yokken bu
+ * boşa taramaydı. Bekçi tek ucuz geçiş: ikisi de yoksa abonelik sabit boş
+ * kayda düşer, bileşen yazı başına re-render olmaz, plan hiç kurulmaz.
+ *
+ * SAHİPLİ SLAB da sayılıyor, sadece mezzanine değil — bilinçli. Son mezzanine
+ * silindiğinde yetim güverteler bir yazı boyunca sahipsiz durur; bekçi yalnız
+ * mezzanine'e baksaydı `plan.deletes` dalı atlanır ve görünmez slab'lar
+ * sahnede sonsuza dek kalırdı. Hiçbir şey hata vermezdi — slab görünmez.
+ *
+ * Kimlik memo'su `clash.ts` / `neighbours.ts` desenindeki gibi: host her
+ * yazıda `nodes` nesnesini değiştirir, aynı kimlik = aynı cevap.
+ */
+const NO_DECK_WORK: Readonly<Record<string, unknown>> = Object.freeze({})
+let scannedNodes: Readonly<Record<string, unknown>> | null = null
+let scannedResult = false
+export function hasDeckWork(nodes: Readonly<Record<string, unknown>>): boolean {
+  if (nodes === scannedNodes) return scannedResult
+  scannedNodes = nodes
+  scannedResult = Object.values(nodes).some(
+    (node) => (node as NodeLike)?.type === 'warehouse:mezzanine' || deckOwnerOf(node) !== null,
+  )
+  return scannedResult
+}
+
 export default function MezzanineDeckSlabSystem() {
-  const nodes = useScene((s) => s.nodes as Readonly<Record<string, unknown>>)
+  const nodes = useScene((s) =>
+    hasDeckWork(s.nodes) ? (s.nodes as Readonly<Record<string, unknown>>) : NO_DECK_WORK,
+  )
 
   useEffect(() => {
     const plan = planDeckSlabs(nodes)

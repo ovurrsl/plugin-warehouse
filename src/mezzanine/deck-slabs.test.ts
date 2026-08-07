@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { electSupportSlab } from '../placement'
 import { useWarehouseStore } from '../store'
-import { planDeckSlabs } from './deck-slab-system'
+import { hasDeckWork, planDeckSlabs } from './deck-slab-system'
 import {
   DECK_OWNER_KEY,
   deckOwnerOf,
@@ -420,5 +420,36 @@ describe('korkuluk anahatı takip ediyor', () => {
       byCardinal.set(edge.cardinal, (byCardinal.get(edge.cardinal) ?? 0) + 1)
     }
     for (const count of byCardinal.values()) expect(count).toBe(1)
+  })
+})
+
+describe('bekçi: hasDeckWork', () => {
+  test('yetim güverte İŞ SAYILIR — son mezzanine silinse de temizlik atlanmaz', () => {
+    /**
+     * Sessiz hata senaryosu: bekçi yalnız mezzanine'e baksaydı, son mezzanine
+     * silindiği yazıda `false` döner, sistem hiç uyanmaz ve görünmez yetim
+     * slab'lar sahnede sonsuza dek kalırdı — slab görünmez olduğu için
+     * kimse fark etmezdi. Bekçi sahipli slab'ı da iş saymalı ve plan o
+     * slab'ı silmeli.
+     */
+    const mezz = mezzanine()
+    const settled = apply(scene(mezz), planDeckSlabs(scene(mezz)))
+    const orphaned = { ...settled }
+    delete orphaned[mezz.id]
+
+    expect(hasDeckWork(orphaned)).toBe(true)
+    const plan = planDeckSlabs(orphaned)
+    expect(plan.deletes).toEqual([deckSlabId(mezz.id, 0)])
+  })
+
+  test('ne mezzanine ne sahipli slab varken iş yok; sahipsiz sıradan slab da iş değil', () => {
+    expect(hasDeckWork({})).toBe(false)
+    expect(
+      hasDeckWork({
+        level_1: { id: 'level_1', type: 'level', parentId: null },
+        rack_1: { id: 'rack_1', type: 'warehouse:pallet-rack' },
+        slab_plain: { id: 'slab_plain', type: 'slab', metadata: {} },
+      }),
+    ).toBe(false)
   })
 })

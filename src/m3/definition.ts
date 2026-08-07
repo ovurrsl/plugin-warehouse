@@ -99,9 +99,7 @@ export const m3ShelvingDefinition = {
     description:
       'One bay of M3 picking shelving. Shelves hang off the uprights on a 25 mm grid — no beams. Levels carry panels or drawers.',
     icon: { kind: 'iconify', name: 'lucide:layout-grid' },
-    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
-    // gerekçe rack/definition.ts'teki bayrağın yanında.
-    hidden: false,
+    hidden: true,
     paletteSection: 'furnish',
   },
 

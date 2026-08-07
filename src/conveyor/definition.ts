@@ -168,9 +168,7 @@ export const conveyorRollerDefinition = {
     icon: { kind: 'iconify', name: 'lucide:move-right' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog.
-    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
-    // gerekçe rack/definition.ts'teki bayrağın yanında.
-    hidden: false,
+    hidden: true,
     paletteSection: 'furnish',
   },
 

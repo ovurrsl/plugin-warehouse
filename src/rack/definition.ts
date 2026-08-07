@@ -182,11 +182,11 @@ export const palletRackDefinition = {
     description:
       'One bay of adjustable pallet racking. Multiply it into a run — each bay is its own object, and bays standing together share a post.',
     icon: { kind: 'iconify', name: 'lucide:rows-3' },
-    // Görünür (2026-08-07): host'un Furnish paleti artık registry'nin
-    // `paletteSection: 'furnish'` kind'larını listeliyor ve kurulum durumunu
-    // süzüyor (fork yaması, UPSTREAM.md) — bu bayrağı gizli tutan iki gerekçe
-    // de (Build paletine sızma + kurulmamış eklentinin karosu) kapandı.
-    hidden: false,
+    // Keeps the kind out of the host's auto-derived Build palette so it is
+    // reachable only from this plugin's catalog. Also sidesteps a live gap:
+    // `build-tab.tsx` enumerates the registry without checking install state,
+    // so a palette-visible plugin kind would show even when uninstalled.
+    hidden: true,
     paletteSection: 'furnish',
   },
 

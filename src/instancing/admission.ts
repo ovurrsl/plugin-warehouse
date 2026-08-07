@@ -50,17 +50,15 @@ const MIN_PER_FRAME = 8
 /**
  * Bütçe dolmadıysa karede en fazla bu kadar.
  *
- * İki işi birden görüyor: küçük sahnenin tamamı ilk turlarda geçsin (elli
- * raflık tesis iki karede biter, kademeli akış hissedilmez), BÜYÜK sahne ise
+ * İki işi birden görüyor: küçük sahnenin tamamı ilk turda geçsin (elli raflık
+ * tesis kademeli yola hiç girmez, tek karede mount olur), BÜYÜK sahne ise
  * GÖRÜNÜR biçimde aksın — kullanıcı isteği (2026-08-07): raflar "tek seferde"
- * değil, göz göz belirsin. Merdivenin üç basamağı ölçülü: 512, 3.582 rafı
- * ~7 karede bitiriyordu ("hepsi birden" okunuyordu); 64 ≈1,1 sn'ydi ve hâlâ
- * hızlı bulundu (kullanıcı, ikinci tur: "daha yavaş yüklesin"); 24 aynı
- * sahneyi ~150 kareye (60 fps'te ≈2,5 sn) yayıyor — dalga göz göz izlenir,
- * toplam süre yine insanı bekletmeyen mertebede. Süre bütçesi (8 ms) yavaş
- * makinede yine ilk sınır.
+ * değil, göz göz belirsin. Eski 512, 3.582 rafı ~7 karede bitiriyordu ve
+ * "hepsi birden" okunuyordu; 64 aynı sahneyi ~56 kareye (≈1,1 sn) yayıyor —
+ * akış görünür, toplam süre hâlâ saniye mertebesinde. Süre bütçesi (8 ms)
+ * yavaş makinede yine ilk sınır.
  */
-const MAX_PER_FRAME = 24
+const MAX_PER_FRAME = 64
 
 /**
  * ÖNCE HOST, SONRA EKLENTİ — kullanıcı isteğinin ikinci yarısı.

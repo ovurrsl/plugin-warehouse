@@ -227,14 +227,7 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
    */
   useLayoutEffect(() => {
     const object = registeredRef.current
-    if (!object) return
-    const flag = hidden && !userHidden
-    object.userData[HIDDEN_FOR_COLLECTIVE] = flag
-    // Host sözleşmesi (fork yaması, editör UPSTREAM.md): mavi kutu seçimi
-    // görünürlük yürüyüşünde bu anahtarı tanır — havuz adına gizlenen raf
-    // marquee'de seçilebilir kalır. Eklentinin kendi anahtarından ayrı,
-    // çünkü host eklenti-özel dizgeyi bilemez; anlamları birebir aynı.
-    object.userData.hiddenForInstancing = flag
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
   }, [hidden, userHidden])
 
   return (

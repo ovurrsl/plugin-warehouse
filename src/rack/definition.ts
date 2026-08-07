@@ -153,6 +153,17 @@ export const palletRackDefinition = {
    */
   system: { module: () => import('../instancing/collective-system'), priority: 3 },
 
+  /**
+   * Baked `/viewer` sözleşmesi — plugin-trees'in kurduğu desen.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyordu; `replace`
+   * baked mesh'i gizletip seviyenin raflarını canlı statik instancing'le
+   * çizdiriyor (`glb-scene.tsx` `bakePolicyOf` yolu). Eklenti yüklü değilse
+   * politika `static`'e düşer ve baked mesh görünür kalır — veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
+
   floorplan: buildPalletRackFloorplan,
 
   tool: () => import('./tool'),

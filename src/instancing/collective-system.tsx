@@ -32,6 +32,16 @@ import { releaseShadows, throttleShadows } from './shadow-throttle'
 const FRAME_PRIORITY = 6
 
 /**
+ * İki katman takası arasındaki en kısa süre, milisaniye.
+ *
+ * Kare sayısı değil süre: yavaş makinede kare uzar, sayaçla kurulan aralık
+ * de uzardı — kısıtın en gerekli olduğu makinede en gevşek hâline düşerdi.
+ * 250 ms, 55-70 m bandında görünmez ve uçuş boyunca tampon yazımını
+ * saniyede 60'tan 4'e indirir.
+ */
+const TIER_SWAP_MIN_MS = 250
+
+/**
  * Bu paketin düğümlerinin KİRLİ BAYRAĞINI TÜKET.
  *
  * ## Sözleşmenin bu paketin yerine getirmediği yarısı
@@ -117,6 +127,9 @@ export default function CollectiveInstancingSystem() {
    *  solo alttakileri gizler ve ÜSTTEKİLERİ yalnız-gölgeye damgalar — üçü de
    *  bu imzada görünür. */
   const levelYRef = useRef(new Map<string, LevelSignature>())
+  /** Bekleyen katman takası + son uygulanışı — bkz. TIER_SWAP_MIN_MS. */
+  const pendingTierSwapRef = useRef(false)
+  const lastTierSwapAtRef = useRef(0)
 
   // Sahne değişti: bir sonraki karede havuzlar yeniden kurulur. `nodes`
   // burada OKUNMAZ — kimliği sahne değişiminin ta kendisidir ve tek işi bu
@@ -268,11 +281,36 @@ export default function CollectiveInstancingSystem() {
     const matricesDirty =
       levelsMoved || dirtyRef.current || generation !== generationRef.current || rebaked > 0
 
-    if (tierChanged || matricesDirty) {
+    /**
+     * Katman geçişi kaynaklı yeniden inşa ZAMANA bağlı — kare hızına değil.
+     *
+     * Kamera uçuşta eşik küreleri sürekli düğüm kesiyor: `tierChanged`
+     * neredeyse her kare doğru ve her seferinde üyeliği değişen havuzların
+     * TAM `instanceMatrix` tamponu yeniden yazılıp GPU'ya yükleniyordu.
+     * Kullanıcının tarifi birebir buydu (2026-08-07): "kamera hareketinde
+     * kilitleniyor, nesne sürüklerken sorun yok" — nesne sürüklerken kamera
+     * durur, küre kimseyi kesmez.
+     *
+     * Takas artık en erken 250 ms'de bir uygulanıyor. Görsel bedel, banda
+     * giren rafın tam detayının en çok çeyrek saniye gecikmesi — 55 m
+     * öteden ayırt edilemez. SAHNE düzenlemeleri bu kısıtın dışında:
+     * `matricesDirty` yolu anında inşa etmeye devam ediyor ve o inşa
+     * bekleyen katman takasını da beraberinde uygular.
+     */
+    if (tierChanged) pendingTierSwapRef.current = true
+    const now = performance.now()
+    const tierSwapDue =
+      pendingTierSwapRef.current && now - lastTierSwapAtRef.current >= TIER_SWAP_MIN_MS
+
+    if (matricesDirty || tierSwapDue) {
       generationRef.current = generation
       dirtyRef.current = false
       if (matricesDirty) refreshLevelWorldMatrices()
       rebuildPools(root, matricesDirty)
+      if (pendingTierSwapRef.current) {
+        pendingTierSwapRef.current = false
+        lastTierSwapAtRef.current = now
+      }
     }
   }, FRAME_PRIORITY)
 

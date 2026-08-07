@@ -135,3 +135,22 @@ describe('kademeli mount kabulü', () => {
     expect(source).toContain('resumeProgressiveAdmission()')
   })
 })
+
+describe('katman takası kısıtı — kamera uçuşu havuzları her kare yeniden kurduramaz', () => {
+  test('takas zamana bağlı, sahne düzenlemesi kısıtsız', () => {
+    /**
+     * Sessiz hata iki yönlü. Kısıt yoksa: kamera uçuşunda `tierChanged`
+     * neredeyse her kare doğru ve etkilenen havuzların tam instanceMatrix
+     * tamponu her kare GPU'ya yeniden yüklenir — kullanıcının "kamera
+     * hareketinde kilitleniyor, nesne sürüklerken sorun yok" tarifi
+     * (2026-08-07). Kısıt matricesDirty'yi de kapsarsa: raf silme/taşıma
+     * çeyrek saniye ekranda hayalet bırakır.
+     */
+    const source = readFileSync(join(import.meta.dir, 'collective-system.tsx'), 'utf8')
+    expect(source).toContain('TIER_SWAP_MIN_MS')
+    // Süre, kare sayısı değil — yavaş makinede kısıt gevşemesin.
+    expect(source).toMatch(/TIER_SWAP_MIN_MS = \d+/)
+    // Sahne düzenlemesi anında inşa: matricesDirty tek başına yeterli kalmalı.
+    expect(source).toContain('if (matricesDirty || tierSwapDue)')
+  })
+})

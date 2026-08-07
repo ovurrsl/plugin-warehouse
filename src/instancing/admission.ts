@@ -1,6 +1,9 @@
 'use client'
 
+import { useScene } from '@pascal-app/core'
 import { useEffect, useState } from 'react'
+import { kindOf } from '../host-adapter'
+import { KIND_PREFIX } from '../plugin-id'
 
 /**
  * Kademeli mount — büyük bir sahne tek React commit'inde kurulmasın.
@@ -45,11 +48,46 @@ const TIME_BUDGET_MS = 8
 const MIN_PER_FRAME = 8
 
 /**
- * Bütçe dolmadıysa karede en fazla bu kadar. Küçük bir sahnenin tamamı ilk
- * turda geçsin diye yüksek: elli raflık bir tesis kademeli yola hiç girmiyor,
- * tek karede mount ediliyor ve gecikme hissedilmiyor.
+ * Bütçe dolmadıysa karede en fazla bu kadar.
+ *
+ * İki işi birden görüyor: küçük sahnenin tamamı ilk turda geçsin (elli raflık
+ * tesis kademeli yola hiç girmez, tek karede mount olur), BÜYÜK sahne ise
+ * GÖRÜNÜR biçimde aksın — kullanıcı isteği (2026-08-07): raflar "tek seferde"
+ * değil, göz göz belirsin. Eski 512, 3.582 rafı ~7 karede bitiriyordu ve
+ * "hepsi birden" okunuyordu; 64 aynı sahneyi ~56 kareye (≈1,1 sn) yayıyor —
+ * akış görünür, toplam süre hâlâ saniye mertebesinde. Süre bütçesi (8 ms)
+ * yavaş makinede yine ilk sınır.
  */
-const MAX_PER_FRAME = 512
+const MAX_PER_FRAME = 64
+
+/**
+ * ÖNCE HOST, SONRA EKLENTİ — kullanıcı isteğinin ikinci yarısı.
+ *
+ * Sahne açılırken host kendi kind'larını kuruyor (duvar/kapı/pencere kendi
+ * kademeli yollarında) ve `dirtyNodes` o iş bitene kadar host kind'ları
+ * taşıyor. Kademeli yola GİRMİŞ bir eklenti kuyruğu, host'un işi sürerken
+ * bekletiliyor: bina önce, raflar sonra ve akarak.
+ *
+ * İki sigorta: (a) yalnız kuyruk gerçekten büyükken (progressive eşiği) —
+ * küçük sahne ve tekil eklemeler beklemez; (b) bekleme tavanlı — host'un
+ * bayrağı temizlenmeyen bir kind'ı (upstream'de yaşanmış sınıf) kuyruğu
+ * sonsuza dek kilitlemesin diye en çok ~3 sn.
+ */
+const HOST_FIRST_THRESHOLD = MAX_PER_FRAME
+const HOST_WAIT_FRAMES_MAX = 150
+let hostWaitFrames = 0
+
+/** Host'un HÂLÂ kurduğu bir şey var mı — kirli kümede eklenti-dışı kind.
+ *  İlk eklenti-dışı kimlikte döner; yükleme sırasında ilk eleman genelde o. */
+function hostStillBuilding(): boolean {
+  const state = useScene.getState()
+  if (state.dirtyNodes.size === 0) return false
+  const nodes = state.nodes as Readonly<Record<string, unknown>>
+  for (const id of state.dirtyNodes) {
+    if (!kindOf(nodes[id])?.startsWith(KIND_PREFIX)) return true
+  }
+  return false
+}
 
 /** Kabul bekleyenler: düğüm kimliği → bileşeni uyandıran geri çağrı. */
 const waiting = new Map<string, () => void>()
@@ -70,6 +108,17 @@ let draining = false
 
 function pump(): void {
   frame = null
+
+  // Önce host: büyük dalga, host'un kendi kurulumu sürerken bekler (tavanlı).
+  // Dışa aktarım boşaltması beklemez — dosyadaki sahne eksiksiz çıkmalı.
+  if (!draining && waiting.size > HOST_FIRST_THRESHOLD && hostWaitFrames < HOST_WAIT_FRAMES_MAX) {
+    if (hostStillBuilding()) {
+      hostWaitFrames++
+      schedule()
+      return
+    }
+  }
+
   const started = performance.now()
   let count = 0
   for (const [id, wake] of waiting) {
@@ -83,6 +132,7 @@ function pump(): void {
     wake()
   }
   if (waiting.size > 0) schedule()
+  else hostWaitFrames = 0
 }
 
 function schedule(): void {
@@ -117,6 +167,7 @@ export function resetAdmission(): void {
   waiting.clear()
   admitted.clear()
   draining = false
+  hostWaitFrames = 0
   if (frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame)
   frame = null
 }

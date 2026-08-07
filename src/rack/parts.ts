@@ -135,15 +135,15 @@ export function rackParts(
 
     frames.forEach((x) => {
       postZ.forEach((z) => {
-        // Tek kutu, iki katmanda da — katlanmış C-profil (web + flanşlar +
-        // dudaklar, beş kutu) sadelik kararıyla düştü. Delik dokusu rafın
-        // imzası ve yakın katmanda kutunun yüzlerinde aynı okunuyor; uzak
-        // katman deseni bırakıyor (alt-piksel tekrar moiré olur).
+        // Tek kutu, iki katmanda da — katlanmış C-profil (beş kutu) ve delik
+        // dokusu sadelik kararlarıyla düştü (kullanıcı, 2026-08-07: dikme
+        // delikleri de gitsin). Dikme artık düz boyalı kutu; atlasın slot
+        // kolonu bu kind'da okunmuyor ama drivein hâlâ kullanıyor, mekanizma
+        // yerinde kalıyor.
         parts.push({
           role: 'upright',
           center: [x, uprightHeight / 2, z],
           size: [uprightWidth, uprightHeight, uprightDepth],
-          ...(full ? { pattern: 'slots' as const } : {}),
         })
 
         // Catalogue footplates are wider than the post they carry — 175 x

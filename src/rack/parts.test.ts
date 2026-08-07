@@ -258,12 +258,16 @@ describe('bay width follows the beam and upright dimensions', () => {
 })
 
 describe('atlas patterns', () => {
-  test('only the upright faces carry the slot pattern', () => {
+  test('hiçbir raf parçası slot deseni taşımaz — delikler bilinçli kaldırıldı', () => {
+    // Kullanıcı kararı (2026-08-07): dikme delikleri de sadelik diyetine
+    // girdi. Bu test geri sürüklenmeyi kilitliyor — desen sessizce dönerse
+    // katmanlar arası UV farkı da habersiz geri gelir.
     const r = rack()
-    for (const part of rackParts(r, 'full')) {
-      if (part.pattern === 'slots') expect(part.role).toBe('upright')
+    for (const tier of ['full', 'simple'] as const) {
+      for (const part of rackParts(r, tier)) {
+        expect(part.pattern === 'slots').toBe(false)
+      }
     }
-    expect(partsOf(r, 'upright').some((part) => part.pattern === 'slots')).toBe(true)
   })
 
   test('only a wire deck carries the mesh pattern', () => {

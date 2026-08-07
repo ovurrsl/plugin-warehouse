@@ -158,7 +158,11 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
     keyFor: (tier) => rackGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `rack:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    // Eklenti nesneleri gölge düşürmez (kullanıcı kararı, 2026-08-07):
+    // binlerce rafın gölge geçidi maliyeti, kazandırdığı görsel derinliğe
+    // değmedi. Tüm kind'larda aynı; bina duvarları gölge düşürmeye devam
+    // ediyor, raflar ÜZERLERİNE düşen gölgeyi almayı da sürdürüyor.
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -548,7 +552,6 @@ function GhostStock({ node }: { node: PalletRackNode }) {
       />
       <instancedMesh
         args={[UNIT_BOX, getGhostLoadMaterial(appearance), capacity]}
-        castShadow
         count={placements.length}
         dispose={null}
         raycast={NO_RAYCAST}

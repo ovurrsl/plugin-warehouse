@@ -124,7 +124,7 @@ function DriveInRackRendererBody({ node }: { node: DriveInRackNode }) {
     // The same pool as the selective rack: identical material, and splitting
     // them would double the draw calls of a scene holding both.
     materialKeyFor: () => `rack:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

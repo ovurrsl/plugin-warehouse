@@ -108,7 +108,6 @@ export function SelfDrawnBody({
        * runtime'da çevirmek three r184'ün WebGPU node cache'ini bozuyor.
        * Built-in kind'ların hepsi koşulsuz bırakıyor.
        */
-      castShadow
       /** Asla dispose edilmez: aynı şekildeki her düğüm bu buffer'ı paylaşıyor. */
       dispose={null}
       geometry={geometryFor(isExporting ? 'full' : tierRef.current)}

@@ -191,7 +191,6 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
             kullanıcının bildirdiği "gölgeler sistem anahtarını izlemeli"
             şikâyetinin bu kind'daki artığıydı. */}
         <mesh
-          castShadow
           dispose={null}
           geometry={stripGeometry}
           material={material}

@@ -8,7 +8,7 @@ import type * as THREE from 'three'
 import { kindOf } from '../host-adapter'
 import { KIND_PREFIX } from '../plugin-id'
 import { rebakeDriftedStaticTransforms } from '../static-transform'
-import { useWarehouseStore } from '../store'
+import { lodScaleSq, useWarehouseStore } from '../store'
 import { admitAllNow, resumeProgressiveAdmission } from './admission'
 import {
   clearPools,
@@ -19,6 +19,7 @@ import {
   rebuildPools,
   refreshLevelWorldMatrices,
 } from './collective'
+import { tickGhostLod } from './ghost-lod'
 
 /**
  * Kolektif sistemin kare önceliği.
@@ -190,6 +191,14 @@ export default function CollectiveInstancingSystem() {
      */
     consumeOwnDirtyNodes()
 
+    /**
+     * Hayalet katmanları da erken çıkışların üstünde: mount olmuş her hayalet
+     * mesh, kolektif çizim kapalıyken ya da dışa aktarım sırasında da ekranda
+     * ve katmanı kameraya göre doğru kalmalı — kendi `useFrame`'i varken de
+     * bu koşullara bakmıyordu.
+     */
+    tickGhostLod(camera)
+
     const root = rootRef.current
     if (!root) return
     /**
@@ -200,7 +209,7 @@ export default function CollectiveInstancingSystem() {
     if (!enabled || isExporting) return
 
     frameRef.current += 1
-    const tierChanged = evaluateTiers(camera.position, frameRef.current)
+    const tierChanged = evaluateTiers(camera.position, frameRef.current, lodScaleSq())
     const generation = instanceGeneration()
     const levelsMoved = pollLevelPositions(levelYRef.current)
 

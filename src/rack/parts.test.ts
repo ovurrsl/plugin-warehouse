@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { type RackPart, type RackPartRole, rackParts } from './parts'
+import { PART_SEAM, type RackPart, type RackPartRole, rackParts } from './parts'
 import { PalletRackNode } from './schema'
 import { bayPitch, frameCentersX, totalDepth, totalWidth } from './slots'
 
@@ -49,20 +49,23 @@ function partsOf(node: ReturnType<typeof rack>, role: RackPartRole) {
 }
 
 describe('beam to upright fit', () => {
-  test('a beam spans the clear width and stops at the upright faces', () => {
-    // The defect this pins: beams were built a full bay pitch long and centred
-    // on the bay, so each ran from one post's centreline to the next and buried
-    // half an upright width in steel at both ends.
+  test('a beam spans the clear width less the seam, ends a seam off the faces', () => {
+    // Two defects pinned at once. The old one: beams built a full bay pitch
+    // long buried half an upright width in steel at both ends. The new one:
+    // an end landing EXACTLY on the face rounds vertex by vertex in the
+    // Float32 buffer and the joint sparkles as the camera moves (kullanıcı,
+    // 2026-08-07: "içe geçer gibi parıldama") — so the end must stop a seam
+    // short, not on the plane and not inside it.
     const r = rack()
     const frames = frameCentersX(r)
     for (const beam of partsOf(r, 'beam')) {
-      expect(beam.size[0]).toBeCloseTo(r.bayClearWidth, 9)
+      expect(beam.size[0]).toBeCloseTo(r.bayClearWidth - 2 * PART_SEAM, 9)
       const left = beam.center[0] - beam.size[0] / 2
       const right = beam.center[0] + beam.size[0] / 2
-      // Both ends land exactly on an upright face.
+      // Both ends sit exactly one seam off an upright face.
       const faces = frames.flatMap((x) => [x - r.uprightWidth / 2, x + r.uprightWidth / 2])
-      expect(faces.some((face) => Math.abs(face - left) < 1e-9)).toBe(true)
-      expect(faces.some((face) => Math.abs(face - right) < 1e-9)).toBe(true)
+      expect(faces.some((face) => Math.abs(left - (face + PART_SEAM)) < 1e-9)).toBe(true)
+      expect(faces.some((face) => Math.abs(right - (face - PART_SEAM)) < 1e-9)).toBe(true)
     }
   })
 
@@ -101,8 +104,8 @@ describe('beam to upright fit', () => {
     // Diagonals meet the horizontals, and each other, at their end nodes. Real
     // frames bolt or weld there, so the steel genuinely occupies one volume.
     'brace × brace',
-    // A post is welded to its baseplate and stands in its thickness.
-    'footplate × upright',
+    // footplate × upright gitti: plaka artık çizilmiyor (2026-08-07). Ölü
+    // muafiyet, gerçek bir kesişmeyi sessizce affederdi.
     // Çapraz, dikmeye CIVATALANIR — gerçek çerçevede de tek hacmi paylaşırlar.
     // Eski beş kutulu C-profilde çaprazın ucu profilin AÇIK tarafına (boşluğa)
     // uzanıyordu ve çift hiç dokunmuyordu; dikme tek dolu kutuya inince aynı
@@ -179,12 +182,15 @@ describe('beam to upright fit', () => {
 })
 
 describe('nothing escapes the declared envelope', () => {
-  test('every part except the footplates fits the collision footprint', () => {
+  test('every part fits the collision footprint — the plate exemption is gone', () => {
+    // Taban plakası çizimden kalktı (2026-08-07); onunla birlikte "plaka
+    // hariç" muafiyeti de kalktı. Artık HİÇBİR parça çelik zarfın dışına
+    // taşamaz — taşarsa ya plaka sessizce geri gelmiştir ya yeni bir parça
+    // kaçmaktadır.
     const r = rack({ depthPositions: 2 })
     const halfWidth = totalWidth(r) / 2
     const halfDepth = totalDepth(r) / 2
     for (const part of rackParts(r, 'full')) {
-      if (part.role === 'footplate') continue
       const box = bounds(part)
       expect(box.min[0]).toBeGreaterThanOrEqual(-halfWidth - 1e-9)
       expect(box.max[0]).toBeLessThanOrEqual(halfWidth + 1e-9)
@@ -242,7 +248,7 @@ describe('bay width follows the beam and upright dimensions', () => {
     const r = rack()
     const alone = rackParts(r, 'full')
     const abutted = rackParts(r, 'full', true)
-    const frameRoles = new Set(['upright', 'footplate', 'brace'])
+    const frameRoles = new Set(['upright', 'brace'])
     const framePartsOf = (list: typeof alone) => list.filter((part) => frameRoles.has(part.role))
 
     // Half the frame steel, and nothing else touched.
@@ -258,15 +264,19 @@ describe('bay width follows the beam and upright dimensions', () => {
 })
 
 describe('atlas patterns', () => {
-  test('hiçbir raf parçası slot deseni taşımaz — delikler bilinçli kaldırıldı', () => {
-    // Kullanıcı kararı (2026-08-07): dikme delikleri de sadelik diyetine
-    // girdi. Bu test geri sürüklenmeyi kilitliyor — desen sessizce dönerse
-    // katmanlar arası UV farkı da habersiz geri gelir.
+  test('delikler boyadır: yakın katmanda her dikme slot deseni taşır, uzakta hiçbiri', () => {
+    // Kullanıcı kararı (2026-08-07, ikinci tur): "delik değil de boya gibi
+    // olsa" — desen zaten dokuydu ve geri geldi. Kilit iki yönlü: yakın
+    // katmanda desensiz bir dikme boyanın sessizce yeniden söküldüğü
+    // anlamına gelir; uzak katmanda desenli bir dikme alt-piksel tekrarın
+    // moiré olarak geri dönmesi demektir.
     const r = rack()
-    for (const tier of ['full', 'simple'] as const) {
-      for (const part of rackParts(r, tier)) {
-        expect(part.pattern === 'slots').toBe(false)
-      }
+    for (const part of rackParts(r, 'full')) {
+      if (part.role !== 'upright') continue
+      expect(part.pattern).toBe('slots')
+    }
+    for (const part of rackParts(r, 'simple')) {
+      expect(part.pattern === 'slots').toBe(false)
     }
   })
 

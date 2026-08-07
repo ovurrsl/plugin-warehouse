@@ -6,6 +6,7 @@ import {
   rackGeometryKey,
   releaseRackGeometry,
   retainRackGeometry,
+  sweepRackGeometry,
 } from './geometry-builder'
 import { PalletRackNode } from './schema'
 
@@ -137,13 +138,13 @@ describe('geometry content', () => {
     const footprint = r.bayClearWidth + r.uprightWidth
     const steel = r.bayClearWidth + 2 * r.uprightWidth
 
-    // Catalogue footplates are wider than the post they carry — 175 mm under a
-    // 122 mm upright — so the built mesh reaches a further 26 mm a side at
-    // floor level. Real, and asserted rather than ignored: anything larger
-    // means a part is escaping further than the design says it may.
+    // Footplates are no longer drawn (2026-08-07), so the mesh ends exactly at
+    // the steel width — nothing reaches past the posts at floor level any more.
+    // Asserted at zero rather than dropped: a positive difference here means
+    // the plate (or some new part) is escaping the posts again.
     const full = getRackGeometry(r, 'full').boundingBox
     const fullWidth = (full?.max.x ?? 0) - (full?.min.x ?? 0)
-    expect(fullWidth - steel).toBeCloseTo(0.053, 5)
+    expect(fullWidth - steel).toBeCloseTo(0, 5)
     // Precision 5, not 9: this is measured off the built Float32 buffer, so the
     // last few digits are the attribute's, not the arithmetic's.
     expect(steel - footprint).toBeCloseTo(r.uprightWidth, 5)
@@ -152,11 +153,9 @@ describe('geometry content', () => {
     expect(full?.max.y ?? 0).toBeCloseTo(r.uprightHeight, 5)
 
     // Both tiers reach exactly the same width, which is what makes the LOD
-    // swap invisible: a rack that grew or shrank by 53 mm as it crossed the
-    // band would pop, and the footplates are the widest thing it builds. This
-    // is the assertion that the far tier is a reduction in detail and not in
-    // extent — it replaced one that read the bare-steel width off `simple`,
-    // which stopped being bare steel when the far tier gained its footplates.
+    // swap invisible: a rack that grew or shrank as it crossed the band would
+    // pop. This is the assertion that the far tier is a reduction in detail
+    // and not in extent.
     const simple = getRackGeometry(r, 'simple').boundingBox
     const simpleWidth = (simple?.max.x ?? 0) - (simple?.min.x ?? 0)
     expect(simpleWidth).toBeCloseTo(fullWidth, 5)
@@ -483,5 +482,61 @@ describe('şekil anahtarı memoizasyonu', () => {
 
     // Yeni nesne = yeni kimlik → yeni anahtar. Host'un gerçekte yaptığı bu.
     expect(rackGeometryKey(rack({ bayClearWidth: 3.6 }), 'full')).not.toBe(before)
+  })
+})
+
+describe('retain-zero süpürme — kullanılmayan şekiller hafızadan gider', () => {
+  beforeEach(() => clearRackGeometryCache())
+  const GRACE = 5000
+
+  test('kimsenin tutmadığı şekil bekleme penceresi dolunca silinir, tutulan asla', () => {
+    /**
+     * İki sessiz hata: pencere dolduğu hâlde silinmeyen şekil, slider
+     * sürtmesinin onlarca MB artığını oturum boyunca taşır ("kullanılmayan
+     * şekiller hafızadan silinsin" — kullanıcı, 2026-08-07); TUTULAN bir
+     * şekli silmek ise o şekli paylaşan HER rafı aynı anda karartır ve
+     * hiçbir yerde hata görünmez.
+     */
+    const held = rack()
+    const scrub = rack({ uprightHeight: 4.2 })
+    const now = Date.now()
+
+    const key = retainRackGeometry(held, 'full', false)
+    const heldGeometry = getRackGeometry(held, 'full')
+    const scrubGeometry = getRackGeometry(scrub, 'full')
+    expect(rackGeometryCacheSize()).toBe(2)
+
+    // Pencere dolmadan: ikisi de yerinde.
+    sweepRackGeometry(now + GRACE - 1)
+    expect(rackGeometryCacheSize()).toBe(2)
+
+    // Pencere doldu: sürtme artığı gider, tutulan kalır.
+    sweepRackGeometry(now + GRACE + 1)
+    expect(rackGeometryCacheSize()).toBe(1)
+    // Silindiğinin kanıtı: aynı şekil yeniden istenince önbellekten değil,
+    // sıfırdan gelir. (three `dispose()` tamponları yerinde bırakır — GPU
+    // tarafını boşaltır — bu yüzden kanıt nesne kimliğinden okunur.)
+    expect(getRackGeometry(scrub, 'full')).not.toBe(scrubGeometry)
+    // Tutulan ise hâlâ AYNI nesne.
+    expect(getRackGeometry(held, 'full')).toBe(heldGeometry)
+
+    releaseRackGeometry(key)
+  })
+
+  test('bırakılıp pencere içinde geri alınan şekil süpürülmez — LOD takası güvenli', () => {
+    // LOD takası ve remount aynı anahtarı milisaniyeler içinde bırakıp geri
+    // alır; damga aday gösterir, hüküm vermez. Yeniden tutulmuş anahtarı
+    // silen bir süpürme, her kamera geçişinde birleşik tamponu yeniden
+    // inşa ettirirdi.
+    const r = rack()
+    const now = Date.now()
+    const key = retainRackGeometry(r, 'full', false)
+    getRackGeometry(r, 'full')
+
+    releaseRackGeometry(key)
+    retainRackGeometry(r, 'full', false)
+
+    sweepRackGeometry(now + GRACE * 2)
+    expect(rackGeometryCacheSize()).toBe(1)
   })
 })

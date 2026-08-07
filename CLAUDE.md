@@ -77,8 +77,12 @@ Two consequences worth internalising before editing `geometry-builder.ts`:
   different racks share one geometry. A field in the key that moves no vertex
   splits the cache for nothing. The coverage test asserts both directions and
   has caught five real defects — trust it over your reading of the code.
-- **Geometry is never disposed.** It belongs to the shape, not to any node, so
-  disposing it when one rack is deleted would blank every rack sharing it.
+- **Geometry disposal follows retain counts, never node lifetime.** A shape
+  belongs to every rack sharing it, so freeing it when one rack is deleted
+  would blank the rest. It IS freed — but only by the sweep in
+  `geometry-builder.ts`, after nothing has held it for a grace period
+  (slider-scrub leftovers were tens of MB per session). Never call
+  `dispose()` on a shared shape yourself.
 
 ## Numbers need a source
 

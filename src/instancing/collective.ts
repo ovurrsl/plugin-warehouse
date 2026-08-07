@@ -549,9 +549,14 @@ const LEVEL_SETTLED_M = 5e-4
  * Sahnede bir avuç kat vardır; bu, kare başına birkaç karşılaştırma.
  */
 export type LevelSignature = { y: number; mask: number }
+/** Kare başına bir `Set` ayırmamak için modül scratch'i — içerik kat sayısı
+ *  kadar küçük ama tahsis kare yolundaydı. Çağrı tekil (kolektif sistemin
+ *  döngüsü), eşzamanlı iki tarama yok. */
+const aliveLevelsScratch = new Set<string>()
 export function pollLevelPositions(seen: Map<string, LevelSignature>): boolean {
   let moved = false
-  const alive = new Set<string>()
+  const alive = aliveLevelsScratch
+  alive.clear()
   for (const levelId of sceneRegistry.byType.level ?? []) {
     const object = sceneRegistry.nodes.get(levelId)
     if (!object) continue

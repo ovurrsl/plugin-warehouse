@@ -490,7 +490,10 @@ function AccessoryEditor({
             swingGates: accessories.swingGates.map((g, j) => (j === i ? { ...g, ...part } : g)),
           })
         return (
-          <div key={`swing-${gate.edge}-${gate.offsetM}`} style={styles.card}>
+          // Kimlik yok, (edge, offset) çifti çakışabilir — indeks ayırt eder.
+          // Liste sıralanmıyor ve patch'ler zaten indeksle çalışıyor; üç
+          // aksesuar listesi de aynı kuralı taşıyor.
+          <div key={`swing-${gate.edge}-${gate.offsetM}-${i}`} style={styles.card}>
             <div style={styles.row}>
               <span style={styles.tag}>kapı</span>
               {edgeSelect(gate.edge, (edge) => editGate({ edge }))}
@@ -521,7 +524,7 @@ function AccessoryEditor({
             ),
           })
         return (
-          <div key={`upover-${gate.edge}-${gate.offsetM}`} style={styles.card}>
+          <div key={`upover-${gate.edge}-${gate.offsetM}-${i}`} style={styles.card}>
             <div style={styles.row}>
               <span style={styles.tag}>palet</span>
               {edgeSelect(gate.edge, (edge) => editGate({ edge }))}
@@ -552,7 +555,7 @@ function AccessoryEditor({
             safetyZones: accessories.safetyZones.map((z, j) => (j === i ? { ...z, ...part } : z)),
           })
         return (
-          <div key={`zone-${zone.edge}-${zone.offsetM}`} style={styles.card}>
+          <div key={`zone-${zone.edge}-${zone.offsetM}-${i}`} style={styles.card}>
             <div style={styles.row}>
               <span style={styles.tag}>bölge</span>
               {edgeSelect(zone.edge, (edge) => editZone({ edge }))}

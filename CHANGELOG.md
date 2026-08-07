@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`01a0b87`](https://github.com/ovurrsl/plugin-warehouse/commit/01a0b87774eb048642dee61f0e3a0582c72a89f0))
 - Refresh generated README blocks [skip ci] ([`7297951`](https://github.com/ovurrsl/plugin-warehouse/commit/7297951664d837761f213de9bd5464cf3bc510a6))
 - Refresh generated README blocks [skip ci] ([`60b02f7`](https://github.com/ovurrsl/plugin-warehouse/commit/60b02f793d1b17b56358e2883189283fac002583))
 - Refresh generated README blocks [skip ci] ([`67064b8`](https://github.com/ovurrsl/plugin-warehouse/commit/67064b860c28d72bccf56f51c51688d9282e564c))
@@ -288,6 +289,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #16 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`4e2414b`](https://github.com/ovurrsl/plugin-warehouse/commit/4e2414b4fbca6cf95926dfc3f47060dc7fb881f4))
 - Merge pull request #15 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`5d42057`](https://github.com/ovurrsl/plugin-warehouse/commit/5d420578bfe52c6e6d591191d86ec03c3b019c4c))
 - Revert "Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2" ([`1e208a3`](https://github.com/ovurrsl/plugin-warehouse/commit/1e208a333bb1fd97a117e06b2b189d6fd2260145))
 - Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e9e9876`](https://github.com/ovurrsl/plugin-warehouse/commit/e9e987616ac72e77755d8e9a3219ae67cca5c830))
@@ -311,6 +313,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Katman takası kısıtı — kamera uçuşu havuzları her kare yeniden kurduramaz ([`dcb2158`](https://github.com/ovurrsl/plugin-warehouse/commit/dcb215877d710840be7d517e3544627d535b605e))
 - Eklenti nesnelerinin gölgeleri tamamen kalktı + performans modu düğmesi ([`515b47b`](https://github.com/ovurrsl/plugin-warehouse/commit/515b47bc78510bbf0066e63705c79402ae195501))
 - Host döşeme-desteği sorgusuna eklenti-tarafı memo — editöre dokunmadan ([`a2dc544`](https://github.com/ovurrsl/plugin-warehouse/commit/a2dc5445f9b52de76d95fb00f1e9630f1f194978))
 - Deck-slab sistemi mezzanine'siz sahnede uyumasın diye bekçi ([`eff5b3b`](https://github.com/ovurrsl/plugin-warehouse/commit/eff5b3baa5c5e81c5b9aa66935e33ff9b272c5de))
@@ -336,6 +339,7 @@ index to it, not a replacement for it.
 
 ### Refactors
 
+- Performans modu düğmesi kaldırıldı — paket yalnız gölge kapatma ([`59f43a3`](https://github.com/ovurrsl/plugin-warehouse/commit/59f43a3b46f39505ea9229e1f69e28b11517e2a1))
 - 3B kompozisyon sadeleşti — iki katman aynı çelik, fark yalnız desen ([`253eb38`](https://github.com/ovurrsl/plugin-warehouse/commit/253eb38093cb966b1859bf46ea85c9b563e9b3ec))
 - One naming standard, read off the editor's own kind list ([`7c25751`](https://github.com/ovurrsl/plugin-warehouse/commit/7c2575187203aa7ad62938a45d31d74758909f7f))
 - Host primitiflerine geçiş + iç içe giren ayarların birleştirilmesi ([`519e2ff`](https://github.com/ovurrsl/plugin-warehouse/commit/519e2fffca9a7748bb889ee43ec71e92123a90ff))

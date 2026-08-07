@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`01a0b87`](https://github.com/ovurrsl/plugin-warehouse/commit/01a0b87774eb048642dee61f0e3a0582c72a89f0))
 - Refresh generated README blocks [skip ci] ([`7297951`](https://github.com/ovurrsl/plugin-warehouse/commit/7297951664d837761f213de9bd5464cf3bc510a6))
 - Refresh generated README blocks [skip ci] ([`60b02f7`](https://github.com/ovurrsl/plugin-warehouse/commit/60b02f793d1b17b56358e2883189283fac002583))
 - Refresh generated README blocks [skip ci] ([`67064b8`](https://github.com/ovurrsl/plugin-warehouse/commit/67064b860c28d72bccf56f51c51688d9282e564c))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`71aa813`](https://github.com/ovurrsl/plugin-warehouse/commit/71aa8135be55fdad6751a95a3294d1c11ccef7d3))
 - Gölge geçidini ölç, ?disable merdivenini yordama al ([`41503d6`](https://github.com/ovurrsl/plugin-warehouse/commit/41503d6c87bcb356434ec003bc146e17a5ce3734))
 - T4 sonucunu yaz, ölçüm planını duran kameraya çevir ([`123d478`](https://github.com/ovurrsl/plugin-warehouse/commit/123d47850cdffea0837b0b65a7d05842780bda00))
-- Refresh generated README blocks [skip ci] ([`034a30f`](https://github.com/ovurrsl/plugin-warehouse/commit/034a30f00fcccd5bf3fe4727a86af2ccc59bc86e))
 
 …
 

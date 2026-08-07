@@ -84,7 +84,9 @@ export const liveRackingDefinition = {
     description:
       'A gravity-flow channel: pallets load at the high end and roll to the exit. FIFO or LIFO push-back, up to 30 pallets deep.',
     icon: { kind: 'iconify', name: 'lucide:chevrons-down' },
-    hidden: true,
+    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
+    // gerekçe rack/definition.ts'teki bayrağın yanında.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

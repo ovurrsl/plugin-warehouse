@@ -98,7 +98,9 @@ export const longspanDefinition = {
     description:
       'One bay of M7 longspan shelving. Levels mix freely: beam-and-board, beamless HM, bare beams for long goods, or a garment rail.',
     icon: { kind: 'iconify', name: 'lucide:library' },
-    hidden: true,
+    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
+    // gerekçe rack/definition.ts'teki bayrağın yanında.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

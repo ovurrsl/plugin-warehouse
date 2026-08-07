@@ -123,7 +123,9 @@ export const truckDefinition = {
     icon: { kind: 'iconify', name: 'lucide:forklift' },
     // Pallet'in gerekçesi: kind bu eklentinin kataloğundan erişilir, host'un
     // Build paletinden değil.
-    hidden: true,
+    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
+    // gerekçe rack/definition.ts'teki bayrağın yanında.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

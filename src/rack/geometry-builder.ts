@@ -9,9 +9,6 @@ import {
   drawnPickingLevels,
   levelSurfaceY,
   levelTypeOf,
-  palletSupportBarCount,
-  palletSupportBarsDrawn,
-  slotOffsetsX,
 } from './slots'
 
 /**
@@ -258,8 +255,6 @@ export function toLinear(hex: string): [number, number, number] {
 const ROLE_COLORS: Record<Exclude<RackPartRole, 'upright' | 'beam' | 'shelf'>, string> = {
   footplate: '#334155',
   brace: '#94a3b8',
-  connector: '#475569',
-  'support-bar': '#cbd5e1',
 }
 
 /**
@@ -360,8 +355,8 @@ function buildFrom(rack: PalletRackNode, parts: readonly RackPart[]): THREE.Buff
  * through `useCollective`'s registration, twice through `retainRackGeometry`)
  * and twice more on **every** re-render, and each build re-derives the level
  * structure from zero — `drawnLevels`, `drawnPickingLevels` and
- * `palletSupportBarsDrawn` each walk `storageLevels`, which is itself O(levels²)
- * through `levelSurfaceY`. In a warehouse the answer is the same string for
+ * each walk `storageLevels`, which is itself O(levels²)
+ * through `levelSurfaceY` (the bar walker is gone with the bars). In a warehouse the answer is the same string for
  * thousands of bays: two thousand racks spend sixteen thousand builds, a couple
  * of million inner iterations and a few hundred thousand throwaway arrays to
  * produce **four** distinct strings.
@@ -421,11 +416,6 @@ function buildGeometryKey(
   // rules move next — a bay with no beamed level has no deck and does not
   // mention one.
   const finishes = drawn.map((level) => deckFinishOf(rack, level) ?? '-').join(',')
-  // Zero unless a bar is actually built. Not `decking === 'open'`, which was the
-  // old test and was wrong per level: a ground beam carries no deck at any
-  // setting, so a wire-decked rack with `hasGroundBeam` really does grow bars,
-  // and two such racks differing only in bar count shared one mesh.
-  const bars = palletSupportBarsDrawn(rack) ? palletSupportBarCount(rack) : 0
 
   return [
     detail,
@@ -449,14 +439,9 @@ function buildGeometryKey(
     // Picking sections and shelf panels are only emitted where a picking level
     // exists; on an all-pallet rack these move nothing.
     hasPicking ? `${rack.pickingBeamHeight}/${rack.pickingShelfThickness}` : '',
-    bars,
-    // Bar positions follow the pallet layout, so those fields matter only when
-    // bars are actually drawn.
-    bars > 0
-      ? slotOffsetsX(rack)
-          .map((offset) => offset.toFixed(5))
-          .join(',')
-      : '',
+    // Palet destek çubukları artık üretilmiyor (sadelik kararı) — bar sayısı
+    // ve yuva ofsetleri anahtardan da düştü: hiç vertex kımıldatmayan bir alan
+    // anahtarda durursa önbelleği boşuna böler (CLAUDE.md'nin ikinci yönü).
     rack.uprightColor,
     rack.beamColor,
   ].join('|')

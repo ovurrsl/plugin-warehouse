@@ -63,22 +63,15 @@ describe('geometry content', () => {
     expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count)
   })
 
-  test('the far tier drops the millimetre work and keeps the shape', () => {
-    // Re-derived when the far tier stopped being a skeleton. It keeps the deck
-    // panels, the frame bracing and the footplates — the three things that
-    // carry a rack's shape at range — and drops what goes sub-pixel: the
-    // folded upright section collapses to one box a post, the beam endplates
-    // go, and so do the support bars. 59 parts to 31.
-    //
-    // So the bound is a little over half, not a little under a half. Asking
-    // for more than that would be asking the far tier to look like sticks
-    // again; the saving that matters is the one against 59 parts of section
-    // detail nobody can resolve past a few metres.
+  test('iki katman aynı üçgen sayısını üretir — kompozisyon eşitlendi', () => {
+    // Sadelik kararı (2026-08-07): full'ün fazladan taşıdığı milimetre işi
+    // (beş kutulu profil, bağlantı plakaları, destek çubukları) tümden gitti;
+    // katman farkı artık yalnız DESEN (UV kolonu), o da üçgen eklemez. Sayılar
+    // ayrışırsa biri yeniden "yalnız yakında görünen" kutu kazanmış demektir —
+    // LOD takasında pat diye belirip kaybolan türden, ve parça-eşitliği testi
+    // ile birlikte iki ayrı dosyadan kilitli.
     const r = rack()
-    const full = triangleCount(r, 'full')
-    const simple = triangleCount(r, 'simple')
-    expect(simple).toBeLessThan(full * 0.6)
-    expect(simple).toBeGreaterThan(full * 0.35)
+    expect(triangleCount(r, 'simple')).toBe(triangleCount(r, 'full'))
   })
 
   test('a warehouse-sized scene stays inside a sane triangle budget', () => {

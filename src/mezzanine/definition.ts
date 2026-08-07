@@ -105,7 +105,9 @@ export const mezzanineDefinition = {
     description:
       'Multi-tier structural steel platform. Sigma, GL2000 or Mixed construction; each tier carries its own load class and floor type.',
     icon: { kind: 'iconify', name: 'lucide:layers-3' },
-    hidden: true,
+    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
+    // gerekçe rack/definition.ts'teki bayrağın yanında.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

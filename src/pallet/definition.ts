@@ -103,11 +103,11 @@ export const palletDefinition = {
     label: 'Pallet',
     description: 'EPAL, GMA and plastic pallets. Set a load height to fill a rack position.',
     icon: { kind: 'iconify', name: 'lucide:package' },
-    // Keeps the kind out of the host's auto-derived Build palette so it is
-    // reachable only from this plugin's catalog. Also sidesteps a live gap:
-    // `build-tab.tsx` enumerates the registry without checking install state,
-    // so a palette-visible plugin kind would show even when uninstalled.
-    hidden: true,
+    // Görünür (2026-08-07): host'un Furnish paleti artık registry'nin
+    // `paletteSection: 'furnish'` kind'larını listeliyor ve kurulum durumunu
+    // süzüyor (fork yaması, UPSTREAM.md) — bu bayrağı gizli tutan iki gerekçe
+    // de (Build paletine sızma + kurulmamış eklentinin karosu) kapandı.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

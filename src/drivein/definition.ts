@@ -123,7 +123,9 @@ export const driveInRackDefinition = {
     icon: { kind: 'iconify', name: 'lucide:rows-4' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog.
-    hidden: true,
+    // Görünür (2026-08-07): Furnish paleti registry kind'larını listeliyor;
+    // gerekçe rack/definition.ts'teki bayrağın yanında.
+    hidden: false,
     paletteSection: 'furnish',
   },
 

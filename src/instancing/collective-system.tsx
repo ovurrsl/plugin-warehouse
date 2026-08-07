@@ -6,6 +6,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { kindOf } from '../host-adapter'
+import { installSlabSupportMemo } from '../host-tune'
 import { KIND_PREFIX } from '../plugin-id'
 import { rebakeDriftedStaticTransforms } from '../static-transform'
 import { lodScaleSq, useWarehouseStore } from '../store'
@@ -117,6 +118,13 @@ export default function CollectiveInstancingSystem() {
    *  solo alttakileri gizler ve ÜSTTEKİLERİ yalnız-gölgeye damgalar — üçü de
    *  bu imzada görünür. */
   const levelYRef = useRef(new Map<string, LevelSignature>())
+
+  // Host'un döşeme-desteği sorgusuna memo sarmalayıcısı — editöre dokunmadan
+  // erişilebilen tek performans noktası (bkz. host-tune.ts). Mount'ta bir
+  // kez; kurulum idempotent olduğu için StrictMode/yeniden mount zararsız.
+  useEffect(() => {
+    installSlabSupportMemo()
+  }, [])
 
   // Sahne değişti: bir sonraki karede havuzlar yeniden kurulur. `nodes`
   // burada OKUNMAZ — kimliği sahne değişiminin ta kendisidir ve tek işi bu

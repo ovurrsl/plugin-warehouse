@@ -58,11 +58,12 @@ describe('definition', () => {
     expect(m3ShelvingDefinition.capabilities.rotatable.snapAngles).toContain(0)
   })
 
-  test('the kind is hidden from the host palette', () => {
-    // Reachable only from this plugin's catalog: `build-tab.tsx` enumerates the
-    // registry without checking install state, so a palette-visible plugin kind
-    // would show even when uninstalled.
-    expect(m3ShelvingDefinition.presentation.hidden).toBe(true)
+  test('the kind is visible to the host Furnish palette', () => {
+    // Tersine döndü (2026-08-07): host'un Furnish paleti registry kind'larını
+    // kurulum süzgeciyle listeliyor (fork yaması) — gizli bayrak, kind'ı
+    // paletten sessizce düşürürdü.
+    expect(m3ShelvingDefinition.presentation.hidden).toBe(false)
+    expect(m3ShelvingDefinition.presentation.paletteSection).toBe('furnish')
   })
 })
 

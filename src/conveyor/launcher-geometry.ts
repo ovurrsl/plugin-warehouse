@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import {
   emitPart,
   finish,
@@ -83,7 +84,7 @@ function buildFrom(
  * `sideGuide` is a boolean here rather than the straight's four-way enum,
  * because a launcher has exactly one side a rail can go on.
  */
-export function launcherGeometryKey(
+function buildLauncherGeometryKey(
   launcher: ConveyorLauncherNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -127,3 +128,9 @@ export function retainLauncherGeometry(
 ): string {
   return retainGeometry(launcherGeometryKey(launcher, detail, hasDownstreamNeighbour))
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildLauncherGeometryKey`. */
+export const launcherGeometryKey = memoiseGeometryKey(
+  buildLauncherGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

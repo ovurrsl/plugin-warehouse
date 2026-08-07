@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './constants'
 import {
   emitPart,
@@ -80,7 +81,7 @@ function buildFrom(
  * difference the body does not contain — the over-reporting half of the key
  * law, and the same one the sweep caught on `dischargeSide` before this split.
  */
-export function transferGeometryKey(
+function buildTransferGeometryKey(
   transfer: ConveyorTransferNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -151,3 +152,9 @@ export function retainTransferGeometry(
 ): string {
   return retainGeometry(transferGeometryKey(transfer, detail, hasDownstreamNeighbour))
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildTransferGeometryKey`. */
+export const transferGeometryKey = memoiseGeometryKey(
+  buildTransferGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

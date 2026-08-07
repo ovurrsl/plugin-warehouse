@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getCachedGeometry, releaseGeometry, retainGeometry } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { emitRackPart, type Sink, toLinear } from '../rack/geometry-builder'
 import { beamOffsetsZ, fittedLevels, levelElevation, levelNeedsZtam } from './levels'
 import {
@@ -86,7 +87,7 @@ function buildFrom(
  * not split the cache, and a derived fitting (the clamps, the centre beam)
  * changes the mesh without being a field anyone could remember to list.
  */
-export function longspanGeometryKey(
+function buildLongspanGeometryKey(
   bay: LongspanNode,
   detail: LongspanDetail,
   omission: FrameOmission = { omitRight: false },
@@ -136,3 +137,9 @@ export function retainLongspanGeometry(
 }
 
 export { releaseGeometry as releaseLongspanGeometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildLongspanGeometryKey`. */
+export const longspanGeometryKey = memoiseGeometryKey(
+  buildLongspanGeometryKey,
+  (detail, omission) => `${detail}:${omission?.omitRight ? 'L' : 'LR'}`,
+)

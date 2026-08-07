@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getCachedGeometry, releaseGeometry, retainGeometry } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { emitRackPart, type Sink, toLinear } from '../rack/geometry-builder'
 import {
   crossBraceSets,
@@ -90,7 +91,7 @@ function buildFrom(
  * The mirror of that discipline is that a level above the frame reaches nothing
  * and must not split the cache, which is why the loop walks `fittedLevels`.
  */
-export function m3GeometryKey(
+function buildM3GeometryKey(
   bay: M3ShelvingNode,
   detail: M3Detail,
   omission: FrameOmission = { omitRight: false },
@@ -143,3 +144,9 @@ export function retainM3Geometry(
 }
 
 export { releaseGeometry as releaseM3Geometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildM3GeometryKey`. */
+export const m3GeometryKey = memoiseGeometryKey(
+  buildM3GeometryKey,
+  (detail, omission) => `${detail}:${omission?.omitRight ? 'L' : 'LR'}`,
+)

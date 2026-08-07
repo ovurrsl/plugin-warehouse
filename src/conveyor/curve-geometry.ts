@@ -1,4 +1,5 @@
 import type * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { ROLLER_DIAMETER_M } from './constants'
 import {
   angleDeg,
@@ -165,7 +166,7 @@ function buildFrom(
  * `supportSlabId` are absent on purpose — none of them moves a vertex, and a
  * key that listed them would give every curve in a warehouse its own buffer.
  */
-export function curveGeometryKey(
+function buildCurveGeometryKey(
   curve: ConveyorCurveNode,
   detail: ConveyorDetail,
   hasDownstreamNeighbour = false,
@@ -215,3 +216,9 @@ export function retainCurveGeometry(
 ): string {
   return retainGeometry(curveGeometryKey(curve, detail, hasDownstreamNeighbour))
 }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildCurveGeometryKey`. */
+export const curveGeometryKey = memoiseGeometryKey(
+  buildCurveGeometryKey,
+  (detail, hasDownstreamNeighbour) => `${detail}:${hasDownstreamNeighbour ? 'U' : 'UD'}`,
+)

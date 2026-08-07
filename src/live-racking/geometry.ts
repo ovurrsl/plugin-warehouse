@@ -20,6 +20,7 @@ import {
   type Sink,
   toLinear,
 } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './catalog'
 import { hasIntermediateRetainers } from './metrics'
 import { type LiveRackingDetail, type LiveRackingPart, liveRackingParts } from './parts'
@@ -72,7 +73,7 @@ function buildParts(
   return finish(sink)
 }
 
-export function liveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingDetail): string {
+function buildLiveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingDetail): string {
   return [
     'live',
     node.variant,
@@ -109,3 +110,9 @@ export function getLiveRackingGeometry(
 }
 
 export { releaseGeometry, retainGeometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildLiveRackingGeometryKey`. */
+export const liveRackingGeometryKey = memoiseGeometryKey(
+  buildLiveRackingGeometryKey,
+  (detail) => detail,
+)

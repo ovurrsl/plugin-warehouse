@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`67064b8`](https://github.com/ovurrsl/plugin-warehouse/commit/67064b860c28d72bccf56f51c51688d9282e564c))
 - Refresh generated README blocks [skip ci] ([`f7f8579`](https://github.com/ovurrsl/plugin-warehouse/commit/f7f8579ba2678b0e5150d44f02f4f590db76bafe))
 - Refresh generated README blocks [skip ci] ([`71aa813`](https://github.com/ovurrsl/plugin-warehouse/commit/71aa8135be55fdad6751a95a3294d1c11ccef7d3))
 - Gölge geçidini ölç, ?disable merdivenini yordama al ([`41503d6`](https://github.com/ovurrsl/plugin-warehouse/commit/41503d6c87bcb356434ec003bc146e17a5ce3734))
@@ -149,6 +150,8 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Furnish paletine katıl + marquee damgası + upstream öneri paketi ([`0c21b84`](https://github.com/ovurrsl/plugin-warehouse/commit/0c21b848fbdfaca6452478fb6682b154cdece742))
+- Kabul dalgasını yavaşlat — kare başına 64 → 24 raf ([`43e4c4b`](https://github.com/ovurrsl/plugin-warehouse/commit/43e4c4b62dd2d608eceaaff317ffad18f58f0d43))
 - Boyalı delikler geri, taban plakası gitti, ek yerlerine dikiş payı, şekiller süpürülüyor ([`49f7307`](https://github.com/ovurrsl/plugin-warehouse/commit/49f730771eac572f7fbe9af9896ed080c8c742e3))
 - Dikme delikleri kalktı + yükleme önce-host ve görünür akış ([`750984f`](https://github.com/ovurrsl/plugin-warehouse/commit/750984f53b72a77f6368a158fb604d99445c6111))
 - Gölge kısıcı — haritayı her kare değil talep üzerine tazele ([`4e5efd1`](https://github.com/ovurrsl/plugin-warehouse/commit/4e5efd1df3cc22d097ea0207206ebc65653a058c))
@@ -283,6 +286,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e9e9876`](https://github.com/ovurrsl/plugin-warehouse/commit/e9e987616ac72e77755d8e9a3219ae67cca5c830))
 - Merge pull request #13 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`c419782`](https://github.com/ovurrsl/plugin-warehouse/commit/c4197828da7dcb9230d6bb5dc8b83f6f1a50746b))
 - Merge pull request #12 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`22477cf`](https://github.com/ovurrsl/plugin-warehouse/commit/22477cf1221d69b07a0725852279d1020f1ef00b))
 - Merge pull request #11 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`2132280`](https://github.com/ovurrsl/plugin-warehouse/commit/21322809f1b6c6fadd75fa444d6880b72e23c032))
@@ -303,6 +307,7 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Host döşeme-desteği sorgusuna eklenti-tarafı memo — editöre dokunmadan ([`a2dc544`](https://github.com/ovurrsl/plugin-warehouse/commit/a2dc5445f9b52de76d95fb00f1e9630f1f194978))
 - Deck-slab sistemi mezzanine'siz sahnede uyumasın diye bekçi ([`eff5b3b`](https://github.com/ovurrsl/plugin-warehouse/commit/eff5b3baa5c5e81c5b9aa66935e33ff9b272c5de))
 - Uzak gölge kısma — 85 m ötesi ayrı gölgesiz havuza taşınır ([`2593772`](https://github.com/ovurrsl/plugin-warehouse/commit/2593772548804786777ac322f3d18e225bc7b961))
 - Kademeli mount kapısı kapısız kalan üç renderer'a — truck, route, telescopic ([`613b56b`](https://github.com/ovurrsl/plugin-warehouse/commit/613b56b8ffd7bf0f0738110d8f01f50e22f75a53))

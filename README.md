@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`67064b8`](https://github.com/ovurrsl/plugin-warehouse/commit/67064b860c28d72bccf56f51c51688d9282e564c))
 - Refresh generated README blocks [skip ci] ([`f7f8579`](https://github.com/ovurrsl/plugin-warehouse/commit/f7f8579ba2678b0e5150d44f02f4f590db76bafe))
 - Refresh generated README blocks [skip ci] ([`71aa813`](https://github.com/ovurrsl/plugin-warehouse/commit/71aa8135be55fdad6751a95a3294d1c11ccef7d3))
 - Gölge geçidini ölç, ?disable merdivenini yordama al ([`41503d6`](https://github.com/ovurrsl/plugin-warehouse/commit/41503d6c87bcb356434ec003bc146e17a5ce3734))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`034a30f`](https://github.com/ovurrsl/plugin-warehouse/commit/034a30f00fcccd5bf3fe4727a86af2ccc59bc86e))
 - Kamera ölçüm planına profil okuma yordamını yaz ([`963d7dc`](https://github.com/ovurrsl/plugin-warehouse/commit/963d7dc2dfdfee6c1887fe5ea76ba5d700a38ce1))
 - Refresh generated README blocks [skip ci] ([`73c26b7`](https://github.com/ovurrsl/plugin-warehouse/commit/73c26b7b237b3759d9b8a434d904fd3056cdda8a))
-- Kamera takılması için ölçüm planı ([`d373538`](https://github.com/ovurrsl/plugin-warehouse/commit/d373538332240100c621fd09c554246762afa00b))
 
 …
 

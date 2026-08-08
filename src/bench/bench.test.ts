@@ -3,6 +3,7 @@ import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { BENCH_VARIANTS, CASTOR_DIAMETER_M, TOP_THICKNESS_M } from './catalog'
 import { benchGeometryKey, getBenchGeometry } from './geometry'
 import { depthM, legHeightM, overallHeightM, widthM, worktopYM } from './metrics'
+import { benchParametrics } from './parametrics'
 import { type BenchDetail, benchParts } from './parts'
 import { BenchNode } from './schema'
 
@@ -178,5 +179,67 @@ describe('varyant kimliği anahtarda YOK — aynı şekle çözülen iki varyant
     const b = bench({ variant: 'eco' })
     expect(benchGeometryKey(a, 'full')).toBe(benchGeometryKey(b, 'full'))
     expect(fingerprint(a, 'full')).toBe(fingerprint(b, 'full'))
+  })
+})
+
+describe('ölçüler gerçekten ayarlanabilir', () => {
+  const sizeFields = () => {
+    const group = benchParametrics.groups.find((entry) => entry.label === 'Size')
+    if (!group) throw new Error('Size grubu yok')
+    return group.fields
+  }
+
+  test('üç ölçü de panelde kaydırıcı olarak var', () => {
+    // Kullanıcının şartı: "masa boyutları ayarlanabilir olmalı." Şemada alan
+    // olması yetmez — panelde görünmeyen bir alan kullanıcı için yoktur.
+    const keys = sizeFields().map((field) => field.key)
+    expect(keys).toEqual(['width', 'height', 'depth'])
+  })
+
+  test('panel sınırları şemanınkiyle BİREBİR aynı', () => {
+    /**
+     * Sessiz hata: panel şemadan geniş bir aralık gösterirse kullanıcı
+     * kaydırıcıyı sonuna kadar sürer, Zod yazımı reddeder ve kaydırıcı geri
+     * sıçrar — konsolda tek satır çıkmaz, panelde tek kelime yazmaz, masa
+     * "bir yerde takılıyor" gibi görünür.
+     *
+     * Aralıklar şemadan OKUNUYOR, elle tekrarlanmıyor: bir gün şema sınırı
+     * değişirse bu test onu takip eder, kopyalanmış bir sayıyı değil.
+     */
+    const shape = BenchNode.shape
+    const bounds = {
+      width: shape.width,
+      height: shape.height,
+      depth: shape.depth,
+    }
+
+    for (const field of sizeFields()) {
+      if (field.kind !== 'number') throw new Error(`${field.key} sayı alanı değil`)
+      const checks = (
+        bounds[field.key as 'width' | 'height' | 'depth'] as unknown as {
+          def: {
+            innerType: { def: { checks?: Array<{ _zod: { def: Record<string, unknown> } }> } }
+          }
+        }
+      ).def.innerType.def.checks
+      const limits: Record<string, number> = {}
+      for (const check of checks ?? []) {
+        const def = check._zod.def as { check?: string; value?: number }
+        if (def.check === 'greater_than' && typeof def.value === 'number') limits.min = def.value
+        if (def.check === 'less_than' && typeof def.value === 'number') limits.max = def.value
+      }
+      expect(field.min, `${field.key} alt sınır`).toBe(limits.min)
+      expect(field.max, `${field.key} üst sınır`).toBe(limits.max)
+    }
+  })
+
+  test('ölçü değiştirmek gerçekten mesh’i değiştiriyor', () => {
+    // Kaydırıcının var olması yetmez: alanın geometriye bağlı olduğunu da
+    // ölçmek gerekiyor. Bağlı olmasaydı kaydırıcı çalışır, sahne kımıldamazdı.
+    const narrow = bench({ variant: 'eco', width: 1.0 })
+    const wide = bench({ variant: 'eco', width: 1.8 })
+    expect(fingerprint(narrow, 'full')).not.toBe(fingerprint(wide, 'full'))
+    expect(widthM(narrow)).toBeCloseTo(1.0, 9)
+    expect(widthM(wide)).toBeCloseTo(1.8, 9)
   })
 })

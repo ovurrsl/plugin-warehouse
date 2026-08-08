@@ -25,6 +25,7 @@ import { isClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
+  samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
@@ -66,6 +67,9 @@ export default function ConveyorObliqueTool() {
   const validRef = useRef(true)
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
+  /** Son YAZILAN imleç merkezi. Kapının belleği: kutu gerçekten kımıldamadıysa
+   *  `setCursorPosition` hiç çağrılmaz. */
+  const cursorPositionRef = useRef<readonly [number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
 
   const previewNode = useMemo(
@@ -129,11 +133,18 @@ export default function ConveyorObliqueTool() {
       // the measuring box sits off the ghost by however far the two differ,
       // carried into world space by the module's own rotation.
       const offset = footprintCentreZM(previewRef.current)
-      setCursorPosition([
+      const centre: [number, number, number] = [
         visual[0] + offset * Math.sin(rotationRef.current),
         visual[1],
         visual[2] + offset * Math.cos(rotationRef.current),
-      ])
+      ]
+      // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
+      // her fare hareketinde kaçamayacağı bir render ettiriyor; ızgaraya
+      // oturmuş imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
+      if (!samePlacementPoint(cursorPositionRef.current, centre)) {
+        cursorPositionRef.current = centre
+        setCursorPosition(centre)
+      }
       lastPositionRef.current = position
       recomputeValidity(visual)
 

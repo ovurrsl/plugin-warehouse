@@ -8,13 +8,17 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
+import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
+import { isSelected } from '../selection'
+import { useStaticTransform } from '../static-transform'
 import { boosterGeometryKey, getBoosterGeometry, retainBoosterGeometry } from './booster-geometry'
 import { frameWidthM, moduleLengthM } from './booster-metrics'
 import type { ConveyorBoosterNode } from './booster-schema'
@@ -50,6 +54,12 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
+  // Olay sarmalayıcısı dönüşümsüz, ama auto-update kaldığı sürece bedava
+  // değil: her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki donmuş koliderin kazancını geri verir. Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
+
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -65,6 +75,17 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
     ? [baseRotation[0], live.rotation, baseRotation[2]]
     : baseRotation
 
+  // Duran modül three'nin kare başına matris yeniden hesabından çıkar; canlı
+  // sürükleme ya da override varken bayrak three'ye geri döner. `isLive`
+  // ifadesi JSX'i süren okumanın AYNISI olmak zorunda — ayrışırsa sürüklenen
+  // modül donar (`../static-transform`).
+  useStaticTransform(
+    registeredRef,
+    position,
+    rotation,
+    live !== undefined || override !== undefined,
+  )
+
   /**
    * Whether the module standing downstream builds the shared support.
    *
@@ -77,7 +98,7 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
   const appearance = useAppearance()
   const material = getConveyorMaterial(appearance)
 
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -85,7 +106,7 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
     keyFor: (tier) => boosterGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -112,9 +133,33 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
   // without one a click lands between the rollers and selects the floor.
   const colliderHeight = Math.max(0.2, node.transportHeight + node.sideGuideHeight)
 
+  /**
+   * Havuz çizerken bu alt ağaç ekranda hiçbir şey yapmıyor ama three onu her
+   * karede renk ve gölge geçidinde geziyor. `visible = false` onu
+   * `projectObject`'ten tamamen düşürüyor; seçim ve gölge sınırları
+   * etkilenmiyor (raycaster ve `Box3.expandByObject` `visible`'a bakmıyor).
+   *
+   * Bayrak ŞART: havuzun görünürlük taraması (`isEffectivelyVisible`) onsuz
+   * "kolektif gizledi"yi "kullanıcı gizledi"den ayıramaz ve bütün aileyi
+   * havuzdan düşürür — ekranda tek modül kalmaz. JSX `userData` prop'u
+   * olarak yazılamaz: R3F nesnenin tamamını değiştirip host'un yazdığı
+   * anahtarları siler.
+   */
+  const hidden = !drawsSelf
+  const userHidden = node.visible === false
+  useLayoutEffect(() => {
+    const object = registeredRef.current
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
+  }, [hidden, userHidden])
+
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      <group position={position} ref={registeredRef} rotation={rotation}>
+    <group ref={wrapperRef} {...handlers}>
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={!userHidden && !hidden}
+      >
         {!isExporting && (
           <Collider position={[0, colliderHeight / 2, 0]} size={[length, colliderHeight, width]} />
         )}

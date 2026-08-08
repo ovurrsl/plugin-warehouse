@@ -31,6 +31,7 @@ import {
 } from './transfer-metrics'
 import { conveyorTransferParametrics } from './transfer-parametrics'
 import { stripParts, transferParts } from './transfer-parts'
+import { nextStripY } from './transfer-renderer'
 import { ConveyorTransferNode } from './transfer-schema'
 
 const transfer = (overrides: Record<string, unknown> = {}) =>
@@ -433,5 +434,44 @@ describe('the volume is the body, skirt and legs included', () => {
     expect(
       isClearAt({ node: alongside, position: alongside.position, rotationY: 0, nodes: scene }),
     ).toBe(true)
+  })
+})
+
+describe('şerit kalkışı — kare döngüsünün kapanabilmesi için', () => {
+  const DELTA = 1 / 60
+
+  test('şerit hedefe TAM oturuyor, sonsuza dek yaklaşmıyor', () => {
+    /**
+     * Sessiz hata: saf lerp hedefe asimptotik yaklaşır, hiç varmaz. Döngü
+     * "oturdu" diyemediği için akış kapandıktan sonra da transfer düğümü
+     * başına her kare bir yazım sürerdi — kaldırılmak istenen maliyetin
+     * tam kendisi, üstelik kapı eklenmiş gibi görünürken.
+     */
+    let y = MTR_STRIP_STROKE_M
+    let frames = 0
+    while (y !== 0 && frames < 600) {
+      y = nextStripY(y, 0, DELTA)
+      frames++
+    }
+    expect(y).toBe(0)
+    expect(frames).toBeLessThan(120)
+  })
+
+  test('eşik ADIMA değil KALANA uygulanıyor — kalkış ilk karede bitmiyor', () => {
+    /**
+     * Eşiği adıma uygulayan bir yazım (`|next - current| < eps`) yerdeki
+     * şeridi ilk karede hedefe ışınlar: adım da küçük olabilir, kalan da.
+     * O zaman "yumuşak kalkış" diye bir şey kalmaz ve kimse hata görmez —
+     * yalnız mekanizma anlamsızlaşır.
+     */
+    const first = nextStripY(0, MTR_STRIP_STROKE_M, DELTA)
+    expect(first).toBeGreaterThan(0)
+    expect(first).toBeLessThan(MTR_STRIP_STROKE_M / 2)
+  })
+
+  test('çok büyük bir kare atlaması hedefi AŞMIYOR', () => {
+    // `delta * 12` bir saniyelik takılmada 1'i geçer; oran sınırlanmazsa
+    // şerit hedefin ötesine fırlar ve geri saler.
+    expect(nextStripY(0, MTR_STRIP_STROKE_M, 1)).toBe(MTR_STRIP_STROKE_M)
   })
 })

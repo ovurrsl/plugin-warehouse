@@ -11,9 +11,10 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
-import { useWarehouseStore } from '../store'
+import { lodScaleSq, useWarehouseStore } from '../store'
 import { FLOW_BOX_M } from './flow-simulation'
 import type { ConveyorDetail } from './parts'
 import { TELESCOPIC_BELT_SPEED_EST_MS } from './telescopic-catalog'
@@ -109,6 +110,12 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
+  // Dönüşümsüz olay sarmalayıcısı: auto-update kaldığı sürece her karede
+  // kendi `compose`'unu yapıp `force`'u çocuklara yayar ve altındaki donmuş
+  // kayıtlı grubun kazancını geri verir. Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
+
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -179,13 +186,19 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
         const distanceSq = camera.position.distanceToSquared(
           worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
         )
+        // Bantlar kullanıcının detay kolundan ölçekli — depoda bu kolu
+        // almayan tek kind buydu, yani yan yana duran bom ile makara hattı
+        // farklı mesafede katman değiştiriyordu ve kol "tek bir şeyi
+        // ayarlıyorum" iddiasını kaybediyordu. Ölçek kare başına değil,
+        // değerlendirme başına okunuyor (rafın yaptığı gibi).
+        const scaleSq = lodScaleSq()
         const current = detailRef.current
         const next =
           current === 'full'
-            ? distanceSq > LOD_FAR_SQ
+            ? distanceSq > LOD_FAR_SQ * scaleSq
               ? 'simple'
               : 'full'
-            : distanceSq < LOD_NEAR_SQ
+            : distanceSq < LOD_NEAR_SQ * scaleSq
               ? 'full'
               : 'simple'
         if (next !== current) {
@@ -252,21 +265,20 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
     : null
 
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      {/* Kolider anlık uzamış zarfı kapsar — bomun ucu da seçilebilir. */}
-      {!isExporting && (
-        <Collider
-          position={[
-            position[0] + Math.cos(rotation[1]) * footprintCenterX(node),
-            position[1] + height / 2,
-            position[2] - Math.sin(rotation[1]) * footprintCenterX(node),
-          ]}
-          rotation={rotation}
-          size={[currentLengthM(node), height, width]}
-        />
-      )}
-
+    <group ref={wrapperRef} visible={node.visible !== false} {...handlers}>
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {/* Kolider anlık uzamış zarfı kapsar — bomun ucu da seçilebilir.
+            Kayıtlı grubun İÇİNDE ve yerel koordinatta: dışarıdayken dünya
+            yerleşimini elle kuruyordu (`position[0] + cos(rotation[1]) * …`),
+            yani yalnız Y dönüşünü hesaba katıyor ve grubun bedava yapacağı
+            işi tekrarlıyordu. Pakette grubunun dışında duran tek kolider
+            buydu. */}
+        {!isExporting && (
+          <Collider
+            position={[footprintCenterX(node), height / 2, 0]}
+            size={[currentLengthM(node), height, width]}
+          />
+        )}
         <mesh
           dispose={null}
           geometry={getTelescopicBaseGeometry(node, 'full')}

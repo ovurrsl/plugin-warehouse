@@ -1,15 +1,36 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { sceneRegistry } from '@pascal-app/core'
-import { Euler, Object3D, Vector3 } from 'three'
-import { applyStaticTransform, rebakeDriftedStaticTransforms } from './static-transform'
+import { Euler, Matrix4, Object3D, Vector3 } from 'three'
+import {
+  applyStaticTransform,
+  frozenStaticTransformCount,
+  rebakeDriftedStaticTransforms,
+  releaseStaticTransform,
+} from './static-transform'
+
+/**
+ * Her testin kurduğu sahte nesneler — sonunda donmuş kümesinden düşürülüyor.
+ *
+ * Bırakılmasalar sızmakla kalmazlar, KOMŞU TESTLERİ BOZARLAR: sahtenin
+ * `updateMatrix`'i yalnız sayaç artırıyor, matrisi gerçekten basmıyor, yani
+ * bir sonraki `rebakeDriftedStaticTransforms` onları sonsuza dek "kaymış"
+ * sayar ve başka bir testin saydığı sayıyı şişirir.
+ */
+const fakes: { position: Vector3 }[] = []
+
+afterEach(() => {
+  for (const fake of fakes) releaseStaticTransform(fake as never)
+  fakes.length = 0
+})
 
 /** A bare stand-in for the slice of `Object3D` this file touches, so the test
  *  drives real `Vector3`/`Euler` math without mounting a scene. */
 function fakeObject() {
   let matrixCalls = 0
-  return {
+  const object = {
     position: new Vector3(),
     rotation: new Euler(),
+    matrix: new Matrix4(),
     matrixAutoUpdate: true,
     updateMatrix() {
       matrixCalls += 1
@@ -18,6 +39,8 @@ function fakeObject() {
       return matrixCalls
     },
   }
+  fakes.push(object)
+  return object
 }
 
 describe('applyStaticTransform', () => {
@@ -75,7 +98,11 @@ describe('rebakeDriftedStaticTransforms — host’un yazdığı Y yutulmasın',
   }
 
   afterEach(() => {
-    for (const id of ids) sceneRegistry.nodes.delete(id)
+    for (const id of ids) {
+      const object = sceneRegistry.nodes.get(id)
+      if (object) releaseStaticTransform(object)
+      sceneRegistry.nodes.delete(id)
+    }
     ids.length = 0
   })
 
@@ -118,5 +145,48 @@ describe('rebakeDriftedStaticTransforms — host’un yazdığı Y yutulmasın',
     expect(rebakeDriftedStaticTransforms()).toBe(1)
     expect(rack.matrix.elements[12]).toBeCloseTo(2.5, 9)
     expect(rack.matrix.elements[14]).toBeCloseTo(-1.5, 9)
+  })
+})
+
+/**
+ * Kayma denetimi artık kayıt defterini değil, BU modülün dondurduklarını
+ * geziyor. Kazanç oradan geliyor, ama kümenin sızması onu tam tersine
+ * çevirir: unmount olan her düğüm sahne ömrü boyunca her kare taranır.
+ */
+describe('donmuş nesne kümesi sızmıyor', () => {
+  test('canlıya dönen nesne kümeden düşer', () => {
+    const before = frozenStaticTransformCount()
+    const object = fakeObject()
+
+    applyStaticTransform(object, [1, 0, 1], [0, 0, 0], false)
+    expect(frozenStaticTransformCount()).toBe(before + 1)
+
+    // Sürükleme başladı: three bayrağı geri aldı, artık denetlenecek bir şey yok.
+    applyStaticTransform(object, [1, 0, 1], [0, 0, 0], true)
+    expect(frozenStaticTransformCount()).toBe(before)
+  })
+
+  test('elle bırakılan nesne kümeden düşer', () => {
+    const before = frozenStaticTransformCount()
+    const object = fakeObject()
+
+    applyStaticTransform(object, [2, 0, 2], [0, 0, 0], false)
+    releaseStaticTransform(object)
+
+    expect(frozenStaticTransformCount()).toBe(before)
+  })
+
+  test('aynı nesneyi iki kez dondurmak kümeyi büyütmez', () => {
+    // Kanca bağımlılık değiştikçe yeniden koşuyor; her koşu bir giriş
+    // eklerse küme düğüm sayısının katlarına çıkar ve tarama daralmış
+    // görünürken aslında genişler.
+    const before = frozenStaticTransformCount()
+    const object = fakeObject()
+
+    applyStaticTransform(object, [3, 0, 3], [0, 0, 0], false)
+    applyStaticTransform(object, [4, 0, 4], [0, 0, 0], false)
+
+    expect(frozenStaticTransformCount()).toBe(before + 1)
+    releaseStaticTransform(object)
   })
 })

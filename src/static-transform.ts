@@ -1,6 +1,5 @@
 'use client'
 
-import { sceneRegistry } from '@pascal-app/core'
 import { useLayoutEffect } from 'react'
 import type { Object3D } from 'three'
 
@@ -14,8 +13,30 @@ const DRIFT_EPSILON = 1e-6
  * `{ matrixAutoUpdate, position, rotation, updateMatrix }` stand-in instead of
  * mounting a real scene.
  */
+/** Kayma denetiminin gerçekten okuduğu yüzey — testin sahte nesnesi de bunu
+ *  karşılıyor, gerçek bir sahne kurmaya gerek kalmıyor. */
+type Freezable = Pick<
+  Object3D,
+  'position' | 'rotation' | 'matrixAutoUpdate' | 'updateMatrix' | 'matrix'
+>
+
+/**
+ * BU modülün dondurduğu nesneler.
+ *
+ * Kayma denetimi (`rebakeDriftedStaticTransforms`) her kare koşuyor ve önceden
+ * `sceneRegistry.nodes` defterinin TAMAMINI geziyordu — 5.000 düğümlük bir
+ * sahnede kare başına 5.000 yineleme, oysa ilgilendiği yalnız kendi
+ * dondurdukları. Küme aynı cevabı verir çünkü kayıtlı VE donmuş nesnelerin
+ * kümesi tam olarak burada dondurulanlardır: kolider ve olay sarmalayıcısı da
+ * donuyor ama ikisi de deftere hiç girmiyor.
+ *
+ * `Set`, `WeakSet` değil: gezilebilir olması şart. Sızıntının karşılığı
+ * `releaseStaticTransform` ve onu kancanın temizliği çağırıyor.
+ */
+const frozen = new Set<Freezable>()
+
 export function applyStaticTransform(
-  object: Pick<Object3D, 'position' | 'rotation' | 'matrixAutoUpdate' | 'updateMatrix'>,
+  object: Freezable,
   position: readonly [number, number, number],
   rotation: readonly [number, number, number],
   isLive: boolean,
@@ -26,12 +47,25 @@ export function applyStaticTransform(
     // imperative-drag convention) straight into its `position`/`rotation` — so
     // three's own per-frame recompute has to stay on for it to move at all.
     object.matrixAutoUpdate = true
+    frozen.delete(object)
     return
   }
   object.position.set(position[0], position[1], position[2])
   object.rotation.set(rotation[0], rotation[1], rotation[2])
   object.matrixAutoUpdate = false
   object.updateMatrix()
+  frozen.add(object)
+}
+
+/** Nesneyi kayma denetiminden düşürür. Unmount'ta çağrılmazsa küme sahne
+ *  ömrü boyunca büyür ve ölü nesneler her kare taranır. */
+export function releaseStaticTransform(object: Freezable): void {
+  frozen.delete(object)
+}
+
+/** Test kancası — sızıntının tek gözlemlenebilir kanıtı. */
+export function frozenStaticTransformCount(): number {
+  return frozen.size
 }
 
 /**
@@ -89,8 +123,9 @@ export function applyStaticTransform(
  */
 export function rebakeDriftedStaticTransforms(): number {
   let rebaked = 0
-  for (const object of sceneRegistry.nodes.values()) {
-    // three zaten her kare basıyor — bizim dondurduklarımız dışında iş yok.
+  for (const object of frozen) {
+    // Kümede yalnız bizim dondurduklarımız var; bayrak açıksa başkası
+    // çözmüş demektir ve three onu zaten her kare basıyor.
     if (object.matrixAutoUpdate) continue
     const { elements } = object.matrix
     if (
@@ -118,5 +153,8 @@ export function useStaticTransform(
     const object = ref.current
     if (!object) return
     applyStaticTransform(object, position, rotation, isLive)
+    // Unmount'ta kümeden düş: kalırsa hem bellek tutar hem ölü nesne her
+    // kare taranır — taramayı daraltmanın kazancını tam tersine çevirir.
+    return () => releaseStaticTransform(object)
   }, [ref, isLive, position[0], position[1], position[2], rotation[0], rotation[1], rotation[2]])
 }

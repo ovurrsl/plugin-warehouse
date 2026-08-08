@@ -8,6 +8,9 @@ import {
   conveyorGeometryCacheSize,
   conveyorGeometryKey,
   getConveyorGeometry,
+  releaseGeometry,
+  retainGeometry,
+  sweepConveyorGeometry,
 } from './geometry-builder'
 import {
   carriesShortestBox,
@@ -468,5 +471,67 @@ describe('the catalogue is the source, and it is not paraphrased', () => {
     for (const pitch of ROLLER_PITCHES_MM) {
       expect(pitch * MIN_ROLLERS_UNDER_A_BOX).toBeLessThanOrEqual(800)
     }
+  })
+})
+
+describe('sıfır-tutan süpürme — paylaşılan konveyör havuzu', () => {
+  const GRACE = 5000
+
+  beforeEach(() => {
+    clearConveyorGeometryCache()
+  })
+
+  test('kimsenin tutmadığı şekil pencere dolunca silinir, tutulan asla', () => {
+    /**
+     * İki sessiz hata. Pencere dolduğu hâlde silinmeyen şekil, kaydırıcı
+     * sürtmesinin artığını oturum boyunca taşır — ve bu havuzu yedi kind
+     * paylaştığı için tavan (`CACHE_LIMIT`) tek başına yetmiyordu, yalnız
+     * TAVANA ULAŞILDIĞINDA iş yapıyordu. TUTULAN bir şekli silmek ise o
+     * şekli paylaşan her modülü aynı anda karartır ve hiçbir yerde hata
+     * görünmez.
+     */
+    const held = conveyor()
+    const scrub = conveyor({ rollers: 30 })
+
+    const key = retainGeometry(conveyorGeometryKey(held, 'full', false))
+    const heldGeometry = getConveyorGeometry(held, 'full')
+    const scrubGeometry = getConveyorGeometry(scrub, 'full')
+    expect(conveyorGeometryCacheSize()).toBe(2)
+
+    // Saat şekiller kurulduktan SONRA okunuyor: damgayı `getCachedGeometry`
+    // kendi `Date.now()`'ıyla basıyor, yani önce okunursa test iki
+    // birleştirilmiş buffer'ın inşa süresine yarışır ve yüklü bir süitte
+    // rastgele kırılır.
+    const now = Date.now()
+
+    sweepConveyorGeometry(now + GRACE - 1)
+    expect(conveyorGeometryCacheSize()).toBe(2)
+
+    sweepConveyorGeometry(now + GRACE + 1)
+    expect(conveyorGeometryCacheSize()).toBe(1)
+    // Silindiğinin kanıtı kimlikten okunur: three'nin `dispose()`'u tamponu
+    // yerinde bırakır, yalnız GPU tarafını boşaltır.
+    expect(getConveyorGeometry(scrub, 'full')).not.toBe(scrubGeometry)
+    expect(getConveyorGeometry(held, 'full')).toBe(heldGeometry)
+
+    releaseGeometry(key)
+  })
+
+  test('bırakılan şekil pencereyi YENİDEN başlatır, silinme anında olmaz', () => {
+    // Sıfıra düşen sayaç anında dispose etseydi, React'in commit boşluğunda
+    // (renderer anahtarını bir efektte tutuyor) çizilen buffer serbest
+    // kalırdı — `evict`'in belgelediği yarışın aynısı.
+    const module = conveyor({ rollers: 34 })
+    const key = retainGeometry(conveyorGeometryKey(module, 'full', false))
+    getConveyorGeometry(module, 'full')
+
+    releaseGeometry(key)
+    const now = Date.now()
+
+    sweepConveyorGeometry(now + GRACE - 1)
+    expect(conveyorGeometryCacheSize()).toBe(1)
+
+    sweepConveyorGeometry(now + GRACE + 1)
+    expect(conveyorGeometryCacheSize()).toBe(0)
   })
 })

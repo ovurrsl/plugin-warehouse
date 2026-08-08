@@ -14,6 +14,7 @@ import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 import { defaultWidthM } from './route/metrics'
 import type { RouteNode } from './route/schema'
+import type { ToteCartNode } from './totecart/schema'
 import type { TruckNode } from './truck/schema'
 
 /**
@@ -228,6 +229,9 @@ type WarehouseStore = {
   dockLevellerBrush: DockLevellerBrush
   setDockLevellerBrush: (patch: Partial<DockLevellerBrush>) => void
 
+  toteCartBrush: ToteCartBrush
+  setToteCartBrush: (patch: Partial<ToteCartBrush>) => void
+
   driveInBrush: DriveInBrush
   setDriveInBrush: (patch: Partial<DriveInBrush>) => void
 
@@ -269,6 +273,13 @@ export type BenchBrush = Pick<BenchNode, 'variant' | 'width' | 'height' | 'depth
  * gösterir, ve kullanıcı çukuru koyuyor, makineyi çalıştırmıyor. Eğim
  * yerleştirmeden SONRA panelden ayarlanan bir poz.
  */
+/** Araba fırçası — `loadedTiers` YOK: yeni araba dolu konur, kısmen
+ *  toplanmış hâli yerleştirmeden SONRA panelden ayarlanan bir durum. */
+export type ToteCartBrush = Pick<
+  ToteCartNode,
+  'toteFootprint' | 'toteHeight' | 'tiers' | 'castorDiameter' | 'tilt' | 'hasHandle'
+>
+
 export type DockLevellerBrush = Pick<
   DockLevellerNode,
   'width' | 'length' | 'lip' | 'lipLength' | 'capacity' | 'frameHeight'
@@ -541,6 +552,19 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setDockLevellerBrush: (patch) =>
     set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
+
+  // Kullanıcının kendi spec'inin arabası: 5 kat x 220 mm kasa, ki toplam
+  // yükseklik onun yayımladigi 1,5 m'ye çıksın.
+  toteCartBrush: {
+    toteFootprint: '600x400',
+    toteHeight: '220',
+    tiers: 5,
+    castorDiameter: '100',
+    tilt: false,
+    hasHandle: true,
+  },
+  setToteCartBrush: (patch) =>
+    set((state) => ({ toteCartBrush: { ...state.toteCartBrush, ...patch } })),
 
   driveInBrush: {
     laneClearWidth: 1.35,

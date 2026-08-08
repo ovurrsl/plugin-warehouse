@@ -461,13 +461,16 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   const benchVariant = useWarehouseStore((s) => s.benchBrush.variant)
   const wantsLip = item.brush?.kind === 'dockleveller' ? item.brush.patch.lip : null
   const levellerLip = useWarehouseStore((s) => s.dockLevellerBrush.lip)
+  const wantsTilt = item.brush?.kind === 'totecart' ? item.brush.patch.tilt : null
+  const cartTilt = useWarehouseStore((s) => s.toteCartBrush.tilt)
   const arming =
     activeTool === item.kind &&
     (wantsLoad === null || wantsLoad === (cargo !== 'none')) &&
     (wantsRole === null || wantsRole === routeRole) &&
     (wantsModel === null || wantsModel === truckModel) &&
     (wantsVariant === null || wantsVariant === benchVariant) &&
-    (wantsLip === null || wantsLip === levellerLip)
+    (wantsLip === null || wantsLip === levellerLip) &&
+    (wantsTilt === null || wantsTilt === cartTilt)
 
   const arm = () => {
     if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
@@ -517,6 +520,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     }
     if (item.brush?.kind === 'dockleveller') {
       useWarehouseStore.getState().setDockLevellerBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'totecart') {
+      useWarehouseStore.getState().setToteCartBrush(item.brush.patch)
     }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the

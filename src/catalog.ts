@@ -43,6 +43,10 @@ export type CatalogItem = {
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
     | {
+        kind: 'totecart'
+        patch: { tiers: number; toteHeight: '170' | '220' | '320'; tilt: boolean }
+      }
+    | {
         kind: 'dockleveller'
         patch: { length: '2500' | '3000' | '3500'; lip: 'hinged' | 'telescopic' }
       }
@@ -543,6 +547,26 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Sade paketleme masası: 1200 × 600 mm tabla, metal çerçeve, donanımsız. Ölçüye yaptırılacak bir masanın başlangıç noktası.',
     icon: 'lucide:table',
     brush: { kind: 'bench', patch: { variant: 'eco' } },
+  },
+  {
+    id: 'tote-cart',
+    kind: 'warehouse:tote-cart',
+    label: 'Tote Cart',
+    sectionId: 'handling',
+    description:
+      'Sipariş toplama arabası: kat başına bir Euro kasa, 600 × 400 mm taban. Beş kat × 220 mm kasa, toplam boy 1,40 m. Yükseklik ALAN DEĞİL — katlardan hesaplanıyor, yani kasalar birbirinin içine giremiyor. [ ve ] ile kat sayısı.',
+    icon: 'lucide:shopping-cart',
+    brush: { kind: 'totecart', patch: { tiers: 5, toteHeight: '220', tilt: false } },
+  },
+  {
+    id: 'tote-cart-tilted',
+    kind: 'warehouse:tote-cart',
+    label: 'Tote Cart (tilted tiers)',
+    sectionId: 'handling',
+    description:
+      'Eğimli tepsili toplama arabası: kasalar operatöre dönük, elle almak kolay. Üç kat × 320 mm kasa. Eğim açısı 15° — gerçek eğimli araba var ama açıyı hiçbir üretici yayımlamıyor, bu değer kullanıcının kendi eski uygulamasından.',
+    icon: 'lucide:package-open',
+    brush: { kind: 'totecart', patch: { tiers: 3, toteHeight: '320', tilt: true } },
   },
   {
     id: 'dock-leveller-hinged',

@@ -18,6 +18,7 @@ import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
+import { toteCartDefinition } from './totecart/definition'
 import { truckDefinition } from './truck/definition'
 
 /**
@@ -61,6 +62,7 @@ export const warehousePlugin: Plugin = {
     m3ShelvingDefinition as unknown as AnyNodeDefinition,
     benchDefinition as unknown as AnyNodeDefinition,
     dockLevellerDefinition as unknown as AnyNodeDefinition,
+    toteCartDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -101,6 +103,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:m3-rack',
     'warehouse:bench',
     'warehouse:dock-leveller',
+    'warehouse:tote-cart',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

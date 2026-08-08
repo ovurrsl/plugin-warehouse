@@ -25,12 +25,11 @@ import type { ConveyorLauncherNode } from './launcher-schema'
 import { frameWidthM, moduleLengthM, usefulWidthMm } from './metrics'
 import {
   branchEndLocal,
+  branchHeadingRad,
   branchLaneMm,
-  branchSign,
   branchWidthM,
   mainLaneMm,
   mainWidthM,
-  angleRad as obliqueAngleRad,
   moduleLengthM as obliqueLengthM,
 } from './oblique-metrics'
 import type { ConveyorObliqueNode } from './oblique-schema'
@@ -399,8 +398,6 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
   if (isObliqueModule(module)) {
     const half = obliqueLengthM(module) / 2
     const outlet = outletPort(module)
-    const side = branchSign(module)
-    const theta = obliqueAngleRad(module)
 
     const main = (['a', 'b'] as const).map((id) => {
       const sign = id === 'b' ? 1 : -1
@@ -430,6 +427,24 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
       module.branchMode === 'divert' ? 'out' : module.branchMode === 'merge' ? 'in' : 'both'
     const [endX, endZ] = branchEndLocal(module)
 
+    /**
+     * Portun dış yönü, KOLUN KENDİ başlığından türetiliyor.
+     *
+     * Önceki hâli `(cos θ, side · sin θ)` idi ve `flow`'u hiç okumuyordu.
+     * Ters akışlı bir modülde kol fiziksel olarak −X'e doğru gidiyor
+     * (`branchHeadingRad` 210°/150° döndürüyor, kol ucu −X ucunda) ama port
+     * hâlâ +X'i işaret ediyordu: 180° ayrışma. Sonuç ekranda hata olarak
+     * görünmüyordu — kol doğru çiziliyor, akış rotası da doğru — yalnız
+     * mıknatıs komşu hattı kolun ARKASINA mateliyor ve simülasyon kutuları
+     * çizilen kolun ters yönünde devrediyordu.
+     *
+     * Tek kaynak: three'de Y ekseni etrafında φ dönüşü +X'i (cos φ, −sin φ)
+     * yapıyor, ve `branchHeadingRad` kolun çizildiği başlık. Dört hâlin
+     * (sol/sağ × ileri/geri) dördü de buradan çıkıyor, ayrı bir trigonometri
+     * kopyası kalmıyor.
+     */
+    const heading = branchHeadingRad(module)
+
     return [
       ...main,
       {
@@ -437,8 +452,8 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         x: endX,
         y: module.transportHeight,
         z: endZ,
-        dx: Math.cos(theta),
-        dz: side * Math.sin(theta),
+        dx: Math.cos(heading),
+        dz: -Math.sin(heading),
         role: branchRole,
         // Narrower than the main line, which is the catalogue's own geometry
         // and what makes R11 a fact about this module rather than a warning.

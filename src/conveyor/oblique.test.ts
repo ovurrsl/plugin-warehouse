@@ -13,6 +13,7 @@ import { getObliqueGeometry, obliqueGeometryKey } from './oblique-geometry'
 import {
   angleRad,
   branchBoxWidthM,
+  branchCentreLocal,
   branchEndLocal,
   branchLengthM,
   branchOffsetM,
@@ -350,5 +351,61 @@ describe('the inspector can reach every field, and every option it writes parses
       (key) => !shown.has(key as never) && !DELIBERATELY_HIDDEN.has(key),
     )
     expect(missing).toEqual([])
+  })
+})
+
+describe('kolun portu, kolun ÇİZİLDİĞİ yönü gösteriyor', () => {
+  /**
+   * Bildirilen hata: "simülasyon, konveyör kol ayrımı ile ters yönde
+   * çalışıyor."
+   *
+   * Sebebi port `c`'nin dış yönünün `flow`'u hiç okumamasıydı: yön
+   * `(cos θ, side · sin θ)` ile sabit +X'e bakıyordu, oysa ters akışlı bir
+   * modülde kol fiziksel olarak −X'e gidiyor. Kol doğru çiziliyordu, akış
+   * rotası da doğruydu — ayrışan yalnız porttu, ve o da ekranda hiçbir şey
+   * göstermiyordu: mıknatıs komşu hattı kolun arkasına matelıyor, kutular
+   * çizilen kolun ters yönünde devrediliyordu.
+   *
+   * Bu yüzden test bayrağa ya da açıya değil, İKİ VEKTÖRÜN UYUŞMASINA
+   * bakıyor: kolun çizilen ekseni (merkezden uca) ile portun dış yönü.
+   */
+  const axisOf = (node: ReturnType<typeof oblique>): [number, number] => {
+    const [ex, ez] = branchEndLocal(node)
+    const [cx, cz] = branchCentreLocal(node)
+    const length = Math.hypot(ex - cx, ez - cz)
+    return [(ex - cx) / length, (ez - cz) / length]
+  }
+
+  for (const branchSide of ['left', 'right'] as const) {
+    for (const flow of ['forward', 'reverse'] as const) {
+      test(`${branchSide} kol, ${flow} akış: port yönü kolun ekseniyle aynı`, () => {
+        const node = oblique({ branchSide, flow, branchMode: 'divert' })
+        const port = localPorts(node).find((entry) => entry.id === 'c')
+        if (!port) throw new Error('kol portu yok')
+
+        const [ax, az] = axisOf(node)
+        expect(port.dx).toBeCloseTo(ax, 6)
+        expect(port.dz).toBeCloseTo(az, 6)
+      })
+    }
+  }
+
+  test('ters akışta kol portu geriye bakıyor — ileri akışın aynısı DEĞİL', () => {
+    // Hatanın tam biçimi buydu: dört yapılandırmanın dördü de aynı +X'i
+    // bildiriyordu. Yukarıdaki döngü yönü doğrularken, bu test iki hâlin
+    // birbirinden gerçekten AYRIŞTIĞINI sabitliyor — tek bir sabit vektör
+    // yazan bir gerileme yukarıdakileri de geçebilirdi.
+    const forward = localPorts(oblique({ branchSide: 'left', flow: 'forward' })).find(
+      (entry) => entry.id === 'c',
+    )
+    const reverse = localPorts(oblique({ branchSide: 'left', flow: 'reverse' })).find(
+      (entry) => entry.id === 'c',
+    )
+    if (!forward || !reverse) throw new Error('kol portu yok')
+
+    expect(Math.sign(forward.dx)).toBe(1)
+    expect(Math.sign(reverse.dx)).toBe(-1)
+    // Kol hangi tarafa ayrıldıysa orada kalıyor; tersine dönen yalnız uzunlamasına yön.
+    expect(Math.sign(forward.dz)).toBe(Math.sign(reverse.dz))
   })
 })

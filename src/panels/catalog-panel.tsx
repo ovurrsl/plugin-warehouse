@@ -455,11 +455,19 @@ function CatalogTile({ item }: { item: CatalogItem }) {
   const wantsRole = item.brush?.kind === 'route' ? item.brush.role : null
   const wantsModel = item.brush?.kind === 'truck' ? item.brush.model : null
   const truckModel = useWarehouseStore((s) => s.truckBrush.model)
+  // Tezgâhın altı fişi ve rampanın iki fişi de aynı kind'ı kuruyor; yanan
+  // fiş, mağazanın şu an giydiği fırçanınki.
+  const wantsVariant = item.brush?.kind === 'bench' ? item.brush.patch.variant : null
+  const benchVariant = useWarehouseStore((s) => s.benchBrush.variant)
+  const wantsLip = item.brush?.kind === 'dockleveller' ? item.brush.patch.lip : null
+  const levellerLip = useWarehouseStore((s) => s.dockLevellerBrush.lip)
   const arming =
     activeTool === item.kind &&
     (wantsLoad === null || wantsLoad === (cargo !== 'none')) &&
     (wantsRole === null || wantsRole === routeRole) &&
-    (wantsModel === null || wantsModel === truckModel)
+    (wantsModel === null || wantsModel === truckModel) &&
+    (wantsVariant === null || wantsVariant === benchVariant) &&
+    (wantsLip === null || wantsLip === levellerLip)
 
   const arm = () => {
     if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
@@ -491,6 +499,24 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     }
     if (item.brush?.kind === 'live-racking') {
       useWarehouseStore.getState().setLiveRackingBrush(item.brush.patch)
+    }
+    // Tezgâhın altı fişi de varyantını buradan yazıyor. YAZILMADIĞI sürece
+    // altısı da fırçadaki varsayılanı (`processing`) koyuyordu: katalog altı
+    // farklı masa gösterip tek masa yerleştiriyordu, ve fark yalnız gözle
+    // görülüyordu. `catalog.test.ts` artık her fırça kolunun bir uygulayıcısı
+    // olduğunu kilitliyor.
+    if (item.brush?.kind === 'bench') {
+      useWarehouseStore.getState().setBenchBrush({
+        ...item.brush.patch,
+        // Varyantla birlikte elle girilmiş ölçüler de temizleniyor —
+        // aracın `[`/`]` davranışının aynısı, aynı gerekçeyle.
+        width: undefined,
+        height: undefined,
+        depth: undefined,
+      })
+    }
+    if (item.brush?.kind === 'dockleveller') {
+      useWarehouseStore.getState().setDockLevellerBrush(item.brush.patch)
     }
     // The host types `tool` as its own built-in union, which by construction
     // cannot know about plugin-contributed kinds. Arming by kind string is the

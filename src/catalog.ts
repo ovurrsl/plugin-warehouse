@@ -43,6 +43,10 @@ export type CatalogItem = {
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
     | {
+        kind: 'dockleveller'
+        patch: { length: '2500' | '3000' | '3500'; lip: 'hinged' | 'telescopic' }
+      }
+    | {
         kind: 'bench'
         patch: {
           variant:
@@ -191,6 +195,17 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
     label: 'Work stations',
     icon: 'lucide:table',
     blurb: 'Packing, dispatch and processing benches. Every dimension adjustable.',
+  },
+  /**
+   * Kural gereği kind'ıyla BİRLİKTE geliyor (bkz. `stations`): boş bir bölüm
+   * var olmayan bir yetenek ilan ediyor. İki fişi de yükleme rampası arıyor
+   * — biri menteşeli, biri teleskopik dudak.
+   */
+  {
+    id: 'docks',
+    label: 'Loading bay',
+    icon: 'lucide:import',
+    blurb: 'Door equipment: dock levellers, flush with the floor at rest.',
   },
   {
     id: 'mezzanine',
@@ -528,6 +543,26 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Sade paketleme masası: 1200 × 600 mm tabla, metal çerçeve, donanımsız. Ölçüye yaptırılacak bir masanın başlangıç noktası.',
     icon: 'lucide:table',
     brush: { kind: 'bench', patch: { variant: 'eco' } },
+  },
+  {
+    id: 'dock-leveller-hinged',
+    kind: 'warehouse:dock-leveller',
+    label: 'Dock Leveller (hinged lip)',
+    sectionId: 'docks',
+    description:
+      'Kapı çukuruna gömülü hidrolik köprü: dinlenmede tablası zeminle aynı kotta, üstünden forklift geçer. 2500 × 2000 mm tabla, 400 mm menteşeli dudak, 60 kN. Ölçüler Stertil S serisinden; eğim sınırı EN 1398 (%12,5).',
+    icon: 'lucide:import',
+    brush: { kind: 'dockleveller', patch: { length: '2500', lip: 'hinged' } },
+  },
+  {
+    id: 'dock-leveller-telescopic',
+    kind: 'warehouse:dock-leveller',
+    label: 'Dock Leveller (telescopic lip)',
+    sectionId: 'docks',
+    description:
+      'Dudağı tablanın altındaki cepten kayarak çıkan rampa: dorsenin içine 1000 mman uzanır, yükü kapıya yakın istiflenmiş dorselerde bile alır. 3000 × 2000 mm tabla. KAYNAK: Stertil X serisi.',
+    icon: 'lucide:move-horizontal',
+    brush: { kind: 'dockleveller', patch: { length: '3000', lip: 'telescopic' } },
   },
   {
     id: 'm3-cabinet',

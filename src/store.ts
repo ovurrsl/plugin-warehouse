@@ -2,6 +2,7 @@ import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
 import type { BenchNode } from './bench/schema'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
+import type { DockLevellerNode } from './dockleveller/schema'
 import type { DriveInRackNode } from './drivein/schema'
 import type { LiveRackingNode } from './live-racking/schema'
 import type { LongspanLevel, LongspanNode } from './longspan/schema'
@@ -224,6 +225,9 @@ type WarehouseStore = {
   benchBrush: BenchBrush
   setBenchBrush: (patch: Partial<BenchBrush>) => void
 
+  dockLevellerBrush: DockLevellerBrush
+  setDockLevellerBrush: (patch: Partial<DockLevellerBrush>) => void
+
   driveInBrush: DriveInBrush
   setDriveInBrush: (patch: Partial<DriveInBrush>) => void
 
@@ -256,6 +260,19 @@ export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth'
  * varyanta geri dönmek bir alanı temizlemek kadar kolay.
  */
 export type BenchBrush = Pick<BenchNode, 'variant' | 'width' | 'height' | 'depth'>
+
+/**
+ * Rampa fırçası — `inclination` YOK ve olmaması bilinçli.
+ *
+ * Fırça "bir sonraki nesne neye benzeyecek" demek, ve rampa her zaman
+ * dinlenmede konuyor: kalkmış bir tabla yerleştirilecek izi olduğundan büyük
+ * gösterir, ve kullanıcı çukuru koyuyor, makineyi çalıştırmıyor. Eğim
+ * yerleştirmeden SONRA panelden ayarlanan bir poz.
+ */
+export type DockLevellerBrush = Pick<
+  DockLevellerNode,
+  'width' | 'length' | 'lip' | 'lipLength' | 'capacity' | 'frameHeight'
+>
 
 export type LiveRackingBrush = Pick<
   LiveRackingNode,
@@ -510,6 +527,20 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   // yazmak, altı varyanttan beşini ilk yerleştirmede yanlış ölçüde koyardı.
   benchBrush: { variant: 'processing' },
   setBenchBrush: (patch) => set((state) => ({ benchBrush: { ...state.benchBrush, ...patch } })),
+
+  // Kataloğun en yaygın satırı: 2500 × 2000 mm, menteşeli dudak (Armo,
+  // "ready in stock"). Yerleştirme her zaman DİNLENMEDE — kullanıcı çukuru
+  // koyuyor, rampayı çalıştırmıyor.
+  dockLevellerBrush: {
+    width: '2000',
+    length: '2500',
+    lip: 'hinged',
+    lipLength: '400',
+    capacity: '60',
+    frameHeight: '585',
+  },
+  setDockLevellerBrush: (patch) =>
+    set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
 
   driveInBrush: {
     laneClearWidth: 1.35,

@@ -62,6 +62,10 @@ export const CLICK_TRIGGER_KINDS = [
   // koliderinin ÜSTÜNDE yerleştiriliyor. Listede olmasa o tıklama yutulur ve
   // ikinci masa hiç konamaz — rafta ve konveyörde ölçülmüş aynı belirti.
   'warehouse:bench',
+  // Rampa kapının içine oturuyor ve ikinci bir rampa çoğu zaman komşu
+  // kapıya, birincinin koliderine değen bir imleçle konuyor. Listede olmasa
+  // o tıklama yutulur.
+  'warehouse:dock-leveller',
   // A placed rack's picking collider swallows the click that lands on it, so
   // without this a second rack cannot be placed against the first — the cursor
   // is over the run you are aligning to, and nothing commits.

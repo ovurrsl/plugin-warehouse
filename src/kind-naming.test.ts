@@ -54,7 +54,7 @@ const COMPOSED_FAMILIES = ['conveyor'] as const
 const VARIANT_FAMILIES = ['rack'] as const
 
 /** Kural 3 — ailesi olmayan tekil şeyler. */
-const SINGLETONS = ['pallet', 'mezzanine', 'route', 'truck', 'bench'] as const
+const SINGLETONS = ['pallet', 'mezzanine', 'route', 'truck', 'bench', 'dock-leveller'] as const
 
 describe('kind isimlendirme standardı', () => {
   test('manifest gerçekten kind taşıyor', () => {

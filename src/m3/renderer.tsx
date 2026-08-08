@@ -8,13 +8,12 @@ import {
   useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getRackMaterial } from '../rack/materials'
@@ -138,22 +137,6 @@ function M3RendererBody({ node }: { node: M3ShelvingNode }) {
    * çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde hiç
    * çizilmez.
    */
-  const hidden = !drawsSelf
-  const userHidden = node.visible === false
-
-  /**
-   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
-   * gizledi"den ayırıyor — ayıramazsa her bay havuzdan düşer ve run boşalır.
-   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
-   *
-   * JSX `userData` prop'u olarak DEĞİL, elle yazılıyor: R3F o prop'la nesnenin
-   * userData'sını tamamen değiştiriyor ve host'un kayıtlı nesneye yazdığı
-   * anahtarlar her renderda silinirdi.
-   */
-  useLayoutEffect(() => {
-    const object = registeredRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
 
   return (
     <group {...handlers} ref={wrapperRef}>
@@ -166,7 +149,7 @@ function M3RendererBody({ node }: { node: M3ShelvingNode }) {
         position={position}
         ref={registeredRef}
         rotation={rotation}
-        visible={!userHidden && !hidden}
+        visible={node.visible !== false}
       >
         {!isExporting && (
           <Collider

@@ -7,14 +7,13 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { BufferGeometry, Camera, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { registerGhostLod } from '../instancing/ghost-lod'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -226,26 +225,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
    */
   const filmed = cargo !== null && node.wrapped && node.cargo !== 'none'
 
-  /**
-   * Kolektif havuz bu paleti çiziyorken alt ağaç render gezinişinden DÜŞER.
-   *
-   * `_projectObject` özyinelemeyi yalnız `visible === false`'ta kesiyor, ilk
-   * satırda, çocuklara hiç inmeden; gerekçenin ve ölçümün tamamı
-   * `instancing/collective.ts`'in `HIDDEN_FOR_COLLECTIVE` bloğunda. Kaybedilen
-   * bir şey yok: `Raycaster` da (çarpıştırıcı zaten `visible={false}`)
-   * `Box3.expandByObject` de (gölge frustum birleşimi) görünürlüğe bakmıyor.
-   *
-   * Rafta koşul düpedüz `!drawsSelf`. Palette DEĞİL, ve fark paletin alt
-   * ağacında havuza GİRMEYEN bir mesh olmasından: streç film saydam, kendi
-   * sıralama düzenini istiyor ve görünürlüğü düğüm başına mesafeyle sürülüyor —
-   * üçü de bir örnek tamponunda ifade edilemiyor, o yüzden film havuzun dışında
-   * kalıyor ve gövdesini kendi çiziyor. Gizlenen bir alt ağaçta ise hiç
-   * çizilmez. Sarılı palet varsayılan olduğu için bunun bedeli açık: yüklü ve
-   * sarılı paletlerde geziniş kazancı yok. Alternatifi bütün streçlerin sessizce
-   * kaybolmasıydı.
-   */
-  const hidden = !drawsSelf && !filmed
-  const userHidden = node.visible === false
+  const _hidden = !drawsSelf && !filmed
 
   /**
    * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
@@ -261,10 +241,6 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
    * ayırır ve R3F onu olduğu gibi yerine koyar. `useLayoutEffect` kolektif
    * sistemin `useFrame`'inden önce koştuğu için havuz bayrağı hep güncel okuyor.
    */
-  useLayoutEffect(() => {
-    const object = wrapperRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
 
   /**
    * Güvertenin katman döngüsü `SelfDrawnBody`'ye taşındı.
@@ -288,7 +264,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
   const totalHeight = unitLoadHeightOf(node)
 
   return (
-    <group {...handlers} ref={wrapperRef} visible={!userHidden && !hidden}>
+    <group {...handlers} ref={wrapperRef} visible={node.visible !== false}>
       <group position={position} ref={registeredRef} rotation={rotation}>
         {/* Selection collider. The deck has 41 mm gaps between boards and open
             fork tunnels, so raycasting the real mesh would let clicks fall

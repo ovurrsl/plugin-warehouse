@@ -13,7 +13,6 @@ import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { registerGhostLod } from '../instancing/ghost-lod'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -201,24 +200,6 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
    * toplu çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde
    * hiç çizilmez.
    */
-  const hidden = !drawsSelf
-  const userHidden = node.visible === false
-
-  /**
-   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
-   * gizledi"den ayırıyor — ayıramazsa her raf havuzdan düşer ve sahne boşalır.
-   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
-   *
-   * JSX prop'u olarak DEĞİL, elle yazılıyor: R3F `userData={{...}}` prop'unu
-   * nesnenin tamamıyla değiştiriyor ve host'un kayıtlı nesneye yazdığı
-   * anahtarlar (`excludeFromBvh` gibi) her renderda silinirdi. `useLayoutEffect`
-   * kolektif sistemin `useFrame`'inden önce koşuyor, yani havuz bayrağı hep
-   * güncel okuyor.
-   */
-  useLayoutEffect(() => {
-    const object = registeredRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
 
   return (
     <group
@@ -226,7 +207,7 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
       position={position}
       ref={registeredRef}
       rotation={rotation}
-      visible={!userHidden && !hidden}
+      visible={node.visible !== false}
     >
       {/*
           Selection collider. A rack is mostly air — clicks aimed at it fall

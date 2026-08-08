@@ -9,13 +9,12 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { isSelected } from '../selection'
@@ -188,32 +187,13 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
   // rail would be in the way of the one thing the machine does.
   const colliderHeight = Math.max(0.2, node.transportHeight)
 
-  /**
-   * Havuz çizerken bu alt ağaç ekranda hiçbir şey yapmıyor ama three onu her
-   * karede renk ve gölge geçidinde geziyor. `visible = false` onu
-   * `projectObject`'ten tamamen düşürüyor; seçim ve gölge sınırları
-   * etkilenmiyor (raycaster ve `Box3.expandByObject` `visible`'a bakmıyor).
-   *
-   * Bayrak ŞART: havuzun görünürlük taraması (`isEffectivelyVisible`) onsuz
-   * "kolektif gizledi"yi "kullanıcı gizledi"den ayıramaz ve bütün aileyi
-   * havuzdan düşürür — ekranda tek modül kalmaz. JSX `userData` prop'u
-   * olarak yazılamaz: R3F nesnenin tamamını değiştirip host'un yazdığı
-   * anahtarları siler.
-   */
-  const hidden = !drawsSelf
-  const userHidden = node.visible === false
-  useLayoutEffect(() => {
-    const object = registeredRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
-
   return (
     <group ref={wrapperRef} {...handlers}>
       <group
         position={position}
         ref={registeredRef}
         rotation={rotation}
-        visible={!userHidden && !hidden}
+        visible={node.visible !== false}
       >
         {!isExporting && (
           <Collider position={[0, colliderHeight / 2, 0]} size={[length, colliderHeight, width]} />

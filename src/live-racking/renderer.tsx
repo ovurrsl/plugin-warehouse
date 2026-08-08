@@ -7,13 +7,12 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { isSelected } from '../selection'
@@ -125,22 +124,6 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
    * çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde hiç
    * çizilmez.
    */
-  const hidden = !drawsSelf
-  const userHidden = node.visible === false
-
-  /**
-   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
-   * gizledi"den ayırıyor — ayıramazsa her kanal havuzdan düşer ve sıra boşalır.
-   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
-   *
-   * JSX `userData` prop'u olarak DEĞİL, elle yazılıyor: R3F o prop'la nesnenin
-   * userData'sını tamamen değiştiriyor ve host'un kayıtlı nesneye yazdığı
-   * anahtarlar her renderda silinirdi.
-   */
-  useLayoutEffect(() => {
-    const object = registeredRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
 
   return (
     <group {...handlers} ref={wrapperRef}>
@@ -150,7 +133,7 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
         position={position}
         ref={registeredRef}
         rotation={rotation}
-        visible={!userHidden && !hidden}
+        visible={node.visible !== false}
       >
         {!isExporting && <Collider position={[0, height / 2, 0]} size={[width, height, depth]} />}
         {drawsSelf && (

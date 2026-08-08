@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { CATALOG_ITEMS } from '../catalog'
+import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
 import {
   CONSTRUCTIVE_SYSTEMS,
@@ -10,7 +11,7 @@ import {
   STAIRCASE_GEOMETRY,
 } from './catalog'
 import { mezzanineDefinition } from './definition'
-import { mezzanineGeometryKey } from './geometry'
+import { getMezzanineGeometry, mezzanineGeometryKey } from './geometry'
 import {
   effectiveClearHeightM,
   gridColumnPositions,
@@ -203,6 +204,174 @@ describe('geometri anahtarı', () => {
       ],
     })
     expect(mezzanineGeometryKey(a)).toBe(mezzanineGeometryKey(b))
+  })
+})
+
+describe('geometri anahtarı kapsaması — iki yönlü', () => {
+  /**
+   * Rafın kapsama tablosunun asma kat hâli, ve buradaki gerekçe daha keskin:
+   * anahtar poligonu HİÇ taşımıyordu, yani aynı ızgarada çizilmiş bir L ile
+   * bir T aynı buffer'a çözülüyor ve ikincisi ekranda birincinin çeliğiyle
+   * duruyordu. Hiçbir hata görünmüyor — yalnız yanlış şekil.
+   *
+   * Tablonun negatif yarısı da dolu olmak zorunda: yalnız pozitif yönü sınayan
+   * bir test "anahtar YETERİNCE büyük mü" diye sorar, ve onu geçmenin en ucuz
+   * yolu her alanı anahtara yazmaktır — önbelleği bedelsiz bölen tam da o.
+   */
+  const buildFresh = (node: MezzanineNode): Float32Array => {
+    clearConveyorGeometryCache()
+    const geometry = getMezzanineGeometry(node)
+    // Konum VE renk: intumesan boya tek bir vertex kımıldatmıyor ama mesh'i
+    // değiştiriyor — yalnız konuma bakan bir kıyas onu gereksiz ilan ederdi.
+    const buffers = (['position', 'color'] as const).map(
+      (name) => geometry.getAttribute(name).array as ArrayLike<number>,
+    )
+    const combined = new Float32Array(buffers.reduce((total, part) => total + part.length, 0))
+    let offset = 0
+    for (const part of buffers) {
+      combined.set(Float32Array.from(part), offset)
+      offset += part.length
+    }
+    return combined
+  }
+
+  const sameMesh = (a: Float32Array, b: Float32Array) =>
+    a.length === b.length && a.every((value, index) => value === b[index])
+
+  /** Merdivenli bir kat — `railings` ancak gerçek bir kolda ölçülebilir. */
+  const stairTier = (railings: 1 | 2) => ({
+    index: 0,
+    elevationM: 'auto',
+    clearHeightM: 3,
+    loadClass: 500,
+    floorType: 'WOOD_CHIPBOARD_30',
+    accessories: {
+      staircases: [
+        {
+          id: 'stair-1',
+          placement: { mode: 'edge', edge: 'north', offsetM: 6 },
+          widthM: 1,
+          landing: 'turn180',
+          railings,
+          steps: 'auto',
+        },
+      ],
+      swingGates: [],
+      upAndOverGates: [],
+      safetyZones: [],
+    },
+  })
+
+  /** Varsayılan ızgaranın (4×3 × 5 m) ürettiği dikdörtgenin ta kendisi. */
+  const IMPLICIT_RECT = [
+    [-10, -7.5],
+    [10, -7.5],
+    [10, 7.5],
+    [-10, 7.5],
+  ]
+
+  const GL2000 = { constructiveSystem: 'GL2000' }
+
+  /** `[etiket, taban yaması, değişken yaması]`. */
+  const CASES: Array<[string, Record<string, unknown>, Record<string, unknown>]> = [
+    // ── Şekli değiştirenler ────────────────────────────────────────────
+    [
+      'polygon: L şekli',
+      {},
+      {
+        polygon: [
+          [-10, -7.5],
+          [10, -7.5],
+          [10, 0],
+          [0, 0],
+          [0, 7.5],
+          [-10, 7.5],
+        ],
+      },
+    ],
+    [
+      // Anahtarın hiç görmediği hâl: iki AYRI özel şekil, aynı ızgara.
+      'polygon: L yerine T',
+      {
+        polygon: [
+          [-10, -7.5],
+          [10, -7.5],
+          [10, 0],
+          [0, 0],
+          [0, 7.5],
+          [-10, 7.5],
+        ],
+      },
+      {
+        polygon: [
+          [-10, -7.5],
+          [10, -7.5],
+          [10, 0],
+          [5, 0],
+          [5, 7.5],
+          [-5, 7.5],
+          [-5, 0],
+          [-10, 0],
+        ],
+      },
+    ],
+    [
+      // Izgaranın ürettiği dikdörtgenin AYNISI çizilse bile mesh değişiyor:
+      // özel şekil dalı panel ve kolon ızgarasını orijine sabitliyor,
+      // dikdörtgen dalı taban izine ortalıyor. Türetilmiş köşeler ikisinde
+      // de aynı, ayıran şey hangi daldan geçildiği.
+      'polygon: ızgaranın kendi dikdörtgeni',
+      {},
+      { polygon: IMPLICIT_RECT },
+    ],
+    ['grid.baysX', {}, { grid: { baysX: 6, baysY: 3, bayWidthM: 5, bayDepthM: 5 } }],
+    ['grid.baysY', {}, { grid: { baysX: 4, baysY: 5, bayWidthM: 5, bayDepthM: 5 } }],
+    ['grid.bayWidthM', {}, { grid: { baysX: 4, baysY: 3, bayWidthM: 6, bayDepthM: 5 } }],
+    ['grid.bayDepthM', {}, { grid: { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 6 } }],
+    ['columnType', {}, { columnType: 'double' }],
+    ['constructiveSystem', {}, GL2000],
+    ['mainBeamProfile (GL2000 okuyor)', GL2000, { mainBeamProfile: 'IPE360' }],
+    ['secondaryBeamProfile (GL2000 okuyor)', GL2000, { secondaryBeamProfile: 'IPE240' }],
+    ['columnProfile (GL2000 okuyor)', GL2000, { columnProfile: 'HEA300' }],
+    ['frameColor', {}, { frameColor: '#00ff00' }],
+    ['intumescentPaint', {}, { intumescentPaint: true }],
+    ['staircase.railings', { tiers: [stairTier(2)] }, { tiers: [stairTier(1)] }],
+
+    // ── Tek bir vertex bile kımıldatmayanlar ───────────────────────────
+    [
+      // SIGMA soğuk şekillendirilmiş kendi ailesini kullanıyor ve override'ı
+      // TÜMDEN yok sayıyor (`resolveIBeam`). Ham alanı anahtara yazmak, aynı
+      // mesh'i iki anahtar altında saklamaktı.
+      'mainBeamProfile SIGMA’da yok sayılıyor',
+      {},
+      { mainBeamProfile: 'IPE360' },
+    ],
+    ['columnProfile SIGMA’da yok sayılıyor', {}, { columnProfile: 'HEA300' }],
+    [
+      // Yazım hatası varsayılana düşüyor — yani varsayılanla aynı mesh.
+      'bilinmeyen profil adı varsayılana düşüyor',
+      GL2000,
+      { mainBeamProfile: 'IPE999' },
+    ],
+    [
+      'loadClass yalnız kapasite',
+      { tiers: [stairTier(2)] },
+      { tiers: [{ ...stairTier(2), loadClass: 1000 }] },
+    ],
+    ['name', {}, { name: 'Asma kat 3' }],
+    ['position', {}, { position: [12, 0, 4] }],
+    ['rotation', {}, { rotation: [0, Math.PI / 2, 0] }],
+    ['supportSlabId', {}, { supportSlabId: 'slab_abcdefgh' }],
+  ]
+
+  test('mesh’i değiştiren her girdi anahtarı da değiştirir, değiştirmeyen değiştirmez', () => {
+    for (const [label, basePatch, variantPatch] of CASES) {
+      const base = MezzanineNode.parse(basePatch)
+      const variant = MezzanineNode.parse({ ...basePatch, ...variantPatch })
+      const changesMesh = !sameMesh(buildFresh(base), buildFresh(variant))
+      const changesKey = mezzanineGeometryKey(variant) !== mezzanineGeometryKey(base)
+      expect({ label, changesKey }).toEqual({ label, changesKey: changesMesh })
+    }
   })
 })
 

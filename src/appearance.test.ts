@@ -8,6 +8,7 @@ import {
   appearanceKey,
   previewMaterial,
   resetSurfaceMaterials,
+  selectAppearance,
   surfaceMaterial,
   surfaceMaterialCacheSize,
 } from './appearance'
@@ -158,6 +159,38 @@ describe('materyal sayısı düğümle DEĞİL ayarla ölçekleniyor', () => {
     expect(ghost).not.toBe(real)
     expect(ghost.transparent).toBe(true)
     expect(real.transparent).toBe(false)
+  })
+})
+
+describe('seçicinin kimliği durum değişmedikçe SABİT', () => {
+  /**
+   * Bu, tek aboneliğe geçmenin ödediği bedel — ve ödenmezse hata sessiz
+   * değil, ölümcül: zustand `useSyncExternalStore` üstünde duruyor ve durum
+   * değişmediği hâlde her çağrıda yeni nesne döndüren bir seçici React'e
+   * "değişti" dedirtir, ekran sonsuz render döngüsüne girer.
+   */
+  const state = { colorPreset: 'clay', shading: 'rendered', textures: true } as const
+
+  test('aynı durumun iki okuması AYNI nesneyi verir', () => {
+    const first = selectAppearance(state)
+    // Store durumu her yazımda yeni nesne; okunan üç alan aynı kaldıysa
+    // sonuç yine de aynı referans olmalı.
+    expect(selectAppearance({ ...state })).toBe(first)
+  })
+
+  test('bir alan değişince YENİ nesne verir', () => {
+    const rendered = selectAppearance(state)
+    const solid = selectAppearance({ ...state, shading: 'solid' })
+    expect(solid).not.toBe(rendered)
+    expect(solid.shading).toBe('solid')
+    // Eski nesne yerinde değiştirilmiş olsaydı `useMemo` bağımlılıkları
+    // kımıldamaz, materyal tazelenmez ve Display düğmesi hiçbir şey yapmazdı.
+    expect(rendered.shading).toBe('rendered')
+  })
+
+  test('dokular kapanınca da yeni nesne — boolean alan gözden kaçmıyor', () => {
+    const on = selectAppearance(state)
+    expect(selectAppearance({ ...state, textures: false })).not.toBe(on)
   })
 })
 

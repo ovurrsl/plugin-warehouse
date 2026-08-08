@@ -11,7 +11,13 @@
  */
 
 import type { ConveyorDetail } from './parts'
-import { beltWidthM, boomSections, frameWidthM, telescopicModelOf } from './telescopic-metrics'
+import {
+  beltWidthM,
+  boomSections,
+  frameWidthM,
+  telescopicModelOf,
+  transportHeightM,
+} from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
 export type TelescopicPartRole =
@@ -48,7 +54,7 @@ export function telescopicBaseParts(
   const model = telescopicModelOf(node.model)
   const a = model.fixedM
   const halfA = a / 2
-  const topY = model.heightM
+  const topY = transportHeightM(node)
   const frame = frameWidthM(node)
   const belt = beltWidthM(node)
   const parts: TelescopicPart[] = []
@@ -135,7 +141,7 @@ export function telescopicSectionParts(
   const sections = boomSections({ ...node, extension: 0 })
   const section = sections[sectionIndex - 1]
   if (!section) return []
-  const topY = model.heightM - section.dropM
+  const topY = transportHeightM(node) - section.dropM
   const width = section.widthM
   const length = section.lengthM
   const parts: TelescopicPart[] = []

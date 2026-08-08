@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getCachedGeometry, releaseGeometry, retainGeometry } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { emitRackPart, type Sink, toLinear } from '../rack/geometry-builder'
 import {
   clearOpening,
@@ -101,8 +102,11 @@ function buildFrom(
  *
  * Id, name, position, rotation, `supportSlabId` and `ghostFill` are absent on
  * purpose: two lanes that look the same must share one geometry.
+ *
+ * Çıplak üretici — dışarıya çıkan `driveInGeometryKey` bunun düğüm nesnesine
+ * memoize edilmiş hâli (dosyanın sonunda).
  */
-export function driveInGeometryKey(
+function buildDriveInGeometryKey(
   lane: DriveInRackNode,
   detail: DriveInDetail,
   omission: FrameOmission = { omitRight: false },
@@ -162,3 +166,9 @@ export function retainDriveInGeometry(
 
 export type { DriveInDetail }
 export { releaseGeometry as releaseDriveInGeometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildDriveInGeometryKey`. */
+export const driveInGeometryKey = memoiseGeometryKey(
+  buildDriveInGeometryKey,
+  (detail, omission) => `${detail}:${omission?.omitRight ? 'L' : 'LR'}`,
+)

@@ -25,6 +25,7 @@ import { isClearAt } from '../clash'
 import {
   electSupportSlab,
   resolveAlignedPlacement,
+  samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
@@ -72,6 +73,9 @@ export default function ConveyorCurveTool() {
   const validRef = useRef(true)
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
+  /** Son YAZILAN imleç merkezi. Kapının belleği: kutu gerçekten kımıldamadıysa
+   *  `setCursorPosition` hiç çağrılmaz. */
+  const cursorPositionRef = useRef<readonly [number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
 
   const previewNode = useMemo(
@@ -133,7 +137,13 @@ export default function ConveyorCurveTool() {
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
       // The footprint is centred on the node, so the box and the ghost share a
       // position — unlike a run of straights, where the box spans them all.
-      setCursorPosition(visual)
+      // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
+      // her fare hareketinde kaçamayacağı bir render ettiriyor; ızgaraya
+      // oturmuş imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
+      if (!samePlacementPoint(cursorPositionRef.current, visual)) {
+        cursorPositionRef.current = visual
+        setCursorPosition(visual)
+      }
       lastPositionRef.current = position
       recomputeValidity(visual)
 

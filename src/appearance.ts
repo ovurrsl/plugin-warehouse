@@ -6,7 +6,6 @@ import {
   resolveSurfaceColor,
   useViewer,
 } from '@pascal-app/viewer'
-import { useMemo } from 'react'
 import * as THREE from 'three'
 
 /**
@@ -84,17 +83,55 @@ export function appearanceKey(appearance: Appearance): string {
 }
 
 /**
- * Display ayarlarını okur.
+ * En son okunan ayar üçlüsü — modül kapsamında, abone başına değil.
  *
- * Üç ayrı seçici, çünkü üçü de ilkel değer döndürüyor: zustand referansla
- * karşılaştırdığı için tek bir nesne döndüren seçici her yazışta yeni kimlik
- * üretir ve abone olan her düğümü boşuna yeniden render ederdi.
+ * Abone başına olması gerekmiyor çünkü hepsi aynı store durumunu okuyor: tek
+ * bir "son sonuç" hepsine yetiyor, ve sahnedeki bütün düğümler aynı nesne
+ * referansını paylaşınca ayarı bağımlılık olarak alan `useMemo`'lar da boşuna
+ * tazelenmiyor.
+ */
+let lastAppearance: Appearance | null = null
+
+/**
+ * Ayarları store durumundan okur, kimliği KARARLI tutarak.
+ *
+ * Kimlik kararlılığı süs değil, zustand'ın sözleşmesi: store `useSyncExternalStore`
+ * üstünde duruyor ve durum değişmediği hâlde her çağrıda yeni nesne döndüren bir
+ * seçici React'e "değişti" dedirtir — sonsuz render döngüsü. Bu yüzden üç alan
+ * bir öncekiyle tek tek kıyaslanıyor ve üçü de aynıysa AYNI nesne geri veriliyor.
+ *
+ * Parametre `Appearance` olarak yazılı çünkü seçicinin okuduğu tek şey bu üç
+ * alan; `ViewerState` yapısal olarak buna atanabiliyor.
+ */
+export function selectAppearance(state: Appearance): Appearance {
+  const previous = lastAppearance
+  if (
+    previous !== null &&
+    previous.shading === state.shading &&
+    previous.textures === state.textures &&
+    previous.colorPreset === state.colorPreset
+  ) {
+    return previous
+  }
+  const next: Appearance = {
+    colorPreset: state.colorPreset,
+    shading: state.shading,
+    textures: state.textures,
+  }
+  lastAppearance = next
+  return next
+}
+
+/**
+ * Display ayarlarını okur — düğüm başına TEK abonelik.
+ *
+ * Üç ayrı `useViewer` çağrısı düğüm başına üç abonelik demekti, ve zustand v5
+ * her store yazımında her abonenin seçicisini koşturuyor: 5.000 düğümlük bir
+ * sahnede tek bir yazım 15.000 seçici çağrısı. Tek seçici bunu üçte birine
+ * indiriyor; ilkel değer döndürmediği hâlde güvenli olmasının nedeni yukarıda.
  */
 export function useAppearance(): Appearance {
-  const shading = useViewer((s) => s.shading)
-  const textures = useViewer((s) => s.textures)
-  const colorPreset = useViewer((s) => s.colorPreset)
-  return useMemo(() => ({ shading, textures, colorPreset }), [shading, textures, colorPreset])
+  return useViewer(selectAppearance)
 }
 
 /**

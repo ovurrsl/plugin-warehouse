@@ -38,6 +38,24 @@ export const ConveyorTelescopicNode = BaseNode.extend({
   beltWidth: z.enum(TELESCOPIC_BELT_WIDTHS).default('800'),
 
   /**
+   * Kuyruk ucunun bant kotu, metre. Boş bırakılırsa modelin katalog kotu.
+   *
+   * Katalog her model için bir kot yayınlıyor (800 / 900 / 950 / 1050 mm) ve
+   * varsayılan odur — bu yüzden alan `optional`, sabit bir sayı değil: bir
+   * varsayılan yazmak katalogdaki dört değerden üçünü sessizce yanlışlardı.
+   *
+   * Ayarlanabilir olmasının sebebi bu makinenin ne olduğu: bom bir iç
+   * konveyör hattından besleniyor ve kuyruk o hattın kotuna kuruluyor. Alan
+   * yokken teleskopik ailenin geri kalanıyla HİÇ birleşemiyordu — mıknatıs
+   * bant kotunda sıfır tolerans istiyor (`port-magnet.ts` `blockingRule`),
+   * teleskopiğin kotu modelden sabitti ve ailenin varsayılanı 0,75 m.
+   *
+   * Sınırlar ailenin kendi `transportHeight`'ıyla aynı (0,37–3 m) ve bu bir
+   * SEÇİLMİŞ VARSAYILAN: katalog bir ayar aralığı yayınlamıyor.
+   */
+  transportHeight: z.number().min(0.37).max(3).optional(),
+
+  /**
    * Uzama oranı, 0 (B tamamen kapalı) … 1 (tam açık, boy = C).
    * Park edilmiş bir sahne durumu — simülasyon değil, yerleşim kararı:
    * rampaya uzanmış bomun kapladığı zemin planın konusudur.

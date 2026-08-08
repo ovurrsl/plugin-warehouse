@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS } from '../catalog'
 import { boxesOverlap, occupiedVolumes, toWorldBox } from '../clash'
+import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
 import { resetStatsIndex, sceneStats } from '../stats'
 import {
@@ -14,7 +15,7 @@ import {
 } from './catalog'
 import { liveRackingDefinition } from './definition'
 import { buildLiveRackingFloorplan } from './floorplan'
-import { liveRackingGeometryKey } from './geometry'
+import { getLiveRackingGeometry, liveRackingGeometryKey } from './geometry'
 import {
   assignedSkuCount,
   bayWidthM,
@@ -364,23 +365,86 @@ describe('katalog doğrulamaları — Faz 2', () => {
 })
 
 describe('geometri anahtarı', () => {
-  test('şekli değiştiren her girdi anahtarda', () => {
-    const base = node()
-    for (const patch of [
-      { palletsDeep: 9 },
-      { levels: 5 },
-      { gradient: 0.05 },
-      { rollerPitch: 0.15 },
-      { palletPreset: 'euro-1200x1200' },
-      { withRetainers: true },
-      { variant: 'LIFO' },
-      { splitRollers: true },
-      { hingedChannels: true },
-      { uprightColor: '#ff0000' },
-    ]) {
-      expect(liveRackingGeometryKey(node(patch), 'full'), JSON.stringify(patch)).not.toBe(
-        liveRackingGeometryKey(base, 'full'),
-      )
+  /**
+   * İki yönlü kapsama — rafın tablosunun canlı raf hâli, ve HER İKİ katmanda
+   * ayrı ayrı.
+   *
+   * İkinci katmanın kendi turu olmasının sebebi ölçülmüş bir eksik rapordu:
+   * akış donanımının tamamı (makara hattı, bölünmüş makara, tutucu) yalnız
+   * yakın katmanda üretiliyor, ama anahtar bu alanları katmandan bağımsız
+   * yazıyordu — uzaktaki iki kanal birebir aynı şeridi çiziyor, iki ayrı
+   * buffer tutuyordu. Yalnız `'full'` üzerinden koşan bir tablo bunu göremez,
+   * çünkü orada üç alan da gerçekten mesh'i değiştiriyor.
+   */
+  const buildFresh = (target: LiveRackingNode, detail: 'full' | 'simple'): Float32Array => {
+    clearConveyorGeometryCache()
+    const geometry = getLiveRackingGeometry(target, detail)
+    // Konum VE renk: boya tek bir vertex kımıldatmıyor ama mesh'i
+    // değiştiriyor — renkler vertex attribute'unda.
+    const buffers = (['position', 'color'] as const).map(
+      (name) => geometry.getAttribute(name).array as ArrayLike<number>,
+    )
+    const combined = new Float32Array(buffers.reduce((total, part) => total + part.length, 0))
+    let offset = 0
+    for (const part of buffers) {
+      combined.set(Float32Array.from(part), offset)
+      offset += part.length
+    }
+    return combined
+  }
+
+  const sameMesh = (a: Float32Array, b: Float32Array) =>
+    a.length === b.length && a.every((value, index) => value === b[index])
+
+  /**
+   * `[etiket, taban yaması, değişken yaması]`.
+   *
+   * Hangi satırın hangi yöne düştüğü tabloda YAZILI DEĞİL, ölçülüyor: aynı
+   * satır `'full'`de mesh'i değiştirip `'simple'`da değiştirmeyebilir ve
+   * anahtarın da tam olarak öyle davranması gerekiyor.
+   */
+  const CASES: Array<[string, Record<string, unknown>, Record<string, unknown>]> = [
+    ['variant', {}, { variant: 'LIFO' }],
+    ['palletPreset', {}, { palletPreset: 'euro-1200x1200' }],
+    ['palletsDeep', {}, { palletsDeep: 9 }],
+    ['levels', {}, { levels: 5 }],
+    ['firstLevelClear', {}, { firstLevelClear: 1.9 }],
+    // Zemin seviyesi transpalet katı `firstLevelClear`i HİÇ okumuyor.
+    ['firstLevelClear (zemin katı)', { floorSetPalletTruckLevel: true }, { firstLevelClear: 1.9 }],
+    ['levelClear', {}, { levelClear: 1.9 }],
+    // Tek katlı kanalda "katlar arası" diye bir şey yok.
+    ['levelClear (tek kat)', { levels: 1 }, { levelClear: 1.9 }],
+    ['gradient', {}, { gradient: 0.05 }],
+    ['rollerPitch', {}, { rollerPitch: 0.15 }],
+    ['withRetainers', {}, { withRetainers: true }],
+    ['splitRollers', {}, { splitRollers: true }],
+    ['intermediateRetainers (derin)', { palletsDeep: 18 }, { intermediateRetainers: true }],
+    ['intermediateRetainers (eşiğin altında)', { palletsDeep: 8 }, { intermediateRetainers: true }],
+    ['hingedChannels', {}, { hingedChannels: true }],
+    ['floorSetPalletTruckLevel', {}, { floorSetPalletTruckLevel: true }],
+    ['cladRack', {}, { cladRack: true }],
+    ['uprightColor', {}, { uprightColor: '#00ff00' }],
+    ['beamColor', {}, { beamColor: '#ff00ff' }],
+    // Tek bir vertex bile kımıldatmayanlar: kimlik, yerleşim ve kapasite
+    // metadata'sı. Negatif yarı boş bırakılırsa test yalnız "anahtar yeterince
+    // büyük mü" diye sorar, ve onu geçmenin en ucuz yolu her alanı yazmaktır.
+    ['skus', {}, { skus: ['SKU-1'] }],
+    ['name', {}, { name: 'Kanal 3' }],
+    ['position', {}, { position: [12, 0, 4] }],
+    ['rotation', {}, { rotation: [0, Math.PI / 2, 0] }],
+    ['supportSlabId', {}, { supportSlabId: 'slab_abcdefgh' }],
+  ]
+
+  test('her katmanda: mesh’i değiştiren her girdi anahtarı da değiştirir, değiştirmeyen değiştirmez', () => {
+    for (const detail of ['full', 'simple'] as const) {
+      for (const [label, basePatch, variantPatch] of CASES) {
+        const base = node(basePatch)
+        const variant = node({ ...basePatch, ...variantPatch })
+        const changesMesh = !sameMesh(buildFresh(base, detail), buildFresh(variant, detail))
+        const changesKey =
+          liveRackingGeometryKey(variant, detail) !== liveRackingGeometryKey(base, detail)
+        expect({ detail, label, changesKey }).toEqual({ detail, label, changesKey: changesMesh })
+      }
     }
   })
 
@@ -494,6 +558,17 @@ describe('tanım ve manifest', () => {
     expect(registered.has('warehouse:live-rack')).toBe(true)
     expect([...registered].sort()).toEqual([...(warehouseCatalogPanel.kinds ?? [])].sort())
     expect(CATALOG_ITEMS.filter((i) => i.kind === 'warehouse:live-rack')).toHaveLength(2)
+  })
+
+  test('bake politikası replace, ve yerine geçecek çizici bildirilmiş', () => {
+    /**
+     * İkisi ayrı düşerse hata görünmez ve sonuç boş bir sahnedir: `replace`
+     * host'a baked mesh'i GİZLETİYOR, yerine koyacak çiziciyi ise ikinci alan
+     * veriyor. Politika var, çizici yoksa kanallar baked görünümde tümden
+     * kaybolur — konsolda tek satır uyarı olmadan.
+     */
+    expect(liveRackingDefinition.bake).toBe('replace')
+    expect(liveRackingDefinition.bakeReplaceRenderer?.module).toBeDefined()
   })
 
   test('taban izi türetilmiş ölçüleri okur', () => {

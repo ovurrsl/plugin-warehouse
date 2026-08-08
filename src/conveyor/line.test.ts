@@ -337,3 +337,50 @@ describe('a port carries what a joint is judged on, and carries it per port', ()
     expect(localPorts(bend()).map((p) => p.id)).toEqual(['a', 'b'])
   })
 })
+
+describe("jointProblems — kimlik memo'su bayat cevap vermiyor", () => {
+  beforeEach(() => {
+    resetLineIndex()
+    resetPortMagnet()
+  })
+
+  test('aynı girdi üçlüsü ikinci kez taranmıyor', () => {
+    // Memo'nun dışarıdan gözlemlenebilir tek kanıtı dönüş kimliği: yedi
+    // panel bu fonksiyonu her store yazımında çağırıyor ve tarama eşleşmiş
+    // port başına tüm sözlüğü geziyor.
+    const wide = conveyor('wide', { position: [0, 0, 0], usefulWidth: '600' })
+    const narrow = conveyor('narrow', { position: [LENGTH, 0, 0], usefulWidth: '400' })
+    const nodes = scene(wide, narrow)
+
+    expect(jointProblems(wide, nodes)).toBe(jointProblems(wide, nodes))
+  })
+
+  test('sözlük değişince cevap YENİDEN hesaplanıyor', () => {
+    /**
+     * Asıl tehlike bu yönde: memo sözlük kimliğini gözetmezse, kullanıcı
+     * komşu modülün şeridini değiştirdikten sonra panel eski uyarıyı
+     * göstermeye devam eder — ya da hiç göstermez. Hiçbir yerde hata
+     * çıkmaz, yalnız panel yalan söyler.
+     */
+    const wide = conveyor('wide', { position: [0, 0, 0], usefulWidth: '600' })
+    const narrow = conveyor('narrow', { position: [LENGTH, 0, 0], usefulWidth: '400' })
+    expect(jointProblems(wide, scene(wide, narrow)).length).toBeGreaterThan(0)
+
+    // Host düğümü yerinde değiştirmiyor, YENİSİYLE değiştiriyor — memo'nun
+    // dayandığı değişmez bu.
+    const matched = conveyor('narrow', { position: [LENGTH, 0, 0], usefulWidth: '600' })
+    expect(jointProblems(wide, scene(wide, matched))).toEqual([])
+  })
+
+  test('birim değişince mesaj yeniden üretiliyor', () => {
+    // Ölçü birimi yalnız METNİ etkiliyor; üçlünün parçası olmasaydı inç'e
+    // geçen kullanıcı milimetreyle yazılmış eski mesajı görürdü.
+    const low = conveyor('low', { position: [0, 0, 0], transportHeight: 0.75 })
+    const high = conveyor('high', { position: [LENGTH, 0, 0], transportHeight: 0.78 })
+    const nodes = scene(low, high)
+
+    const metric = jointProblems(low, nodes, 'metric')
+    const imperial = jointProblems(low, nodes, 'imperial')
+    expect(imperial).not.toEqual(metric)
+  })
+})

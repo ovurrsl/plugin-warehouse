@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { tierGapFor } from './exploded-tiers'
+import { nextTierY, tierGapFor } from './exploded-tiers'
 import { resolveTierElevations } from './metrics'
 import { mezzanineParts, tierCount } from './parts'
 import { emptyAccessories, MezzanineNode, type MezzanineTier } from './schema'
@@ -128,5 +128,41 @@ describe('açılma payı kendini sınırlıyor', () => {
 
   test('tek kat da bir sayı veriyor — sıfıra bölme yok', () => {
     expect(Number.isFinite(tierGapFor(1))).toBe(true)
+  })
+})
+
+describe('hareket gerçekten BİTİYOR', () => {
+  /** 60 fps'te bir karenin yumuşatma oranı (`LERP_RATE = 12`). */
+  const T = Math.min(1, (1 / 60) * 12)
+
+  test('hedefe TAM oturuyor — sonsuza kadar yaklaşmıyor', () => {
+    /**
+     * Sessiz hata: oransal lerp hedefe hiçbir zaman eşit olmaz, yalnız
+     * yaklaşır. Eşiksiz hâlde patlatma açık kaldığı SÜRECE her kare kat başına
+     * bir `position.y` yazımı sürüyordu — ekranda hareket çoktan bitmişken,
+     * her yazım alt ağacın dünya matrisini yeniden çarptırarak.
+     */
+    let y = 0
+    const target = 4
+    let frames = 0
+    while (y !== target && frames < 1000) {
+      y = nextTierY(y, target, T)
+      frames++
+    }
+    expect(y).toBe(target)
+    // Yarım saniyelik bir hareket için makul bir üst sınır; asıl iddia
+    // "bitiyor", bu yalnız "makul sürede" diyor.
+    expect(frames).toBeLessThan(120)
+    // Ve oturduktan sonra çağıran hiçbir yazım görmez.
+    expect(nextTierY(y, target, T)).toBe(y)
+  })
+
+  test('eşik hareketi YUTMUYOR — uzaktan hedefe ışınlanma yok', () => {
+    // Eşiği adıma (kalan × t) değil KALANA uygulamak zorunda: adıma
+    // uygulanmış bir eşik, 4 m uzaktaki bir katı ilk karede hedefe
+    // yapıştırırdı ve açılma animasyonu diye bir şey kalmazdı.
+    const first = nextTierY(0, 4, T)
+    expect(first).toBeGreaterThan(0)
+    expect(first).toBeLessThan(4)
   })
 })

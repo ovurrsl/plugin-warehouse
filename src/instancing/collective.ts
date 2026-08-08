@@ -334,6 +334,20 @@ export function evaluateTiers(
  * (`lights.tsx` `Box3.expandByObject`, o da bakmıyor) etkilemiyor — yani seçme
  * ve gölgeler bedelsiz çalışmaya devam ediyor.
  */
+/**
+ * NOT: bugün bu bayrağı hiçbir renderer YAZMIYOR, ve bu bilinçli.
+ *
+ * Kayıtlı nesneyi "havuz zaten çiziyor" diye gizlemek ölçülmüş bir kazançtı
+ * ama host'un kutu-seçimi (`box-select-tool.tsx` → `isObjectVisible`) ata
+ * zincirinde `visible === false` gören düğümü eliyor: gizlenen kind, V
+ * modunda mavi alanla seçilemez hâle geliyordu. Gerekçenin tamamı ve bekçisi
+ * `src/collective-visibility.test.ts`'te.
+ *
+ * Ayrım burada duruyor çünkü havuzun sözleşmesinin bir parçası: kullanıcının
+ * gizlemesi düğümü havuzdan düşürmeli, başkasının gizlemesi düşürmemeli. Host
+ * seçim tarafında aynı ayrımı okur hâle gelirse budama tek satırla geri
+ * gelebilir.
+ */
 export const HIDDEN_FOR_COLLECTIVE = 'warehouseHiddenForCollective'
 
 /**

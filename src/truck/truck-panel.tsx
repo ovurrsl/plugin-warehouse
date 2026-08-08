@@ -3,7 +3,7 @@
 import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
 import { ActionButton, ActionGroup, PanelSection } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { gapsFor } from '../handling/gaps'
 import { aisleBandForVariant, aisleFigureForModel } from '../handling/metrics'
 import { TRUCK_MODELS, TRUCK_VARIANT_LABEL } from '../handling/models'
@@ -17,7 +17,6 @@ import { truckParametrics } from './parametrics'
 import { parsePinTag, pinTag } from './pin-tag'
 import { claimRoute } from './route-binding'
 import type { TruckNode } from './schema'
-import { stationsAlong } from './stations'
 
 /**
  * Bağla düğmesinin arama yarıçapı.
@@ -58,6 +57,17 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
   const allNodes = useSceneNodes()
   const [commitNote, setCommitNote] = useState<string | null>(null)
   const unit = useUnit()
+  /**
+   * Filo TARAMASI render başına bir kez.
+   *
+   * İki tarama koşuyordu: `buildFleet` (çevrimi kurmak için rota boyunca
+   * bütün rafları geziyor) ve hemen ardından `stationsAlong` — ikincisi
+   * birincinin zaten yaptığı işin aynısı. Kaynak artık `truck.stations`,
+   * yani tarama yarıya indi; `useMemo` de kalanı sahne gerçekten
+   * değiştiğine bağlıyor, çünkü panel seçim, birim ve taahhüt notu için de
+   * yeniden render oluyor.
+   */
+  const fleet = useMemo(() => buildFleet(allNodes), [allNodes])
   if (!node) return null
 
   const model = TRUCK_MODELS[node.model]
@@ -92,7 +102,7 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
    * her bırakma bir geri-alma adımı olurdu ve kullanıcı kendi çizdiği
    * sahneyi Ctrl+Z ile geri alamaz hâle gelirdi.
    */
-  const fleetTruck = buildFleet(allNodes).trucks.find((t) => t.id === node.id)
+  const fleetTruck = fleet.trucks.find((t) => t.id === node.id)
   const cycle = fleetTruck?.cycle ?? null
 
   /**
@@ -103,9 +113,7 @@ export default function TruckPanel({ node: provided }: { node?: TruckNode }) {
    * hayaletsiz yuvalar — rolüne uygun olmayan yuva listeye hiç girmiyor,
    * seçilip sessizce yok sayılmasındansa.
    */
-  const stations = fleetTruck
-    ? stationsAlong(allNodes, fleetTruck.track, TRUCK_MODELS[fleetTruck.modelId])
-    : []
+  const stations = fleetTruck?.stations ?? []
   const writePin = (key: 'pickSlot' | 'dropSlot', tag: string) => {
     const value = tag === 'auto' ? null : parsePinTag(tag)
     useScene.getState().updateNode(node.id as AnyNodeId, { [key]: value } as Partial<AnyNode>)

@@ -9,12 +9,17 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
+import { isSelected } from '../selection'
+import { useStaticTransform } from '../static-transform'
+import { useWarehouseStore } from '../store'
 import { MTR_STRIP_STROKE_M } from './constants'
 import { isLifting } from './flow-simulation'
 import { releaseGeometry } from './geometry-builder'
@@ -32,19 +37,6 @@ import { frameWidthM, moduleLengthM } from './transfer-metrics'
 import type { ConveyorTransferNode } from './transfer-schema'
 
 const NO_RAYCAST = () => {}
-
-/** Shared by every module's picking collider, scaled per node. */
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/**
- * Invisible, and deliberately so. `visible = false` takes the collider out of
- * `WebGLRenderer.projectObject` entirely — no colour pass, no shadow pass —
- * while three's raycaster and R3F's event layer both ignore `visible` and keep
- * hitting it. A `colorWrite: false` material still costs a draw call per module
- * in both passes, which on two hundred modules is two hundred draws that paint
- * nothing.
- */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 /**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
@@ -80,6 +72,12 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
+  // Olay sarmalayıcısı dönüşümsüz, ama auto-update kaldığı sürece bedava
+  // değil: her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki donmuş koliderin kazancını geri verir. Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
+
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -95,6 +93,17 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
     ? [baseRotation[0], live.rotation, baseRotation[2]]
     : baseRotation
 
+  // Duran modül three'nin kare başına matris yeniden hesabından çıkar; canlı
+  // sürükleme ya da override varken bayrak three'ye geri döner. `isLive`
+  // ifadesi JSX'i süren okumanın AYNISI olmak zorunda — ayrışırsa sürüklenen
+  // modül donar (`../static-transform`).
+  useStaticTransform(
+    registeredRef,
+    position,
+    rotation,
+    live !== undefined || override !== undefined,
+  )
+
   /**
    * Whether the module standing downstream builds the shared support.
    *
@@ -107,7 +116,7 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
   const appearance = useAppearance()
   const material = getConveyorMaterial(appearance)
 
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -115,7 +124,7 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
     keyFor: (tier) => transferGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
-    castsShadow: true,
+    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,
@@ -149,20 +158,25 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
   const stripGeometry = useMemo(() => getTransferStripsGeometry(node), [node])
 
   /**
-   * Eased rather than switched, because a strip that snapped up in one frame
-   * would read as a glitch and not as a lift.
+   * Kare döngüsü akış KOŞARKEN mount ediliyor, ve akış durduktan sonra da
+   * şerit yere inene kadar.
    *
-   * Katman döngüsü buradan KALKTI — o iş artık ya kolektif sistemin merkezî
-   * `evaluateTiers`'ında ya da `SelfDrawnBody`'nin içinde. Kalan tek kare
-   * döngüsü bu, ve gerçekten her karede bir şey yapıyor.
+   * Önceki hâlinde abonelik koşulsuzdu: akış kapalıyken `isLifting` hep
+   * `false`, hedef 0, şerit zaten 0 — yani transfer düğümü başına kare
+   * başına bir boş kapanış çağrısı ve etkisiz bir yazım. `self-drawn.tsx`
+   * bu deseni ölçüp kaldırmıştı; burası kalan örneğiydi. Teleskopik aynı
+   * kapıyı zaten `flowRunning` ile kuruyor.
+   *
+   * Kancalar koşullu çağrılamaz, bileşen mount'u koşullu olabilir — döngü
+   * bu yüzden ayrı bir bileşende. `settling`, akış durduğu anda şeridin
+   * yumuşak inişini KAYBETMEMEK için var: kapıyı hemen kapatmak şeridi
+   * havada dondururdu.
    */
-  useFrame((_, delta) => {
-    const strips = stripsRef.current
-    if (!strips) return
-    const target = isLifting(node.id) ? MTR_STRIP_STROKE_M : 0
-    const rate = Math.min(1, delta * 12)
-    strips.position.y += (target - strips.position.y) * rate
-  })
+  const flowRunning = useWarehouseStore((s) => s.flowRunning)
+  const [settling, setSettling] = useState(false)
+  useEffect(() => {
+    if (flowRunning) setSettling(true)
+  }, [flowRunning])
 
   const length = moduleLengthM(node)
   const width = frameWidthM(node)
@@ -174,17 +188,15 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
   const colliderHeight = Math.max(0.2, node.transportHeight)
 
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      <group position={position} ref={registeredRef} rotation={rotation}>
+    <group ref={wrapperRef} {...handlers}>
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={node.visible !== false}
+      >
         {!isExporting && (
-          <mesh
-            dispose={null}
-            geometry={UNIT_COLLIDER}
-            material={COLLIDER_MATERIAL}
-            position={[0, colliderHeight / 2, 0]}
-            scale={[length, colliderHeight, width]}
-            visible={false}
-          />
+          <Collider position={[0, colliderHeight / 2, 0]} size={[length, colliderHeight, width]} />
         )}
         {/* Gölge bayrakları koşulsuz, ailenin geri kalanı gibi: şeritler gerçek
             çelik ve kalktıklarında gövdenin üstünde duruyorlar. Eksik olmaları
@@ -198,6 +210,9 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
           receiveShadow
           ref={stripsRef}
         />
+        {(flowRunning || settling) && (
+          <StripLift nodeId={node.id} onSettled={() => setSettling(false)} stripsRef={stripsRef} />
+        )}
 
         {drawsSelf && (
           <SelfDrawnBody
@@ -212,4 +227,52 @@ function ConveyorTransferRendererBody({ node }: { node: ConveyorTransferNode }) 
       </group>
     </group>
   )
+}
+
+/** Şeridin bir kare sonraki Y'si, metre.
+
+ *  Saf, çünkü ölçülecek olan tam bu: eşik ADIMA değil KALANA uygulanmalı.
+ *  Adıma uygulanmış bir eşik, yolun ortasındaki şeridi ilk karede hedefe
+ *  ışınlar ve kalkış animasyonu diye bir şey kalmaz. */
+export function nextStripY(current: number, target: number, delta: number): number {
+  const rate = Math.min(1, delta * 12)
+  const next = current + (target - current) * rate
+  return Math.abs(target - next) < SETTLE_EPSILON_M ? target : next
+}
+
+/** Şerit hedefe bu kadar yaklaştığında oturmuş sayılır, metre. Strok 0,04 m
+ *  mertebesinde (`MTR_STRIP_STROKE_M`), yani bu değer stroğun binde biri —
+ *  gözle ayırt edilemez ama döngüyü kapatmaya yeter. */
+const SETTLE_EPSILON_M = 5e-5
+
+/**
+ * Şeridi yumuşatarak taşıyan kare döngüsü, KENDİ bileşeninde.
+ *
+ * Ayrı bileşen olmasının sebebi kanca kuralı: `useFrame` koşullu
+ * çağrılamaz, ama bu bileşen koşullu mount edilebilir. Akış kapalı ve
+ * şerit yerdeyken hiç mount olmuyor — transfer düğümü başına kare başına
+ * bir boş kapanış çağrısı böyle kalkıyor.
+ */
+function StripLift({
+  nodeId,
+  onSettled,
+  stripsRef,
+}: {
+  nodeId: string
+  onSettled: () => void
+  stripsRef: { current: THREE.Mesh | null }
+}) {
+  useFrame((_, delta) => {
+    const strips = stripsRef.current
+    if (!strips) return
+    const target = isLifting(nodeId) ? MTR_STRIP_STROKE_M : 0
+    const next = nextStripY(strips.position.y, target, delta)
+    if (next === strips.position.y) {
+      // Yerde durmuş ve kaldıran yok: döngünün yapacağı iş bitti.
+      if (target === 0) onSettled()
+      return
+    }
+    strips.position.y = next
+  })
+  return null
 }

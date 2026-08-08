@@ -43,6 +43,18 @@ export type CatalogItem = {
     | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
     | { kind: 'telescopic'; model: string }
     | {
+        kind: 'bench'
+        patch: {
+          variant:
+            | 'dispatch-packing'
+            | 'mail-order-packing'
+            | 'processing'
+            | 'weighing-scale'
+            | 'mobile-workbench'
+            | 'eco'
+        }
+      }
+    | {
         kind: 'longspan'
         patch: {
           bayLength: number
@@ -167,15 +179,19 @@ export const CATALOG_SECTIONS: readonly CatalogSection[] = [
     blurb: 'Conveyors and sortation.',
   },
   /**
-   * `stations` — "Packing, dispatch, and processing benches" — BURADAN
-   * KALDIRILDI, çünkü hiçbir fişi yoktu.
+   * `stations` bir kez KALDIRILMIŞTI: fişi olmayan bir bölüm, her açılışta
+   * başlığını ve "Nothing here yet." kutusunu çiziyor ve var olmayan bir
+   * yetenek ilan ediyordu. Kural o zaman yazıldı — bir bölüm ancak içine
+   * konacak bir kind'la birlikte gelir — ve `catalog.test.ts` onu kilitledi.
    *
-   * Bölüm başlığını, açıklamasını ve "Nothing here yet." kutusunu her açılışta
-   * çiziyordu: raftaki her şeyin yanında, var olmayan bir yetenek ilan eden
-   * kalıcı bir boşluk. Bir bölüm ancak içine konacak bir kind'la birlikte
-   * gelmeli — `catalog.test.ts` bunu artık test ediyor, yani boş bir bölüm
-   * ikinci kez sessizce eklenemez.
+   * Şimdi geri geliyor çünkü kuralı karşılıyor: altı tezgâh fişiyle birlikte.
    */
+  {
+    id: 'stations',
+    label: 'Work stations',
+    icon: 'lucide:table',
+    blurb: 'Packing, dispatch and processing benches. Every dimension adjustable.',
+  },
   {
     id: 'mezzanine',
     label: 'Mezzanine',
@@ -452,6 +468,66 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
         model: 'HM',
       },
     },
+  },
+  {
+    id: 'bench-dispatch',
+    kind: 'warehouse:bench',
+    label: 'Dispatch Packing Table',
+    sectionId: 'stations',
+    description:
+      'Yoğun sevkiyat istasyonu: 2000 × 900 mm tabla, makaralı yüzey, üst raf ve alt raf. Zarf eski uygulamanın spec dosyasından; iç ölçüler seçilmiş varsayılan. Genişlik, kot ve derinlik panelden ayarlanır.',
+    icon: 'lucide:package-open',
+    brush: { kind: 'bench', patch: { variant: 'dispatch-packing' } },
+  },
+  {
+    id: 'bench-mail-order',
+    kind: 'warehouse:bench',
+    label: 'Mail Order Packing Table',
+    sectionId: 'stations',
+    description:
+      'Posta siparişi paketleme: 1830 × 915 mm tabla, ahşap yüzey, sarf malzemesi için üst raf. [ ve ] ile tezgâh tipleri arasında dolaşın.',
+    icon: 'lucide:mail',
+    brush: { kind: 'bench', patch: { variant: 'mail-order-packing' } },
+  },
+  {
+    id: 'bench-processing',
+    kind: 'warehouse:bench',
+    label: 'Processing Bench',
+    sectionId: 'stations',
+    description:
+      'Ayırma ve kontrol tezgâhı: 1600 × 750 mm tabla, çekmece bloğu ve alet panosu. Çekmeceler masanın yarısında, öteki yarısı diz boşluğu.',
+    icon: 'lucide:wrench',
+    brush: { kind: 'bench', patch: { variant: 'processing' } },
+  },
+  {
+    id: 'bench-weighing',
+    kind: 'warehouse:bench',
+    label: 'Weighing Scale Bench',
+    sectionId: 'stations',
+    description:
+      'Tartılı istasyon: 1400 × 750 mm tabla, gömme platform terazi ve okuma ekranı standı. Platform tablaya sığmazsa panel HATA verir.',
+    icon: 'lucide:scale',
+    brush: { kind: 'bench', patch: { variant: 'weighing-scale' } },
+  },
+  {
+    id: 'bench-mobile',
+    kind: 'warehouse:bench',
+    label: 'Mobile Workbench',
+    sectionId: 'stations',
+    description:
+      'Tekerlekli tezgâh: 1220 × 910 mm tabla, çekmeceli. Tekerler tabla kotunu YÜKSELTMEZ — ayaklar kısalır, böylece sabit tezgâhla yan yana hizalanır.',
+    icon: 'lucide:truck',
+    brush: { kind: 'bench', patch: { variant: 'mobile-workbench' } },
+  },
+  {
+    id: 'bench-eco',
+    kind: 'warehouse:bench',
+    label: 'Eco Table',
+    sectionId: 'stations',
+    description:
+      'Sade paketleme masası: 1200 × 600 mm tabla, metal çerçeve, donanımsız. Ölçüye yaptırılacak bir masanın başlangıç noktası.',
+    icon: 'lucide:table',
+    brush: { kind: 'bench', patch: { variant: 'eco' } },
   },
   {
     id: 'm3-cabinet',

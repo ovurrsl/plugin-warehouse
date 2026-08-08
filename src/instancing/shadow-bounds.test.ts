@@ -34,7 +34,7 @@ import { join } from 'node:path'
  *
  * ## Neden bedeli yok
  *
- * `colliderProps` `visible: false` veriyor; üç, görünmez alt ağacı
+ * `<Collider>` `visible: false` veriyor; üç, görünmez alt ağacı
  * `projectObject`'te tümden eliyor, yani ne renk ne gölge geçidine tek bir
  * çizim çağrısı ekleniyor. `Box3.expandByObject` ise görünürlüğe HİÇ bakmıyor.
  * Kutuyu içeri almak bu yüzden bedava: gölge sınırları düzeliyor, çizim sayısı
@@ -76,8 +76,17 @@ const COLLECTIVE_RENDERERS = [
   'conveyor/transfer-renderer.tsx',
 ]
 
-/** Kolider mesh'inin iki yazım biçimi de sayılır. */
-const COLLIDER_MARKER = /UNIT_COLLIDER|colliderProps\(/
+/**
+ * Kolider bileşeninin JSX'teki izi.
+ *
+ * Eski iki yazım (`UNIT_COLLIDER` satır içi mesh'i, `colliderProps` yayılımı)
+ * tek bir `<Collider>`'da birleşti (matris dondurma, `collider.tsx`), ve o
+ * geçişte bu bekçi kırmızı yandı — istenen buydu: montaj kararı değişmedi
+ * ama yazımı değişti, yani işaretçinin de değişmesi gerekiyordu. Eski
+ * biçimler işaretçide TUTULMUYOR: geri dönen bir satır içi mesh, dondurulmuş
+ * matrisi de kaybederdi ve bu test onu yakalamalı.
+ */
+const COLLIDER_MARKER = /<Collider\b/
 
 describe('gölge sınırları — kolider kayıtlı grubun içinde', () => {
   test('liste boş değil — bekçinin en sinsi kendini kandırma biçimi', () => {

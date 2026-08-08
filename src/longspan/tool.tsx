@@ -13,7 +13,12 @@ import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
-import { electSupportSlab, subscribeGridMove, subscribePlacementClicks } from '../placement'
+import {
+  electSupportSlab,
+  samePlacementPoint,
+  subscribeGridMove,
+  subscribePlacementClicks,
+} from '../placement'
 import { useWarehouseStore } from '../store'
 import { bayPitch, totalDepth } from './levels'
 import LongspanPreview from './preview'
@@ -51,6 +56,9 @@ export default function LongspanTool() {
   const validRef = useRef(true)
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
+  /** Son YAZILAN imleç merkezi. Kapının belleği: kutu gerçekten kımıldamadıysa
+   *  `setCursorPosition` hiç çağrılmaz. */
+  const cursorPositionRef = useRef<readonly [number, number, number] | null>(null)
   const previousSnapRef = useRef<string | null>(null)
   const levelCountRef = useRef(levelCount)
   levelCountRef.current = levelCount
@@ -137,7 +145,13 @@ export default function LongspanTool() {
     const applyCursor = (position: [number, number, number]) => {
       cursorRef.current?.position.set(...position)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
-      setCursorPosition(position)
+      // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
+      // her fare hareketinde kaçamayacağı bir render ettiriyor; ızgaraya
+      // oturmuş imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
+      if (!samePlacementPoint(cursorPositionRef.current, position)) {
+        cursorPositionRef.current = position
+        setCursorPosition(position)
+      }
       setCursorRotationY(rotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(position)

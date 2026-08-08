@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS } from '../catalog'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
@@ -21,6 +23,11 @@ import {
   currentLengthM,
   footprintCenterX,
   frameWidthM,
+  LAMP_BEAM_LENGTH_M,
+  LAMP_HOUSING_SIZE_M,
+  LAMP_LENS_SIZE_M,
+  lampBeamDirection,
+  noseLamp,
   transportHeightM,
 } from './telescopic-metrics'
 import { conveyorTelescopicParametrics } from './telescopic-parametrics'
@@ -177,6 +184,109 @@ describe('burun donanımı: sensör ve platform panelden kapatılabilir', () => 
       hasPlatform: false,
     })
     expect(telescopicSectionKey(on, 3, 'full')).not.toBe(telescopicSectionKey(off, 3, 'full'))
+  })
+})
+
+describe('çalışma lambası: mercek gövdesinin üstünde durur', () => {
+  /**
+   * Bu bölümün tuttuğu hata SESSİZDİ ve aylarca ekrandaydı.
+   *
+   * Gövde parça listesinde `+widthM/2 − 0.08`'de, mercek renderer'da
+   * `−widthM/2 − 0.055`'te duruyordu: parlayan yüzey bomun ÖTEKİ yanında,
+   * havada. Hiçbir şey hata vermiyor — ekranda bir şey yanıyor, ve o şeyin
+   * lambanın kendisi olmadığını ancak makineye yakından bakan biri görüyor.
+   *
+   * Testler `noseLamp`'i kilitliyor çünkü artık iki dosyanın da okuduğu tek
+   * kaynak o; ayrıca renderer'ın gerçekten onu okuduğunu kaynak üzerinden
+   * doğruluyorlar — fonksiyon doğru olup çağıran yanlış hesaplarsa hata aynı
+   * hatadır.
+   */
+  const NODE = ConveyorTelescopicNode.parse({ model: 'a4-6+12' })
+  const NOSE = boomSections(NODE)[boomSections(NODE).length - 1]
+  if (!NOSE) throw new Error('burun bölümü bekleniyordu')
+
+  test('mercek gövdeyle AYNI yanda ve gövdenin +X yüzüne yapışık', () => {
+    const lamp = noseLamp(NODE, NOSE)
+    // Y ve Z birebir aynı: mercek gövdenin yüzü, komşusu değil.
+    expect(lamp.lens[1]).toBeCloseTo(lamp.housing[1], 9)
+    expect(lamp.lens[2]).toBeCloseTo(lamp.housing[2], 9)
+    // X'te tam olarak iki yarı kalınlık kadar ileri — ne gövdenin içine
+    // gömülü ne de havada.
+    expect(lamp.lens[0] - lamp.housing[0]).toBeCloseTo(
+      LAMP_HOUSING_SIZE_M[0] / 2 + LAMP_LENS_SIZE_M[0] / 2,
+      9,
+    )
+  })
+
+  test('mercek bomun içinde — ESKİ hatanın kendisi', () => {
+    const lamp = noseLamp(NODE, NOSE)
+    // Eski değer `−widthM/2 − 0.055` idi: hem ters işaretli hem çerçevenin
+    // dışında. İkisini de ayrı ayrı reddet.
+    expect(Math.sign(lamp.lens[2])).toBe(Math.sign(lamp.housing[2]))
+    expect(Math.abs(lamp.lens[2])).toBeLessThan(NOSE.widthM / 2)
+  })
+
+  test('mercek +X’e bakıyor — ince eksen X', () => {
+    // Yana bakan bir far dorseyi aydınlatmaz. İnce eksenin X olması,
+    // merceğin yüzünün ileri baktığının tek makine-okunur ifadesi.
+    expect(LAMP_LENS_SIZE_M[0]).toBeLessThan(LAMP_LENS_SIZE_M[1])
+    expect(LAMP_LENS_SIZE_M[0]).toBeLessThan(LAMP_LENS_SIZE_M[2])
+  })
+
+  test('uzamadan bağımsız — bom uzarken mercek gövdeden kaymaz', () => {
+    // Parça listesi bölümü dinlenme pozunda (`extension: 0`) kuruyor,
+    // renderer anlık uzamada. İkisi aynı sonucu vermezse mercek uzama
+    // sürüklendikçe gövdeden ayrılır.
+    for (const extension of [0, 0.37, 1]) {
+      const node = ConveyorTelescopicNode.parse({ model: 'a4-6+12', extension })
+      const sections = boomSections(node)
+      const nose = sections[sections.length - 1]
+      if (!nose) throw new Error('burun bölümü bekleniyordu')
+      expect(noseLamp(node, nose)).toEqual(noseLamp(NODE, NOSE))
+    }
+  })
+
+  test('parça listesindeki gövde `noseLamp` ile aynı yerde', () => {
+    const parts = telescopicSectionParts(NODE, 3, 'full')
+    const housing = parts.find((part) => part.role === 'lamp-housing')
+    if (!housing) throw new Error('lamba gövdesi bekleniyordu')
+    expect([...housing.center]).toEqual([...noseLamp(NODE, NOSE).housing])
+    expect([...housing.size]).toEqual([...LAMP_HOUSING_SIZE_M])
+  })
+
+  test('kot değişince lamba da yükselir', () => {
+    const raised = ConveyorTelescopicNode.parse({ model: 'a4-6+12', transportHeight: 1.4 })
+    const sections = boomSections(raised)
+    const nose = sections[sections.length - 1]
+    if (!nose) throw new Error('burun bölümü bekleniyordu')
+    const delta = transportHeightM(raised) - transportHeightM(NODE)
+    expect(noseLamp(raised, nose).lens[1] - noseLamp(NODE, NOSE).lens[1]).toBeCloseTo(delta, 9)
+  })
+
+  test('hüzme İLERİ ve AŞAĞI gidiyor', () => {
+    // Koninin dinlenmedeki gövdesi −Y'de; dönüşün işaretini ters yazmak onu
+    // makinenin içine ve yukarı gönderir. Ekranda garip, konsolda sessiz.
+    const [forward, vertical] = lampBeamDirection()
+    expect(forward).toBeGreaterThan(0.9)
+    expect(vertical).toBeLessThan(0)
+    // Eğim makul: dik inen bir hüzme dorseyi değil zemini aydınlatırdı.
+    expect(Math.abs(vertical)).toBeLessThan(0.4)
+  })
+
+  test('hüzme bomun ucunu AŞIYOR — dorsenin içine giriyor', () => {
+    // İçeri değil dışarı bakması gereken tek parça bu: hüzme boyunca bom
+    // tipinden ileri gitmezse makinenin kendi gövdesini aydınlatır.
+    const lamp = noseLamp(NODE, NOSE)
+    const reach = lamp.lens[0] + LAMP_BEAM_LENGTH_M * lampBeamDirection()[0]
+    expect(reach).toBeGreaterThan(NOSE.lengthM / 2)
+  })
+
+  test('renderer merceği elle DEĞİL `noseLamp` ile yerleştiriyor', () => {
+    const source = readFileSync(join(import.meta.dir, 'telescopic-renderer.tsx'), 'utf8')
+    expect(source).toContain('noseLamp(node, nose)')
+    // Eski elle hesap ve onun imzası olan ters işaret bir daha girmesin.
+    expect(source).not.toContain('-nose.widthM / 2')
+    expect(source).not.toContain('nose.widthM / 2')
   })
 })
 

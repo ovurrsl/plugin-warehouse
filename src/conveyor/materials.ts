@@ -55,3 +55,79 @@ export function getConveyorMaterial(appearance: Appearance): THREE.Material {
 export function getConveyorPreviewMaterial(appearance: Appearance): THREE.Material {
   return previewMaterial(spec(), appearance)
 }
+
+/**
+ * Teleskopik bomun boyası — hattınkinden AYRI, ve bilerek.
+ *
+ * Hat çinko makara ile mill-finish profil (`metalness 0.55`); bom boyalı
+ * makine gövdesi. Tek materyalde birleştirmek ikisinden birini yanlış yapardı
+ * ve yanlış olan, bu ailenin en büyük yüzeyi olurdu.
+ *
+ * Atlas YOK: teleskopik geometri harita sütunu 0'ı (boş) yazıyor, yani
+ * dokunun katacağı bir şey olmadığı hâlde her boma bir doku bağlaması binerdi.
+ *
+ * Bu üçlü buraya taşındı çünkü `telescopic-renderer.tsx` içinde modül düzeyinde
+ * çıplak `MeshStandardMaterial` olarak duruyorlardı: `useAppearance()` hiç
+ * okunmuyor, yani Display menüsü Solid'e alındığında bütün bina Lambert'e
+ * düşerken bom PBR kalıyordu. Kapsam bekçisi (`appearance.test.ts`) yalnız
+ * `materials.ts` dosyalarını tarıyor, o yüzden fark edilmemişti — bekçi de
+ * bu yamada renderer'ları tarayacak biçimde genişletildi.
+ */
+const TELESCOPIC_SPEC = {
+  family: 'telescopic',
+  vertexColors: true,
+  roughness: 0.8,
+  metalness: 0.2,
+} as const
+
+export function getTelescopicMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(TELESCOPIC_SPEC, appearance)
+}
+
+export function getTelescopicPreviewMaterial(appearance: Appearance): THREE.Material {
+  return previewMaterial(TELESCOPIC_SPEC, appearance)
+}
+
+/**
+ * Çalışma lambasının merceği — paketin TEK yayıcı yüzeyi.
+ *
+ * Ayrı materyal, ayrı çizim çağrısı, ve bunun alternatifi yok: makinenin
+ * geri kalanı vertex-renkli tek materyalden çiziliyor ve o materyali yayıcı
+ * yapmak bomun tamamını parlatırdı. Teleskopik düşük adetli bir kind (bir
+ * tesiste iki üç tane), yani düğüm başına bir ek çizim yazılı ve kabul.
+ *
+ * `solid`'de de yanıyor — Lambert `emissive` taşıyor (bkz. `../appearance`).
+ * Dokular kapalıyken sönüyor, çünkü o mod tek renk demek.
+ */
+const LAMP_LENS_SPEC = {
+  family: 'telescopic-lens',
+  color: '#fff6d8',
+  emissive: '#ffe9a8',
+  emissiveIntensity: 1.6,
+  roughness: 0.4,
+} as const
+
+export function getLampLensMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(LAMP_LENS_SPEC, appearance)
+}
+
+/**
+ * Akış kutusu — sahnedeki HER kutu, kim çizerse çizsin.
+ *
+ * İki yer çiziyor: hat sistemi (`flow-system.tsx`, tek `InstancedMesh`, altı
+ * yüz kutu) ve teleskopik bom (kendi küçük havuzu). İkisi de kendi çıplak
+ * `MeshStandardMaterial`'ini kuruyordu — aynı kraft rengin iki kopyası, ve
+ * ikisi de Display menüsünü duymuyordu.
+ */
+const FLOW_BOX_SPEC = {
+  family: 'flow-box',
+  // Kraft, so a box reads as goods rather than as machinery — the whole
+  // conveyor family is blue steel and zinc.
+  color: '#c8a06a',
+  metalness: 0,
+  roughness: 0.85,
+} as const
+
+export function getFlowBoxMaterial(appearance: Appearance): THREE.Material {
+  return surfaceMaterial(FLOW_BOX_SPEC, appearance)
+}

@@ -154,6 +154,22 @@ export type SurfaceSpec = {
    * tema rengine çökmek demek.
    */
   color?: THREE.ColorRepresentation
+  /**
+   * Kendi ışığını veren yüzey — bu pakette yalnız teleskopik bomun çalışma
+   * lambası merceği.
+   *
+   * `physical` alanlarının yanında DEĞİL, ve fark önemli: Lambert
+   * `emissive` ile `emissiveIntensity`'yi TAŞIYOR
+   * (`three/src/materials/MeshLambertMaterial.js:122,130`), yani `solid`
+   * modda da uygulanabiliyor. Yanan bir lamba, kullanıcı gölgeleme modelini
+   * değiştirdi diye sönmez.
+   *
+   * Dokular KAPALIYKEN düşüyor, ve bu bilinçli: o modun tek iddiası sahnenin
+   * tek renge inmesi, ve parlayan bir leke tam olarak o iddiayı bozan şey
+   * olurdu.
+   */
+  emissive?: THREE.ColorRepresentation
+  emissiveIntensity?: number
   /** Harmanlama alanları: her modda korunur. */
   transparent?: boolean
   opacity?: number
@@ -217,6 +233,9 @@ function build(spec: SurfaceSpec, appearance: Appearance): THREE.Material {
     ...(spec.map ? { map: spec.map } : {}),
     ...(spec.vertexColors === undefined ? {} : { vertexColors: spec.vertexColors }),
     ...(spec.color === undefined ? {} : { color: spec.color }),
+    // Yayıcılık iki dalın da taşıdığı bir alan — `physical` grubunda değil.
+    ...(spec.emissive === undefined ? {} : { emissive: spec.emissive }),
+    ...(spec.emissiveIntensity === undefined ? {} : { emissiveIntensity: spec.emissiveIntensity }),
     ...invariantOf(spec),
   }
 

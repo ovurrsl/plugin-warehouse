@@ -10,12 +10,14 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { lodScaleSq, useWarehouseStore } from '../store'
 import { FLOW_BOX_M } from './flow-simulation'
+import { getFlowBoxMaterial, getLampLensMaterial, getTelescopicMaterial } from './materials'
 import type { ConveyorDetail } from './parts'
 import { TELESCOPIC_BELT_SPEED_EST_MS } from './telescopic-catalog'
 import {
@@ -32,6 +34,12 @@ import {
   currentLengthM,
   footprintCenterX,
   frameWidthM,
+  LAMP_BEAM_APEX_ALPHA,
+  LAMP_BEAM_LENGTH_M,
+  LAMP_BEAM_MOUTH_RADIUS_M,
+  LAMP_LENS_SIZE_M,
+  lampBeamRotationZ,
+  noseLamp,
   telescopicModelOf,
   transportHeightM,
 } from './telescopic-metrics'
@@ -54,27 +62,65 @@ function hashPhase(id: string): number {
   return (hash >>> 0) % LOD_INTERVAL
 }
 
-/** Bant üstündeki kutular — ailenin kraft kutusu, paylaşılan tekiller. */
+/** Bant üstündeki kutular — ailenin kraft kutusu, paylaşılan tekil geometri. */
 const BOX_GEOMETRY = new THREE.BoxGeometry(...FLOW_BOX_M)
-const BOX_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#c8a06a',
-  metalness: 0,
-  roughness: 0.85,
-})
+
+/** Merceğin gövdesi — ölçüsü de yeri de `telescopic-metrics`'ten. */
+const LAMP_LENS_GEOMETRY = new THREE.BoxGeometry(...LAMP_LENS_SIZE_M)
 
 /**
- * Çalışma lambasının merceği — TEK yayıcı materyal, tüm sahne.
+ * Işık hüzmesi — lambanın YANDIĞINI okutan şey.
  *
- * Ayrı materyal, ayrı çizim çağrısı: makinenin vertex-renkli tek materyali
- * yayıcı olamaz (bütün gövde parlardı). Düğüm başına bir ek çizim, yalnız
- * yakın katmanda — bir tesiste iki üç bom olur, bedeli budur ve yazılıdır.
+ * Yedi santimlik bir mercek, yirmi metrelik bir makinenin ucunda, normal
+ * kamera mesafesinde birkaç piksel: yanıyor ama görünmüyor. Hüzme o boşluğu
+ * kapatıyor ve makinenin ne yaptığını (karanlık dorsenin içini aydınlatmak)
+ * tek bakışta söylüyor.
+ *
+ * GERÇEK bir ışık kaynağı DEĞİL, ve olmamalı: sahneye bir `spotLight`
+ * eklemek three'ye bütün materyalleri yeniden derletir ve o materyaller bu
+ * paketin tamamı tarafından paylaşılıyor — tek makine için bütün deponun
+ * gölgelendirme maliyeti artardı. Hüzme toplamsal harmanlanan, ışık
+ * hesabına hiç girmeyen tek bir saydam koni.
+ *
+ * Ayara BAĞLI DEĞİL, çünkü bir yüzey değil: `appearance` gölgeleme modelini
+ * seçiyor, hüzmenin gölgelenecek bir yüzü yok. `MeshBasicMaterial`'in
+ * `solid` ile `rendered` arasında değişecek hiçbir alanı yok.
+ *
+ * Ölçüleri ve yönü `telescopic-metrics`'te — yön oradan geliyor çünkü
+ * işaretini ters yazmak hüzmeyi makinenin İÇİNE ve yukarı gönderir, ve bu
+ * hiçbir hata vermez. Orada saf bir fonksiyon olarak durunca test edilebilir.
  */
-const LAMP_LENS_GEOMETRY = new THREE.BoxGeometry(0.11, 0.07, 0.02)
-const LAMP_LENS_MATERIAL = new THREE.MeshStandardMaterial({
-  color: '#fff6d8',
-  emissive: new THREE.Color('#ffe9a8'),
-  emissiveIntensity: 1.6,
-  roughness: 0.4,
+function buildBeamGeometry(): THREE.BufferGeometry {
+  // Açık uçlu: kapak, hüzmenin ucunda duran parlak bir disk olurdu.
+  const cone = new THREE.ConeGeometry(LAMP_BEAM_MOUTH_RADIUS_M, LAMP_BEAM_LENGTH_M, 16, 1, true)
+  // Tepe origin'e çekiliyor: ışık mercekten çıkar, koninin ortasından değil.
+  cone.translate(0, -LAMP_BEAM_LENGTH_M / 2, 0)
+  const position = cone.getAttribute('position')
+  // Dört bileşenli renk: alfa vertex'te sönüyor. Sabit opaklıktaki bir koni
+  // ışık gibi değil, dumandan bir külah gibi durur.
+  const colors = new Float32Array(position.count * 4)
+  for (let index = 0; index < position.count; index++) {
+    const along = -position.getY(index) / LAMP_BEAM_LENGTH_M
+    const alpha = LAMP_BEAM_APEX_ALPHA * (1 - along) ** 2
+    colors[index * 4] = 1
+    colors[index * 4 + 1] = 0.94
+    colors[index * 4 + 2] = 0.72
+    colors[index * 4 + 3] = alpha
+  }
+  cone.setAttribute('color', new THREE.BufferAttribute(colors, 4))
+  return cone
+}
+
+const BEAM_GEOMETRY = buildBeamGeometry()
+const BEAM_MATERIAL = new THREE.MeshBasicMaterial({
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide,
+  // Ton eşlemesi hüzmeyi sahnenin pozlamasına bağlar; ışık kaynağı olarak
+  // değil, çizilmiş bir efekt olarak duruyor.
+  toneMapped: false,
+  transparent: true,
+  vertexColors: true,
 })
 
 /** Aynı anda bantta görünen en fazla kutu — C=25 m'de ~2 m arayla yeter. */
@@ -142,11 +188,14 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
 
   const model = telescopicModelOf(node.model)
   const sections = boomSections(node)
-  const material = useMemo(() => {
-    // Ailenin paylaşılan materyali atlas ister; teleskopik düz renk çizer —
-    // vertexColors'lı tek standart materyal, modül tekili.
-    return getSharedMaterial()
-  }, [])
+
+  // Üç materyal de aile × ayar başına TEK örnek (`../appearance`): modül
+  // tekili olmakla ayar duyarlı olmak birbirini dışlamıyor, ve tekilliği
+  // elde tutmak Display menüsünü sağır bırakmanın bahanesi değildi.
+  const appearance = useAppearance()
+  const material = getTelescopicMaterial(appearance)
+  const lensMaterial = getLampLensMaterial(appearance)
+  const boxMaterial = getFlowBoxMaterial(appearance)
 
   // İki katman da ekranda sayılır: tahliye çizileni boşaltamaz.
   useEffect(() => {
@@ -252,18 +301,14 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
   const width = frameWidthM(node)
 
   /**
-   * Merceğin yeri: en uçtaki bölümün burnu. Parça listesindeki lamba
-   * gövdesiyle AYNI aritmetikten çıkar — iki yerde iki formül olsaydı,
-   * bom uzayınca mercek gövdesinden ayrılırdı.
+   * Merceğin yeri: parça listesindeki lamba gövdesiyle AYNI fonksiyondan
+   * (`noseLamp`). Yerel X bölüm çerçevesinde döndüğü için düğüm çerçevesine
+   * `centerX` eklenerek taşınıyor — bölüm grubunun tek ötelemesi o.
    */
   const nose = sections[sections.length - 1]
-  const noseLens: [number, number, number] | null = nose
-    ? [
-        nose.centerX + nose.lengthM / 2 - 0.16,
-        transportHeightM(node) - nose.dropM + 0.58,
-        -nose.widthM / 2 - 0.055,
-      ]
-    : null
+  const lamp = nose ? noseLamp(node, nose) : null
+  const lensCenter: [number, number, number] | null =
+    nose && lamp ? [nose.centerX + lamp.lens[0], lamp.lens[1], lamp.lens[2]] : null
 
   return (
     <group ref={wrapperRef} visible={node.visible !== false} {...handlers}>
@@ -309,7 +354,7 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
             geçersiz kılmaz) — `flow-system.tsx`'in uzun uzun anlattığı kural
             burada da geçerli, çünkü kutular bomun ucuna kadar yürüyor. */}
         <instancedMesh
-          args={[BOX_GEOMETRY, BOX_MATERIAL, MAX_BOXES]}
+          args={[BOX_GEOMETRY, boxMaterial, MAX_BOXES]}
           count={0}
           dispose={null}
           frustumCulled={false}
@@ -318,30 +363,31 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
         />
         {/* Çalışma lambasının merceği — burun bölümünün ucunda, o bölümün
             uzamasıyla birlikte gider. */}
-        {noseLens && (
+        {lensCenter && (
           <mesh
             dispose={null}
             geometry={LAMP_LENS_GEOMETRY}
-            material={LAMP_LENS_MATERIAL}
-            position={noseLens}
+            material={lensMaterial}
+            position={lensCenter}
             raycast={NO_RAYCAST}
+          />
+        )}
+        {/* Hüzme YALNIZ makine çalışırken. Ailenin Çalıştır düğmesi
+            "hat iş görüyor" demek, ve bir çalışma lambası tam olarak o zaman
+            yakılıyor — duran bir sahnede yanan hüzme, olmayan bir işi
+            resmetmek olurdu. Dışa aktarımda da yok: çıktı dosyadaki sahnedir,
+            bir efekt değil. */}
+        {lensCenter && flowRunning && !isExporting && (
+          <mesh
+            dispose={null}
+            geometry={BEAM_GEOMETRY}
+            material={BEAM_MATERIAL}
+            position={lensCenter}
+            raycast={NO_RAYCAST}
+            rotation={[0, 0, lampBeamRotationZ()]}
           />
         )}
       </group>
     </group>
   )
-}
-
-let sharedMaterial: THREE.MeshStandardMaterial | null = null
-
-/** Tek materyal, iki katman — vertex renkleri taşır; araç ailesinin kuralı. */
-function getSharedMaterial(): THREE.MeshStandardMaterial {
-  if (!sharedMaterial) {
-    sharedMaterial = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.8,
-      metalness: 0.2,
-    })
-  }
-  return sharedMaterial
 }

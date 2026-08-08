@@ -178,27 +178,27 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
   const depth = totalDepth(node)
 
   /**
-   * Kolektif havuz bu rafı çiziyorken alt ağaç render gezinişinden DÜŞER.
+   * Kayıtlı grup YALNIZ kullanıcı gizlediğinde gizlenir.
    *
-   * `_projectObject` özyinelemeyi yalnız `visible === false`'ta kesiyor
-   * (`three/Renderer.js:3082`), ilk satırda, çocuklara inmeden. Havuz açıkken
-   * bu alt ağacın çizdiği hiçbir şey yok — gövde sahne kökündeki
-   * `InstancedMesh`'ten geliyor — yani three'nin her karede, her geçitte
-   * (renk + gölge) buraya inip "çizeyim mi?" diye sorması tamamen boşa iş.
+   * Burada bir zamanlar kolektif budaması vardı: havuz çizerken alt ağaç
+   * `visible = false` ile render gezinişinden düşüyordu (ölçülmüş kazanç,
+   * gezilen nesne 3.582 raflık sahnede 10.746 → 3.582). İKİ kullanıcı
+   * şikâyeti onu geri aldırdı ve ikisi de aynı kökten geliyordu:
    *
-   * Ölçüm: 3.582 raflık bir sahnede gezilen nesne sayısı 10.746 → 3.582, ve
-   * kare 70,4 → ~31 ms. Nesne başına ~2,7 µs sabiti beş ayrı `?disable`
-   * koşusundan türedi (`docs/olcum-sonuclari.md`).
+   *  - Kutu-seçimi (V modu) rafı hiç görmüyordu. Host'un `isObjectVisible`'ı
+   *    ata zincirinde `visible === false` gören düğümü eliyor, yani gizlenen
+   *    raf marquee'ye görünmez oluyordu — tıklama çalıştığı için hata
+   *    sessizdi.
+   *  - **Hayalet stok yalnız raf SEÇİLİYKEN görünüyordu.** `GhostStock`
+   *    `drawsSelf`'e bağlı değil, ama bu grubun içinde; grup gizlenince o da
+   *    gizleniyordu, ve grup tam olarak "raf seçili değilken" gizliydi.
    *
-   * Kaybedilen bir şey yok: three'nin `Raycaster`'ı `visible`'a bakmıyor
-   * (seçme ve fare olayları çalışır — görünmez çarpıştırıcı zaten tam bu
-   * yüzden `visible={false}`), `Box3.expandByObject` de bakmıyor (gölge
-   * frustum birleşimi bozulmaz). `layers` maskesi bu işi göremezdi: maske
-   * testi başarısız olsa bile çocuklar yine geziliyor.
+   * İkincisi budamanın kendi ölçümünü de şüpheli kılıyor: hayalet stok o
+   * pencerede hiç çizilmiyordu, yani kazancın bir kısmı çizilmeyen bir
+   * şeyden geliyordu.
    *
-   * `drawsSelf` true olduğunda — seçili, sürükleniyor, dışa aktarım, ya da
-   * toplu çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde
-   * hiç çizilmez.
+   * Gerekçenin tamamı ve geri gelmesini engelleyen bekçi
+   * `src/collective-visibility.test.ts`'te.
    */
 
   return (

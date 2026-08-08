@@ -73,3 +73,36 @@ describe('kayıtlı nesne yalnız KULLANICI gizlediğinde gizlenir', () => {
     expect(rendererSources().length).toBeGreaterThanOrEqual(13)
   })
 })
+
+/**
+ * BEKÇİ: hayalet stok SEÇİMDEN bağımsız çizilir.
+ *
+ * Kullanıcının bildirdiği belirti: "rack ürünleri göster özelliği sadece raf
+ * seçili iken çalışıyor." Sebep `GhostStock`'un kendisi değildi — o zaten
+ * yalnız `ghostFill > 0`'a bağlı. Sebep, onu taşıyan kayıtlı grubun havuz
+ * çizerken gizlenmesiydi, ve grup tam olarak "raf seçili değilken" gizliydi:
+ * `drawsSelf` seçili / sürükleniyor / dışa aktarım / kolektif kapalı
+ * hâllerinde true.
+ *
+ * Yukarıdaki görünürlük bekçisi grubu koruyor; bu ikincisi hayaletin kendi
+ * mount koşulunu koruyor. İkisi ayrı, çünkü `{drawsSelf && <GhostStock/>}`
+ * yazmak grup görünür kalsa bile aynı belirtiyi geri getirirdi — ve o hâli
+ * bir performans iyileştirmesi gibi görünür.
+ */
+describe('hayalet stok seçime bağlı değil', () => {
+  const source = readFileSync(join(import.meta.dir, 'rack', 'renderer.tsx'), 'utf8')
+
+  test('GhostStock `drawsSelf` ile kapılanmıyor', () => {
+    expect(source).toContain('{node.ghostFill > 0 && <GhostStock node={node} />}')
+    expect(source).not.toContain('drawsSelf && <GhostStock')
+    expect(source).not.toContain('drawsSelf && node.ghostFill')
+  })
+
+  test('mount koşulu yalnız ghostFill okuyor', () => {
+    // Koşula seçim, dışa aktarım ya da katman durumu eklemek belirtiyi geri
+    // getirir; hepsi "bazen görünür" demenin farklı yolları.
+    const line = source.split('\n').find((entry) => entry.includes('<GhostStock'))
+    if (!line) throw new Error('GhostStock mount satırı bulunamadı')
+    expect(line).not.toMatch(/selected|isExporting|drawsSelf|hidden/)
+  })
+})

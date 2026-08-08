@@ -225,9 +225,17 @@ function DockLevellerBody({ node }: { node: DockLevellerNode }) {
             birlikte büyüyor. */}
         {!isExporting && <Collider position={[0, height / 2, 0]} size={[length, height, width]} />}
 
+        {/* Katman `detailRef.current`'tan okunuyor, 'full' sabitinden DEĞİL.
+            Sabit yazıldığında sessiz bir hata doğuyor: bir alan değişip
+            geometri anahtarı yenilendiğinde React yeni buffer'ı prop olarak
+            yazıyor ve mesh uzakta olmasına rağmen tam ayrıntıya dönüyor —
+            LOD döngüsünün `if (next === current) return` kapısı da katmanı
+            zaten 'simple' saydığı için onu bir daha asla düşürmüyor.
+            `truck/renderer.tsx:222` aynı hatayı yaşamış ve aynı çözümü
+            yazmış. */}
         <mesh
           dispose={null}
-          geometry={getDockLevellerFrameGeometry(node, 'full')}
+          geometry={getDockLevellerFrameGeometry(node, isExporting ? 'full' : detailRef.current)}
           material={material}
           raycast={NO_RAYCAST}
           receiveShadow
@@ -237,7 +245,7 @@ function DockLevellerBody({ node }: { node: DockLevellerNode }) {
         <group ref={deckRef}>
           <mesh
             dispose={null}
-            geometry={getDockLevellerDeckGeometry(node, 'full')}
+            geometry={getDockLevellerDeckGeometry(node, isExporting ? 'full' : detailRef.current)}
             material={material}
             raycast={NO_RAYCAST}
             receiveShadow
@@ -246,7 +254,7 @@ function DockLevellerBody({ node }: { node: DockLevellerNode }) {
           <group ref={lipRef}>
             <mesh
               dispose={null}
-              geometry={getDockLevellerLipGeometry(node, 'full')}
+              geometry={getDockLevellerLipGeometry(node, isExporting ? 'full' : detailRef.current)}
               material={material}
               raycast={NO_RAYCAST}
               receiveShadow

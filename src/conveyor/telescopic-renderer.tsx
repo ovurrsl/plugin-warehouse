@@ -327,7 +327,7 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
         )}
         <mesh
           dispose={null}
-          geometry={getTelescopicBaseGeometry(node, 'full')}
+          geometry={getTelescopicBaseGeometry(node, isExporting ? 'full' : detailRef.current)}
           material={material}
           raycast={NO_RAYCAST}
           receiveShadow
@@ -336,7 +336,11 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
         {sections.map((section) => (
           <mesh
             dispose={null}
-            geometry={getTelescopicSectionGeometry(node, section.index, 'full')}
+            geometry={getTelescopicSectionGeometry(
+              node,
+              section.index,
+              isExporting ? 'full' : detailRef.current,
+            )}
             key={section.index}
             material={material}
             position={[section.centerX, 0, 0]}

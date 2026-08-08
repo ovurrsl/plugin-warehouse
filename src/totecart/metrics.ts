@@ -72,11 +72,41 @@ export function toteSizeM(node: ToteCartNode): readonly [number, number, number]
   return [family.lengthM, toteSizeOf(node).heightM, family.widthM]
 }
 
-/** Araba taban izi: `[boy, en]`, metre. Tepsi artı çerçeve profili. */
+/**
+ * Eğik kasanın Z'de origin'den EN UZAK noktası.
+ *
+ * X ekseni etrafındaki dönüş kasayı Z'de hem büyütüyor hem KAYDIRIYOR:
+ * uzak üst köşe `H·sin θ + (W/2)·cos θ`'ya çıkarken yakın alt köşe
+ * `−(W/2)·cos θ`'ya iniyor. Yani eğik kasa çerçevesinde simetrik değil, ve
+ * ortalanmış bir iz kutusunun yarı-eni büyük olanı kapsamak zorunda.
+ *
+ * Y eksenindeki aynı düzeltme (`occupiedToteHeightM`) yazılmıştı, bu
+ * yazılmamıştı: eğimli araba düşeyde doğru, YATAYDA 72 mm'ye kadar
+ * bildirdiği kutunun dışına taşıyordu. Çarpışma denetimi, sürükleme
+ * sınırı, yerleştirme kutusu ve plan sembolü hepsi bu izi okuyor, yani
+ * eğik bir araba duvara dayanıp içine 46 mm giriyordu — ve yeşil kutu
+ * "yerleşti" diyordu.
+ */
+export function occupiedToteHalfWidthM(node: ToteCartNode): number {
+  const family = familyOf(node)
+  const theta = tiltRad(node)
+  if (theta === 0) return family.widthM / 2
+  const height = toteSizeOf(node).heightM
+  return Math.max(
+    height * Math.sin(theta) + (family.widthM / 2) * Math.cos(theta),
+    (family.widthM / 2) * Math.cos(theta),
+  )
+}
+
+/**
+ * Araba taban izi: `[boy, en]`, metre. Tepsi artı çerçeve profili — ve
+ * eğik kasa taşıyorsa onun kapladığı yer.
+ */
 export function footprintM(node: ToteCartNode): readonly [number, number] {
   const family = familyOf(node)
   const fit = 2 * TOTE_FIT_CLEAR_M
-  return [family.lengthM + fit + 2 * FRAME_M, family.widthM + fit + 2 * FRAME_M]
+  const frame = family.widthM + fit + 2 * FRAME_M
+  return [family.lengthM + fit + 2 * FRAME_M, Math.max(frame, 2 * occupiedToteHalfWidthM(node))]
 }
 
 export function cartLengthM(node: ToteCartNode): number {

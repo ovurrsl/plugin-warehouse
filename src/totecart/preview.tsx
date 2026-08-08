@@ -25,9 +25,14 @@ export default function ToteCartPreview({ node }: { node: ToteCartNode }) {
   const tilt = tiltRad(node)
   const count = loadedTiersOf(node)
 
+  // Bağımlılık `count` — boş DEĞİL, ve bu bir ayrıntı değil: hayaletin alt
+  // ağacı kat sayısıyla büyüyor (`[`/`]` yerleştirme sırasında değiştiriyor)
+  // ve katmanlar three'de MİRAS ALINMIYOR. Bir kez koşan atama, sonradan
+  // eklenen kasayı sahne katmanında bırakıyordu: hayaletin bir parçası dışa
+  // aktarıma ve anlık görüntüye sızan, ötekilerden farklı davranan bir mesh.
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))
-  }, [])
+  }, [count])
 
   useEffect(() => {
     const keys = [

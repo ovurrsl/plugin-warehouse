@@ -188,12 +188,21 @@ export function toteCartFrameParts(node: ToteCartNode, detail: ToteCartDetail): 
       size: [HANDLE_TUBE_M, HANDLE_TUBE_M, width - 2 * FRAME_M],
     })
     if (detail === 'full') {
-      // Kolu dikmeye bağlayan iki dirsek.
+      /**
+       * Kolu dikmeye bağlayan iki dirsek — borudan ve dikmeden BÜYÜK DEĞİL.
+       *
+       * İlk hâlde her iki eksende de "boru + 6 mm" yazılıydı ve iki ayrı
+       * taşma üretiyordu: X'te dikmenin 1,5 mm önüne çıkıp taban izinin
+       * dışına, Y'de borunun 3 mm üstüne çıkıp zarfın dışına. İkisi de
+       * çarpışma kutusunun görmediği ama duvara ilk değecek parçalar.
+       * Zarf borunun yarıçapından hesaplandığı için dirsek de borudan
+       * kalın olamaz.
+       */
       for (const sz of [-1, 1] as const) {
         parts.push({
           role: 'joint',
           center: [-frameFootX, y, sz * (width / 2 - FRAME_M)],
-          size: [HANDLE_TUBE_M + 0.006, HANDLE_TUBE_M + 0.006, 0.03],
+          size: [FRAME_M, HANDLE_TUBE_M, 0.03],
         })
       }
     }

@@ -186,9 +186,17 @@ function ToteCartBody({ node }: { node: ToteCartNode }) {
             alan tıklama çerçevenin arasından geçip arkadakini seçerdi. */}
         {!isExporting && <Collider position={[0, height / 2, 0]} size={[length, height, width]} />}
 
+        {/* Katman `detailRef.current`'tan okunuyor, 'full' sabitinden DEĞİL.
+            Sabit yazıldığında sessiz bir hata doğuyor: bir alan değişip
+            geometri anahtarı yenilendiğinde React yeni buffer'ı prop olarak
+            yazıyor ve mesh uzakta olmasına rağmen tam ayrıntıya dönüyor —
+            LOD döngüsünün `if (next === current) return` kapısı da katmanı
+            zaten 'simple' saydığı için onu bir daha asla düşürmüyor.
+            `truck/renderer.tsx:222` aynı hatayı yaşamış ve aynı çözümü
+            yazmış. */}
         <mesh
           dispose={null}
-          geometry={getToteCartFrameGeometry(node, 'full')}
+          geometry={getToteCartFrameGeometry(node, isExporting ? 'full' : detailRef.current)}
           material={material}
           raycast={NO_RAYCAST}
           ref={frameMeshRef}
@@ -197,7 +205,7 @@ function ToteCartBody({ node }: { node: ToteCartNode }) {
         {totes.map((tote) => (
           <mesh
             dispose={null}
-            geometry={getToteGeometry(node, 'full')}
+            geometry={getToteGeometry(node, isExporting ? 'full' : detailRef.current)}
             key={tote.index}
             material={material}
             position={[0, tote.y, 0]}

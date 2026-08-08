@@ -583,6 +583,98 @@ describe('çerçeve arabayı gerçekten taşıyor', () => {
   })
 })
 
+describe('ÇİZİLEN her şey bildirilen kutunun içinde', () => {
+  /**
+   * Bu testin tuttuğu hata iki kez oldu, iki farklı eksende, ve ikisi de
+   * sessizdi: eğim düşeyde düzeltildi ama YATAYDA unutuldu. Eğik kasa
+   * bildirdiği izin 46 mm dışına taşıyor, duvara dayanmış araba duvarın
+   * içine giriyor, ve yeşil yerleştirme kutusu "sığdı" diyordu.
+   *
+   * Tek tek eksen düzeltmek yerine artık ÇİZİLEN geometrinin tamamı —
+   * çerçeve parçaları ARTI kasaların kendi dönüşümleriyle taşınmış
+   * köşeleri — kutuya karşı ölçülüyor. Yeni bir parça eklenip kutunun
+   * dışına taşarsa bu test yakalar, hangi eksende olduğunu bilmeye gerek
+   * kalmadan.
+   */
+  const CASES = TOTE_FOOTPRINTS.flatMap((footprint) =>
+    toteHeightIds(footprint).flatMap((height) =>
+      [1, 3, 8].flatMap((tiers) =>
+        [false, true].flatMap((tilt) =>
+          (['100', '160'] as const).flatMap((castorDiameter) =>
+            [false, true].map((hasHandle) => ({
+              footprint,
+              height,
+              tiers,
+              tilt,
+              castorDiameter,
+              hasHandle,
+            })),
+          ),
+        ),
+      ),
+    ),
+  )
+
+  test(`${CASES.length} kombinasyonun hiçbiri izin dışına taşmıyor`, () => {
+    expect(CASES.length).toBeGreaterThan(200)
+    for (const spec of CASES) {
+      const node = cart({
+        toteFootprint: spec.footprint,
+        toteHeight: spec.height,
+        tiers: spec.tiers,
+        tilt: spec.tilt,
+        castorDiameter: spec.castorDiameter,
+        hasHandle: spec.hasHandle,
+      })
+      const label = `${spec.footprint}/${spec.height}/${spec.tiers}kat/${spec.tilt ? 'eğik' : 'düz'}/Ø${spec.castorDiameter}/${spec.hasHandle ? 'kollu' : 'kolsuz'}`
+      const [length, width] = footprintM(node)
+      const envelope = overallHeightM(node)
+      const theta = tiltRad(node)
+
+      const check = (x: number, y: number, z: number, what: string) => {
+        expect(Math.abs(x), `${label}: ${what} X'te taşıyor`).toBeLessThanOrEqual(length / 2 + 1e-9)
+        expect(Math.abs(z), `${label}: ${what} Z'de taşıyor`).toBeLessThanOrEqual(width / 2 + 1e-9)
+        expect(y, `${label}: ${what} zarfı aşıyor`).toBeLessThanOrEqual(envelope + 1e-9)
+        expect(y, `${label}: ${what} zeminin altında`).toBeGreaterThanOrEqual(-1e-9)
+      }
+
+      for (const part of toteCartFrameParts(node, 'full')) {
+        // Tepsiler eğik: köşelerini döndürerek ölç.
+        const tilted = part.tiltX ?? 0
+        for (const sy of [-1, 1] as const) {
+          for (const sz of [-1, 1] as const) {
+            const ly = (sy * part.size[1]) / 2
+            const lz = (sz * part.size[2]) / 2
+            check(
+              Math.abs(part.center[0]) + part.size[0] / 2,
+              part.center[1] + ly * Math.cos(tilted) - lz * Math.sin(tilted),
+              part.center[2] + ly * Math.sin(tilted) + lz * Math.cos(tilted),
+              part.role,
+            )
+          }
+        }
+      }
+
+      // Kasalar: renderer'ın koyduğu yerde ve açıda.
+      for (let tier = 0; tier < loadedTiersOf(node); tier++) {
+        const base = tierYM(node, tier)
+        const [toteLength, toteHeight] = toteSizeM(node)
+        const toteWidth = toteSizeM(node)[2]
+        for (const y of [0, toteHeight]) {
+          for (const z of [-toteWidth / 2, toteWidth / 2]) {
+            check(
+              toteLength / 2,
+              base + y * Math.cos(theta) - z * Math.sin(theta),
+              y * Math.sin(theta) + z * Math.cos(theta),
+              `kat ${tier} kasası`,
+            )
+          }
+        }
+      }
+    }
+  })
+})
+
 describe('zarf her şeyi kapsıyor', () => {
   test('alçak arabada KOL en yüksek nokta ve zarfa giriyor', () => {
     // Tek katlı bir arabada üst kasa kolun altında kalıyor. Zarfı yalnız

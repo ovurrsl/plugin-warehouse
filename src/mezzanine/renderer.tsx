@@ -7,12 +7,15 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
+import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { useCollective } from '../instancing/use-collective'
+import { isSelected } from '../selection'
 import { useStaticTransform } from '../static-transform'
 import ExplodedTiers from './exploded-tiers'
 import {
@@ -53,6 +56,13 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
 
+  // Olay sarmalayıcısı: dönüşümsüz, ama auto-update açık kaldığı sürece bedava
+  // değil — her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki donmuş çarpıştırıcı ile kayıtlı grubun kazandığını geri verir.
+  // Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
+
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
   )
@@ -92,7 +102,7 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
   const appearance = useAppearance()
   const material = getMezzanineMaterial(appearance)
 
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -146,9 +156,41 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
   const depth = footprintDepthM(node)
   const height = totalHeightM(node)
 
+  /**
+   * Havuz bu asma katı çiziyorken alt ağaç render gezinişinden tümden DÜŞER:
+   * `_projectObject` özyinelemeyi `visible === false`'ta, çocuklara hiç inmeden
+   * kesiyor. Ölçüm ve tam gerekçe rafın renderer'ında — kaybedilen bir şey yok,
+   * çünkü ne three'nin ışın testi ne de gölge frustum'unun
+   * `Box3.expandByObject` birleşimi `visible`'a bakıyor.
+   *
+   * Patlatma açıkken `excluded` zaten kurulu, yani `drawsSelf` true ve grup
+   * görünür kalıyor — katları taşıyan dal da bu grubun altında.
+   */
+  const hidden = !drawsSelf
+  const userHidden = node.visible === false
+
+  /**
+   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
+   * gizledi"den ayırıyor — ayıramazsa asma kat havuzdan düşer ve hiç çizilmez.
+   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
+   *
+   * JSX `userData` prop'u olarak DEĞİL, elle yazılıyor: R3F o prop'la nesnenin
+   * userData'sını tamamen değiştiriyor ve host'un kayıtlı nesneye yazdığı
+   * anahtarlar her renderda silinirdi.
+   */
+  useLayoutEffect(() => {
+    const object = registeredRef.current
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
+  }, [hidden, userHidden])
+
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      <group position={position} ref={registeredRef} rotation={rotation}>
+    <group {...handlers} ref={wrapperRef}>
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={!userHidden && !hidden}
+      >
         {!isExporting && <Collider position={[0, height / 2, 0]} size={[width, height, depth]} />}
         {/*
           Patlatılmışken kat başına bir grup, kapalıyken tek birleşik mesh —

@@ -7,13 +7,16 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useRef } from 'react'
-import * as THREE from 'three'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
+import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
+import { isSelected } from '../selection'
 import { useStaticTransform } from '../static-transform'
 import {
   getLiveRackingGeometry,
@@ -25,8 +28,6 @@ import { getLiveRackingMaterial } from './materials'
 import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
 import type { LiveRackingNode } from './schema'
 
-const _NO_RAYCAST = () => {}
-
 /**
  * LOD bandı — rafın kendi değerleriyle aynı gerekçe: tek eşik, tam üstünde
  * duran bir kanalı kamera her nefes aldığında geometri değiştirtir.
@@ -36,18 +37,6 @@ const _NO_RAYCAST = () => {}
  */
 const LOD_FAR_SQ = 45 * 45
 const LOD_NEAR_SQ = 32 * 32
-const LOD_INTERVAL = 8
-
-const _worldPosition = new THREE.Vector3()
-
-function _hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
-}
 
 export default function LiveRackingRenderer({ node }: { node: LiveRackingNode }) {
   // Kademeli mount kapısı. Gövde AYRI bileşende olmak ZORUNDA: pahalı iş onun
@@ -61,9 +50,15 @@ export default function LiveRackingRenderer({ node }: { node: LiveRackingNode })
 
 function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
-  const _meshRef = useRef<THREE.Mesh>(null)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
+
+  // Olay sarmalayıcısı: dönüşümsüz, ama auto-update açık kaldığı sürece bedava
+  // değil — her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki donmuş çarpıştırıcı ile kayıtlı grubun kazandığını geri verir.
+  // Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
 
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
@@ -90,7 +85,7 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   const appearance = useAppearance()
   const material = getLiveRackingMaterial(appearance)
 
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -119,11 +114,44 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   const depth = channelDepthM(node)
   const height = frameHeightM(node)
 
+  /**
+   * Havuz bu kanalı çiziyorken alt ağaç render gezinişinden tümden DÜŞER:
+   * `_projectObject` özyinelemeyi `visible === false`'ta, çocuklara hiç inmeden
+   * kesiyor. Ölçüm ve tam gerekçe rafın renderer'ında — kaybedilen bir şey yok,
+   * çünkü ne three'nin ışın testi ne de gölge frustum'unun
+   * `Box3.expandByObject` birleşimi `visible`'a bakıyor.
+   *
+   * `drawsSelf` true olduğunda — seçili, sürükleniyor, dışa aktarım ya da toplu
+   * çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde hiç
+   * çizilmez.
+   */
+  const hidden = !drawsSelf
+  const userHidden = node.visible === false
+
+  /**
+   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
+   * gizledi"den ayırıyor — ayıramazsa her kanal havuzdan düşer ve sıra boşalır.
+   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
+   *
+   * JSX `userData` prop'u olarak DEĞİL, elle yazılıyor: R3F o prop'la nesnenin
+   * userData'sını tamamen değiştiriyor ve host'un kayıtlı nesneye yazdığı
+   * anahtarlar her renderda silinirdi.
+   */
+  useLayoutEffect(() => {
+    const object = registeredRef.current
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
+  }, [hidden, userHidden])
+
   return (
-    <group visible={node.visible !== false} {...handlers}>
+    <group {...handlers} ref={wrapperRef}>
       {/* Seçim kolideri: bir kanal neredeyse tamamen hava, tıklamalar
           makaraların arasından geçip arkadakini seçerdi. */}
-      <group position={position} ref={registeredRef} rotation={rotation}>
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={!userHidden && !hidden}
+      >
         {!isExporting && <Collider position={[0, height / 2, 0]} size={[width, height, depth]} />}
         {drawsSelf && (
           <SelfDrawnBody

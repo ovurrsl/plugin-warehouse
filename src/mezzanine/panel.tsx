@@ -3,6 +3,7 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { PanelSection, SegmentedControl } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
+import { useMemo } from 'react'
 import { IssueList } from '../panels/issue-list'
 import { Figure, Figures, Note, SelectRow } from '../panels/kit'
 import { useWarehouseStore } from '../store'
@@ -38,12 +39,28 @@ export default function MezzaninePanel({ node: provided }: { node?: MezzanineNod
   const unit = useUnit()
   const activeDeck = useWarehouseStore((s) => s.activeDeck)
   const setActiveDeck = useWarehouseStore((s) => s.setActiveDeck)
+
+  const resolved = useMemo(() => (node ? resolveTierElevations(node.tiers) : []), [node])
+
+  /**
+   * Taşınan raflar SAHNENİN TAMAMINI geziyor (`Object.entries(nodes)`).
+   *
+   * Memo yürüyüşü kaldırmıyor — sözlük gerçekten değiştiğinde yine geziyor.
+   * Kestiği şey öteki renderlar: birim değişimi, hedef güverte seçimi, seçim
+   * değişikliği, host'un panelin üstünden geçen her yeniden çizimi. Sahne hiç
+   * yazılmadan gelen bu renderların her biri, önceden binlerce düğümü bir kez
+   * daha geziyordu.
+   */
+  const supported = useMemo(
+    () =>
+      node ? racksOnMezzanine(nodes as Readonly<Record<string, unknown>>, node, resolved) : [],
+    [nodes, node, resolved],
+  )
+
   if (!node) return null
 
   const system = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem]
   const issues = mezzanineParametrics.invariants?.flatMap((check) => check(node)) ?? []
-  const resolved = resolveTierElevations(node.tiers)
-  const supported = racksOnMezzanine(nodes as Readonly<Record<string, unknown>>, node)
   const overloaded = overloadedRacks(supported)
   const isSigma = node.constructiveSystem === 'SIGMA'
 

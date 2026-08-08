@@ -7,16 +7,20 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
-import type { BufferGeometry, Mesh, Object3D } from 'three'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import type { BufferGeometry, Camera, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
+import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
+import { registerGhostLod } from '../instancing/ghost-lod'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
+import { isSelected } from '../selection'
 import { useStaticTransform } from '../static-transform'
+import { lodScaleSq } from '../store'
 import { FILM_DRAW_DISTANCE_M } from './cargo-constants'
 import {
   cargoCacheKey,
@@ -57,25 +61,21 @@ const LOD_NEAR_SQ = 18 * 18
  * Fill rate rather than triangles: a blended veil costs its whole silhouette in
  * shaded fragments every frame however few triangles it has, so the only
  * effective control is how many are on screen at once.
+ *
+ * Detay kolu (`lodScaleSq`) buna da uygulanıyor, katman bantlarına uygulandığı
+ * gibi: kol tek bir kalite ekseni, ve film kesimini onun dışında bırakmak
+ * "yakın" konumunda yükün kutuya düştüğü ama streçin hâlâ tam mesafede
+ * çizildiği bir hâl bırakırdı — kolun kıstığı en pahalı kalemin dışarıda
+ * kalması.
  */
 const FILM_CUT_SQ = FILM_DRAW_DISTANCE_M * FILM_DRAW_DISTANCE_M
 
-/** Frames between tier checks. Distance to a camera does not change fast enough
- *  to be worth a square root every frame on every pallet in a warehouse. */
-const LOD_INTERVAL = 8
-
 const worldPosition = new Vector3()
 
-/** Spreads the tier checks across the interval so a thousand pallets do not all
- *  re-evaluate on the same frame and spike it. */
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
-}
+/** Yükün çapasının dönüşü hep sıfır. Modül kapsamında, çünkü aksi hâlde her
+ *  render'da düğüm başına bir dizi ayrılırdı ve `useStaticTransform`'un tek tek
+ *  sayı olan bağımlılıkları o diziyi zaten okumuyor. */
+const ZERO_ROTATION: readonly [number, number, number] = [0, 0, 0]
 
 /**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
@@ -104,9 +104,26 @@ export default function PalletRenderer({ node }: { node: PalletNode }) {
 }
 
 function PalletRendererBody({ node }: { node: PalletNode }) {
+  const wrapperRef = useRef<Object3D>(null)
   const registeredRef = useRef<Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
+
+  /**
+   * Dönüşümsüz dış sarmalayıcı da donuyor — ve donmazsa altındakilerin donmuş
+   * olması yarı yarıya boşa gidiyor.
+   *
+   * `matrixAutoUpdate` açık bir grup her karede kendi `compose`'unu yapıyor VE
+   * çıkarken `force` bayrağını çocuklarına yayıyor; bayrak gelen çocuk, kendi
+   * bayrağı kapalı olsa bile `multiplyMatrices`'i yapmak zorunda. Yani bu
+   * sarmalayıcı açık kaldığı sürece altındaki kayıtlı grup ve çarpıştırıcı
+   * `compose`'tan kurtuluyor ama dünya çarpımından kurtulmuyor. Satır satır
+   * mekanizma: `../frozen-matrix`.
+   *
+   * Burada güvenli olmasının sebebi sarmalayıcının hiç kımıldamaması: konum,
+   * dönüş, ölçek prop'u yok — yalnız `visible` ve olay işleyicileri var.
+   */
+  useFrozenMatrix(wrapperRef)
 
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
@@ -159,7 +176,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
    * düzenini istiyor ve görünürlüğü düğüm başına mesafeyle açılıp kapanıyor —
    * bir örnek tamponunda ifade edilemeyecek üç şey.
    */
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   /**
    * Havuzdan çıkma koşulu — güverte ve yük İÇİN AYNI ifade, tek yerde.
    *
@@ -200,6 +217,56 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
   }, [node])
 
   /**
+   * Streç çizilecek mi — kararı `CargoLoad` değil BURASI veriyor.
+   *
+   * Aşağıdaki görünürlük kapısı bu cevaba dayanıyor, yani iki yerde ayrı ayrı
+   * kurulan iki kopya ayrışabilseydi ayrıştıkları hâl sessiz olurdu: kapı "film
+   * yok" derken filmin mount edilmesi, bütün streçlerin gizli bir alt ağaçta
+   * hiç çizilmemesi demek. Tek ifade, tek yer.
+   */
+  const filmed = cargo !== null && node.wrapped && node.cargo !== 'none'
+
+  /**
+   * Kolektif havuz bu paleti çiziyorken alt ağaç render gezinişinden DÜŞER.
+   *
+   * `_projectObject` özyinelemeyi yalnız `visible === false`'ta kesiyor, ilk
+   * satırda, çocuklara hiç inmeden; gerekçenin ve ölçümün tamamı
+   * `instancing/collective.ts`'in `HIDDEN_FOR_COLLECTIVE` bloğunda. Kaybedilen
+   * bir şey yok: `Raycaster` da (çarpıştırıcı zaten `visible={false}`)
+   * `Box3.expandByObject` de (gölge frustum birleşimi) görünürlüğe bakmıyor.
+   *
+   * Rafta koşul düpedüz `!drawsSelf`. Palette DEĞİL, ve fark paletin alt
+   * ağacında havuza GİRMEYEN bir mesh olmasından: streç film saydam, kendi
+   * sıralama düzenini istiyor ve görünürlüğü düğüm başına mesafeyle sürülüyor —
+   * üçü de bir örnek tamponunda ifade edilemiyor, o yüzden film havuzun dışında
+   * kalıyor ve gövdesini kendi çiziyor. Gizlenen bir alt ağaçta ise hiç
+   * çizilmez. Sarılı palet varsayılan olduğu için bunun bedeli açık: yüklü ve
+   * sarılı paletlerde geziniş kazancı yok. Alternatifi bütün streçlerin sessizce
+   * kaybolmasıydı.
+   */
+  const hidden = !drawsSelf && !filmed
+  const userHidden = node.visible === false
+
+  /**
+   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
+   * gizledi"den ayırıyor; ayıramazsa hata iki yönde de sessiz — bayrak
+   * okunmazsa her palet havuzdan düşer ve sahne boşalır, fazla geniş okunursa
+   * gizlenen palet çizilmeye devam eder. Bkz. `collective.ts`.
+   *
+   * Tarama ATA zincirini yürüdüğü için bayrağın `visible = false` yazılan
+   * nesnede olması şart: burada dış sarmalayıcıda, çünkü geziniş orada kesiliyor
+   * ve kayıtlı grup ile yükün çapası onun altında kalıyor.
+   *
+   * JSX prop'u olarak değil elle: `userData={{...}}` her renderda yeni bir nesne
+   * ayırır ve R3F onu olduğu gibi yerine koyar. `useLayoutEffect` kolektif
+   * sistemin `useFrame`'inden önce koştuğu için havuz bayrağı hep güncel okuyor.
+   */
+  useLayoutEffect(() => {
+    const object = wrapperRef.current
+    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
+  }, [hidden, userHidden])
+
+  /**
    * Güvertenin katman döngüsü `SelfDrawnBody`'ye taşındı.
    *
    * Güverte, paketteki her mesafede tam detay çizilen tek mesh'ti — birkaç yüz
@@ -221,7 +288,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
   const totalHeight = unitLoadHeightOf(node)
 
   return (
-    <group visible={node.visible !== false} {...handlers}>
+    <group {...handlers} ref={wrapperRef} visible={!userHidden && !hidden}>
       <group position={position} ref={registeredRef} rotation={rotation}>
         {/* Selection collider. The deck has 41 mm gaps between boards and open
             fork tunnels, so raycasting the real mesh would let clicks fall
@@ -272,6 +339,7 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
           <CargoLoad
             cargo={cargo}
             excluded={excluded}
+            filmed={filmed}
             isExporting={isExporting}
             node={node}
             y={spec.height}
@@ -301,6 +369,7 @@ const CARGO_INSTANCE_SUFFIX = ':cargo'
 function CargoLoad({
   cargo,
   excluded,
+  filmed,
   node,
   y,
   isExporting,
@@ -308,6 +377,9 @@ function CargoLoad({
   /** İki katmanın girdisi, mount sınırında `null` olmadığı doğrulanmış. */
   cargo: Record<CargoDetail, CargoInput>
   excluded: boolean
+  /** Streç çizilecek mi — kararı görünürlük kapısıyla PAYLAŞILIYOR, bkz.
+   *  `PalletRendererBody`. Burada yeniden kurmak ikisini ayrıştırırdı. */
+  filmed: boolean
   node: PalletNode
   y: number
   isExporting: boolean
@@ -346,14 +418,27 @@ function CargoLoad({
     excluded,
   })
 
+  /**
+   * Çapanın yerel dönüşümü de donuyor.
+   *
+   * Bu grup kayıtlı grubun ÇOCUĞU ve `matrixAutoUpdate` açık kaldığı sürece her
+   * karede kendi `compose`'unu yapıyor — yüklü palet başına iki matris işlemi,
+   * ve yüklü palet sahnedeki en kalabalık düğüm. `useStaticTransform` bunu tek
+   * seferlik basıma indiriyor.
+   *
+   * `isLive` her zaman `false`, ve bu bir ihmal değil: çapayı kımıldatan hiçbir
+   * şey yok. Paleti sürükleyen de, host'un slab liftini yazan da ÜSTTEKİ kayıtlı
+   * gruba yazıyor, three de `force` bayrağını çocuklara yaydığı için bu grubun
+   * dünya matrisi donmuş hâlde bile tazeleniyor. (Havuz yükün matrisini tam
+   * buradan okuyor.)
+   */
+  const anchorPosition = useMemo<[number, number, number]>(() => [0, y, 0], [y])
+  useStaticTransform(anchorRef, anchorPosition, ZERO_ROTATION, false)
+
   // One sleeve fits both tiers: `loadExtent` reads type, preset and variant and
   // never the tier, so the far tier's single box has exactly the near tier's
   // extent.
-  const wrapped = node.wrapped && node.cargo !== 'none'
-  const filmGeometry = useMemo(
-    () => (wrapped ? getFilmGeometry(cargo.full) : null),
-    [cargo, wrapped],
-  )
+  const filmGeometry = useMemo(() => (filmed ? getFilmGeometry(cargo.full) : null), [cargo, filmed])
 
   // Tell the cache both tiers are on screen. Eviction must never free a buffer
   // something is drawing, and a tier switch must not have to build one. Havuz
@@ -362,16 +447,19 @@ function CargoLoad({
   useEffect(() => {
     const nearKey = retainCargoGeometry(cargo.full)
     const farKey = retainCargoGeometry(cargo.simple)
-    const filmKey = wrapped ? retainFilmGeometry(cargo.full) : null
+    const filmKey = filmed ? retainFilmGeometry(cargo.full) : null
     return () => {
       releaseCargoGeometry(nearKey)
       releaseCargoGeometry(farKey)
       if (filmKey) releaseFilmGeometry(filmKey)
     }
-  }, [cargo, wrapped])
+  }, [cargo, filmed])
 
   return (
-    <group position={[0, y, 0]} ref={anchorRef}>
+    // Konum prop'u YOK: `useStaticTransform` yazıyor ve bayrak kapalıyken
+    // R3F'in yazdığı `position` yerel matrise zaten işlemezdi — iki kaynak
+    // olması, biri sessizce yok sayılan iki kaynak olurdu.
+    <group ref={anchorRef}>
       {/* Kolektif kapalıyken ya da bu palet seçili/sürükleniyorken yükünü
           kendi çizer; açıkken aynı yüke çözülen bütün paletleri tek
           `InstancedMesh` çiziyor. */}
@@ -393,13 +481,23 @@ function CargoLoad({
 }
 
 /**
- * Streç film — kendi bileşeni, ve kendi kare döngüsü.
+ * Streç film — kendi bileşeni, ve kesme mesafesini MERKEZÎ döngüden alan tek
+ * mesh'i.
  *
- * Döngü eskiden `CargoLoad`'un gövdesindeydi ve yükün katmanıyla filmin kesme
- * mesafesini aynı hesaptan sürüyordu. Katman artık kolektif çizicinin merkezî
- * döngüsüne ait, geriye yalnız film kaldı — ve film sarılı OLMAYAN palette hiç
- * yok. Ayrı bir bileşen, aboneliğin de yalnız sarılı paletlerde kurulması
- * demek: `useFrame` koşullu çağrılamaz ama bir bileşen koşullu MOUNT edilebilir.
+ * Bileşenin ayrı olması, filmin yalnız sarılı paletlerde mount edilmesi için:
+ * bir kanca koşullu çağrılamaz ama bir bileşen koşullu MOUNT edilebilir.
+ *
+ * Değerlendirme burada bir `useFrame` idi ve maliyeti `self-drawn.tsx` ile
+ * `ghost-lod.ts`'in ölçüp kaldırdığının aynısıydı: sarılı palet varsayılan
+ * olduğu için abonelik sayısı doğrudan palet sayısı — beş bin paletlik bir
+ * sahnede kare başına beş bin kapanış, sekizde yedisi ilk satırda dönen. Kayıt
+ * `registerGhostLod`'a taşındı; sürüş kolektif sistemin zaten koşan tek
+ * döngüsünden geliyor, faz dağıtımı ve 1/8 aralığı orada aynen korunuyor
+ * (`tickGhostLod` erken çıkışların üstünde, yani kolektif çizim kapalıyken de
+ * koşuyor).
+ *
+ * Kayıt kimliği `:film` ekiyle: aynı düğüm zaten güvertesiyle havuzda ve
+ * `${id}:cargo` ile yükünde: çakışan bir kimlik ötekinin kaydını sessizce ezer.
  */
 function FilmVeil({
   geometry,
@@ -411,22 +509,22 @@ function FilmVeil({
   nodeId: string
 }) {
   const meshRef = useRef<Mesh>(null)
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(nodeId), [nodeId])
   const appearance = useAppearance()
 
-  useFrame(({ camera }) => {
-    const mesh = meshRef.current
-    if (!mesh || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
+  const evaluate = useCallback(
+    (camera: Camera) => {
+      const mesh = meshRef.current
+      if (!mesh || isExporting) return
+      const { elements } = mesh.matrixWorld
+      const distanceSq = camera.position.distanceToSquared(
+        worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+      )
+      mesh.visible = distanceSq <= FILM_CUT_SQ * lodScaleSq()
+    },
+    [isExporting],
+  )
 
-    const { elements } = mesh.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    mesh.visible = distanceSq <= FILM_CUT_SQ
-  })
+  useEffect(() => registerGhostLod(`${nodeId}:film`, evaluate), [nodeId, evaluate])
 
   return (
     <mesh

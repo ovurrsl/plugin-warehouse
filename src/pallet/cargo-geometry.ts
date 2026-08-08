@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { CARTON_ROW_CELLS, type CargoRegionId, type UVRect, uvOf } from './cargo-atlas-regions'
 import { CORNER_BOARD_MIN_FILL } from './cargo-constants'
 import { type CargoInput, type CargoPart, cargoParts, loadExtent } from './cargo-parts'
@@ -289,7 +290,7 @@ function emitCylinder(
  * already decided by `type` and `variant`. Naming them again would be the
  * over-reporting half of the same mistake.
  */
-export function cargoCacheKey(input: CargoInput): string {
+function buildCargoCacheKey(input: CargoInput): string {
   const full = input.detail === 'full'
   return [
     input.type.id,
@@ -320,6 +321,21 @@ function layoutKey(input: CargoInput): string {
   }
   return `n${unitCount(input.type, input.preset, input.variant)}`
 }
+
+/**
+ * Girdi NESNESİNE memoize — bkz. `geometry-key-memo.ts`; çıplak üretici:
+ * `buildCargoCacheKey`.
+ *
+ * Girdi nesnesi zaten katmanı taşıyor (`detail`), yani `full` ve `simple` ayrı
+ * nesneler ve ayrı memo girdileri: nesne dışında bir varyant ekseni yok, o
+ * yüzden `variantOf` sabit.
+ *
+ * Girdiler `cargoInputOf` ile üretiliyor ve renderer onları düğüm kimliğine
+ * memoize ediyor, yani bir palet mount olduğu sürece aynı iki nesne dolaşıyor —
+ * anahtar mount başına iki kez kuruluyor, her renderda dört kez değil
+ * (`useCollective`'in şekil anahtarı + geometri tutma + havuz kaydı).
+ */
+export const cargoCacheKey = memoiseGeometryKey(buildCargoCacheKey, () => '')
 
 const cache = new Map<string, THREE.BufferGeometry>()
 

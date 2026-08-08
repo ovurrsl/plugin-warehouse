@@ -55,6 +55,41 @@ function fingerprint(geometry: THREE.BufferGeometry): string {
 
 const meshOf = (input: CargoInput) => fingerprint(buildCargoGeometry(input))
 
+/**
+ * Anahtar girdi NESNESİNE memoize (`geometry-key-memo.ts`), ve memoizasyonun
+ * iki bozulma yönü de sessiz.
+ *
+ * Aşağıdaki kapsama taraması bu dosyanın asıl bekçisi ve memoizasyondan sonra
+ * da geçerli: `at()` her çağrıda taze bir girdi nesnesi kuruyor, yani sweep
+ * memoize edilmiş `cargoCacheKey`'in TA KENDİSİ üzerinden koşuyor ve "mesh
+ * değişti, anahtar değişmedi" hâlini yakalamaya devam ediyor. Memo'nun kendi
+ * getirdiği riskleri bu blok kapatıyor.
+ */
+describe('kargo anahtarı memoizasyonu', () => {
+  test('yapıca aynı iki AYRI girdi aynı anahtarı alıyor — paylaşım korunuyor', () => {
+    // Memoizasyonun bozmaması gereken şey bu: paylaşım nesne kimliğine değil
+    // alanlara bakar. Bozulsaydı hata sessiz olurdu — sahne doğru görünür,
+    // ama her paletin yükü kendi tamponunu ve kendi havuzunu alır, yani hem
+    // geometri önbelleği hem çizim çağrısı sayısı düğüm sayısıyla büyür.
+    expect(cargoCacheKey(at({}))).toBe(cargoCacheKey(at({})))
+  })
+
+  test('YERİNDE mutasyon anahtarı tazelemez — memo nesne kimliğine bağlı', () => {
+    // İki iş. Birincisi sözleşmeyi sabitlemek: girdiler `cargoInputOf`'un taze
+    // çıktısı ve yerinde değiştirilmiyorlar; desteklenen kullanım bu.
+    //
+    // İkincisi memoizasyonun kendisini yakalamak: memo kaldırılırsa anahtar
+    // mutasyondan sonra yeniden kurulur ve DEĞİŞİR, yani bu beklenti düşer.
+    const input = at({ color: 'kraft' })
+    const before = cargoCacheKey(input)
+    input.color = 'blue'
+    expect(cargoCacheKey(input)).toBe(before)
+
+    // Yeni nesne = yeni kimlik → yeni anahtar. Gerçekte olan bu.
+    expect(cargoCacheKey(at({ color: 'blue' }))).not.toBe(before)
+  })
+})
+
 describe('the cache key names what the builder consumes, and nothing else', () => {
   /**
    * The law this package runs on, swept at **both tiers**.
@@ -582,6 +617,20 @@ describe('yük havuzlanabilir mi — anahtarın paylaşması ve ayırması', () 
     const full = cargoInputOf(node, 'full')
     const simple = cargoInputOf(node, 'simple')
     if (!full || !simple) throw new Error('yük girdisi kurulamadı')
+    expect(cargoCacheKey(full)).not.toBe(cargoCacheKey(simple))
+  })
+
+  test('memoize edilmiş anahtar iki katmanı hâlâ ayırıyor', () => {
+    // Yukarıdakinin memoizasyona bakan hâli. `cargoInputOf` her çağrıda TAZE
+    // bir nesne veriyor ve memo o nesneye bağlı, yani iki katman iki ayrı
+    // girdiye düşüyor. Bir gün girdi düğüm başına önbelleğe alınıp katman
+    // alanı yerinde değiştirilirse, ikinci katman birincinin anahtarını geri
+    // alır ve uzaktaki her palet tam detay çizilir — bu beklenti o anda düşer.
+    const node = PalletNode.parse({ id: 'pallet_memo_tier', cargo: 'carton' })
+    const full = cargoInputOf(node, 'full')
+    const simple = cargoInputOf(node, 'simple')
+    if (!full || !simple) throw new Error('yük girdisi kurulamadı')
+    expect(full).not.toBe(simple)
     expect(cargoCacheKey(full)).not.toBe(cargoCacheKey(simple))
   })
 

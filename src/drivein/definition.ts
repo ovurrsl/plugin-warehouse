@@ -103,6 +103,18 @@ export const driveInRackDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Baked `/viewer` sözleşmesi — rafla aynı, ve bir blok için farkı daha büyük.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyor: on şeritlik bir
+   * blok on ayrı mesh, hepsi aynı şekli çiziyor. `replace` baked mesh'i
+   * gizletip seviyenin şeritlerini canlı statik instancing'le çizdiriyor, yani
+   * blok şekil başına tek çizim çağrısına iniyor. Eklenti yüklü değilse
+   * politika `static`'e düşer ve baked mesh görünür kalır — veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
+
   floorplan: buildDriveInFloorplan,
 
   tool: () => import('./tool'),

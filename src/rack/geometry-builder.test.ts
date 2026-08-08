@@ -499,12 +499,18 @@ describe('retain-zero süpürme — kullanılmayan şekiller hafızadan gider', 
      */
     const held = rack()
     const scrub = rack({ uprightHeight: 4.2 })
-    const now = Date.now()
 
     const key = retainRackGeometry(held, 'full', false)
     const heldGeometry = getRackGeometry(held, 'full')
     const scrubGeometry = getRackGeometry(scrub, 'full')
     expect(rackGeometryCacheSize()).toBe(2)
+
+    // Saat, şekiller kurulduktan SONRA okunuyor. Önce okunursa test duvar
+    // saatine yarışır: `zeroSince` damgasını `getRackGeometry` kendi
+    // `Date.now()`'ıyla basıyor, yani iki birleştirilmiş buffer'ın inşası
+    // 1 ms'yi geçtiği anda damga `now + 1`'i aşıyor ve "pencere doldu"
+    // iddiası yüklü bir süitte rastgele kırılıyor.
+    const now = Date.now()
 
     // Pencere dolmadan: ikisi de yerinde.
     sweepRackGeometry(now + GRACE - 1)

@@ -7,14 +7,16 @@ import {
   useRegistry,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
-import type { Mesh, Object3D } from 'three'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import type { Camera, Mesh, Object3D } from 'three'
 import { Vector3 } from 'three'
 import { useAppearance } from '../appearance'
 import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
+import { registerGhostLod } from '../instancing/ghost-lod'
 import { useStaticTransform } from '../static-transform'
+import { lodScaleSq } from '../store'
 import { getTruckGeometry, releaseTruckGeometry, retainTruckGeometry } from './geometry'
 import { mastPose } from './kinematics'
 import { getTruckMaterial } from './materials'
@@ -28,21 +30,15 @@ const NO_RAYCAST = () => {}
  * Rafın 70/55'i ile paletin 25/18'i arasında: araç raf kadar büyük değil ama
  * palet gibi yüzlerce de değil. Histerezis bandı aynı gerekçeyle var — tek
  * eşik, tam o mesafede duran araca her kamera nefesinde katman değiştirtir.
+ *
+ * Detay kolu (`lodScaleSq`) bu banda da uygulanıyor, rafın ve paletin
+ * bandına uygulandığı gibi: yan yana duran iki kind'ın farklı mesafede
+ * katman değiştirmesi, kolun tek bir şeyi ayarladığı iddiasını bozardı.
  */
 const LOD_FAR_SQ = 45 * 45
 const LOD_NEAR_SQ = 35 * 35
-const LOD_INTERVAL = 8
 
 const worldPosition = new Vector3()
-
-function hashPhase(id: string): number {
-  let hash = 0x811c9dc5
-  for (let index = 0; index < id.length; index++) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 0x01000193)
-  }
-  return (hash >>> 0) % LOD_INTERVAL
-}
 
 /**
  * Pallet'in deseninde kayıtlı grup + paylaşımlı buffer'lar: geometri modül
@@ -73,6 +69,12 @@ function TruckBody({ node }: { node: TruckNode }) {
   const registeredRef = useRef<Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
+
+  // Olay sarmalayıcısı: dönüşümsüz, ama auto-update açık kaldığı sürece bedava
+  // değil — her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki kayıtlı grubun donmuşluğunu geri verir. Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<Object3D>(null)
+  useFrozenMatrix(wrapperRef)
 
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
@@ -113,8 +115,6 @@ function TruckBody({ node }: { node: TruckNode }) {
 
   const meshRefs = useRef<Map<string, Mesh>>(new Map())
   const detailRef = useRef<TruckDetail>('full')
-  const frameRef = useRef(0)
-  const phase = useMemo(() => hashPhase(node.id), [node.id])
   const appearance = useAppearance()
   const material = getTruckMaterial(appearance)
 
@@ -130,51 +130,65 @@ function TruckBody({ node }: { node: TruckNode }) {
     }
   }, [node.model, node.mastRowId, bodies])
 
-  useFrame(({ camera }) => {
-    const root = registeredRef.current
-    if (!root || isExporting) return
-    frameRef.current += 1
-    if ((frameRef.current + phase) % LOD_INTERVAL !== 0) return
+  /**
+   * Katman değerlendirmesi MERKEZÎ döngüden (`../instancing/ghost-lod`).
+   *
+   * Burası düğüm başına bir `useFrame` kuruyordu — `self-drawn.tsx` ile
+   * `pallet/renderer.tsx`'in ölçüp kaldırdığı maliyetin aynısı: abonelik
+   * sayısı araç sayısına bağlı, ve sekiz karenin yedisinde kapanış ilk
+   * satırlarda dönüyor. Faz dağıtımı ve 1/8 aralığı defterin kendisinde,
+   * yani buradaki `hashPhase` + kare sayacı ikinci bir kopyaydı.
+   *
+   * Ölçek kare BAŞINA değil, değerlendirme başına okunuyor (rafın kuralı):
+   * `lodScaleSq` bir `getState` ve sekiz karede bir ödeniyor.
+   */
+  const evaluateDetail = useCallback(
+    (camera: Camera) => {
+      const root = registeredRef.current
+      if (!root || isExporting) return
 
-    const { elements } = root.matrixWorld
-    const distanceSq = camera.position.distanceToSquared(
-      worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
-    )
-    const current = detailRef.current
-    const next =
-      current === 'full'
-        ? distanceSq > LOD_FAR_SQ
-          ? 'simple'
-          : 'full'
-        : distanceSq < LOD_NEAR_SQ
-          ? 'full'
-          : 'simple'
-    if (next === current) return
-    detailRef.current = next
-    for (const body of bodies) {
-      const mesh = meshRefs.current.get(body)
-      if (!mesh) continue
-      mesh.geometry = getTruckGeometry(node.model, node.mastRowId, body, next)
-    }
-  })
+      const { elements } = root.matrixWorld
+      const distanceSq = camera.position.distanceToSquared(
+        worldPosition.set(elements[12] ?? 0, elements[13] ?? 0, elements[14] ?? 0),
+      )
+      const scaleSq = lodScaleSq()
+      const current = detailRef.current
+      const next: TruckDetail =
+        current === 'full'
+          ? distanceSq > LOD_FAR_SQ * scaleSq
+            ? 'simple'
+            : 'full'
+          : distanceSq < LOD_NEAR_SQ * scaleSq
+            ? 'full'
+            : 'simple'
+      if (next === current) return
+      detailRef.current = next
+      for (const body of bodies) {
+        const mesh = meshRefs.current.get(body)
+        if (!mesh) continue
+        mesh.geometry = getTruckGeometry(node.model, node.mastRowId, body, next)
+      }
+    },
+    [bodies, isExporting, node.model, node.mastRowId],
+  )
+
+  useEffect(() => registerGhostLod(node.id, evaluateDetail), [node.id, evaluateDetail])
 
   const height = overallHeightM(model, mastRow)
   const length = planLengthM(model)
   const width = planWidthM(model)
 
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      {/* Seçim kolideri: gövdeler arasında boşluk çok (mast rayları, çatal
-          araları) — kullanıcının nişan aldığı şey zarfın kendisi. */}
-      {!isExporting && (
-        <Collider
-          position={[position[0], position[1] + height / 2, position[2]]}
-          rotation={rotation}
-          size={[length, height, width]}
-        />
-      )}
-
+    <group ref={wrapperRef} visible={node.visible !== false} {...handlers}>
       <group position={position} ref={registeredRef} rotation={rotation}>
+        {/* Seçim kolideri: gövdeler arasında boşluk çok (mast rayları, çatal
+            araları) — kullanıcının nişan aldığı şey zarfın kendisi.
+
+            İÇERİDE ve YEREL koordinatta, rafın şablonuyla (`rack/renderer.tsx`):
+            dışarıdayken aracın konumu ve dönüşü iki ayrı yerde yazılıyordu ve
+            ikisi ayrışabiliyordu. Burada dönüşüm yalnız kayıtlı gruptadır —
+            filo sürerken kolider de aynı matristen taşınır. */}
+        {!isExporting && <Collider position={[0, height / 2, 0]} size={[length, height, width]} />}
         {bodies.map((body) => {
           const offsetY =
             body === 'stage1'

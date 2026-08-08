@@ -66,6 +66,18 @@ export const liveRackingDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Baked `/viewer` sözleşmesi — rafla ve öteki raf kind'larıyla aynı.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyor: on kanallık bir
+   * sıra on ayrı mesh, hepsi aynı şekli çiziyor. `replace` baked mesh'i
+   * gizletip seviyenin kanallarını canlı statik instancing'le çizdiriyor, yani
+   * sıra şekil başına tek çizim çağrısına iniyor. Eklenti yüklü değilse
+   * politika `static`'e düşer ve baked mesh görünür kalır — veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
+
   floorplan: buildLiveRackingFloorplan,
 
   tool: () => import('./tool'),

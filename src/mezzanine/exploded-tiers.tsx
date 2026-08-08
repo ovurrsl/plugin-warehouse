@@ -1,12 +1,19 @@
 'use client'
 
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { useAppearance } from '../appearance'
-import { getMezzanineTierGeometry } from './geometry'
+import {
+  getMezzanineTierGeometry,
+  mezzanineTierGeometryKey,
+  releaseGeometry,
+  retainGeometry,
+} from './geometry'
 import { getMezzanineMaterial } from './materials'
 import type { MezzanineNode } from './schema'
+
+const NO_RAYCAST = () => {}
 
 /**
  * Patlatılmış görünümde asma katın KENDİ katlarını ayırması.
@@ -50,6 +57,32 @@ export function tierGapFor(tierCount: number): number {
   return Math.min(2, HOST_LEVEL_GAP / spans)
 }
 
+/**
+ * Hedefe "oturmuş" sayılan mesafe.
+ *
+ * Oransal lerp hedefe hiçbir zaman ULAŞMIYOR — her kare kalan farkın bir
+ * oranını kapatıyor, yani fark küçülüyor ama sıfırlanmıyor. Eşiksiz hâlde
+ * bu, patlatma açık kaldığı sürece kare başına kat sayısı kadar `position.y`
+ * yazımı demekti; her yazım `matrixWorldNeedsUpdate` kaldırıyor ve alt ağacın
+ * dünya matrisini yeniden çarptırıyor. 0,5 mm bir asma katta hiçbir ekranda
+ * ayırt edilemez ve hareketin bittiği yer olarak kullanılabilir.
+ */
+const SETTLE_EPSILON_M = 5e-4
+
+/**
+ * Bir katın bir sonraki kotu — hareketin saf hâli, test bunu ölçüyor.
+ *
+ * Fark eşiğin altındaysa hedefin KENDİSİ dönüyor: oransal yaklaşmanın
+ * kendiliğinden biteceği bir nokta yok, "bitti" diyen tek şey bu. Çağıran
+ * dönen değeri mevcut kotla karşılaştırıp yazıp yazmayacağına karar veriyor,
+ * yani oturmuş bir kata bir daha dokunulmuyor.
+ */
+export function nextTierY(current: number, target: number, t: number): number {
+  const remaining = target - current
+  if (Math.abs(remaining) < SETTLE_EPSILON_M) return target
+  return current + remaining * t
+}
+
 export default function ExplodedTiers({
   node,
   tierCount,
@@ -58,20 +91,52 @@ export default function ExplodedTiers({
   tierCount: number
 }) {
   const groupsRef = useRef<Array<THREE.Group | null>>([])
+  const settledRef = useRef(false)
   const appearance = useAppearance()
   const material = getMezzanineMaterial(appearance)
   const gap = tierGapFor(tierCount)
 
+  /**
+   * Kat sayısı değişince hareket yeniden başlar: yeni bir grup y=0'da mount
+   * oluyor ve hedefleri de kayıyor. `gap` bu sayıdan türüyor, yani tek
+   * bağımlılık yeter.
+   */
+  useLayoutEffect(() => {
+    settledRef.current = false
+  }, [tierCount])
+
+  /**
+   * Kat geometrileri de ekranda sayılır: tahliye çizileni boşaltamaz.
+   *
+   * Bölünmüş yol ikinci bir temsil ve kendi anahtarlarını üretiyor
+   * (`mezzanineTierGeometryKey`) — bütünün anahtarını tutmak bunları
+   * korumuyor. Tutulmadan bırakılan bir kat, patlatma açıkken havuzun
+   * sınırına takılıp serbest bırakılabilirdi. Şablon: `rack/renderer.tsx`.
+   */
+  useEffect(() => {
+    const keys = Array.from({ length: tierCount }, (_, index) =>
+      retainGeometry(mezzanineTierGeometryKey(node, index)),
+    )
+    return () => {
+      for (const key of keys) releaseGeometry(key)
+    }
+  }, [node, tierCount])
+
   useFrame((_, delta) => {
+    if (settledRef.current) return
     // Host'un kendi lerp'i gibi: hedefe doğru kare başına oransal yaklaşma.
     // `delta` ile ölçekli, yani kare hızı hareketi değiştirmiyor.
     const t = Math.min(1, delta * LERP_RATE)
+    let settled = true
     for (let index = 0; index < groupsRef.current.length; index++) {
       const group = groupsRef.current[index]
       if (!group) continue
       const target = index * gap
-      group.position.y += (target - group.position.y) * t
+      const next = nextTierY(group.position.y, target, t)
+      if (next !== group.position.y) group.position.y = next
+      if (next !== target) settled = false
     }
+    settledRef.current = settled
   })
 
   return (
@@ -87,6 +152,10 @@ export default function ExplodedTiers({
             dispose={null}
             geometry={getMezzanineTierGeometry(node, index)}
             material={material}
+            // Seçim ışını çarpıştırıcıdan geçiyor (kayıtlı grubun içinde) —
+            // bu mesh de ışına girseydi, kat başına bir kez daha üçgen üçgen
+            // taranırdı ve tıklama yine aynı düğümü seçerdi.
+            raycast={NO_RAYCAST}
             receiveShadow
           />
         </group>

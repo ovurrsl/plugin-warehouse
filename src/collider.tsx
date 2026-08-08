@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
+import { freezeMatrix } from './frozen-matrix'
 
 /**
  * Seçim kolideri — TEK birim küp, TEK materyal, tüm paket.
@@ -40,29 +41,23 @@ export function colliderProps(size: readonly [number, number, number]) {
 }
 
 /**
- * Donmuş yerel matrisi bir kez basar ve three'nin her-kare yeniden hesabını
- * kapatır.
+ * Çarpıştırıcının donmuş yerel matrisi — `frozen-matrix.ts`'in aynısı, bu
+ * çağrı yerinin adıyla.
  *
- * `Object3D.updateMatrixWorld` her karede `if (this.matrixAutoUpdate)
- * this.updateMatrix()` yapıyor — yani bayrağı AÇIK olan her nesne yerel
- * matrisini yeniden besteliyor (`compose`) ve `matrixWorldNeedsUpdate`
- * işaretliyor, bu da dünya matrisini yeniden bestelettiriyor
- * (`multiplyMatrices`). Çarpıştırıcı mount'tan sonra asla kımıldamıyor, yani
- * bu iş tamamen boşa: 3.582 raflık sahnede kare başına 3.582 `compose` +
- * 3.582 `multiplyMatrices`. Ölçüm (kullanıcı izleri, kamera hareketi,
- * 2026-08-07): `updateMatrixWorld` self %18, `multiplyMatrices` %12,1 —
- * profilin ilk iki kalemi.
+ * Mekanizma ve neden auto-update'in kare başına iki matris hesabı olduğu orada.
+ * Ölçüm burada: 3.582 raflık sahnede kare başına 3.582 `compose` + 3.582
+ * `multiplyMatrices` (kullanıcı izleri, kamera hareketi, 2026-08-07 —
+ * `updateMatrixWorld` self %18, `multiplyMatrices` %12,1, profilin ilk iki
+ * kalemi).
  *
- * `updateMatrix()` çağrısı ŞART ve tuzağın kendisi: R3F `matrixAutoUpdate`'i
- * ne okuyor ne yazıyor (dist'inde geçmiyor), yani bayrak kapatılıp matris
- * basılmazsa çarpıştırıcı birim küp olarak kalır — ekranda hiçbir şey
- * değişmez, yalnız tıklama yanlış yeri vurur. Aynı tuzağın kayıtlı gruptaki
- * karşılığı `static-transform.ts`'te belgeli.
+ * Buraya ait olan tuzak, `freezeMatrix`'in içindeki `updateMatrix()` çağrısı:
+ * R3F `matrixAutoUpdate`'i ne okuyor ne yazıyor (dist'inde geçmiyor), yani
+ * bayrak kapatılıp matris BASILMAZSA çarpıştırıcı birim küp olarak kalır —
+ * ekranda hiçbir şey değişmez (zaten görünmez), yalnız tıklama düğümün gerçek
+ * hacmi yerine birim küpü vurur. Aynı tuzağın kayıtlı gruptaki karşılığı
+ * `static-transform.ts`'te belgeli.
  */
-export function freezeColliderMatrix(mesh: THREE.Object3D): void {
-  mesh.matrixAutoUpdate = false
-  mesh.updateMatrix()
-}
+export { freezeMatrix as freezeColliderMatrix }
 
 /**
  * Seçim çarpıştırıcısı — donmuş matrisli, tek paylaşılan küp ve materyal.
@@ -86,7 +81,7 @@ export function Collider({
 
   useLayoutEffect(() => {
     const mesh = ref.current
-    if (mesh) freezeColliderMatrix(mesh)
+    if (mesh) freezeMatrix(mesh)
   }, [px, py, pz, rx, ry, rz, sx, sy, sz])
 
   return (

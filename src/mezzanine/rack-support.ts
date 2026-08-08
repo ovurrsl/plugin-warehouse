@@ -19,7 +19,7 @@ import type { PalletRackNode } from '../rack/schema'
 import { bayPitch, storageLevelsPresent, totalDepth } from '../rack/slots'
 import { areaLabel, DEFAULT_UNIT, type LinearUnit } from '../units'
 import { deckSlabId } from './deck-slabs'
-import { resolveTierElevations } from './metrics'
+import type { ResolvedTier } from './metrics'
 import type { MezzanineNode } from './schema'
 
 export type SupportedRack = {
@@ -65,17 +65,17 @@ export function rackFootprintM2(rack: PalletRackNode): number {
  * Katta hiç zemin döşemesi yoksa güverte tek adaydır, kalıcılaşmaz ve o raf
  * burada görünmez — görüntüde yine doğru yerde durur, yalnız yük sayımına
  * girmez. Zemin döşemesi olan her sahnede (yani pratikte hepsinde) sorun yok.
+ *
+ * Çözülmüş katlar ÇAĞIRANDAN geliyor, burada yeniden çözülmüyor: tek çağıran
+ * olan panel zinciri zaten kendi tablosu için çözüyor ve ikinci bir çözüm,
+ * aynı yürüyüşü her renderda tekrarlamaktı.
  */
 export function racksOnMezzanine(
   nodes: Readonly<Record<string, unknown>>,
   mezzanine: MezzanineNode,
+  tiers: readonly ResolvedTier[],
 ): SupportedRack[] {
-  const byDeckId = new Map(
-    resolveTierElevations(mezzanine.tiers).map((tier) => [
-      deckSlabId(mezzanine.id, tier.index),
-      tier,
-    ]),
-  )
+  const byDeckId = new Map(tiers.map((tier) => [deckSlabId(mezzanine.id, tier.index), tier]))
 
   const found: SupportedRack[] = []
 

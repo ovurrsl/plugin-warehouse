@@ -15,6 +15,18 @@ import {
 } from './telescopic-catalog'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
+/**
+ * Kuyruk ucunun bant kotu — kullanıcının ayarı, yoksa modelin katalog kotu.
+ *
+ * Makinenin bütün yüksekliği buradan türüyor (gövde kirişi, bacaklar, bom
+ * kademeleri, kolider, akış kutuları), yani tek okuma noktası olması şart:
+ * bir yer `model.heightM`'de kalırsa kot değiştiğinde o parça yerinde durur
+ * ve makine kendi içinde ayrışır.
+ */
+export function transportHeightM(node: ConveyorTelescopicNode): number {
+  return node.transportHeight ?? telescopicModelOf(node.model).heightM
+}
+
 export function telescopicModelOf(id: TelescopicModelId): TelescopicModel {
   return TELESCOPIC_MODELS[id]
 }

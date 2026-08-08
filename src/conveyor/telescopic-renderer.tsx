@@ -33,6 +33,7 @@ import {
   footprintCenterX,
   frameWidthM,
   telescopicModelOf,
+  transportHeightM,
 } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
@@ -229,7 +230,7 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
     const endX = boomTipX(node) - 0.2
     const span = Math.max(endX - startX, 0.5)
     const count = Math.min(MAX_BOXES, Math.max(1, Math.floor(span / BOX_GAP_M)))
-    const topY = model.heightM + FLOW_BOX_M[1] / 2
+    const topY = transportHeightM(node) + FLOW_BOX_M[1] / 2
 
     for (let index = 0; index < count; index++) {
       const offset = (travelRef.current + index * BOX_GAP_M) % span
@@ -247,7 +248,7 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
     void length
   })
 
-  const height = model.heightM + 0.12
+  const height = transportHeightM(node) + 0.12
   const width = frameWidthM(node)
 
   /**
@@ -259,7 +260,7 @@ function TelescopicBody({ node }: { node: ConveyorTelescopicNode }) {
   const noseLens: [number, number, number] | null = nose
     ? [
         nose.centerX + nose.lengthM / 2 - 0.16,
-        model.heightM - nose.dropM + 0.58,
+        transportHeightM(node) - nose.dropM + 0.58,
         -nose.widthM / 2 - 0.055,
       ]
     : null

@@ -38,6 +38,7 @@ import {
   currentLengthM as telescopicCurrentLengthM,
   frameWidthM as telescopicFrameWidthM,
   telescopicModelOf,
+  transportHeightM as telescopicTransportHeightM,
 } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 import {
@@ -199,7 +200,7 @@ export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId)
    * `false`, yani "kotlar uyuşuyor". Uyuşmayan iki ucu birleştirmek, kutunun
    * takılacağı bir eklemi sahnede sorunsuz göstermek olurdu.
    */
-  if (isTelescopicModule(module)) return telescopicModelOf(module.model).heightM
+  if (isTelescopicModule(module)) return telescopicTransportHeightM(module)
   return module.transportHeight
 }
 
@@ -313,7 +314,7 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
       {
         id: 'a',
         x: -model.fixedM / 2,
-        y: model.heightM,
+        y: telescopicTransportHeightM(module),
         z: 0,
         dx: -1,
         dz: 0,

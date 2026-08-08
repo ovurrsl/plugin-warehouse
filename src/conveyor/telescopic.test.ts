@@ -21,6 +21,7 @@ import {
   currentLengthM,
   footprintCenterX,
   frameWidthM,
+  transportHeightM,
 } from './telescopic-metrics'
 import { conveyorTelescopicParametrics } from './telescopic-parametrics'
 import { telescopicSectionParts } from './telescopic-parts'
@@ -390,5 +391,79 @@ describe('yayınlanmamışlar kayıtlı', () => {
     expect(TELESCOPIC_UNPUBLISHED_NOTE).toContain('yayınlanmamış')
     expect(TELESCOPIC_UNPUBLISHED_NOTE).toContain('0.4 m/s')
     expect(TELESCOPIC_UNPUBLISHED_NOTE.toLowerCase()).toContain('ölçüm değildir')
+  })
+})
+
+describe('kuyruk kotu ayarlanabilir — makinenin birleşebilmesinin şartı', () => {
+  const tele = (overrides: Record<string, unknown> = {}) =>
+    ConveyorTelescopicNode.parse({ id: 'conveyor-telescopic_t', ...overrides })
+  const roller = (overrides: Record<string, unknown> = {}) =>
+    ConveyorRollerNode.parse({ id: 'conveyor_roller_t', rollers: 40, ...overrides })
+
+  beforeEach(() => {
+    resetLineIndex()
+    resetPortMagnet()
+  })
+
+  test('alan boşken kot modelin KATALOG değeri', () => {
+    // Sabit bir varsayılan yazmak katalogdaki dört kottan üçünü sessizce
+    // yanlışlardı; alan bu yüzden opsiyonel.
+    for (const model of ALL) {
+      expect(transportHeightM(tele({ model: model.id })), model.label).toBeCloseTo(model.heightM, 9)
+    }
+  })
+
+  test('kot ayarlandığında port O kotu bildiriyor', () => {
+    const node = tele({ transportHeight: 0.75 })
+    expect(transportHeightAt(node, 'a')).toBeCloseTo(0.75, 9)
+  })
+
+  test('şerit ve kot eşleşince teleskopik bir makara hattına BİRLEŞİYOR', () => {
+    /**
+     * Bildirilen eksik: "teleskopik diğer konveyör ürünleri ile
+     * birleşebilmeli." Birleşemiyordu ve sebebi iki katmanlıydı — şerit
+     * sınıfı (600/800/1000'e karşı 400/600) ve bant kotu (modelden sabit
+     * 0,80–1,05 m'ye karşı ailenin 0,75 m'si). Mıknatıs ikisinde de sıfır
+     * tolerans istiyor, ve kotu ayarlayacak alan hiç yoktu.
+     *
+     * Test iki ucu da eşitleyip mıknatısın gerçekten engel bildirmediğini
+     * ölçüyor. Kot alanı geri alınırsa 'kot' engeli yeniden çıkar.
+     */
+    const line = roller({ position: [0, 0, 0], usefulWidth: '600', transportHeight: 0.75 })
+    const boom = tele({ beltWidth: '600', transportHeight: 0.75, flow: 'forward' })
+
+    // Bomun kuyruğu −X'e bakıyor; hattın çıkışına kuyruk kotunda dayanıyor.
+    const tail = localPorts(boom).find((port) => port.id === 'a')
+    if (!tail) throw new Error('kuyruk portu yok')
+    const seam = moduleLengthM(line) / 2
+    const at: [number, number, number] = [seam - tail.x, 0, 0]
+
+    const blockers = mateBlockers(boom, at, 0, { [line.id]: line })
+    expect(blockers).toEqual([])
+    expect(snapToLineEnd(boom, at, 0, [], { [line.id]: line })).not.toBeNull()
+  })
+
+  test('kot AYRIŞTIĞINDA mıknatıs hâlâ engelliyor — kural gevşetilmedi', () => {
+    // Kotu ayarlanabilir yapmak, basamaklı bir eki serbest bırakmak değil:
+    // iki yatak arasındaki basamak kutunun takılacağı yer ve kural yerinde.
+    const line = roller({ position: [0, 0, 0], usefulWidth: '600', transportHeight: 0.75 })
+    const boom = tele({ beltWidth: '600', transportHeight: 0.95 })
+
+    const tail = localPorts(boom).find((port) => port.id === 'a')
+    if (!tail) throw new Error('kuyruk portu yok')
+    const at: [number, number, number] = [moduleLengthM(line) / 2 - tail.x, 0, 0]
+
+    expect(mateBlockers(boom, at, 0, { [line.id]: line }).length).toBeGreaterThan(0)
+  })
+
+  test('kot geometri anahtarına giriyor — iki kot tek buffer’ı paylaşmaz', () => {
+    // Kot bütün yüksekliği sürüyor (gövde kirişi, bacaklar, kademeler). Anahtarda
+    // olmasaydı farklı kottaki iki bom aynı mesh'i paylaşır ve biri yanlış
+    // yükseklikte çizilirdi — ekranda hata yok, yalnız makine yerde değil.
+    const low = tele({ transportHeight: 0.75 })
+    const high = tele({ transportHeight: 1.2 })
+
+    expect(telescopicBaseKey(low, 'full')).not.toBe(telescopicBaseKey(high, 'full'))
+    expect(telescopicSectionKey(low, 1, 'full')).not.toBe(telescopicSectionKey(high, 1, 'full'))
   })
 })

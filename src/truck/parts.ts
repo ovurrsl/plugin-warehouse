@@ -38,6 +38,10 @@ export type TruckPartRole =
   | 'wheel'
   | 'hub'
   | 'guide-roller'
+  /** Gövdeyi bölen bel kuşağı / tampon çıtası — koyu, gövde renginden ayrı. */
+  | 'belt'
+  /** Turuncu çakar — bir depo aracını tek bakışta tanıtan şey. */
+  | 'beacon'
 
 /**
  * Hareket eden birimler. Parçalar araç çerçevesinde emit edilir; `stage1` ve
@@ -102,6 +106,8 @@ export const TRUCK_ROLE_COLORS: Record<TruckPartRole, string> = {
   wheel: '#1a1d21',
   hub: '#8b939e',
   'guide-roller': '#4a525c',
+  belt: '#23272d',
+  beacon: '#e8a317',
 }
 
 /** Zeminle z-çakışmasını önleyen taban payı. T26 "en alçak vertex [0, 1 mm]"
@@ -300,6 +306,108 @@ export function pushMastStage(
       size: [rx * 0.8, 0.1, args.railZ * 2 - rz],
     })
   }
+}
+
+/**
+ * Gövde kabuğu — TEK kutu yerine etek + bel kuşağı + üst gövde.
+ *
+ * ## Neden
+ *
+ * Beş ailenin beşi de gövdesini tek bir prizma olarak çiziyordu: turret'in
+ * 1,6 m'lik sarı bloğu, reach'in 1,05 m'lik mavi levhası, transpaletin yeşil
+ * tuğlası. Tek prizmanın iki sonucu var ve ikisi de görsel:
+ *
+ *   - **Silüette hiçbir kırılma yok.** Bir metre yüksekliğinde kesintisiz bir
+ *     yüz, hangi açıdan bakılırsa bakılsın düz bir renk lekesi olarak okunuyor;
+ *     makineyi makine yapan yatay gölge çizgisi hiç doğmuyor.
+ *   - **Tekerlekler gövdenin içinde kayboluyor.** Prizma izin tamamı kadar
+ *     geniş ve lastik hep içeride kalıyor, yani araç tekerlek üstünde
+ *     DURMUYOR gibi görünüyor — havada duran bir kutu.
+ *
+ * Kabuk üç kutu: içeri kaçık bir ETEK (lastik açığa çıkar, altta gölge
+ * doğar), izin tam genişliğinde ince bir BEL KUŞAĞI (gerçek makinelerdeki
+ * tampon çıtası; koyu renk, gövdeyi ikiye böler) ve kuşaktan bir tık dar ÜST
+ * GÖVDE.
+ *
+ * Üçü de İKİ katmanda birden çiziliyor. Bu bilinçli: kırılma bir ayrıntı
+ * değil siluetin kendisi, ve uzak katmanda düşürmek LOD geçişinde aracın
+ * şeklini değiştirirdi. Z zarfını kuşak belirliyor ve iki katmanda da aynı —
+ * T20'nin ölçtüğü şey.
+ *
+ * Oranlar SEÇİLMİŞ VARSAYILAN: hiçbir katalog gövde kesitini yayımlamıyor.
+ */
+export function pushBodyShell(
+  parts: TruckPart[],
+  args: {
+    role: Extract<TruckPartRole, 'chassis' | 'cowl' | 'counterweight'>
+    xRear: number
+    xFront: number
+    /** Bel kuşağının — yani izin — yarı genişliği. */
+    halfWidth: number
+    yBottom: number
+    yTop: number
+    /** Kuşağın kotu. Gövdenin alt üçte birine yakın durması gerçekçi. */
+    beltY: number
+    /** Eteğin kuşaktan içeri kaçıklığı, yan başına. */
+    skirtInset: number
+  },
+): void {
+  const length = args.xFront - args.xRear
+  const centerX = (args.xRear + args.xFront) / 2
+  const beltHeight = Math.min(0.09, (args.yTop - args.yBottom) * 0.12)
+  const beltBottom = args.beltY - beltHeight / 2
+  const beltTop = args.beltY + beltHeight / 2
+
+  if (beltBottom > args.yBottom) {
+    parts.push({
+      role: args.role,
+      center: [centerX, (args.yBottom + beltBottom) / 2, 0],
+      size: [length, beltBottom - args.yBottom, 2 * (args.halfWidth - args.skirtInset)],
+    })
+  }
+  parts.push({
+    role: 'belt',
+    center: [centerX, args.beltY, 0],
+    size: [length, beltHeight, 2 * args.halfWidth],
+  })
+  if (args.yTop > beltTop) {
+    parts.push({
+      role: args.role,
+      center: [centerX, (beltTop + args.yTop) / 2, 0],
+      size: [length, args.yTop - beltTop, 2 * (args.halfWidth - 0.012)],
+    })
+  }
+}
+
+/**
+ * Turuncu çakar — kaide + lamba, GÖVDENİN üstünde.
+ *
+ * Koruyucu tavanın üstüne konmuyor ve sebebi zarf: tavanın kotu h6, yani
+ * yayımlanmış zarf yüksekliğinin ta kendisi. Oraya bir lamba koymak makineyi
+ * kataloğun söylediğinden yüksek çizerdi — bu paketin bütün ölçü disiplinine
+ * aykırı. Gövde tepesi zarfın epey altında ve lamba oraya sığıyor.
+ *
+ * Yalnız yakın katmanda: 40 m'den 110 mm'lik bir lamba tek piksel etmiyor.
+ */
+export function pushBeacon(
+  parts: TruckPart[],
+  args: { x: number; yBase: number; z: number; detail: TruckDetail },
+): void {
+  if (args.detail !== 'full') return
+  parts.push({
+    role: 'belt',
+    center: [args.x, args.yBase + 0.02, args.z],
+    size: [0.09, 0.04, 0.09],
+  })
+  parts.push({
+    kind: 'cyl',
+    role: 'beacon',
+    center: [args.x, args.yBase + 0.095, args.z],
+    radius: 0.05,
+    length: 0.11,
+    axis: 'y',
+    segments: 8,
+  })
 }
 
 /**

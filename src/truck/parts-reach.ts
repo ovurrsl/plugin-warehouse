@@ -14,6 +14,8 @@
 
 import type { TruckModel } from '../handling/models'
 import {
+  pushBeacon,
+  pushBodyShell,
   pushForkPair,
   pushMastStage,
   pushOverheadGuard,
@@ -49,12 +51,22 @@ export function reachParts(model: TruckModel, body: TruckBody, detail: TruckDeta
 
   switch (body) {
     case 'chassis': {
-      // Gövde bloğu: batarya + sürüş ünitesi, ayakların gerisi.
-      parts.push({
+      // Gövde bloğu: batarya + sürüş ünitesi, ayakların gerisi. Tek prizma
+      // DEĞİL: 1,05 m'lik kesintisiz mavi yüz düz bir levha olarak okunuyor ve
+      // tahrik tekeri tamamen içinde kalıyordu (bkz. `pushBodyShell`).
+      pushBodyShell(parts, {
         role: 'chassis',
-        center: [(rearX + bodyFrontX) / 2, 0.62, 0],
-        size: [bodyFrontX - rearX, 1.05, model.b1 - 0.04],
+        xRear: rearX,
+        xFront: bodyFrontX,
+        halfWidth: model.b1 / 2 - 0.02,
+        yBottom: 0.095,
+        yTop: 1.145,
+        beltY: 0.44,
+        skirtInset: 0.07,
       })
+      // Çakar gövdenin sırtında, koruyucu tavan direklerinin arasında —
+      // tavanın kotu h6, yani zarfın kendisi; oraya konamaz.
+      pushBeacon(parts, { x: rearX + 0.3, yBase: 1.145, z: 0.3, detail })
       if (detail === 'full') {
         // Yana oturan operatör bölmesi: koltuk h7'de, konsol karşısında.
         parts.push({

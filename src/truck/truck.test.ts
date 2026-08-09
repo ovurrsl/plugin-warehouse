@@ -15,7 +15,7 @@ import {
 import { mastPose, mastTopY } from './kinematics'
 import * as materials from './materials'
 import { forkFaceX, forkTipX, overallHeightM, planWidthM, waPivotLocalX } from './metrics'
-import { bodiesOf } from './parts'
+import { bodiesOf, truckParts } from './parts'
 import { TruckNode } from './schema'
 
 const CTX_UNSELECTED = {} as GeometryContext
@@ -276,6 +276,105 @@ describe('T24/T25 — plan bütçesi ve tıklama hijyeni', () => {
       (child) => child.kind === 'rect' && 'fillOpacity' in child && child.fillOpacity !== undefined,
     )
     expect(bands.length).toBe(0)
+  })
+})
+
+/**
+ * T27 — gövdenin BELİ var: alt bant en geniş banttan dar.
+ *
+ * Beş ailenin beşi de gövdesini tek bir prizma olarak çiziyordu. Bir metre
+ * yüksekliğinde, izin tamamı kadar geniş, kesintisiz bir yüz iki şeyi birden
+ * yapıyor: siluete hiçbir yatay kırılma bırakmıyor (düz bir renk lekesi) ve
+ * lastiği kendi genişliğinin içine alıyor (araç yere basmıyor gibi duruyor).
+ *
+ * Ölçülen şey kabuğun ta kendisi: en alttaki 250 mm'lik bantta gövdenin en
+ * geniş yarı-Z'si, makinenin en geniş bandından belirgin biçimde dar olmalı.
+ * `skirtInset` sıfırlanırsa bu kırmızı yanar — ekranda hiçbir hata çıkmadan
+ * eski görünüme dönüleceği için tek uyarı burası.
+ *
+ * Manuel transpalet kapsam dışı: onun "gövdesi" 300 mm'lik bir pompa kutusu,
+ * bel verecek bir yüzü yok.
+ */
+describe('T27 — gövdenin beli var, alt bant dar', () => {
+  const SHELLED = TRUCK_MODEL_ID_LIST.filter((id) => TRUCK_MODELS[id].variant !== 'hand-pallet')
+
+  test('kabuk taşıyan dört ailede etek en geniş banttan dar', () => {
+    expect(SHELLED.length).toBe(4)
+
+    for (const id of SHELLED) {
+      const model = TRUCK_MODELS[id]
+      const parts = bodiesOf(model)
+        .flatMap((body) => truckParts(model, null, body, 'full'))
+        .filter(
+          (part) =>
+            part.kind !== 'cyl' &&
+            part.kind !== 'beam' &&
+            (part.role === 'chassis' || part.role === 'cowl' || part.role === 'counterweight'),
+        )
+
+      const bandHalfWidth = (yLow: number, yHigh: number): number => {
+        let widest = 0
+        for (const part of parts) {
+          if (part.kind === 'cyl' || part.kind === 'beam') continue
+          const [, cy, cz] = part.center
+          const [, sy, sz] = part.size
+          if (cy + sy / 2 <= yLow || cy - sy / 2 >= yHigh) continue
+          widest = Math.max(widest, Math.abs(cz) + sz / 2)
+        }
+        return widest
+      }
+
+      const widest = bandHalfWidth(0, 10)
+      const skirt = bandHalfWidth(0, 0.25)
+      expect(widest, `${id}: gövde parçası bulunamadı`).toBeGreaterThan(0)
+      expect(skirt, `${id}: etek en geniş bantla aynı — gövde tek prizma`).toBeLessThan(
+        widest - 0.04,
+      )
+    }
+  })
+
+  test('forkliftin taban plakası tahrik lastiğinin izinden DAR', () => {
+    /**
+     * Ailenin en somut örneği. Plaka `b1 − 0.06` iken lastiğin dış yüzü
+     * plakanın yalnız 39 mm dışında kalıyordu ve hiçbir açıdan görünmüyordu.
+     * Ölçü lastikten okunuyor, sabit yazılmıyor: lastik büyürse test onu
+     * takip eder.
+     */
+    const model = TRUCK_MODELS['forklift-1300']
+    const parts = truckParts(model, null, 'chassis', 'full')
+    const plate = parts.find(
+      (part) => part.kind !== 'cyl' && part.kind !== 'beam' && part.role === 'chassis',
+    )
+    const tyre = parts.find((part) => part.kind === 'cyl' && part.role === 'wheel')
+    if (!plate || plate.kind === 'cyl' || plate.kind === 'beam') throw new Error('plaka yok')
+    if (tyre?.kind !== 'cyl') throw new Error('lastik yok')
+
+    const tyreOuter = Math.abs(tyre.center[2]) + tyre.length / 2
+    expect(plate.size[2] / 2).toBeLessThan(tyreOuter - 0.08)
+  })
+})
+
+/**
+ * T28 — siluetteki kırılma katmandan bağımsız.
+ *
+ * Bel kuşağı bir "ayrıntı" değil: gövdeyi iki kütleye bölen şey o. Yalnız
+ * yakın katmanda çizilseydi araç uzaklaşırken şekil değiştirirdi — LOD'un
+ * yapmaması gereken tek şey.
+ */
+describe('T28 — bel kuşağı iki katmanda da var', () => {
+  test('kabuk taşıyan dört ailede kuşak hem full hem simple’da', () => {
+    const withShell = TRUCK_MODEL_ID_LIST.filter((id) => TRUCK_MODELS[id].variant !== 'hand-pallet')
+    expect(withShell.length).toBe(4)
+
+    for (const id of withShell) {
+      const model = TRUCK_MODELS[id]
+      for (const detail of ['full', 'simple'] as const) {
+        const belts = bodiesOf(model)
+          .flatMap((body) => truckParts(model, null, body, detail))
+          .filter((part) => part.role === 'belt')
+        expect(belts.length, `${id}/${detail}`).toBeGreaterThan(0)
+      }
+    }
   })
 })
 

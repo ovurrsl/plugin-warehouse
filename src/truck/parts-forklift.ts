@@ -16,6 +16,8 @@ import type { MastRow } from '../handling/masts'
 import type { TruckModel } from '../handling/models'
 import {
   GROUND_CLEARANCE,
+  pushBeacon,
+  pushBodyShell,
   pushForkPair,
   pushMastStage,
   pushOverheadGuard,
@@ -55,19 +57,33 @@ export function forkliftParts(
 
   switch (body) {
     case 'chassis': {
-      // Taban plakası — iki aks arasını kapatır.
+      /**
+       * Taban plakası — iki aks arasını kapatır, ve lastik izinden DAR.
+       *
+       * Daha önce `b1 − 0.06` idi: tahrik lastiğinin dış yüzü plakanın yalnız
+       * 39 mm dışında kalıyordu, yani hiçbir açıdan görünmüyordu ve makine
+       * tekerlek üstünde durmuyormuş gibi okunuyordu. Gerçek karşı ağırlıklı
+       * forkliftin beli tam bu yüzden lastiğin içine çekilir; plaka artık
+       * 110 mm içeride ve lastik ortaya çıkıyor.
+       */
       parts.push({
         role: 'chassis',
         center: [(rearAxleX + frontAxleX) / 2, 0.3, 0],
-        size: [frontAxleX - rearAxleX + 0.55, 0.24, model.b1 - 0.06],
+        size: [frontAxleX - rearAxleX + 0.55, 0.24, model.b1 - 0.3],
       })
       // Karşı ağırlık: alt blok tam b1, üstü arkaya YUVARLANIR (eğimli
       // kapak + daralan tepe) — dik kesilmiş kutu, "kutu kutu" görünümünün
-      // gövdedeki kaynağıydı.
-      parts.push({
+      // gövdedeki kaynağıydı. Alt blok da kabuğa geçti: eteği içeri kaçık,
+      // beli tamponu taşıyor, ve arka lastik artık eteğin yanında görünüyor.
+      pushBodyShell(parts, {
         role: 'counterweight',
-        center: [rearX + 0.275, 0.5, 0],
-        size: [0.55, 0.6, model.b1],
+        xRear: rearX,
+        xFront: rearX + 0.55,
+        halfWidth: model.b1 / 2,
+        yBottom: 0.2,
+        yTop: 0.8,
+        beltY: 0.31,
+        skirtInset: 0.055,
       })
       parts.push({
         kind: 'sloped',
@@ -136,6 +152,10 @@ export function forkliftParts(
           segments: 10,
         })
       }
+      // Çakar karşı ağırlığın sırtında: koruyucu tavanın kotu h6 ve o zarfın
+      // kendisi — lamba oraya konsaydı makine kataloğun söylediğinden yüksek
+      // çizilirdi.
+      pushBeacon(parts, { x: rearX + 0.34, yBase: 1.14, z: 0, detail })
       pushOverheadGuard(parts, {
         xFront: frontAxleX + 0.22,
         xRear: rearX + 0.5,

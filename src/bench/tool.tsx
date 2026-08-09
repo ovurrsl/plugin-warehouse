@@ -8,6 +8,7 @@ import {
   PlacementBox,
   triggerSFX,
   useEditor,
+  useFacingPose,
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -128,6 +129,15 @@ export default function BenchTool() {
       setCursorRotationY(rotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(position)
+
+      // Tezgâhın ön yüzü +Z ve kind `facingIndicator` bildiriyor, yani host'un
+      // TEK yön üçgeni bu pozu okuyor. Kendi üçgenimizi hayaletin içine
+      // çizmek host'un açıkça uyardığı şey: görünmez çıkıyor.
+      useFacingPose.getState().set({
+        position,
+        rotationY: rotationRef.current,
+        depth: depthM(ghostRef.current),
+      })
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -221,6 +231,9 @@ export default function BenchTool() {
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      // Taahhüt, Esc, kind değişimi ve unmount'u tek elden karşılıyor —
+      // sahipsiz kalan bir yön üçgeni tuvalin üstünde asılı kalır.
+      useFacingPose.getState().clear()
     }
   }, [activeLevelId, previewNode, setBrush])
 

@@ -144,6 +144,26 @@ export const BENCH_VARIANT_IDS = Object.keys(BENCH_VARIANTS) as [
 ]
 
 /**
+ * Tezgâhın ÖN yüzü: **+Z**. Operatör orada durur.
+ *
+ * Bir tezgâhın ön yüzü tanımlanmadan donanımı yerleştirilemez, çünkü donanımın
+ * yarısı operatöre bakmak zorunda (çekmece ona açılır, ekran ona döner) ve öteki
+ * yarısı ondan uzağa (üst raf ve alet panosu görüşünü kesmemeli, duvara
+ * dayanmalı). Yön yazılmadığı sürece her parça kendi işaretini seçiyordu ve
+ * ikisi aynı masada zıt yüzlere düşebiliyordu — ekranda hata yok, yalnız
+ * çekmecesi duvara açılan bir masa.
+ *
+ * +Z seçildi çünkü host'un yön göstergesi ±Z'ye kilitli (`facingIndicator`) ve
+ * kamyonda olduğu gibi ileri yönü +X olan bir kind göstergeyi kullanamıyor.
+ * Tezgâhın ön yüzünü +Z yapmak göstergeyi bedava veriyor.
+ *
+ * Kural: operatöre bakan her parça `FRONT_Z * ...`, arkaya bakan her parça
+ * `-FRONT_Z * ...` yazar. Çıplak işaret yazan bir parça bu kuralın dışında
+ * kalır ve sessizce ters dönebilir.
+ */
+export const FRONT_Z = 1
+
+/**
  * Zarfın içindeki ölçüler — HİÇBİRİ katalogdan gelmiyor.
  *
  * Spec dosyaları yalnız dış üçlüyü yayınlıyor. Aşağıdakiler o zarfa oturan,
@@ -170,9 +190,17 @@ export const ROLLER_DIAMETER_M = mm(50) // sevkiyat masasının tabla makarası
 export const ROLLER_PITCH_M = mm(90)
 export const SCALE_PLATFORM_M = mm(500) // gömme terazi platformu kenarı
 export const SCALE_RECESS_M = mm(12)
+/** Terazi platformunun tabla kenarına bırakması gereken pay — platform dar bir
+ *  tezgâhta bu payla birlikte küçülüyor, tablanın dışına taşmıyor. */
+export const SCALE_EDGE_CLEAR_M = mm(120)
 export const MONITOR_POST_M = mm(35)
 export const MONITOR_HEIGHT_M = mm(450) // tabladan ekranın altına
 export const MONITOR_SCREEN_M: readonly [number, number, number] = [mm(320), mm(220), mm(30)]
+/** Ekran standının tablanın sağ kenarından içeri kaçıklığı. */
+export const MONITOR_SIDE_INSET_M = mm(200)
+/** Ekran standının ARKA kenardan içeri kaçıklığı — stand arka kenarda durur,
+ *  ekran operatöre bakar. */
+export const MONITOR_BACK_INSET_M = mm(100)
 
 /** Aile paleti — parça rolü başına tek renk, vertex attribute'una yazılıyor. */
 export const PALETTE = {

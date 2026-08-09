@@ -88,6 +88,173 @@ describe('toplam yükseklik üst yapıyı sayıyor', () => {
     const bare = bench({ variant: 'eco' })
     expect(overallHeightM(bare)).toBeCloseTo(worktopYM(bare), 9)
   })
+
+  test('üst yapısı OLMAYAN ama ekran taşıyan varyantın zarfı ekranı sayıyor', () => {
+    /**
+     * Kaydedilen hata. Terazi tezgâhının `overhead` alanı `none`, yani zarf
+     * tam tabla kotu bildiriliyordu — oysa ekran standı tablanın 670 mm
+     * üstüne çıkıyor. Sessiz: masa doğru çiziliyor, yalnız üstünden geçen
+     * konveyör serbest sayılıyor ve ekrana nişan alan tıklama arkadaki şeyi
+     * seçiyor.
+     */
+    const scale = bench({ variant: 'weighing-scale' })
+    expect(overallHeightM(scale)).toBeGreaterThan(worktopYM(scale) + 0.6)
+  })
+})
+
+/**
+ * ZARF BEKÇİSİ — bildirilen kutu ile çizilen geometri BİREBİR aynı.
+ *
+ * Yerleştirme zarfı, çarpışma, seçim kolideri ve sürükleme sınırı hepsi
+ * `widthM × overallHeightM × depthM` okuyor. Bu üçlünün dışına taşan bir
+ * parça ekranda hatasız görünür: yalnız duvara ilk değecek şey görünmez
+ * olur, ve tıklama onun üstünden geçer.
+ *
+ * İki yön de ölçülüyor. Eksik bildirim (parça dışarıda) yukarıdaki hatayı
+ * üretiyor; fazla bildirim (kutu boş yer kaplıyor) masaları birbirine
+ * yaklaştırılamaz yapıyor — alet panosunda tam olarak bu vardı, zarf raf
+ * kalınlığı kadar fazla bildiriliyordu.
+ */
+describe('çizilen geometri bildirilen kutunun İÇİNDE', () => {
+  const OVERRIDES: Array<Record<string, unknown>> = [
+    {},
+    // Şemanın uçları: dar + sığ bir masa, sabit ölçülü donanımın (500 mm
+    // terazi platformu, 320 mm ekran) taştığı yer.
+    { width: 0.6, depth: 0.4, height: 0.6 },
+    { width: 4, depth: 1.4, height: 1.2 },
+    { overhead: 'shelf' },
+    { overhead: 'toolboard' },
+    { overhead: 'none' },
+    { under: 'drawers' },
+    { under: 'shelf' },
+    { under: 'none' },
+    { width: 0.6, depth: 0.4, overhead: 'shelf', under: 'drawers' },
+  ]
+
+  for (const variant of Object.values(BENCH_VARIANTS)) {
+    for (const [index, overrides] of OVERRIDES.entries()) {
+      for (const detail of ['full', 'simple'] as const) {
+        test(`${variant.id} #${index} ${detail}: her parça kutunun içinde`, () => {
+          const node = bench({ variant: variant.id, ...overrides })
+          const halfWidth = widthM(node) / 2
+          const halfDepth = depthM(node) / 2
+          const height = overallHeightM(node)
+          // Kayan nokta payı; 0,1 mm'nin altındaki taşma ölçüm gürültüsü.
+          const slack = 1e-4
+
+          for (const part of benchParts(node, detail)) {
+            const [cx, cy, cz] = part.center
+            const [sx, sy, sz] = part.size
+            const where = `${part.role} @ ${cx.toFixed(3)},${cy.toFixed(3)},${cz.toFixed(3)}`
+
+            expect(sx, `${where}: negatif genişlik`).toBeGreaterThan(0)
+            expect(sy, `${where}: negatif yükseklik`).toBeGreaterThan(0)
+            expect(sz, `${where}: negatif derinlik`).toBeGreaterThan(0)
+
+            expect(
+              Math.abs(cx) + sx / 2,
+              `${where}: X'te taban izinin dışında`,
+            ).toBeLessThanOrEqual(halfWidth + slack)
+            expect(
+              Math.abs(cz) + sz / 2,
+              `${where}: Z'de taban izinin dışında`,
+            ).toBeLessThanOrEqual(halfDepth + slack)
+            expect(cy - sy / 2, `${where}: zeminin altında`).toBeGreaterThanOrEqual(-slack)
+            expect(cy + sy / 2, `${where}: zarfın üstünde`).toBeLessThanOrEqual(height + slack)
+          }
+        })
+      }
+    }
+  }
+
+  test('zarf FAZLA da bildirmiyor — tepe gerçekten bir parçaya değiyor', () => {
+    // Tek yönlü bir bekçi (yalnız "içinde mi") kutuyu büyüterek her zaman
+    // yeşile çevrilebilir. Bu yön onu kapatıyor: `overallHeightM` en yüksek
+    // parçanın tepesine BİREBİR oturmalı.
+    for (const variant of Object.values(BENCH_VARIANTS)) {
+      const node = bench({ variant: variant.id })
+      const peak = Math.max(
+        ...benchParts(node, 'full').map((part) => part.center[1] + part.size[1] / 2),
+      )
+      expect(overallHeightM(node), variant.label).toBeCloseTo(peak, 9)
+    }
+  })
+})
+
+describe('ön yüz +Z — operatör orada duruyor', () => {
+  const sideOf = (node: ReturnType<typeof bench>, role: string) => {
+    const parts = benchParts(node, 'full').filter((part) => part.role === role)
+    if (parts.length === 0) throw new Error(`${role} parçası yok`)
+    return parts.map((part) => Math.sign(Number(part.center[2].toFixed(6))))
+  }
+
+  test('çekmece yüzleri ÖN kenarda', () => {
+    // Arkaya konsalardı masa duvara dayandığı anda çekmece açılamazdı — ve
+    // hiçbir test bunu söylemezdi, çünkü masa kusursuz çiziliyor.
+    expect(sideOf(bench({ variant: 'processing', under: 'drawers' }), 'drawer')).toEqual([
+      1, 1, 1, 1,
+    ])
+  })
+
+  /** ÜST rafın Z işareti. `shelf` rolünü alt raf da kullanıyor (o ortada,
+   *  işareti 0) — ayıran şey kot, o yüzden en yüksek olan seçiliyor. */
+  const overheadSide = (node: ReturnType<typeof bench>) => {
+    const shelves = benchParts(node, 'full').filter((part) => part.role === 'shelf')
+    const highest = shelves.reduce((best, part) => (part.center[1] > best.center[1] ? part : best))
+    return Math.sign(Number(highest.center[2].toFixed(6)))
+  }
+
+  test('üst yapı ve ekran ARKA kenarda', () => {
+    // Üst raf öne gelseydi operatörün tam gözünün önünde dururdu.
+    expect(overheadSide(bench({ variant: 'mail-order-packing' }))).toBe(-1)
+    for (const side of sideOf(bench({ variant: 'weighing-scale' }), 'screen')) {
+      expect(side).toBe(-1)
+    }
+    for (const side of sideOf(bench({ variant: 'processing' }), 'toolboard')) {
+      expect(side).toBe(-1)
+    }
+  })
+
+  test('çekmece ile üst yapı ZIT yüzlerde', () => {
+    // Asıl kural bu: ikisi aynı yüze düşerse masanın önü diye bir şey kalmaz.
+    const node = bench({ variant: 'processing', under: 'drawers', overhead: 'shelf' })
+    expect(sideOf(node, 'drawer')[0]).toBe(-overheadSide(node))
+  })
+})
+
+describe('makara yatağı tablanın YERİNE geçiyor', () => {
+  test('makara sırtı tam tabla kotunda — üstünde değil', () => {
+    /**
+     * Kaydedilen hata: makaralar düz tablanın ÜSTÜNE diziliyordu. Çalışma
+     * kotu 50 mm yükseliyor, yayımlanmış 920 mm zarf aşılıyor, ve makaralı
+     * masa düz masanın yanına konduğunda yüzey basamaklanıyordu. Spec'in
+     * cümlesi de tersini söylüyor: "built-in rollers **or** smooth
+     * countertops".
+     */
+    const node = bench({ variant: 'dispatch-packing' })
+    const rollers = benchParts(node, 'full').filter((part) => part.role === 'roller')
+    expect(rollers.length).toBeGreaterThan(10)
+    for (const roller of rollers) {
+      expect(roller.center[1] + roller.size[1] / 2).toBeCloseTo(worktopYM(node), 9)
+    }
+  })
+
+  test('makaralı masanın çalışma yüzeyi düz masanınkiyle AYNI kotta', () => {
+    // Yan yana konan iki masanın yüzeyi hizalanmalı — tekerli/sabit masada
+    // korunan invaryantın aynısı.
+    const rollered = bench({ variant: 'dispatch-packing' })
+    const flat = bench({
+      variant: 'mail-order-packing',
+      height: BENCH_VARIANTS['dispatch-packing'].heightM,
+    })
+    const topOf = (node: ReturnType<typeof bench>) =>
+      Math.max(
+        ...benchParts(node, 'full')
+          .filter((part) => part.role === 'roller' || part.role === 'top')
+          .map((part) => part.center[1] + part.size[1] / 2),
+      )
+    expect(topOf(rollered)).toBeCloseTo(topOf(flat), 9)
+  })
 })
 
 describe('geometri anahtarı kapsaması — iki yönlü', () => {
@@ -115,6 +282,15 @@ describe('geometri anahtarı kapsaması — iki yönlü', () => {
     ['çerçeve rengi', {}, { frameColor: '#112233' }],
     ['ahşap rengi', {}, { timberColor: '#445566' }],
     ['makaralı tabla', { variant: 'eco' }, { variant: 'dispatch-packing' }],
+    // Yalnız `top` oynatan satır: zarfı ve donanımı eşitlenmiş iki varyant,
+    // aralarındaki TEK fark tabla tipi. Yukarıdaki satır bunu ölçemiyor —
+    // orada ölçüler de değişiyor ve mesh zaten değişiyor, yani anahtar
+    // `top`'u hiç taşımasa bile testi geçerdi.
+    [
+      'yalnız tabla tipi',
+      { variant: 'eco', width: 1.4, height: 0.9, depth: 0.75, overhead: 'none', under: 'shelf' },
+      { variant: 'dispatch-packing' },
+    ],
     ['terazi platformu', { variant: 'eco' }, { variant: 'weighing-scale' }],
     ['tekerler', { variant: 'processing' }, { variant: 'mobile-workbench' }],
     // Mesh'e girmeyenler: adı ve konumu geometriyi kımıldatmıyor.

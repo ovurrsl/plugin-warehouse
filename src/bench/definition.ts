@@ -15,10 +15,10 @@ const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
  * bir mıknatıs onları raf gibi birbirine yapıştırırsa kullanıcı iki masayı
  * ayrı ayrı taşıyamaz.
  *
- * `facingIndicator` şimdilik YOK ve bu bilinçli bir eksik: masanın ön yüzü
- * (operatörün durduğu taraf) henüz tanımlı değil — çekmeceler bir yüzde, üst
- * yapı öteki yüzde. Bir yön göstergesi koymak, tanımlanmamış bir yönü
- * tanımlıymış gibi gösterirdi. Kayıtlı iş: `#24`.
+ * Tezgâhın ÖN yüzü +Z (`catalog.ts` → `FRONT_Z`): operatör orada durur,
+ * çekmeceler ona açılır, ekran ona bakar, üst raf ve alet panosu arkada
+ * duvara dayanır. Yön tanımlı olduğu için `facingIndicator` de açık — host'un
+ * göstergesi ±Z'ye kilitli ve tezgâhın ön yüzü tam olarak orası.
  */
 export const benchDefinition = {
   kind: 'warehouse:bench',
@@ -27,6 +27,7 @@ export const benchDefinition = {
   category: 'furnish',
   surfaceRole: 'furnishing',
   snapProfile: 'item',
+  facingIndicator: true,
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = BenchNode.parse({})

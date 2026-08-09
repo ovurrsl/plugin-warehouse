@@ -1,7 +1,7 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { lengthLabel, unitOf } from '../units'
-import { PALETTE } from './catalog'
-import { depthM, overheadOf, topKindOf, underOf, widthM } from './metrics'
+import { FRONT_Z, PALETTE } from './catalog'
+import { depthM, overheadOf, scalePlatformM, topKindOf, underOf, widthM } from './metrics'
 import type { BenchNode } from './schema'
 
 /**
@@ -57,17 +57,37 @@ export function buildBenchFloorplan(
   // Üst yapının oturduğu kenar — kesik değil KALIN çizgi: plan sembollerinde
   // kesik çizgi "üstte/görünmez" demek, oysa bu kenar masanın en somut
   // parçası. Kalınlık "burası kapalı, bu tarafa yaklaşılmaz" diyor.
+  //
+  // Plan ekseni: 3B'nin +Z'si burada +y. Arka kenar bu yüzden `-FRONT_Z`.
   if (overheadOf(node) !== 'none') {
     children.push({
       kind: 'line',
       x1: -halfWidth,
-      y1: -halfDepth,
+      y1: -FRONT_Z * halfDepth,
       x2: halfWidth,
-      y2: -halfDepth,
+      y2: -FRONT_Z * halfDepth,
       stroke,
       strokeWidth: 0.06,
     })
   }
+
+  /**
+   * ÇALIŞMA kenarı — operatörün durduğu taraf, ince ve içeri kaçık çizgi.
+   *
+   * Üst yapı kenarı yalnız raflı/panolu varyantlarda çiziliyor, yani altı
+   * masanın üçünde planda hangi tarafın ön olduğunu söyleyen HİÇBİR şey
+   * yoktu: yerleşimi okuyan kişi masayı duvara ters çevirip koyabilir, ve
+   * hata ancak 3B'de çekmeceyi duvara açarken görülürdü.
+   */
+  children.push({
+    kind: 'line',
+    x1: -halfWidth + 0.05,
+    y1: FRONT_Z * (halfDepth - 0.05),
+    x2: halfWidth - 0.05,
+    y2: FRONT_Z * (halfDepth - 0.05),
+    stroke: ink,
+    strokeWidth: 0.02,
+  })
 
   // Tabla donanımı.
   const top = topKindOf(node)
@@ -89,8 +109,10 @@ export function buildBenchFloorplan(
       })
     }
   } else if (top === 'scale') {
-    // Terazi platformu: tablanın ortasındaki kare, planda da kimliği.
-    const side = Math.min(0.5, Math.min(width, depth) - 0.12)
+    // Terazi platformu: tablanın ortasındaki kare, planda da kimliği. Kenar
+    // 3B ile AYNI fonksiyondan — plan kendi kırpmasını yapıyordu ve 3B
+    // yapmıyordu, yani iki görünüm aynı masayı farklı çiziyordu.
+    const side = scalePlatformM(node)
     children.push({
       kind: 'rect',
       x: -side / 2,

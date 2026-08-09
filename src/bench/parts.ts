@@ -22,6 +22,7 @@ import {
   DRAWER_COUNT,
   DRAWER_GAP_M,
   DRAWER_HEIGHT_M,
+  FRONT_Z,
   LEG_M,
   MONITOR_HEIGHT_M,
   MONITOR_POST_M,
@@ -29,7 +30,6 @@ import {
   OVERHEAD_POST_M,
   ROLLER_DIAMETER_M,
   ROLLER_PITCH_M,
-  SCALE_PLATFORM_M,
   SCALE_RECESS_M,
   SHELF_THICKNESS_M,
   TOOLBOARD_THICKNESS_M,
@@ -37,13 +37,17 @@ import {
   UNDER_SHELF_Y_M,
 } from './catalog'
 import {
+  deckTopYM,
   depthM,
   hasCastors,
   hasMonitorStand,
   legHeightM,
+  monitorStandXM,
+  monitorStandZM,
   overheadOf,
   overheadShelfDepthM,
   overheadShelfYM,
+  scalePlatformM,
   topKindOf,
   underOf,
   widthM,
@@ -57,6 +61,8 @@ export type BenchPartRole =
   | 'leg'
   | 'apron'
   | 'top'
+  /** Makara yatağının taşıyıcı sacı — tabla değil, çerçevenin parçası. */
+  | 'bed'
   | 'shelf'
   | 'drawer'
   | 'roller'
@@ -76,20 +82,27 @@ export type BenchPart = {
  * Bütün parçalar tablanın merkezine göre, yerel çerçevede: +X genişlik, +Z
  * derinlik, Y zeminden yukarı. Düğümün kendi dönüşü grubun matrisinde —
  * burada hiçbir şey dönmüyor.
+ *
+ * ÖN yüz `+FRONT_Z` (bkz. `catalog.ts`): operatöre bakan parçalar oraya,
+ * duvara bakanlar `-FRONT_Z`'ye. Çıplak işaret yazılmıyor.
  */
 export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
   const width = widthM(node)
   const depth = depthM(node)
   const worktop = worktopYM(node)
+  // Güverte, çalışma yüzeyiyle aynı değil: makaralı tezgâhta bir makara çapı
+  // aşağıda ve makaralar aradaki boşluğu dolduruyor.
+  const deckTop = deckTopYM(node)
   const legHeight = legHeightM(node)
   const castors = hasCastors(node)
   const castorY = castors ? CASTOR_DIAMETER_M : 0
+  const rollerBed = topKindOf(node) === 'rollers'
   const parts: BenchPart[] = []
 
-  // ── Tabla ──────────────────────────────────────────────────────────────
+  // ── Tabla (ya da makara yatağı) ────────────────────────────────────────
   parts.push({
-    role: 'top',
-    center: [0, worktop - TOP_THICKNESS_M / 2, 0],
+    role: rollerBed ? 'bed' : 'top',
+    center: [0, deckTop - TOP_THICKNESS_M / 2, 0],
     size: [width, TOP_THICKNESS_M, depth],
   })
 
@@ -122,7 +135,7 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
   // ── Tabla altı çevre kirişi ────────────────────────────────────────────
   // Siluete girer: tablanın altındaki gölge bandı masayı "tabla + dört çubuk"
   // olmaktan çıkaran şey. Bu yüzden uzak katmanda da duruyor.
-  const apronY = worktop - TOP_THICKNESS_M - APRON_HEIGHT_M / 2
+  const apronY = deckTop - TOP_THICKNESS_M - APRON_HEIGHT_M / 2
   for (const sz of [-1, 1]) {
     parts.push({
       role: 'apron',
@@ -149,14 +162,16 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
   } else if (under === 'drawers' && detail === 'full') {
     // Çekmece bloğu masanın SOL yarısında: sağ taraf diz boşluğu olarak
     // kalıyor, çünkü tam genişlik çekmece bir tezgâhı dolap yapar.
-    const blockWidth = Math.min(width / 2 - LEG_M, 0.5)
+    const blockWidth = Math.max(0.1, Math.min(width / 2 - LEG_M, 0.5))
     const blockX = -width / 4
     for (let index = 0; index < DRAWER_COUNT; index++) {
       const y = apronY - APRON_HEIGHT_M / 2 - (index + 0.5) * (DRAWER_HEIGHT_M + DRAWER_GAP_M)
       if (y - DRAWER_HEIGHT_M / 2 < castorY) break
       parts.push({
         role: 'drawer',
-        center: [blockX, y, depth / 2 - APRON_THICKNESS_M],
+        // Çekmece yüzü ÖN yüzde: operatör onu kendine doğru çeker. Arkaya
+        // konsaydı masa duvara dayandığı anda açılamaz olurdu.
+        center: [blockX, y, FRONT_Z * (depth / 2 - APRON_THICKNESS_M)],
         size: [blockWidth, DRAWER_HEIGHT_M, APRON_THICKNESS_M * 1.5],
       })
     }
@@ -164,38 +179,64 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
 
   // ── Tabla yüzeyi donanımı ──────────────────────────────────────────────
   const top = topKindOf(node)
-  if (top === 'rollers' && detail === 'full') {
-    // Makaralar tablanın ÜSTÜNDE, derinlik boyunca uzanır ve genişlik boyunca
-    // dizilir — mal masanın uzun kenarı boyunca kayar.
+  if (top === 'rollers') {
+    /**
+     * Makaralar yatağın İÇİNDE: sırtları tam tabla kotunda, gövdeleri güverte
+     * sacıyla çalışma kotu arasındaki boşluğu dolduruyor.
+     *
+     * Önceki hâlde düz bir tablanın üstüne diziliyorlardı. Referans görsel
+     * (`dispatch-packing-table.png`) ile spec'in cümlesi ("built-in rollers or
+     * smooth countertops") ikisi de tersini söylüyor: makara yatağı tablanın
+     * YERİNE geçen bir seçenek. Üstüne konması çalışma kotunu 50 mm
+     * yükseltiyor, yayımlanmış 920 mm zarfı aşıyor ve yan yana duran iki
+     * masanın yüzeyini basamaklandırıyordu.
+     *
+     * Uzak katmanda da duruyorlar — ARTIK siluete giriyorlar: makaralar
+     * düşerse yatağın üstü boş bir oluk olarak kalır, oysa daha önce
+     * düştüklerinde geriye tam bir tabla kalıyordu.
+     */
     const span = width - 2 * LEG_M
     const count = Math.max(2, Math.floor(span / ROLLER_PITCH_M))
     const first = -((count - 1) * ROLLER_PITCH_M) / 2
-    for (let index = 0; index < count; index++) {
+    // Uzak katmanda tek tek makara değil, oluğu dolduran tek bir sac: siluet
+    // aynı, parça sayısı yirmide bir.
+    if (detail === 'simple') {
       parts.push({
         role: 'roller',
-        center: [first + index * ROLLER_PITCH_M, worktop + ROLLER_DIAMETER_M / 2, 0],
-        size: [ROLLER_DIAMETER_M * 0.8, ROLLER_DIAMETER_M, depth - 2 * LEG_M],
+        center: [0, worktop - ROLLER_DIAMETER_M / 2, 0],
+        size: [span, ROLLER_DIAMETER_M, depth - 2 * LEG_M],
       })
+    } else {
+      for (let index = 0; index < count; index++) {
+        parts.push({
+          role: 'roller',
+          center: [first + index * ROLLER_PITCH_M, worktop - ROLLER_DIAMETER_M / 2, 0],
+          size: [ROLLER_DIAMETER_M * 0.8, ROLLER_DIAMETER_M, depth - 2 * LEG_M],
+        })
+      }
     }
   } else if (top === 'scale') {
     // Gömme platform: tablanın içine oturuyor, üstüne değil. Uzak katmanda da
     // duruyor çünkü tablanın ortasındaki açık renk kare bu masanın kimliği.
+    // Kenarı tablaya KIRPILMIŞ — sabit 500 mm dar bir masadan taşıyordu.
+    const platform = scalePlatformM(node)
     parts.push({
       role: 'scale',
       center: [0, worktop - SCALE_RECESS_M / 2, 0],
-      size: [SCALE_PLATFORM_M, SCALE_RECESS_M, SCALE_PLATFORM_M],
+      size: [platform, SCALE_RECESS_M, platform],
     })
   }
 
   // ── Üst yapı ───────────────────────────────────────────────────────────
   const overhead = overheadOf(node)
   if (overhead !== 'none') {
+    // Üst yapı ARKA kenarda: duvara dayanır ve operatörün görüşünü kesmez.
     const shelfY = overheadShelfYM(node)
-    const postZ = depth / 2 - OVERHEAD_POST_M / 2
+    const postZ = -FRONT_Z * (depth / 2 - OVERHEAD_POST_M / 2)
     for (const sx of [-1, 1]) {
       parts.push({
         role: 'post',
-        center: [sx * (width / 2 - OVERHEAD_POST_M / 2), worktop + (shelfY - worktop) / 2, -postZ],
+        center: [sx * (width / 2 - OVERHEAD_POST_M / 2), worktop + (shelfY - worktop) / 2, postZ],
         size: [OVERHEAD_POST_M, shelfY - worktop, OVERHEAD_POST_M],
       })
     }
@@ -203,30 +244,38 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
       const shelfDepth = overheadShelfDepthM(node)
       parts.push({
         role: 'shelf',
-        center: [0, shelfY + SHELF_THICKNESS_M / 2, -(depth / 2 - shelfDepth / 2)],
+        center: [0, shelfY + SHELF_THICKNESS_M / 2, -FRONT_Z * (depth / 2 - shelfDepth / 2)],
         size: [width, SHELF_THICKNESS_M, shelfDepth],
       })
     } else {
-      // Alet panosu: dikmelerin arasını dolduran dikey levha.
+      // Alet panosu: dikmelerin arasını dolduran dikey levha. Dikmelerin
+      // ÜSTÜNE çıkmıyor — zarf da bu yüzden panoda raf kalınlığı saymıyor.
       parts.push({
         role: 'toolboard',
-        center: [0, worktop + (shelfY - worktop) / 2, -(depth / 2 - TOOLBOARD_THICKNESS_M / 2)],
+        center: [
+          0,
+          worktop + (shelfY - worktop) / 2,
+          -FRONT_Z * (depth / 2 - TOOLBOARD_THICKNESS_M / 2),
+        ],
         size: [width - 2 * OVERHEAD_POST_M, shelfY - worktop, TOOLBOARD_THICKNESS_M],
       })
     }
   }
 
   // ── Terazi ekranı ──────────────────────────────────────────────────────
+  // Stand arka kenarda, ekran operatöre bakıyor. İki kot da kırpılmış:
+  // çıplak literaller dar bir tezgâhta standı tablanın dışına atıyordu.
   if (hasMonitorStand(node) && detail === 'full') {
-    const standX = width / 2 - 0.2
+    const standX = monitorStandXM(node)
+    const standZ = monitorStandZM(node)
     parts.push({
       role: 'post',
-      center: [standX, worktop + MONITOR_HEIGHT_M / 2, -(depth / 2 - 0.1)],
+      center: [standX, worktop + MONITOR_HEIGHT_M / 2, standZ],
       size: [MONITOR_POST_M, MONITOR_HEIGHT_M, MONITOR_POST_M],
     })
     parts.push({
       role: 'screen',
-      center: [standX, worktop + MONITOR_HEIGHT_M + MONITOR_SCREEN_M[1] / 2, -(depth / 2 - 0.1)],
+      center: [standX, worktop + MONITOR_HEIGHT_M + MONITOR_SCREEN_M[1] / 2, standZ],
       size: MONITOR_SCREEN_M,
     })
   }

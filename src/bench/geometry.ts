@@ -49,6 +49,9 @@ function colorOf(node: BenchNode, role: BenchPart['role']): string {
     case 'leg':
     case 'apron':
     case 'post':
+    // Makara yatağı ahşap değil boyalı sac: tablanın yerine geçen bir
+    // çerçeve parçası, ve rengi de çerçevenin.
+    case 'bed':
       return node.frameColor
     case 'top':
     case 'shelf':

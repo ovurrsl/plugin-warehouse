@@ -42,6 +42,12 @@ export type TruckPartRole =
   | 'belt'
   /** Turuncu çakar — bir depo aracını tek bakışta tanıtan şey. */
   | 'beacon'
+  /** Kabin/kaporta sacı — koruyucu tavanla aynı orta gri. */
+  | 'shroud'
+  /** Çalışma lambası camı. */
+  | 'lamp'
+  /** Arka stop grubu — karşı ağırlığın üst köşelerinde koyu şerit. */
+  | 'tail-light'
 
 /**
  * Hareket eden birimler. Parçalar araç çerçevesinde emit edilir; `stage1` ve
@@ -74,6 +80,8 @@ export type TruckPart =
       size: readonly [number, number, number]
       face: 'front' | 'back'
       drop: number
+      /** Hangi düzlem eğilecek. Varsayılan `top`; `bottom` alt köşe pahı. */
+      edge?: 'top' | 'bottom'
     }
   | {
       kind: 'beam'
@@ -87,27 +95,47 @@ export type TruckPart =
 
 /**
  * Renk, TOTAL kayıt — ternary zinciri değil: `rack`'te iki rolün tek dala
- * düşüp aynı rengi alması tam bu yüzden yaşandı. Markasız endüstriyel palet;
- * üretici renkleri (RAL 1028 vb.) kasten kullanılmıyor.
+ * düşüp aynı rengi alması tam bu yüzden yaşandı.
+ *
+ * ## Tonlar nereden geliyor
+ *
+ * Markasız kalma kuralı duruyor: hiçbir logo, hiçbir üretici adı, hiçbir RAL
+ * iddiası yok. Ama tonların KENDİSİ artık uydurma değil — kullanıcının
+ * gönderdiği EFG 213–220 ürün fotoğraflarından örneklendi (baskın renk
+ * histogramı, `scratchpad/ref/palette.ts`). Ölçülenler:
+ *
+ *   gövde sarısı  #f2a901 / #f4a701  (aydınlık yüz #f8b602, gölge #eb9801)
+ *   kabin/mast    #878787 / #979797 / #787878
+ *   koyu donanım  #282727 / #191717
+ *   jant          #a7a7a6
+ *
+ * Bunun düzelttiği şey bir tercih değil bir hata: mast ve koruyucu tavan
+ * `#2e333a`/`#3d434b` ile neredeyse siyah çiziliyordu, oysa gerçek makinede
+ * ikisi de ORTA gri. Karşı ağırlık da koyu griydi; gerçekte gövdenin
+ * kendisiyle aynı sarı (forklift artık o rolü hiç kullanmıyor — bkz.
+ * `parts-forklift.ts`).
  */
 export const TRUCK_ROLE_COLORS: Record<TruckPartRole, string> = {
-  chassis: '#d98a2b',
-  cowl: '#d98a2b',
+  chassis: '#f0a501',
+  cowl: '#f0a501',
   counterweight: '#3d434b',
-  'mast-rail': '#2e333a',
-  carriage: '#2e333a',
+  'mast-rail': '#8c8c8c',
+  carriage: '#26282b',
   backrest: '#3d434b',
-  fork: '#23272d',
-  'overhead-guard': '#3d434b',
+  fork: '#26282b',
+  'overhead-guard': '#8c8c8c',
   cab: '#22262c',
   platform: '#3d434b',
   tiller: '#2e333a',
   'straddle-leg': '#3d434b',
-  wheel: '#1a1d21',
-  hub: '#8b939e',
+  wheel: '#191919',
+  hub: '#a7a7a6',
   'guide-roller': '#4a525c',
   belt: '#23272d',
   beacon: '#e8a317',
+  shroud: '#8c8c8c',
+  lamp: '#e9edf0',
+  'tail-light': '#2a2224',
 }
 
 /** Zeminle z-çakışmasını önleyen taban payı. T26 "en alçak vertex [0, 1 mm]"
@@ -138,7 +166,8 @@ export function bodiesOf(model: TruckModel): readonly TruckBody[] {
 const VARIANT_BODY_COLOR: Record<TruckModel['variant'], string> = {
   'hand-pallet': '#a83a34',
   'powered-pallet': '#2e6b4f',
-  forklift: '#d98a2b',
+  // Ürün fotoğrafından örneklenmiş gövde sarısı (bkz. TRUCK_ROLE_COLORS).
+  forklift: '#f0a501',
   reach: '#33608c',
   turret: '#b8892f',
   agv: '#5b636e',

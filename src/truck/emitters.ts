@@ -99,9 +99,14 @@ export function emitCylinder(
 }
 
 /**
- * Tepesi bir yöne eğimli kutu — kaputun buruna inişi, karşı ağırlığın arkaya
- * yuvarlanışı, koltuk sırtının yatışı. `drop`: üst yüzün `face` kenarının
- * aşağı inme miktarı; 0'da düz kutudur.
+ * Bir yüzü eğimli kutu — kaputun buruna inişi, karşı ağırlığın arkaya
+ * yuvarlanışı, koltuk sırtının yatışı. `drop`: `face` kenarının çekilme
+ * miktarı; 0'da düz kutudur.
+ *
+ * `edge` hangi düzlemin eğileceğini söyler. Varsayılan `top`. `bottom`,
+ * ALT düzlemi yukarı çekiyor ve bu ayrı bir siluet: forkliftin arka alt
+ * köşesindeki pah — makinenin arkadan en tanınır hattı, ve `top` ile
+ * çizilemiyor çünkü orada alt düzlem sabit.
  */
 export function emitSlopedBox(
   sink: Sink,
@@ -110,21 +115,26 @@ export function emitSlopedBox(
     size: readonly [number, number, number]
     face: 'front' | 'back'
     drop: number
+    edge?: 'top' | 'bottom'
   },
   color: readonly [number, number, number],
 ): void {
   const [cx, cy, cz] = args.center
   const [hx, hy, hz] = [args.size[0] / 2, args.size[1] / 2, args.size[2] / 2]
   const drop = Math.min(args.drop, args.size[1])
-  const frontTop = cy + hy - (args.face === 'front' ? drop : 0)
-  const backTop = cy + hy - (args.face === 'back' ? drop : 0)
+  const bottomEdge = args.edge === 'bottom'
+  const cut = (side: 'front' | 'back') => (args.face === side ? drop : 0)
+  const frontTop = cy + hy - (bottomEdge ? 0 : cut('front'))
+  const backTop = cy + hy - (bottomEdge ? 0 : cut('back'))
+  const frontBottom = cy - hy + (bottomEdge ? cut('front') : 0)
+  const backBottom = cy - hy + (bottomEdge ? cut('back') : 0)
 
-  // 8 köşe: alt düzlem sabit, üst düzlem X'e göre eğimli.
+  // 8 köşe: bir düzlem sabit, öteki X'e göre eğimli.
   const corners: Record<string, [number, number, number]> = {
-    fbl: [cx + hx, cy - hy, cz - hz],
-    fbr: [cx + hx, cy - hy, cz + hz],
-    bbl: [cx - hx, cy - hy, cz - hz],
-    bbr: [cx - hx, cy - hy, cz + hz],
+    fbl: [cx + hx, frontBottom, cz - hz],
+    fbr: [cx + hx, frontBottom, cz + hz],
+    bbl: [cx - hx, backBottom, cz - hz],
+    bbr: [cx - hx, backBottom, cz + hz],
     ftl: [cx + hx, frontTop, cz - hz],
     ftr: [cx + hx, frontTop, cz + hz],
     btl: [cx - hx, backTop, cz - hz],
@@ -149,11 +159,13 @@ export function emitSlopedBox(
     sink.indices.push(base, base + 1, base + 2, base, base + 2, base + 3)
   }
 
-  // Eğimli üst yüzün normali.
-  const slopeLen = Math.hypot(2 * hx, frontTop - backTop) || 1
-  const topNormal: [number, number, number] = [
-    -(frontTop - backTop) / slopeLen,
-    (2 * hx) / slopeLen,
+  // Eğimli yüzlerin normalleri — eğilmeyen düzlem düz kalır.
+  const topLen = Math.hypot(2 * hx, frontTop - backTop) || 1
+  const topNormal: [number, number, number] = [-(frontTop - backTop) / topLen, (2 * hx) / topLen, 0]
+  const bottomLen = Math.hypot(2 * hx, frontBottom - backBottom) || 1
+  const bottomNormal: [number, number, number] = [
+    (frontBottom - backBottom) / bottomLen,
+    -(2 * hx) / bottomLen,
     0,
   ]
 
@@ -162,7 +174,7 @@ export function emitSlopedBox(
   quad('fbr', 'fbl', 'ftl', 'ftr', [1, 0, 0])
   quad('bbl', 'bbr', 'btr', 'btl', [-1, 0, 0])
   quad('btr', 'ftr', 'ftl', 'btl', topNormal)
-  quad('bbl', 'fbl', 'fbr', 'bbr', [0, -1, 0])
+  quad('bbl', 'fbl', 'fbr', 'bbr', bottomNormal)
 }
 
 /**

@@ -25,7 +25,7 @@ import {
   releaseDriveInGeometry,
   retainDriveInGeometry,
 } from './geometry-builder'
-import { totalDepth, totalWidth } from './lanes'
+import { frameTopY, totalDepth, totalWidth } from './lanes'
 import { hasRightNeighbour } from './neighbours'
 import type { DriveInRackNode } from './schema'
 
@@ -171,10 +171,7 @@ function DriveInRackRendererBody({ node }: { node: DriveInRackNode }) {
         visible={node.visible !== false}
       >
         {!isExporting && (
-          <Collider
-            position={[0, node.uprightHeight / 2, 0]}
-            size={[width, node.uprightHeight, depth]}
-          />
+          <Collider position={[0, frameTopY(node) / 2, 0]} size={[width, frameTopY(node), depth]} />
         )}
         {drawsSelf && (
           <SelfDrawnBody

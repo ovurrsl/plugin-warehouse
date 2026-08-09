@@ -3,6 +3,7 @@ import {
   effectivePostPitchZ,
   fittedLevelCount,
   frameCentersX,
+  frameTopY,
   orientedPalletFootprint,
   postCentersZ,
   railHeight,
@@ -26,6 +27,7 @@ import { GUIDE_GAP_INSET, RAIL_PROFILES, railNoseInset } from './standards'
  */
 
 export type DriveInPartRole =
+  | 'centraliser'
   | 'upright'
   | 'footplate'
   | 'brace'
@@ -61,6 +63,16 @@ const GUIDE_HEIGHT = 0.05
 const GUIDE_THICKNESS = 0.04
 /** Impact reinforcer, p.25. Height chosen to cover a fork's strike zone. */
 const REINFORCER_HEIGHT = 0.4
+/**
+ * Giriş ortalayıcısı — s.24 GP fitting. Kanal ağzını genişleten kademeli huni.
+ * Ölçüler SEÇİLMİŞ VARSAYILAN: katalog parçayı tarif ediyor ama tablosunu
+ * yayımlamıyor. Kardeş kind'ın (live-racking) şeridiyle aynı büyüklük bandı.
+ */
+const CENTRALISER_LENGTH_M = 0.4
+const CENTRALISER_HEIGHT_M = 0.08
+const CENTRALISER_THICKNESS_M = 0.02
+/** Ağzın kanaldan ne kadar dışarı açıldığı. */
+const CENTRALISER_FLARE_M = 0.05
 
 /**
  * Which frame lines this lane actually builds.
@@ -84,14 +96,16 @@ export function driveInParts(
   const rail = RAIL_PROFILES[lane.railType]
   const railH = railHeight(lane)
   const depth = totalDepth(lane)
+  const frameTop = frameTopY(lane)
 
   // ── Uprights and their plates ─────────────────────────────────────────────
   for (const x of lines) {
     for (const z of posts) {
       parts.push({
         role: 'upright',
-        center: [x, lane.uprightHeight / 2, z],
-        size: [lane.uprightWidth, lane.uprightHeight, lane.uprightDepth],
+        // Boy `frameTopY`: dikme üst kuşağı TAŞIR, altında bitmez.
+        center: [x, frameTop / 2, z],
+        size: [lane.uprightWidth, frameTop, lane.uprightDepth],
         // Perforations are texture, not geometry. Drawing each punched slot as
         // a box costs about a thousand extra boxes per lane — more than
         // everything else in the model combined.
@@ -129,12 +143,27 @@ export function driveInParts(
     // Brackets at every rail–post crossing. Full tier only: at distance they
     // are sub-pixel and cost one box per post per level per side.
     if (detail === 'full') {
+      /**
+       * Braket dikmenin iç yüzünden rayın dış yüzüne KÖPRÜ kuruyor.
+       *
+       * Önceki hâl 60 mm'lik bir küptü ve merkezi rayın kendi x'indeydi: ray
+       * çerçeveden 58 mm uzakta, 3,3 m boyunca hiçbir şeye dokunmadan
+       * duruyordu, braket de boşluğu kapatmak şöyle dursun raydan bile daha
+       * içerideydi. Boşluk şerit genişledikçe büyüyordu (E=1,55'te 158 mm),
+       * çünkü ray konumu katalogun sabit D açıklığından, dikme yüzü ise
+       * şeridin kendi genişliğinden geliyor. Değişmesi gereken ray değil,
+       * onu taşıyan parça.
+       */
+      const postInnerFace = lane.laneClearWidth / 2
+      const railOuterFace = railCentreOffset + rail.width / 2
+      const span = Math.abs(postInnerFace - railOuterFace) + BRACKET_SIZE
+      const midX = (postInnerFace + railOuterFace) / 2
       for (const z of posts) {
         for (const sign of [-1, 1] as const) {
           parts.push({
             role: 'bracket',
-            center: [sign * railCentreOffset, topY - railH - BRACKET_SIZE / 2, z],
-            size: [BRACKET_SIZE, BRACKET_SIZE, BRACKET_SIZE],
+            center: [sign * midX, topY - railH - BRACKET_SIZE / 2, z],
+            size: [span, BRACKET_SIZE, BRACKET_SIZE],
           })
         }
       }
@@ -150,14 +179,57 @@ export function driveInParts(
   // at each end — the exact bug `rack/parts.ts` was written to prevent, and
   // invisible unless you fly the camera into the frame. `parts.test.ts` refuses
   // it now.
+  //
+  // `omission`'dan BAĞIMSIZ. Kuşak paylaşılan bir parça değil: şeridin kendi
+  // açıklığını kapatıyor. `omitRight` bloğunun içindeyken on şeritlik bir
+  // blokta 1–9 arası şeritlerin hiçbirinde kuşak çizilmiyordu — çünkü hepsi
+  // `omitRight: true` alıyor — ve yalnız en sağdaki şeridin üstünde kalıyordu.
+  // `omitRight` yalnız PAYLAŞILAN dikme hattını kısar.
   const beamUnderside = topBeamUndersideY(lane)
-  if (!omission.omitRight) {
-    for (const z of posts) {
-      parts.push({
-        role: 'top-beam',
-        center: [0, beamUnderside + lane.topBeamHeight / 2, z],
-        size: [lane.laneClearWidth, lane.topBeamHeight, 0.05],
-      })
+  for (const z of posts) {
+    parts.push({
+      role: 'top-beam',
+      center: [0, beamUnderside + lane.topBeamHeight / 2, z],
+      size: [lane.laneClearWidth, lane.topBeamHeight, 0.05],
+    })
+  }
+
+  /**
+   * ── Giriş ortalayıcıları (s.24, yalnız GP rayı) ──────────────────────────
+   *
+   * Şema bu alanı `default(true)` ile açıyordu ve geometri anahtarı da onun
+   * vertex oynattığını İDDİA ediyordu — ama `driveInParts` alanı hiç okumuyordu.
+   * Varsayılan düğümde tek bir ortalayıcı çizilmiyordu: açık bir kutu, ölü bir
+   * anahtar girdisi, ve panelde hiçbir şey yapmayan bir onay kutusu.
+   *
+   * Huni KADEMELİ, eğik değil: `emitRackPart` yalnız X ve Z ekseninde
+   * yatırabiliyor, Y ekseni etrafında döndüremiyor. 400 mm'lik bir şerit için
+   * emitter'a yeni bir eksen eklemek doğru takas değil; iki kademe ağzın
+   * genişleyip kanala kapandığını okutuyor ve dört kutuya mal oluyor.
+   *
+   * Ağız aisle ucunda: `entryMode` 'drive-through' ise iki uçta da.
+   */
+  if (detail === 'full' && lane.centralisers && lane.railType === 'gp') {
+    const noseX = railCentreOffset - rail.width / 2
+    const mouths: number[] = lane.entryMode === 'drive-through' ? [1, -1] : [1]
+    for (let level = 1; level <= fitted; level++) {
+      const topY = railTopY(lane, level)
+      for (const facing of mouths) {
+        for (const sign of [-1, 1] as const) {
+          for (const [index, flare] of [CENTRALISER_FLARE_M, 0].entries()) {
+            const length = CENTRALISER_LENGTH_M / 2
+            parts.push({
+              role: 'centraliser',
+              center: [
+                sign * (noseX + flare + CENTRALISER_THICKNESS_M / 2),
+                topY + CENTRALISER_HEIGHT_M / 2,
+                facing * (depth / 2 - length / 2 - index * length),
+              ],
+              size: [CENTRALISER_THICKNESS_M, CENTRALISER_HEIGHT_M, length],
+            })
+          }
+        }
+      }
     }
   }
 

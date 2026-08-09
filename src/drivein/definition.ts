@@ -1,6 +1,6 @@
 import type { NodeDefinition } from '@pascal-app/core'
 import { buildDriveInFloorplan } from './floorplan'
-import { lanePitch, totalDepth, totalWidth } from './lanes'
+import { frameTopY, lanePitch, totalDepth, totalWidth } from './lanes'
 import { snapToNeighbourSeam } from './magnet'
 import { driveInParametrics } from './parametrics'
 import { DriveInRackNode } from './schema'
@@ -74,7 +74,7 @@ export const driveInRackDefinition = {
       footprint: (node) => {
         const lane = node as unknown as DriveInRackNode
         return {
-          dimensions: [lanePitch(lane), lane.uprightHeight, totalDepth(lane)],
+          dimensions: [lanePitch(lane), frameTopY(lane), totalDepth(lane)],
           rotation: lane.rotation ?? [0, 0, 0],
         }
       },
@@ -87,8 +87,8 @@ export const driveInRackDefinition = {
     dragBounds: (node) => {
       const lane = node as unknown as DriveInRackNode
       return {
-        size: [totalWidth(lane), lane.uprightHeight, totalDepth(lane)],
-        centerY: lane.uprightHeight / 2,
+        size: [totalWidth(lane), frameTopY(lane), totalDepth(lane)],
+        centerY: frameTopY(lane) / 2,
       }
     },
   },

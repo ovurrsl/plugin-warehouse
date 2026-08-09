@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { driveInRackDefinition } from './definition'
-import { lanePitch, totalDepth, totalWidth } from './lanes'
+import { frameTopY, lanePitch, totalDepth, totalWidth } from './lanes'
 import { resetSeamIndex, snapToNeighbourSeam } from './magnet'
 import { resetNeighbourIndex } from './neighbours'
 import { DriveInRackNode } from './schema'
@@ -45,7 +45,9 @@ describe('definition', () => {
     const node = lane()
     const bounds = driveInRackDefinition.capabilities.dragBounds(node as never)
     expect(bounds.size[0]).toBeCloseTo(totalWidth(node), 9)
-    expect(bounds.centerY).toBeCloseTo(node.uprightHeight / 2, 9)
+    // Zarf `frameTopY`den — dikmenin ham boyundan değil. Üst kuşak dikmeyi
+    // taşımıyor, dikme kuşağı taşıyor, ve yapının tepesi kuşağın üstü.
+    expect(bounds.centerY).toBeCloseTo(frameTopY(node) / 2, 9)
   })
 
   test('0 is in the rotation snap list', () => {

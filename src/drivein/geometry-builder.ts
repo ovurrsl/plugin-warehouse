@@ -49,6 +49,9 @@ const ROLE_COLORS: Record<Exclude<DriveInPartRole, 'upright' | 'top-beam' | 'rai
   guide: '#8b9299',
   /** The impact reinforcer is the one part a driver is meant to notice. */
   reinforcer: '#eab308',
+  /** Giriş ortalayıcısı: sürücünün nişan aldığı ağız, uyarı sarısı ailesinden
+   *  ama takviyeden sönük — ikisi yan yana duruyor ve karışmamalılar. */
+  centraliser: '#ca8a04',
 }
 
 function buildFrom(

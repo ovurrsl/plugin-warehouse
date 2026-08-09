@@ -180,16 +180,34 @@ export const SHELF_THICKNESS_M = mm(22)
 export const DRAWER_HEIGHT_M = mm(140) // tek çekmece yüzü — SEÇİLMİŞ VARSAYILAN
 export const DRAWER_GAP_M = mm(6)
 export const DRAWER_COUNT = 4
+/** Çekmece bloğunun ayağın iç yüzüne bırakması gereken pay — blok ayağa
+ *  değmemeli, ve 'tam değiyor' ile 'içine giriyor' arasında görsel fark yok. */
+export const DRAWER_SIDE_CLEAR_M = mm(8)
 export const OVERHEAD_POST_M = mm(40) // üst yapı dikmesi — SEÇİLMİŞ VARSAYILAN
 export const OVERHEAD_CLEAR_M = mm(520) // tablanın üstündeki serbest yükseklik
 export const OVERHEAD_SHELF_DEPTH_RATIO = 0.45 // üst raf, tabla derinliğinin oranı
 export const TOOLBOARD_THICKNESS_M = mm(18)
-export const CASTOR_DIAMETER_M = mm(100) // teker çapı — SEÇİLMİŞ VARSAYILAN
-export const CASTOR_INSET_M = mm(90)
+/**
+ * Tekerin YAPI yüksekliği: ayağın altından zemine kadar olan mesafe, yani
+ * ayak boyundan düşülen şey. Tekerin çapı bu DEĞİL — arada bir de ayağa
+ * cıvatalanan döner mesnet var, ve o mesnet olmadan ayak boşlukta bitiyor.
+ * SEÇİLMİŞ VARSAYILAN.
+ */
+export const CASTOR_BUILD_HEIGHT_M = mm(100)
+/** Tekerin kendi çapı. Yapı yüksekliğinin geri kalanı mesnet plakası. */
+export const CASTOR_WHEEL_M = mm(75)
+/** Tekerin sırtının genişliği. */
+export const CASTOR_TREAD_M = mm(35)
 export const ROLLER_DIAMETER_M = mm(50) // sevkiyat masasının tabla makarası
 export const ROLLER_PITCH_M = mm(90)
+/** Makara yatağının iki yan kanalı — makara mili onlara oturur ve oluğun
+ *  kenarını bilinçli bir kenar yapar. SEÇİLMİŞ VARSAYILAN. */
+export const ROLLER_CHANNEL_M = mm(45)
 export const SCALE_PLATFORM_M = mm(500) // gömme terazi platformu kenarı
 export const SCALE_RECESS_M = mm(12)
+/** Platformun tabla yüzeyinden yükseği. Eş düzlem iki yukarı bakan yüz demek,
+ *  yani z-savaşı; paletin kargo sabitlerindeki 1,5 mm ile aynı gerekçe. */
+export const SCALE_PROUD_M = mm(1.5)
 /** Terazi platformunun tabla kenarına bırakması gereken pay — platform dar bir
  *  tezgâhta bu payla birlikte küçülüyor, tablanın dışına taşmıyor. */
 export const SCALE_EDGE_CLEAR_M = mm(120)

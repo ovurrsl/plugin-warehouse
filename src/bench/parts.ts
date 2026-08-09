@@ -17,19 +17,23 @@
 import {
   APRON_HEIGHT_M,
   APRON_THICKNESS_M,
-  CASTOR_DIAMETER_M,
-  CASTOR_INSET_M,
+  CASTOR_BUILD_HEIGHT_M,
+  CASTOR_TREAD_M,
+  CASTOR_WHEEL_M,
   DRAWER_COUNT,
   DRAWER_GAP_M,
   DRAWER_HEIGHT_M,
+  DRAWER_SIDE_CLEAR_M,
   FRONT_Z,
   LEG_M,
   MONITOR_HEIGHT_M,
   MONITOR_POST_M,
   MONITOR_SCREEN_M,
   OVERHEAD_POST_M,
+  ROLLER_CHANNEL_M,
   ROLLER_DIAMETER_M,
   ROLLER_PITCH_M,
+  SCALE_PROUD_M,
   SCALE_RECESS_M,
   SHELF_THICKNESS_M,
   TOOLBOARD_THICKNESS_M,
@@ -95,7 +99,7 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
   const deckTop = deckTopYM(node)
   const legHeight = legHeightM(node)
   const castors = hasCastors(node)
-  const castorY = castors ? CASTOR_DIAMETER_M : 0
+  const castorY = castors ? CASTOR_BUILD_HEIGHT_M : 0
   const rollerBed = topKindOf(node) === 'rollers'
   const parts: BenchPart[] = []
 
@@ -118,15 +122,39 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
         center: [sx * legX, castorY + legHeight / 2, sz * legZ],
         size: [LEG_M, legHeight, LEG_M],
       })
-      if (castors && detail === 'full') {
+      /**
+       * Teker AYAĞIN ALTINDA — ve iki katmanda da.
+       *
+       * İki ayrı hata vardı, ikisi de sessiz:
+       *
+       *  - Teker tabla kenarından ölçülüyordu (`CASTOR_INSET_M`), ayak ise
+       *    kendi yarı profilinden. Mobil tezgâhta arada 13 mm AÇIK ara
+       *    kalıyordu: ayak 100 mm yukarıda boşlukta bitiyor, teker yanında
+       *    hiçbir şeye bağlı olmadan asılı duruyordu. Teker ayağa göre
+       *    konumlanır, tablaya göre değil.
+       *  - Teker yalnız yakın katmanda çiziliyordu ama ayak tabanı her
+       *    katmanda yukarı itiliyordu: uzak katmanda bütün masa 100 mm havada
+       *    uçuyordu. Bu bir "ayrıntı" değil, siluetin kendisi.
+       *
+       * Zincir artık kapanıyor: ayağın altında mesnet plakası, onun altında
+       * teker, tekerin altı tam zeminde.
+       */
+      if (castors) {
+        const mountHeight = CASTOR_BUILD_HEIGHT_M - CASTOR_WHEEL_M
+        parts.push({
+          role: 'leg',
+          center: [sx * legX, CASTOR_WHEEL_M + mountHeight / 2, sz * legZ],
+          size: [LEG_M, mountHeight, LEG_M],
+        })
+        // Teker ayak profilinden GENİŞ (Ø75 > 60 mm), o yüzden merkezi taban
+        // izine kırpılıyor: ayak ekseninde bıraksaydım 7,5 mm dışarı taşardı
+        // ve zarf bekçisi bunu ilk koşuda yakaladı. Kaçıklık gerçek bir döner
+        // tekerde zaten var — teker mafsal ekseninin üstünde durmaz.
+        const wheelZ = Math.min(legZ, depth / 2 - CASTOR_WHEEL_M / 2)
         parts.push({
           role: 'castor',
-          center: [
-            sx * (width / 2 - CASTOR_INSET_M),
-            CASTOR_DIAMETER_M / 2,
-            sz * (depth / 2 - CASTOR_INSET_M),
-          ],
-          size: [CASTOR_DIAMETER_M * 0.35, CASTOR_DIAMETER_M, CASTOR_DIAMETER_M],
+          center: [sx * legX, CASTOR_WHEEL_M / 2, sz * wheelZ],
+          size: [CASTOR_TREAD_M, CASTOR_WHEEL_M, CASTOR_WHEEL_M],
         })
       }
     }
@@ -160,10 +188,21 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
       size: [width - 2 * LEG_M, SHELF_THICKNESS_M, depth - 2 * LEG_M],
     })
   } else if (under === 'drawers' && detail === 'full') {
-    // Çekmece bloğu masanın SOL yarısında: sağ taraf diz boşluğu olarak
-    // kalıyor, çünkü tam genişlik çekmece bir tezgâhı dolap yapar.
-    const blockWidth = Math.max(0.1, Math.min(width / 2 - LEG_M, 0.5))
+    /**
+     * Çekmece bloğu masanın SOL yarısında: sağ taraf diz boşluğu olarak
+     * kalıyor, çünkü tam genişlik çekmece bir tezgâhı dolap yapar.
+     *
+     * Kırpma bloğun KENDİ merkezine göre. Önceki hâl genişliği sol yarının
+     * TOPLAM boşluğuna göre kırpıyor ama bloğu o yarının ortasına değil
+     * `-width/4`'e koyuyordu: iki ölçü tam bir `LEG_M` ayrışıyor ve 1,24 m'den
+     * dar her çekmeceli tezgâhta blok ön ayağın içine giriyordu. Varsayılan
+     * mobil tezgâhta (1220 mm) çakışma 5 mm, şemanın alt sınırında 30 mm —
+     * yüzün sekizde biri ayağın içinde.
+     */
     const blockX = -width / 4
+    const legInnerFace = width / 2 - LEG_M
+    const room = 2 * Math.min(legInnerFace - Math.abs(blockX), Math.abs(blockX))
+    const blockWidth = Math.max(0.1, Math.min(room - DRAWER_SIDE_CLEAR_M, 0.5))
     for (let index = 0; index < DRAWER_COUNT; index++) {
       const y = apronY - APRON_HEIGHT_M / 2 - (index + 0.5) * (DRAWER_HEIGHT_M + DRAWER_GAP_M)
       if (y - DRAWER_HEIGHT_M / 2 < castorY) break
@@ -195,34 +234,67 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
      * düşerse yatağın üstü boş bir oluk olarak kalır, oysa daha önce
      * düştüklerinde geriye tam bir tabla kalıyordu.
      */
-    const span = width - 2 * LEG_M
-    const count = Math.max(2, Math.floor(span / ROLLER_PITCH_M))
-    const first = -((count - 1) * ROLLER_PITCH_M) / 2
+    /**
+     * Makara alanı güvertenin KENDİ ölçüsünden türüyor, ayaklar arası clear
+     * ölçüsünden değil.
+     *
+     * Önceki hâl `width - 2·LEG` ve `depth - 2·LEG` kullanıyordu; o iki sayı
+     * alt raf için doğru (orada gerçekten kaçınılacak ayak var) ama güverte
+     * kotunda ayak yok. Sonuç: tabla boyunca önde ve arkada 60 mm'lik,
+     * uçlarda 125 mm'lik çıplak sac — çalışma yüzeyinden 50 mm aşağıda açık
+     * bir oluk, hiçbir gerçek makaralı masada olmayan bir şey.
+     *
+     * İki yan KANAL eklendi: gerçek makara yatağında makaraların mili onlara
+     * oturur, ve oluğun kenarı böylece bilinçli bir kenar oluyor. Makaralar
+     * kanalların arasını, adım kalanı iki uca eşit dağıtılarak dolduruyor.
+     */
+    const channel = ROLLER_CHANNEL_M
+    const rollerZ = depth - 2 * channel
+    for (const sz of [-1, 1]) {
+      parts.push({
+        role: 'bed',
+        center: [0, worktop - ROLLER_DIAMETER_M / 2, sz * (depth / 2 - channel / 2)],
+        size: [width, ROLLER_DIAMETER_M, channel],
+      })
+    }
     // Uzak katmanda tek tek makara değil, oluğu dolduran tek bir sac: siluet
     // aynı, parça sayısı yirmide bir.
     if (detail === 'simple') {
       parts.push({
         role: 'roller',
         center: [0, worktop - ROLLER_DIAMETER_M / 2, 0],
-        size: [span, ROLLER_DIAMETER_M, depth - 2 * LEG_M],
+        size: [width, ROLLER_DIAMETER_M, rollerZ],
       })
     } else {
+      const count = Math.max(2, Math.round(width / ROLLER_PITCH_M))
+      // Adım genişliğe BÖLÜNÜYOR: sabit adım uçlarda 125 mm boşluk bırakıyordu.
+      const pitch = width / count
       for (let index = 0; index < count; index++) {
         parts.push({
           role: 'roller',
-          center: [first + index * ROLLER_PITCH_M, worktop - ROLLER_DIAMETER_M / 2, 0],
-          size: [ROLLER_DIAMETER_M * 0.8, ROLLER_DIAMETER_M, depth - 2 * LEG_M],
+          center: [-width / 2 + (index + 0.5) * pitch, worktop - ROLLER_DIAMETER_M / 2, 0],
+          size: [ROLLER_DIAMETER_M * 0.8, ROLLER_DIAMETER_M, rollerZ],
         })
       }
     }
   } else if (top === 'scale') {
-    // Gömme platform: tablanın içine oturuyor, üstüne değil. Uzak katmanda da
-    // duruyor çünkü tablanın ortasındaki açık renk kare bu masanın kimliği.
-    // Kenarı tablaya KIRPILMIŞ — sabit 500 mm dar bir masadan taşıyordu.
+    /**
+     * Terazi platformu tablanın 1,5 mm ÜSTÜNDE duruyor.
+     *
+     * Önceki hâlde üst yüzü tablanınkiyle TAM eş düzlemdeydi: 500×500 mm'lik
+     * bir alanda iki yukarı bakan yüz aynı kotta, aynı merged geometride, aynı
+     * materyalle — yani z-savaşı. Deponun kendi kuralı bunu zaten adlandırıyor
+     * (`pallet/cargo-constants.ts`: "two coplanar surfaces z-fight") ve orada
+     * da 1,5 mm ofset kullanılıyor.
+     *
+     * Gerçek gömme terazide de plaka tabla yüzeyinden bir tık yukarıdadır;
+     * "gömme" olan platformun kendisi değil, altındaki hücre yuvası.
+     * Kenarı tablaya KIRPILMIŞ — sabit 500 mm dar bir masadan taşıyordu.
+     */
     const platform = scalePlatformM(node)
     parts.push({
       role: 'scale',
-      center: [0, worktop - SCALE_RECESS_M / 2, 0],
+      center: [0, worktop + SCALE_PROUD_M - SCALE_RECESS_M / 2, 0],
       size: [platform, SCALE_RECESS_M, platform],
     })
   }
@@ -262,22 +334,41 @@ export function benchParts(node: BenchNode, detail: BenchDetail): BenchPart[] {
     }
   }
 
-  // ── Terazi ekranı ──────────────────────────────────────────────────────
-  // Stand arka kenarda, ekran operatöre bakıyor. İki kot da kırpılmış:
-  // çıplak literaller dar bir tezgâhta standı tablanın dışına atıyordu.
-  if (hasMonitorStand(node) && detail === 'full') {
+  /**
+   * ── Terazi ekranı ──────────────────────────────────────────────────────
+   *
+   * Stand arka kenarda, ekran operatöre bakıyor. İki kot da kırpılmış: çıplak
+   * literaller dar bir tezgâhta standı tablanın dışına atıyordu.
+   *
+   * İKİ katmanda da çiziliyor. Yalnız yakın katmandayken terazi tezgâhı 30
+   * m'de boyunun %43'ünü kaybediyordu: bu varyantın üst yapısı `none`, yani
+   * tablanın üstünde başka hiçbir şey yok ve siluet düz bir masaya dönüşüyordu
+   * — sonra kamera 22 m'ye gelince 670 mm'lik direk geri bitiyordu. Uzak
+   * katman "daha az parça" demek, "başka bir nesne" değil.
+   */
+  if (hasMonitorStand(node)) {
     const standX = monitorStandXM(node)
     const standZ = monitorStandZM(node)
-    parts.push({
-      role: 'post',
-      center: [standX, worktop + MONITOR_HEIGHT_M / 2, standZ],
-      size: [MONITOR_POST_M, MONITOR_HEIGHT_M, MONITOR_POST_M],
-    })
-    parts.push({
-      role: 'screen',
-      center: [standX, worktop + MONITOR_HEIGHT_M + MONITOR_SCREEN_M[1] / 2, standZ],
-      size: MONITOR_SCREEN_M,
-    })
+    if (detail === 'simple') {
+      // Direk ve ekran tek kutuda: siluet aynı, iki parça yerine bir.
+      const total = MONITOR_HEIGHT_M + MONITOR_SCREEN_M[1]
+      parts.push({
+        role: 'screen',
+        center: [standX, worktop + total / 2, standZ],
+        size: [MONITOR_SCREEN_M[0], total, MONITOR_SCREEN_M[2]],
+      })
+    } else {
+      parts.push({
+        role: 'post',
+        center: [standX, worktop + MONITOR_HEIGHT_M / 2, standZ],
+        size: [MONITOR_POST_M, MONITOR_HEIGHT_M, MONITOR_POST_M],
+      })
+      parts.push({
+        role: 'screen',
+        center: [standX, worktop + MONITOR_HEIGHT_M + MONITOR_SCREEN_M[1] / 2, standZ],
+        size: MONITOR_SCREEN_M,
+      })
+    }
   }
 
   return parts

@@ -103,10 +103,14 @@ function buildBenchGeometryKey(node: BenchNode, detail: BenchDetail): string {
     // için iki mesh üretirdi.
     //
     // Teker ve ekran varyanttan geliyor ama mesh'i değiştiriyorlar, o yüzden
-    // ETKİN değerleriyle giriyorlar — ve yalnız yakın katmanda üretildikleri
-    // için katmana kapılı.
-    full && hasCastors(node),
-    full && hasMonitorStand(node),
+    // ETKİN değerleriyle giriyorlar. Katmana KAPILI DEĞİLLER ve bu bu turda
+    // değişti: ikisi de artık iki katmanda da çiziliyor. Eskiden `full &&`
+    // yazılıydı ve uzak katmanda teker bayrağı anahtardan tamamen düşüyordu —
+    // aynı zarftaki tekerlekli ve tekerleksiz iki tezgâh BİREBİR aynı anahtara
+    // çözülüyor ama farklı mesh üretiyordu; önbelleğe ilk giren kazanıyor,
+    // öteki masa 100 mm havada ya da tekersiz çiziliyordu.
+    hasCastors(node),
+    hasMonitorStand(node),
     detail,
     node.frameColor,
     node.timberColor,

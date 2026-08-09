@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
-import { BENCH_VARIANTS, CASTOR_DIAMETER_M, TOP_THICKNESS_M } from './catalog'
+import { BENCH_VARIANTS, CASTOR_BUILD_HEIGHT_M, TOP_THICKNESS_M } from './catalog'
 import { benchGeometryKey, getBenchGeometry } from './geometry'
 import { depthM, legHeightM, overallHeightM, widthM, worktopYM } from './metrics'
 import { benchParametrics } from './parametrics'
@@ -66,13 +66,16 @@ describe('tabla kotu tekerden etkilenmiyor', () => {
 
     expect(worktopYM(mobile)).toBeCloseTo(worktopYM(fixed), 9)
     // Fark ayağın boyunda: teker çapı kadar kısa.
-    expect(legHeightM(fixed) - legHeightM(mobile)).toBeCloseTo(CASTOR_DIAMETER_M, 9)
+    expect(legHeightM(fixed) - legHeightM(mobile)).toBeCloseTo(CASTOR_BUILD_HEIGHT_M, 9)
   })
 
   test('ayak + tabla + teker tam olarak tabla kotunu veriyor', () => {
     // Zincir kapanmazsa masa ya havada durur ya zemine gömülür.
     const node = bench({ variant: 'mobile-workbench' })
-    expect(legHeightM(node) + TOP_THICKNESS_M + CASTOR_DIAMETER_M).toBeCloseTo(worktopYM(node), 9)
+    expect(legHeightM(node) + TOP_THICKNESS_M + CASTOR_BUILD_HEIGHT_M).toBeCloseTo(
+      worktopYM(node),
+      9,
+    )
   })
 })
 
@@ -177,6 +180,114 @@ describe('çizilen geometri bildirilen kutunun İÇİNDE', () => {
         ...benchParts(node, 'full').map((part) => part.center[1] + part.size[1] / 2),
       )
       expect(overallHeightM(node), variant.label).toBeCloseTo(peak, 9)
+    }
+  })
+})
+
+/**
+ * MASA YERE BASIYOR MU — ve iki katmanda da.
+ *
+ * Denetimin bulduğu üç hata da aynı sınıftan: ekranda hiçbir uyarı yok, masa
+ * her hâlükârda çiziliyor, yalnız yanlış çiziliyor.
+ */
+describe('zincir zemine kadar kapanıyor', () => {
+  test('tekerlekli tezgâh İKİ katmanda da yere basıyor', () => {
+    /**
+     * Bulunan hata: teker yalnız yakın katmanda çiziliyordu ama ayak tabanı
+     * her katmanda teker yapı yüksekliği kadar yukarı itiliyordu. Uzak
+     * katmanda bütün masa 100 mm havada uçuyordu — altında hiçbir şey yok.
+     */
+    for (const detail of ['full', 'simple'] as const) {
+      const parts = benchParts(bench({ variant: 'mobile-workbench' }), detail)
+      const minY = Math.min(...parts.map((part) => part.center[1] - part.size[1] / 2))
+      expect(minY, `${detail}: masa havada`).toBeCloseTo(0, 6)
+    }
+  })
+
+  test('teker AYAĞIN altında, arada boşluk yok', () => {
+    // Teker tabla kenarından ölçülüyordu, ayak kendi profilinden: arada 13 mm
+    // açık ara kalıyor, ayak boşlukta bitiyor, teker yanında asılı duruyordu.
+    const parts = benchParts(bench({ variant: 'mobile-workbench' }), 'full')
+    const legs = parts.filter((part) => part.role === 'leg')
+    for (const castor of parts.filter((part) => part.role === 'castor')) {
+      const above = legs.filter(
+        (leg) =>
+          Math.abs(leg.center[0] - castor.center[0]) < (leg.size[0] + castor.size[0]) / 2 &&
+          Math.abs(leg.center[2] - castor.center[2]) < (leg.size[2] + castor.size[2]) / 2,
+      )
+      expect(above.length, 'tekerin üstünde ayak yok').toBeGreaterThan(0)
+      // Ve zincir dikeyde de kapanıyor: tekerin üstü bir ayağın altına değiyor.
+      const gap = Math.min(
+        ...above.map(
+          (leg) => leg.center[1] - leg.size[1] / 2 - (castor.center[1] + castor.size[1] / 2),
+        ),
+      )
+      expect(gap, 'teker ile ayak arasında boşluk').toBeLessThanOrEqual(1e-9)
+    }
+  })
+
+  test('tekerlekli ile tekerleksiz tezgâh uzak katmanda AYNI anahtara çözülmüyor', () => {
+    // Anahtar `full && hasCastors` yazıyordu: simple katmanda teker bayrağı
+    // anahtardan tamamen düşüyor, aynı zarftaki iki masa tek buffer'ı
+    // paylaşıyor ve önbelleğe ilk giren kazanıyordu.
+    const mobile = bench({ variant: 'mobile-workbench' })
+    const fixed = bench({
+      variant: 'eco',
+      width: widthM(mobile),
+      height: worktopYM(mobile),
+      depth: depthM(mobile),
+      under: 'drawers',
+    })
+    expect(benchGeometryKey(mobile, 'simple')).not.toBe(benchGeometryKey(fixed, 'simple'))
+  })
+
+  test('çekmece bloğu hiçbir ayağın içine girmiyor', () => {
+    // 1,24 m'den dar her çekmeceli tezgâhta blok ön ayağın içine giriyordu;
+    // şemanın alt sınırında yüzün sekizde biri ayağın içindeydi.
+    for (const width of [0.6, 0.8, 1.0, 1.22, 1.6, 2.4]) {
+      const parts = benchParts(bench({ variant: 'processing', width, under: 'drawers' }), 'full')
+      const legs = parts.filter((part) => part.role === 'leg')
+      for (const drawer of parts.filter((part) => part.role === 'drawer')) {
+        for (const leg of legs) {
+          const overlapX =
+            Math.min(drawer.center[0] + drawer.size[0] / 2, leg.center[0] + leg.size[0] / 2) -
+            Math.max(drawer.center[0] - drawer.size[0] / 2, leg.center[0] - leg.size[0] / 2)
+          const overlapZ =
+            Math.min(drawer.center[2] + drawer.size[2] / 2, leg.center[2] + leg.size[2] / 2) -
+            Math.max(drawer.center[2] - drawer.size[2] / 2, leg.center[2] - leg.size[2] / 2)
+          const overlapY =
+            Math.min(drawer.center[1] + drawer.size[1] / 2, leg.center[1] + leg.size[1] / 2) -
+            Math.max(drawer.center[1] - drawer.size[1] / 2, leg.center[1] - leg.size[1] / 2)
+          const inside = overlapX > 1e-9 && overlapZ > 1e-9 && overlapY > 1e-9
+          expect(inside, `${width} m: çekmece ayağın içinde`).toBe(false)
+        }
+      }
+    }
+  })
+
+  test('terazi platformu tabla yüzeyiyle EŞ DÜZLEM değil', () => {
+    // İki yukarı bakan yüz aynı kotta, 500×500 mm'lik alanda, aynı merged
+    // geometride: z-savaşı. Deponun kendi kuralı (`cargo-constants.ts`) bunu
+    // adlandırıyor ve orada da ofset kullanılıyor.
+    const node = bench({ variant: 'weighing-scale' })
+    const parts = benchParts(node, 'full')
+    const scale = parts.find((part) => part.role === 'scale')
+    const deck = parts.find((part) => part.role === 'top' || part.role === 'bed')
+    if (!scale || !deck) throw new Error('platform ya da tabla yok')
+    const scaleTop = scale.center[1] + scale.size[1] / 2
+    const deckTop = deck.center[1] + deck.size[1] / 2
+    expect(Math.abs(scaleTop - deckTop)).toBeGreaterThan(5e-4)
+  })
+
+  test('ekran standı uzak katmanda da duruyor', () => {
+    // Terazi tezgâhının üst yapısı `none`: ekran düşünce siluet düz bir masaya
+    // dönüşüyor ve nesne boyunun %43'ünü kaybediyordu.
+    const node = bench({ variant: 'weighing-scale' })
+    for (const detail of ['full', 'simple'] as const) {
+      const peak = Math.max(
+        ...benchParts(node, detail).map((part) => part.center[1] + part.size[1] / 2),
+      )
+      expect(peak, `${detail}: ekran kayboldu`).toBeCloseTo(overallHeightM(node), 6)
     }
   })
 })

@@ -1,7 +1,7 @@
 import {
   BENCH_VARIANTS,
   type BenchVariant,
-  CASTOR_DIAMETER_M,
+  CASTOR_BUILD_HEIGHT_M,
   FRONT_Z,
   MONITOR_BACK_INSET_M,
   MONITOR_HEIGHT_M,
@@ -91,7 +91,7 @@ export function deckTopYM(node: BenchNode): number {
  * masa yan yana konduğunda tablalar hizalanmazdı.
  */
 export function legHeightM(node: BenchNode): number {
-  const castor = hasCastors(node) ? CASTOR_DIAMETER_M : 0
+  const castor = hasCastors(node) ? CASTOR_BUILD_HEIGHT_M : 0
   return Math.max(0.05, deckTopYM(node) - TOP_THICKNESS_M - castor)
 }
 

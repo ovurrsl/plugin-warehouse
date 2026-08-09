@@ -8,7 +8,12 @@
  */
 
 import {
+  BUMPER_FACE_M,
   BUMPER_PROJECTION_M,
+  BUMPER_Y_M,
+  CONTROL_BOX_M,
+  CONTROL_HEIGHT_M,
+  CONTROL_OFFSET_M,
   EN1398_MAX_GRADIENT,
   LIP_PLATE_M,
   PLATFORM_PLATE_M,
@@ -199,6 +204,58 @@ export function footprintM(node: DockLevellerNode): readonly [number, number] {
  */
 export function aboveFloorHeightM(node: DockLevellerNode): number {
   return Math.max(PLATFORM_PLATE_M, riseM(node) + PLATFORM_PLATE_M)
+}
+
+/**
+ * SEÇİM kutusu — zeminin üstünde duran her şeyi saran kutu, `{merkez, ölçü}`.
+ *
+ * ## Neden çarpışma zarfından ayrı
+ *
+ * Yerleştirme zarfı (`footprintM` × `aboveFloorHeightM`) bilerek İNCE: rampanın
+ * üstünden geçmek onun işi ve zarfı 1,3 m yapmak forklift rotasını, paleti,
+ * konveyör ayağını rampanın üstünde çakışık sayardı.
+ *
+ * Ama seçim aynı kutuyu okuyunca başka bir şey oluyor: tampon kapı yüzünün
+ * 100 mm önünde, kumanda direği tablanın 350 mm yanında ve 1,2 m yukarıda —
+ * ikisi de o ince kutunun tamamen DIŞINDA. Ekranda duruyorlar, tıklama
+ * içlerinden geçip arkadaki duvarı seçiyor. Sessiz: parça doğru çiziliyor,
+ * yalnız var olmadığı söyleniyor.
+ *
+ * Tek bir AABB "zeminle aynı kotta tabla + yanda 1,2 m'lik direk" diyemiyor,
+ * o yüzden ikisi ayrı: çarpışma sürüş kotunu, seçim çizilen gövdeyi anlatıyor.
+ *
+ * Dudak İKİSİNE DE girmiyor. Açık dudak dorsenin üstünde duruyor ve `bbox`
+ * seçimi orada tırın kendi tıklamalarını çalardı — izden dışlanmasıyla aynı
+ * gerekçe.
+ */
+export function selectionBoxM(node: DockLevellerNode): {
+  center: readonly [number, number, number]
+  size: readonly [number, number, number]
+} {
+  const length = platformLengthM(node)
+  const width = widthM(node)
+
+  let xMax = length / 2
+  let zMax = width / 2
+  let yMax = aboveFloorHeightM(node)
+
+  if (node.hasBumpers) {
+    xMax = Math.max(xMax, length / 2 + BUMPER_PROJECTION_M)
+    yMax = Math.max(yMax, BUMPER_Y_M + BUMPER_FACE_M[0] / 2)
+  }
+  if (node.hasControlPost) {
+    // Direk yalnız +Z yanında: kutu bu yüzden simetrik değil ve merkezi de
+    // origin'de değil.
+    zMax = Math.max(zMax, width / 2 + CONTROL_OFFSET_M + CONTROL_BOX_M[2] / 2)
+    yMax = Math.max(yMax, CONTROL_HEIGHT_M + CONTROL_BOX_M[1] / 2)
+  }
+
+  const xMin = -length / 2
+  const zMin = -width / 2
+  return {
+    center: [(xMin + xMax) / 2, yMax / 2, (zMin + zMax) / 2],
+    size: [xMax - xMin, yMax, zMax - zMin],
+  }
 }
 
 /** Kapı yüzünün yerel X'i — tampon oraya oturuyor. */

@@ -32,6 +32,7 @@ import {
   lipReachM,
   platformLengthM,
   riseM,
+  selectionBoxM,
   telescopicLipMaxM,
   widthM,
   workingRangeM,
@@ -323,6 +324,108 @@ describe('geometri anahtarı kapsaması — iki yönlü', () => {
 })
 
 // ── Ayak koruma eteği ────────────────────────────────────────────────────────
+
+/**
+ * SEÇİM KUTUSU BEKÇİSİ — zeminin üstünde duran her parça tıklanabilir.
+ *
+ * Bulunan hata: kolider çarpışma zarfını okuyordu ve o zarf bilerek ince —
+ * dinlenmede 12 mm, çünkü rampanın üstünden geçilebilmesi gerekiyor. Tampon
+ * (kapı yüzünün 100 mm önünde) ve kumanda direği (yanda 350 mm, yukarı
+ * 1,2 m) o kutunun tamamen dışında kalıyordu: ekranda duran, tıklandığında
+ * arkadaki duvarı seçen parçalar.
+ *
+ * İki yön de ölçülüyor. Kutu küçükse parça seçilemiyor; büyükse rampanın
+ * yanındaki boşluk rampaya ait sayılıyor ve komşuya nişan alan tıklamayı
+ * çalıyor.
+ */
+describe('seçim kutusu zeminin üstündeki gövdeyi sarıyor', () => {
+  const FIXTURES: Array<[label: string, overrides: Record<string, unknown>]> = [
+    ['çıplak, dinlenmede', { hasBumpers: false, hasControlPost: false }],
+    ['tamponlu', { hasBumpers: true, hasControlPost: false }],
+    ['kumandalı', { hasBumpers: false, hasControlPost: true }],
+    ['ikisi de', { hasBumpers: true, hasControlPost: true }],
+    ['ikisi de, tabla kalkık', { hasBumpers: true, hasControlPost: true, inclination: 1 }],
+    ['ikisi de, tabla inik', { hasBumpers: true, hasControlPost: true, inclination: -1 }],
+  ]
+
+  /** Zeminin ÜSTÜNDE kalan parçalar — çukurun astarı ve nervürler aşağıda ve
+   *  seçim kutusunun konusu değiller. */
+  const aboveFloor = (node: DockLevellerNode) =>
+    [...dockLevellerFrameParts(node, 'full'), ...dockLevellerFrameParts(node, 'simple')].filter(
+      (part) => part.center[1] + part.size[1] / 2 > 1e-9,
+    )
+
+  for (const [label, overrides] of FIXTURES) {
+    test(`${label}: her parça kutunun içinde`, () => {
+      const node = leveller(overrides)
+      const box = selectionBoxM(node)
+      const slack = 1e-6
+
+      for (const part of aboveFloor(node)) {
+        for (const axis of [0, 1, 2] as const) {
+          const low = box.center[axis] - box.size[axis] / 2
+          const high = box.center[axis] + box.size[axis] / 2
+          const where = `${part.role} ekseni ${axis}`
+          expect(part.center[axis] - part.size[axis] / 2, where).toBeGreaterThanOrEqual(low - slack)
+          expect(part.center[axis] + part.size[axis] / 2, where).toBeLessThanOrEqual(high + slack)
+        }
+      }
+    })
+  }
+
+  test('kutu FAZLA da bildirmiyor — dört yüzü de bir parçaya değiyor', () => {
+    // Tek yönlü bekçi kutuyu büyüterek yeşile çevrilebilir. Kalkık tabla
+    // ölçülüyor: orada tavanı belirleyen şey direk değil tablanın burnu.
+    const node = leveller({ hasBumpers: true, hasControlPost: true })
+    const box = selectionBoxM(node)
+    const parts = aboveFloor(node)
+
+    const reach = (axis: 0 | 1 | 2, sign: 1 | -1) =>
+      Math.max(...parts.map((part) => sign * (part.center[axis] + (sign * part.size[axis]) / 2)))
+
+    // +X tampon, +Z kumanda direği, +Y direğin kutusu.
+    expect(reach(0, 1)).toBeCloseTo(box.center[0] + box.size[0] / 2, 9)
+    expect(reach(2, 1)).toBeCloseTo(box.center[2] + box.size[2] / 2, 9)
+    expect(reach(1, 1)).toBeCloseTo(box.size[1], 9)
+  })
+
+  test('çıplak rampanın kutusu çarpışma zarfıyla AYNI', () => {
+    // Tampon ve direk yoksa iki kutunun ayrışması için sebep yok; ayrışırsa
+    // ince zarfın anlamı kalmaz.
+    const node = leveller({ hasBumpers: false, hasControlPost: false })
+    const box = selectionBoxM(node)
+    const [length, width] = footprintM(node)
+    expect(box.size[0]).toBeCloseTo(length, 9)
+    expect(box.size[1]).toBeCloseTo(aboveFloorHeightM(node), 9)
+    expect(box.size[2]).toBeCloseTo(width, 9)
+    expect(box.center[0]).toBeCloseTo(0, 9)
+    expect(box.center[2]).toBeCloseTo(0, 9)
+  })
+
+  test('renderer koliderı SEÇİM kutusundan besliyor', () => {
+    /**
+     * Yukarıdaki testler `selectionBoxM`'i ölçüyor, koliderı değil. Metrik
+     * doğru olup renderer'ın hâlâ ince zarfı okuması tam da düzeltilen hata,
+     * ve onu ancak kaynağı okuyan bir bekçi görebiliyor.
+     */
+    const source = readFileSync(join(import.meta.dir, 'renderer.tsx'), 'utf8')
+    const collider = source.match(/<Collider[\s\S]{0,200}?\/>/)
+    expect(collider, 'renderer.tsx içinde <Collider> yok').not.toBeNull()
+    expect(collider?.[0], 'kolider seçim kutusunu okumuyor').toContain('selectionBox')
+  })
+
+  test('ÇARPIŞMA zarfı ince kalıyor — seçim kutusu ona bulaşmıyor', () => {
+    /**
+     * Bu düzeltmenin kolay yanlışı: koliderı büyütürken çarpışma zarfını da
+     * büyütmek. O zarf 1,3 m olsaydı rampanın üstünden geçen forklift rotası,
+     * palet ve konveyör ayağı çakışık sayılırdı — makinenin bütün amacı
+     * üstünden geçilebilmesi.
+     */
+    const node = leveller({ hasBumpers: true, hasControlPost: true })
+    expect(aboveFloorHeightM(node)).toBeCloseTo(PLATFORM_PLATE_M, 9)
+    expect(selectionBoxM(node).size[1]).toBeGreaterThan(1)
+  })
+})
 
 describe('ayak koruma eteği tablanın altında', () => {
   test('etek dinlenmede zeminin altında kalıyor', () => {

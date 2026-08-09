@@ -29,13 +29,12 @@ import {
 } from './geometry'
 import { getDockLevellerMaterial } from './materials'
 import {
-  aboveFloorHeightM,
   deckAngleRad,
   hingedLipAngleRad,
   lipFullLengthM,
   lipReachM,
   platformLengthM,
-  widthM,
+  selectionBoxM,
 } from './metrics'
 import type { DockLevellerNode } from './schema'
 
@@ -125,8 +124,7 @@ function DockLevellerBody({ node }: { node: DockLevellerNode }) {
   const material = getDockLevellerMaterial(appearance)
 
   const length = platformLengthM(node)
-  const width = widthM(node)
-  const height = aboveFloorHeightM(node)
+  const selectionBox = useMemo(() => selectionBoxM(node), [node])
 
   // Tablanın menteşedeki pozu ve dudağın tabladaki pozu — ikisi de KOŞULSUZ
   // donuyor. Düğüm sürüklenirken bile doğru: sürüklenen şey ATA grubu, ve
@@ -219,11 +217,13 @@ function DockLevellerBody({ node }: { node: DockLevellerNode }) {
   return (
     <group ref={wrapperRef} visible={node.visible !== false} {...handlers}>
       <group position={position} ref={registeredRef} rotation={rotation}>
-        {/* Seçim kolideri: dinlenmede rampa zeminle aynı kotta, yani hacmi
-            tabla sacı kadar ince. Yine de tıklanabilir — ışın üstten geliyor
-            ve kutunun ÜST yüzü bütün izi kaplıyor. Kalkınca zarf onunla
-            birlikte büyüyor. */}
-        {!isExporting && <Collider position={[0, height / 2, 0]} size={[length, height, width]} />}
+        {/* Seçim kolideri ÇARPIŞMA zarfından ayrı bir kutu (`selectionBoxM`).
+            Dinlenmede rampa zeminle aynı kotta ve çarpışma zarfı bilerek
+            tabla sacı kadar ince — üstünden geçilebilsin diye. Ama tampon ve
+            kumanda direği o ince kutunun tamamen dışında kalıyor ve
+            tıklanamıyorlardı: ekranda duran, seçilemeyen parçalar. Seçim
+            kutusu zeminin üstündeki gövdenin tamamını sarıyor. */}
+        {!isExporting && <Collider position={selectionBox.center} size={selectionBox.size} />}
 
         {/* Katman `detailRef.current`'tan okunuyor, 'full' sabitinden DEĞİL.
             Sabit yazıldığında sessiz bir hata doğuyor: bir alan değişip

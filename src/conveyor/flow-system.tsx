@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useAppearance } from '../appearance'
 import { useWarehouseStore } from '../store'
+import { advanceConveyorBelt, resetConveyorBelt } from './conveyor-texture'
 import {
   buildNetwork,
   EMPTY_NETWORK,
@@ -97,8 +98,24 @@ export default function ConveyorFlowSystem() {
     if (!running || isExporting) {
       mesh.count = 0
       publishLifting(network, [])
+      // Bant da dursun ve BAŞA dönsün: duran bir hattın rastgele bir fazda
+      // donmuş kalması, iki kez çalıştırılan sahnenin farklı görünmesi demek.
+      resetConveyorBelt()
       return
     }
+
+    /**
+     * Yatağın kendisi de aksın.
+     *
+     * Kutular hareket ediyordu ama makaralar duruyordu: hat çalışırken kutular
+     * hareketsiz bir yüzeyin üstünde KAYIYORDU. Makara deseni bir dokuda ve
+     * hareketi o dokunun offset'ini kaydırmak — sahnedeki bütün modülleri tek
+     * uniform güncellemesiyle sürüyor, kare başına ek bir maliyeti yok.
+     *
+     * Burada, simülasyonun yanında: ikisini aynı kapıya bağlamak, bandın
+     * kutular dururken akmasını imkânsız kılıyor.
+     */
+    advanceConveyorBelt(Math.min(delta, MAX_STEP_S))
 
     boxesRef.current = step(network, boxesRef.current, Math.min(delta, MAX_STEP_S), () => {
       seedRef.current += 1

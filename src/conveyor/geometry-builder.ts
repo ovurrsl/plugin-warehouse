@@ -233,6 +233,23 @@ export type { ConveyorDetail } from './parts'
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
+/**
+ * Makara deseninin V ekseni boyunca kaç tekrar ettiği — ve İŞARETİ akış yönü.
+ *
+ * Üç kind bunu paylaşıyor (düz hat, hızlandırıcı, transfer): hepsi aynı atlası
+ * kullanıyor ve hepsinin bandı aynı dokunun kaymasıyla hareket ediyor.
+ */
+export function beltStripeSpan(node: { flow: 'forward' | 'reverse' }, tiles: number): number
+export function beltStripeSpan(conveyor: ConveyorRollerNode): number
+export function beltStripeSpan(
+  node: { flow: 'forward' | 'reverse' } & Partial<ConveyorRollerNode>,
+  tiles?: number,
+): number {
+  const span =
+    tiles ?? moduleLengthM(node as ConveyorRollerNode) / rollerPitchM(node as ConveyorRollerNode)
+  return node.flow === 'reverse' ? -span : span
+}
+
 function buildFrom(
   conveyor: ConveyorRollerNode,
   parts: readonly ConveyorPart[],
@@ -244,7 +261,13 @@ function buildFrom(
   // One tile per roller pitch, so the painted rollers land where real ones
   // would however long the module is. This is the number that makes the stripe
   // a bed rather than a texture.
-  const stripeSpan = moduleLengthM(conveyor) / rollerPitchM(conveyor)
+  //
+  // Ters akışta NEGATİF. Bandın hareketi tek bir paylaşılan dokunun offset'ini
+  // kaydırarak yapılıyor (`advanceConveyorBelt`) ve bir offset tek yöne kayar;
+  // yönü modül başına ayırmanın bedelsiz yolu V'yi burada, inşa anında
+  // çevirmek. Alternatifi ikinci bir doku + ikinci bir materyaldi — bu ailenin
+  // tek materyal kuralını, yani bütün çizim maliyeti hikâyesini bozardı.
+  const stripeSpan = beltStripeSpan(conveyor)
 
   for (const part of parts) {
     const color =
@@ -320,6 +343,12 @@ function buildConveyorGeometryKey(
     // module the forward mesh whenever it carried no motor, which was the only
     // other way flow reached this key.
     hasDownstreamNeighbour ? `U${outletPort(conveyor)}` : 'UD',
+    // Akış yönü artık KOŞULSUZ anahtarda: ters akışta yatağın V'si negatif
+    // dokunuyor (`beltStripeSpan`), yani mesh gerçekten farklı. Eskiden yön
+    // yalnız motorun bulunduğu uçtan sızıyordu ve motorsuz iki modül —
+    // biri ileri, biri ters — tek buffer'ı paylaşırdı; şimdi bandı ters yöne
+    // akardı ve hiçbir yerde hata çıkmazdı.
+    conveyor.flow === 'reverse' ? 'r' : 'f',
     usefulWidthMm(conveyor),
     frameWidthM(conveyor).toFixed(5),
     moduleLengthM(conveyor).toFixed(5),

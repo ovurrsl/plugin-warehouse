@@ -46,6 +46,50 @@ const WIDTH = TILE * 2
 const ROLLER_SPAN = 0.66
 
 let cached: THREE.Texture | null = null
+/** Aynı doku, kaydırma için ayrı bir tutamakla. `cached` null iken (SSR, test)
+ *  kaydırma çağrıları sessizce hiçbir şey yapmasın diye ayrı duruyor. */
+let scrollable: THREE.Texture | null = null
+
+/**
+ * Bandın saniyede kaç MAKARA ADIMI ilerlediği.
+ *
+ * Desen tam olarak bir adımda tekrar ettiği için (V bir pitch'te bir tur),
+ * `hız / adım` doğrudan saniyedeki tekrar sayısını veriyor. Katalog
+ * varsayılanından: 45 m/dk ve 75 mm adım → saniyede 10 adım.
+ *
+ * TEK bir sahne geneli hız ve bu bilinçli bir ödün. Modül başına doğru hız,
+ * modül başına ayrı bir doku — yani ayrı bir materyal — demekti; oysa bu
+ * ailenin bütün çizim maliyeti hikâyesi tek materyalde duruyor (sekiz bin
+ * makara, tek draw call). Farklı hızda iki modül yan yana konduğunda ikisi de
+ * aynı tempoda akıyor; kutular yine kendi hızlarında gidiyor, çünkü onları
+ * simülasyon sürüyor.
+ */
+export const BELT_PITCHES_PER_SECOND = 45 / 60 / 0.075
+
+/**
+ * Bandı `seconds` kadar ilerlet.
+ *
+ * İşaret NEGATİF ve sebebi örnekleme yönü: kabuk `uv.v + offset.y` okuyor,
+ * yani offset büyüdükçe desen −V'ye doğru kayıyor. İleri akışta desenin +X'e
+ * (kutuların gittiği yöne) gitmesi gerekiyor, o yüzden offset küçülüyor.
+ * Ters akışlı modüller V'lerini negatif dokuyor (bkz. `emitPart` çağrıları) ve
+ * aynı kaydırma onlarda ters yöne okunuyor — ikinci bir materyal gerekmiyor.
+ */
+export function advanceConveyorBelt(seconds: number): void {
+  if (!scrollable) return
+  scrollable.offset.y -= BELT_PITCHES_PER_SECOND * seconds
+  // Tek bir adıma sar: desen zaten periyodik, ve saatlerce koşan bir sahnede
+  // offset'in büyümesi float çözünürlüğünü yiyip bandı titretiyor.
+  if (scrollable.offset.y <= -1 || scrollable.offset.y >= 1) {
+    scrollable.offset.y %= 1
+  }
+}
+
+/** Akış durunca bandı başa al — duran bir hat rastgele bir fazda donmuş
+ *  görünmemeli, ve iki kez çalıştırılan bir sahne aynı yerden başlamalı. */
+export function resetConveyorBelt(): void {
+  if (scrollable) scrollable.offset.y = 0
+}
 
 export function getConveyorTexture(): THREE.Texture {
   if (cached) return cached
@@ -92,6 +136,7 @@ export function getConveyorTexture(): THREE.Texture {
   context.fillRect(rollerX, 0, TILE, Math.max(1, Math.round(TILE / 64)))
 
   const texture = new THREE.CanvasTexture(canvas)
+  scrollable = texture
   // U is clamped so a part parked in one column can never bleed into the other
   // under filtering; V repeats so the pitch stays the real 50/75/100 mm however
   // long the module is. That asymmetry is why the bed maps U across its width

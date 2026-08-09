@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { clashesWith } from '../clash'
 import { PalletRackNode } from '../rack/schema'
 import { CAR, exteriorWidthM, SPEEDS_M_PER_MIN } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
+import { BELT_PITCHES_PER_SECOND } from './conveyor-texture'
 import {
   clearConveyorGeometryCache,
   conveyorGeometryCacheSize,
@@ -18,6 +21,7 @@ import {
   moduleLengthM,
   rollerOffsetsX,
   rollerPitchM,
+  speedMPerSec,
   supportOffsetsX,
   withinCatalogueLength,
 } from './metrics'
@@ -200,8 +204,66 @@ describe('geometry', () => {
     expect(conveyorGeometryKey(forward, 'full', true)).not.toBe(
       conveyorGeometryKey(reverse, 'full', true),
     )
-    // And unabutted they are the same mesh, because nothing is dropped.
-    expect(conveyorGeometryKey(forward, 'full')).toBe(conveyorGeometryKey(reverse, 'full'))
+    // Dayanmamışken de AYRI, ve bu bu turda değişti: yatağın makara deseni
+    // artık akış yönünde kayıyor, yön de V'nin işaretinde taşınıyor
+    // (`beltStripeSpan`). İki yön tek buffer'ı paylaşsaydı ters modülün bandı
+    // kutuların tersine akardı — ekranda hata yok, yalnız yanlış yöne dönen
+    // bir hat. Eskiden burada `toBe` yazıyordu ve o zaman doğruydu: yön hiçbir
+    // vertex'i kımıldatmıyordu.
+    expect(conveyorGeometryKey(forward, 'full')).not.toBe(conveyorGeometryKey(reverse, 'full'))
+  })
+
+  /**
+   * BANT GERÇEKTEN AKIYOR MU.
+   *
+   * Bildirilen hata: hat çalışırken kutular gidiyordu ama makaralar
+   * duruyordu — kutular hareketsiz bir yüzeyin üstünde kayıyordu. Sessiz:
+   * konsolda tek satır yok, sahne kusursuz çiziliyor, yalnız duran bir
+   * makinenin üstünde yük taşınıyor.
+   *
+   * Kaydırmanın kendisi bir `CanvasTexture` üstünde çalışıyor ve canvas
+   * `document` istiyor, yani test ortamında doku hiç doğmuyor. O yüzden
+   * ölçülebilen iki şey ölçülüyor: hızın katalogla tutarlılığı, ve KABLONUN
+   * takılı olduğu — çünkü hız doğru olup döngünün çağırmaması tam da
+   * düzeltilen hata.
+   */
+  test('bant hızı katalog varsayılanından geliyor', () => {
+    // 45 m/dk ve 75 mm adım → saniyede 10 makara adımı. Sabit elle yazılsaydı
+    // katalog değişince sessizce ayrışırdı.
+    const node = conveyor({})
+    const expected = speedMPerSec(node) / rollerPitchM(node)
+    expect(BELT_PITCHES_PER_SECOND).toBeCloseTo(expected, 9)
+    expect(BELT_PITCHES_PER_SECOND).toBeGreaterThan(0)
+  })
+
+  test('akış döngüsü bandı gerçekten sürüyor ve durunca sıfırlıyor', () => {
+    const source = readFileSync(join(import.meta.dir, 'flow-system.tsx'), 'utf8')
+    const frame = source.slice(source.indexOf('useFrame('))
+    expect(frame, 'kare döngüsü bandı ilerletmiyor').toContain('advanceConveyorBelt(')
+    // Durma dalı `running` kapısının içinde; orada sıfırlanmazsa hat rastgele
+    // bir fazda donmuş kalıyor.
+    const stopped = frame.slice(frame.indexOf('if (!running'), frame.indexOf('boxesRef.current ='))
+    expect(stopped, 'akış durunca bant başa dönmüyor').toContain('resetConveyorBelt()')
+  })
+
+  test('ters akışın yatak UV’si ileri akışın AYNASI', () => {
+    // Anahtarın ayrışması yetmez: mesh'in gerçekten aynalandığını ölçmek
+    // gerekiyor, yoksa anahtar boşuna bölünmüş olurdu.
+    clearConveyorGeometryCache()
+    const uvOf = (flow: 'forward' | 'reverse') => {
+      clearConveyorGeometryCache()
+      const geometry = getConveyorGeometry(conveyor({ flow, hasDrive: false }), 'full')
+      const uv = geometry.getAttribute('uv')
+      const vs: number[] = []
+      for (let i = 0; i < uv.count; i++) vs.push(uv.getY(i))
+      return vs
+    }
+    const forward = uvOf('forward')
+    const reverse = uvOf('reverse')
+    expect(reverse.length).toBe(forward.length)
+    expect(Math.max(...forward)).toBeGreaterThan(1)
+    expect(Math.min(...reverse)).toBeLessThan(-1)
+    for (const [index, v] of forward.entries()) expect(reverse[index]).toBeCloseTo(-v, 9)
   })
 })
 

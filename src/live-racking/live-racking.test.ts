@@ -7,8 +7,11 @@ import { warehouseCatalogPanel, warehousePlugin } from '../index'
 import { resetStatsIndex, sceneStats } from '../stats'
 import {
   BAY_SIDE_CLEARANCE_M,
+  CHANNEL_PROFILE_HEIGHT_M,
+  CHANNEL_PROFILE_WIDTH_M,
   CLEARANCE_TABLE,
   DEFAULT_GRADIENT,
+  DYNAMIC_BEAM_HEIGHT_M,
   MAX_PALLETS_DEEP,
   ROLLER_OVER_PALLET_M,
   ROLLER_PITCH_STEP_M,
@@ -598,5 +601,97 @@ describe('tanım ve manifest', () => {
       if (BASE.includes(key)) continue
       expect(covered.has(key) || HIDDEN.includes(key), `${key} erişilemez`).toBe(true)
     }
+  })
+})
+
+/**
+ * DENETİMİN BULDUĞU DÖRT KUSUR — hiçbiri ekranda hata üretmiyordu.
+ */
+describe('kanal, kafes ve fren gerçekten çizildikleri yerde', () => {
+  const node = (overrides: Record<string, unknown> = {}) =>
+    LiveRackingNode.parse({ id: 'live-racking_g', ...overrides })
+
+  test('ilk katın altındaki açıklık TAM `firstLevelClear`', () => {
+    /**
+     * `levelExitYM` makara ÜST kotunu döndürüyor; kanalın kendi yapısı
+     * (kiriş + profil = 220 mm) o kotun ALTINDA. Zemin-transpalet dalı bunu
+     * doğru kuruyordu, öteki dal `structure`'ı eklemiyordu: kullanıcı 1,5 m
+     * girdiğinde çizilen açıklık 1,28 m oluyordu.
+     *
+     * Asıl sessizlik panelde: aynı alan katalogun H ≥ 400 mm kuralına karşı
+     * denetleniyor, yani 0,40 girildiğinde panel "uygun" der ve model 0,18 m
+     * çizerdi — sınırın yarısından az.
+     */
+    for (const firstLevelClear of [0.4, 1.0, 1.5, 2.2]) {
+      const lane = node({ firstLevelClear })
+      const structure = DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
+      expect(levelExitYM(lane, 0) - structure, `${firstLevelClear} m`).toBeCloseTo(
+        firstLevelClear,
+        9,
+      )
+    }
+    // Zemin-transpalet katında açıklık YOK ve olmaması kuralın ihlali değil.
+    const floorSet = node({ floorSetPalletTruckLevel: true })
+    expect(levelExitYM(floorSet, 0)).toBeCloseTo(
+      DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M,
+      9,
+    )
+  })
+
+  test('çerçeve çaprazı gerçekten ÇAPRAZ — yatay basamak değil', () => {
+    /**
+     * Rolün adı `diagonal` idi ama üretilen kutu sabit y'de X boyunca yatay
+     * bir çubuktu: uç çerçeveler kafes değil, düz basamaklı bir merdiven
+     * olarak okunuyordu. Paketin öteki üç raf kind'ı gerçek kafes kuruyor.
+     */
+    const diagonals = liveRackingParts(node(), 'full').filter((part) => part.role === 'diagonal')
+    expect(diagonals.length).toBeGreaterThan(2)
+    const leaning = diagonals.filter((part) => (part.tiltX ?? 0) !== 0)
+    expect(leaning.length, 'hiçbir çapraz yatmıyor').toBeGreaterThan(0)
+    // Ve zikzak: ardışık çaprazlar zıt yöne yatıyor.
+    const signs = leaning.map((part) => Math.sign(part.tiltX ?? 0))
+    expect(new Set(signs).size, 'bütün çaprazlar aynı yöne yatıyor').toBe(2)
+  })
+
+  test('fren tamburu kanal profilinin DIŞINDA', () => {
+    /**
+     * Tamburun 35 mm'sinin 30 mm'si rayın içinde kalıyordu; dışarıda kalan
+     * 5 mm üstten görünüşte üçte bir piksel ediyor, yani 32 tamburun hiçbiri
+     * görünmüyordu. Dosyanın kendi yorumu tam tersini söylüyordu.
+     */
+    const lane = node()
+    const parts = liveRackingParts(lane, 'full')
+    const drums = parts.filter((part) => part.role === 'brake-drum')
+    expect(drums.length).toBeGreaterThan(0)
+    const profileOuter = rollerLengthM(lane) / 2 + CHANNEL_PROFILE_WIDTH_M / 2
+    for (const drum of drums) {
+      const inner = Math.abs(drum.center[0]) - drum.size[0] / 2
+      expect(inner, 'tambur profilin içinde').toBeGreaterThanOrEqual(profileOuter - 1e-9)
+    }
+  })
+
+  test('frenli makara sıradan makaranın İÇİNE girmiyor', () => {
+    /**
+     * Frenli makara bir makara POZİSYONUDUR, komşusunun içine sokulmuş ikinci
+     * bir silindir değil. Ham Z ofseti ızgaraya oturmadığı için varsayılan
+     * düğümde 40 çift çakışıyordu.
+     */
+    const parts = liveRackingParts(node(), 'full')
+    const rollers = parts.filter((part) => part.role === 'roller')
+    const brakes = parts.filter((part) => part.role === 'brake-roller')
+    expect(brakes.length).toBeGreaterThan(0)
+
+    let clashes = 0
+    for (const brake of brakes) {
+      for (const roller of rollers) {
+        const hit = ([0, 1, 2] as const).every(
+          (axis) =>
+            Math.abs(brake.center[axis] - roller.center[axis]) <
+            (brake.size[axis] + roller.size[axis]) / 2 - 1e-9,
+        )
+        if (hit) clashes += 1
+      }
+    }
+    expect(clashes, 'frenli makara komşusunun içinde').toBe(0)
   })
 })

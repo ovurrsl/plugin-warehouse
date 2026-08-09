@@ -119,13 +119,44 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
         })
       }
     }
-    // Çerçeve içi yatay bağlar — kafesi okunur kılan asgari kadar.
-    const ties = Math.max(2, Math.round(height / 1.2))
-    for (let i = 1; i <= ties; i++) {
+    /**
+     * Çerçeve kafesi: ZİKZAK çapraz + üstte ve altta birer yatay bağ.
+     *
+     * Rolün adı `'diagonal'` idi ama üretilen kutu sabit y'de, X boyunca
+     * YATAY bir çubuktu — çerçeve başına yedi tane, eşit aralıkla. Uç
+     * çerçeveler bu yüzden kafes değil, düz basamaklı bir merdiven olarak
+     * okunuyordu. Oysa bir raf çerçevesinin siluetini tanımlayan şey
+     * çaprazlardır, ve paketin öteki üç raf kind'ı (rack, longspan, drivein)
+     * gerçek kafes kuruyor — canlı raf tek istisnaydı.
+     *
+     * Çapraz çerçevenin kendi düzleminde (X–Y) duruyor ama `emitPart` Z ekseni
+     * etrafında döndüremiyor — yalnız ZY düzleminde yatırıyor (`tiltX`) ve
+     * sonra yaw uyguluyor (`rotationY`). Sıra tam da bunu mümkün kılıyor:
+     * Z boyunca uzanan bir çubuğu önce ZY'de yatırıp sonra çeyrek tur
+     * çevirmek, X–Y düzleminde eğik bir çubuk veriyor. Emitter'a yeni bir
+     * eksen eklemekten ucuz ve aynı sonucu veriyor.
+     */
+    const span = halfWidth * 2 - UPRIGHT_WIDTH_M
+    const bays = Math.max(2, Math.round(height / 1.2))
+    const step = height / (bays + 1)
+    const lean = Math.atan2(step, span)
+    for (let i = 0; i < bays; i++) {
       parts.push({
         role: 'diagonal',
-        center: [0, (i / (ties + 1)) * height, z],
-        size: [halfWidth * 2 - UPRIGHT_WIDTH_M, DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M],
+        center: [0, (i + 1) * step, z],
+        size: [DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M, Math.hypot(span, step)],
+        // Ardışık çaprazlar zıt yöne yatıyor — zikzak bu.
+        tiltX: (i % 2 === 0 ? -1 : 1) * lean,
+        rotationY: -Math.PI / 2,
+      })
+    }
+    // Kafesi kapatan iki yatay bağ: altta ve üstte. Zikzak tek başına
+    // çerçeveyi bağlamıyor, uçlarda serbest kalıyor.
+    for (const tieY of [step / 2, height - step / 2]) {
+      parts.push({
+        role: 'diagonal',
+        center: [0, tieY, z],
+        size: [span, DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M],
       })
     }
 
@@ -262,14 +293,52 @@ function pushRollers(
     return
   }
 
-  const count = Math.max(2, Math.floor(depth / node.rollerPitch))
+  const count = rollerGridCount(node)
+  // Frenli pozisyonlar bu ızgaranın İNDEKSLERİ — orada sıradan makara yok,
+  // frenli olan onun yerini alıyor. Atlanmazsa iki silindir iç içe geçiyor.
+  const braked = brakeRollerIndices(node)
   for (let i = 0; i <= count; i++) {
+    if (braked.has(i)) continue
     const t = i / count
     const z = -halfDepth + t * depth
     // Çıkış (−Z) alçak, giriş (+Z) yüksek.
     const y = exitY + t * drop
     pushRollerAt(parts, node, 'roller', y - ROLLER_DIAMETER_M / 2, z, ROLLER_DIAMETER_M)
   }
+}
+
+/** Bir kanaldaki makara ızgarasının aralık sayısı — indeksler 0..count. */
+export function rollerGridCount(node: LiveRackingNode): number {
+  return Math.max(2, Math.floor(channelDepthM(node) / node.rollerPitch))
+}
+
+/**
+ * Frenli makaraların ızgara İNDEKSLERİ.
+ *
+ * Katalogun Z ofseti (`ROLLER_TO_BRAKE_M`) frenli makaranın hangi POZİSYONDA
+ * olduğunu seçmek için var, ızgaranın dışına çıkmak için değil: gerçek üründe
+ * frenli makara bir makara pozisyonudur, komşusunun içine sokulmuş ikinci bir
+ * silindir değil.
+ *
+ * Önceki hâl ham Z'yi kullanıyordu ve ızgaraya oturmuyordu: varsayılan
+ * düğümde 40 adet `brake-roller × roller` çifti çakışıyordu, ölçülen kesişim
+ * 830 × 40,6 × 16 mm. Üstten bakınca temiz bir frenli makara değil, kalın
+ * koyu bir bant çıkıyordu.
+ */
+export function brakeRollerIndices(node: LiveRackingNode): Set<number> {
+  const indices = new Set<number>()
+  if (!hasBrakeRollers(node)) return indices
+  const depth = channelDepthM(node)
+  const halfDepth = depth / 2
+  const count = rollerGridCount(node)
+  const step = depth / node.palletsDeep
+  for (let i = 0; i < node.palletsDeep; i++) {
+    const target = -halfDepth + (i + 0.5) * step + ROLLER_TO_BRAKE_M
+    if (target > halfDepth) continue
+    const index = Math.round(((target + halfDepth) / depth) * count)
+    if (index >= 0 && index <= count) indices.add(index)
+  }
+  return indices
 }
 
 /**
@@ -294,14 +363,22 @@ function pushBrakeRollers(parts: LiveRackingPart[], node: LiveRackingNode, level
   const drop = channelDropM(node)
   const exitY = levelExitYM(node, level)
   const halfDepth = depth / 2
-  const step = depth / node.palletsDeep
-  const drumX = rollerLengthM(node) / 2 + BRAKE_DRUM_WIDTH_M / 2
+  const count = rollerGridCount(node)
+  /**
+   * Tambur kanal profilinin DIŞINDA.
+   *
+   * Önceki hâl `rollerLengthM/2 + genişlik/2` yazıyordu ve profilin kendi
+   * genişliğini atlıyordu: 35 mm'lik tamburun 30 mm'si rayın içinde kalıyor,
+   * dışarıda kalan 5 mm üstten görünüşün ölçeğinde üçte bir piksel ediyordu —
+   * 32 tamburun hiçbiri görünmüyordu. Dosyanın kendi yorumu (yukarıda) tam
+   * tersini söylüyor, ve canlı rafı sıradan makaralı kanaldan ayıran en
+   * tanınır bileşen bu.
+   */
+  const drumX = rollerLengthM(node) / 2 + CHANNEL_PROFILE_WIDTH_M / 2 + BRAKE_DRUM_WIDTH_M / 2
 
-  for (let i = 0; i < node.palletsDeep; i++) {
-    // Palet pozisyonunun ortası, sonra katalogun Z ofseti kadar öteye.
-    const z = -halfDepth + (i + 0.5) * step + ROLLER_TO_BRAKE_M
-    if (z > halfDepth) continue
-    const t = (z + halfDepth) / depth
+  for (const index of brakeRollerIndices(node)) {
+    const t = index / count
+    const z = -halfDepth + t * depth
     const y = exitY + t * drop - ROLLER_DIAMETER_M / 2 + BRAKE_ROLLER_RAISE_M
 
     pushRollerAt(parts, node, 'brake-roller', y, z, ROLLER_DIAMETER_M)

@@ -177,7 +177,17 @@ export function m3Parts(
     // hooked into the upright's side slots. Full tier only — four boxes per
     // level per bay, each a few centimetres across.
     if (detail === 'full') {
-      for (const x of lines) {
+      /**
+       * Taşıyıcılar HER İKİ çerçeve çizgisinde — `lines` değil.
+       *
+       * Braket çerçevenin değil RAFIN parçası: paylaşılan çerçeveye takılıp
+       * BU gözün rafını taşıyor, komşununkini değil. `lines` üzerinde
+       * dönerken sıraya eklenen her göz dört rafını yalnız sol uçtan braketli
+       * çiziyordu — rafın sağ ucu havada duruyordu. Çerçeve paylaşımı
+       * dikme, taban plakası ve kuşak için geçerli; kata ait bağlantı
+       * elemanları için değil.
+       */
+      for (const x of frameCentersX(bay)) {
         for (const sign of [-1, 1] as const) {
           parts.push({
             role: 'shelf-support',
@@ -227,7 +237,15 @@ export function m3Parts(
   // the steel and the rule cannot drift apart.
   const braceSets = crossBraceSets(bay)
   if (braceSets > 0 && detail === 'full') {
-    const zRear = -bay.shelfDepth / 2 + postDepth
+    /**
+     * Çapraz arka dikmelerin ARKA yüzüne cıvatalanır ve gözün arkasında kalır.
+     *
+     * `-shelfDepth/2 + postDepth` onu arka dikmenin ÖN yüzüne koyuyordu, yani
+     * rafın derinlik ayak izinin tam içine: 18 mm'lik çubuk dört katın hepsini
+     * kesiyordu. Sayılar örtüşmeyi kanıtlıyor — çapraz Z ∈ [−0,169, −0,151],
+     * raf paneli Z ∈ [−0,200, +0,200].
+     */
+    const zRear = -bay.shelfDepth / 2 - CROSS_BRACE_SECTION / 2
     for (let set = 0; set < braceSets; set++) {
       const bandBottom = (bay.frameHeight * set) / braceSets
       const bandHeight = bay.frameHeight / braceSets

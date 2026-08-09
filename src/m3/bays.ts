@@ -1,6 +1,7 @@
 import type { M3Level, M3ShelvingNode } from './schema'
 import {
   CROSS_BRACE_ONE_SET_MAX,
+  CROSS_BRACE_SECTION,
   CROSS_TIES_MIN,
   DIVIDER_MAX_DEPTH,
   DOOR_BAY_LENGTH,
@@ -49,7 +50,11 @@ export function totalWidth(bay: M3ShelvingNode): number {
 }
 
 export function totalDepth(bay: M3ShelvingNode): number {
-  return bay.shelfDepth
+  // Koridor çaprazı arka dikmelerin ARKA yüzüne cıvatalanıyor, yani rafın
+  // derinlik ayak izinin dışında duruyor. Zarf onu saymazsa çapraz görünür
+  // ama tıklanamaz ve komşusuyla çakıştığı görülmez — tam olarak bu paketin
+  // öteki kind'larında düzeltilen sınıf.
+  return bay.shelfDepth + (crossBraceSets(bay) > 0 ? CROSS_BRACE_SECTION : 0)
 }
 
 /** Local X of the two frame centrelines, left then right. */

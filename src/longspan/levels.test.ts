@@ -127,10 +127,16 @@ describe('clear height above a level', () => {
   })
 
   test('stops at the next level’s STEEL, not at its load surface', () => {
-    // The next level's beam and board hang below its surface; a "distance
-    // between surfaces" reading would promise headroom that is not there.
-    // 1.5 − (0.055 beam + 0.022 board) − 0.5 = 0.923
-    expect(clearAbove(node, 0)).toBeCloseTo(0.923, 9)
+    // The next level's beam hangs below its surface; a "distance between
+    // surfaces" reading would promise headroom that is not there.
+    //
+    // Bu sayı bu turda 0,923'ten 0,945'e çıktı ve sebebi panelin yerleşimi:
+    // sunta artık kirişin ÜSTÜNE oturmuyor, iki kirişin ARASINA düşüyor ve
+    // üstü onlarla aynı düzlemde bitiyor (`standards.ts`: "the beam's vertical
+    // edge conceals the front edge"). Panel kirişin altına sarkmadığı için en
+    // alçak çelik yalnız kirişin kendisi.
+    // 1.5 − 0.055 kiriş − 0.5 = 0.945
+    expect(clearAbove(node, 0)).toBeCloseTo(0.945, 9)
   })
 
   test('the topmost level is bounded by the frame', () => {

@@ -1,6 +1,6 @@
 import { DEFAULT_UNIT, type LinearUnit, lengthLabel, millimetreLabel } from '../units'
 import { isPortMated } from './line-index'
-import type { ConveyorModule, ConveyorPortId, PortRole } from './ports'
+import type { ConveyorModule, ConveyorPortId, LocalPort, PortRole } from './ports'
 import {
   asConveyorModule,
   conveyorPorts,
@@ -155,6 +155,9 @@ type PlacedEnd = {
   z: number
   dx: number
   dz: number
+  /** Kendi çerçevesindeki hâli — yerleştirme mıknatısı gereken DÖNÜŞÜ bundan
+   *  çözüyor, dünya yönünden geri hesaplamak yerine. */
+  local: LocalPort
 }
 
 function endsAt(
@@ -170,7 +173,16 @@ function endsAt(
   return localPorts(module).map((local) => {
     const [x, z] = toWorldPlan([local.x, local.z], position, cos, sin)
     const [dx, dz] = toWorldPlan([local.dx, local.dz], [0, 0, 0], cos, sin)
-    return { id: local.id, role: local.role, lane: local.laneMm, x, z, dx, dz }
+    return {
+      id: local.id,
+      role: local.role,
+      lane: local.laneMm,
+      x,
+      z,
+      dx,
+      dz,
+      local,
+    }
   })
 }
 
@@ -237,6 +249,112 @@ export function snapToLineEnd(
   }
 
   return best?.position ?? null
+}
+
+/**
+ * **Yerleştirme mıknatısı — modülü hem taşır hem ÇEVİRİR.**
+ *
+ * `snapToLineEnd` host'un `groupMoveSnap` kancasına bağlı ve o kanca yalnız
+ * bir KONUM döndürebiliyor. Sonuç: mıknatıs, modül zaten doğru açıya
+ * çevrilmişse yardım ediyor, çevrilmemişse hiç devreye girmiyor — ve kullanıcı
+ * için ikisi arasındaki fark görünmez. Bir dirseği hattın ucuna takmak, önce
+ * R/T ile doğru çeyreği bulmayı, sonra 8 cm'lik hizalama penceresine
+ * girmeyi gerektiriyordu.
+ *
+ * Yerleştirme aracında böyle bir kısıt yok: dönüşün sahibi araç. Bu yüzden
+ * yerleştirme kendi mıknatısını kullanıyor — gereken açıyı KOMŞUDAN çözüyor
+ * ve hayaleti oraya oturtuyor. Kullanıcı yalnız açık bir uca yaklaşıyor.
+ *
+ * Yaklaşıklık yok: dönüş, karşı ucun dış yönünün tam tersi olacak şekilde
+ * hesaplanıyor, konum da portu porta getiren ötelemeyle. 45°'lik R/T adımı
+ * kullanıcının kendi kolu; mıknatıs onunla sınırlı değil, çünkü bir hattın
+ * ucu 45°'nin katında olmak zorunda değil.
+ *
+ * **Yalnız GEÇERLİ eklem için döner.** Rol, şerit ve kot kuralları
+ * `blockingRule`'dan okunuyor — mıknatısın çekemeyeceği bir eklemi
+ * yerleştirme de kuramaz. Kural tutmuyorsa hayalet hiç kımıldamıyor ve
+ * kullanıcının kendi açısı korunuyor; "neden yapışmadı"yı `mateBlockers`
+ * söylüyor.
+ */
+export type PlacementSnap = {
+  position: [number, number, number]
+  rotationY: number
+  /** Hangi uca oturdu — arayüzün bunu söyleyebilmesi için. */
+  target: { nodeId: string; port: ConveyorPortId }
+}
+
+/** Açıyı (−π, π] aralığına indirger — dönüş farkını kıyaslamak için. */
+function wrapAngle(angle: number): number {
+  const turn = (((angle + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+  return turn - Math.PI
+}
+
+export function snapPlacementToLineEnd(
+  module: ConveyorModule,
+  candidate: readonly [number, number, number],
+  rotationY: number,
+  nodes: Readonly<Record<string, unknown>>,
+): PlacementSnap | null {
+  const cells = freeEnds(nodes)
+  const mine = endsAt(module, candidate, rotationY)
+
+  let bestDistance = MAGNET_RADIUS_SQ
+  /** Eşitlikte en AZ döneni seç: kullanıcının kendi açısına saygı. */
+  let bestTurn = Number.POSITIVE_INFINITY
+  let best: PlacementSnap | null = null
+
+  for (const end of mine) {
+    const bx = Math.floor(end.x / CELL)
+    const bz = Math.floor(end.z / CELL)
+    for (let ix = bx - 1; ix <= bx + 1; ix++) {
+      for (let iz = bz - 1; iz <= bz + 1; iz++) {
+        for (const other of cells.get(`${ix}:${iz}`) ?? []) {
+          if (other.nodeId === module.id) continue
+
+          /**
+           * Yakınlık, hayaletin ŞU ANKİ pozunda ölçülüyor — döndürülmüş
+           * hâlinde değil. Kullanıcının gördüğü şey bu: "benim ucum onun
+           * ucunun yanında". Döndürülmüş poza göre ölçmek, 6 m'lik bir
+           * modülü çeyrek tur çevirdikten sonra imlecin metrelerce uzağına
+           * düşürür ve mıknatıs rastgele ateşliyor gibi görünürdü.
+           */
+          const distance = (other.x - end.x) ** 2 + (other.z - end.z) ** 2
+          if (distance > bestDistance) continue
+
+          // Gereken dönüş: portun YEREL yönü, karşı ucun tersine bakacak.
+          // `toWorldPlan` yerel açıyı `rotationY` kadar GERİ çeviriyor
+          // (x·cos + z·sin, −x·sin + z·cos), yani dünya açısı = yerel − dönüş.
+          const localAngle = Math.atan2(end.local.dz, end.local.dx)
+          const facing = Math.atan2(-other.dz, -other.dx)
+          const turned = localAngle - facing
+
+          const cos = Math.cos(turned)
+          const sin = Math.sin(turned)
+          const [px, pz] = toWorldPlan([end.local.x, end.local.z], candidate, cos, sin)
+          const rotated: PlacedEnd = {
+            ...end,
+            x: px,
+            z: pz,
+            dx: -other.dx,
+            dz: -other.dz,
+          }
+          if (blockingRule(module, rotated, other) !== null) continue
+
+          const turn = Math.abs(wrapAngle(turned - rotationY))
+          if (distance === bestDistance && turn >= bestTurn) continue
+          bestDistance = distance
+          bestTurn = turn
+          best = {
+            position: [candidate[0] + (other.x - px), candidate[1], candidate[2] + (other.z - pz)],
+            rotationY: turned,
+            target: { nodeId: other.nodeId, port: other.port },
+          }
+        }
+      }
+    }
+  }
+
+  return best
 }
 
 /**

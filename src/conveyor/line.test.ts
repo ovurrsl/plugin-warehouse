@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { ConveyorCurveNode } from './curve-schema'
 import {
   hasDownstreamNeighbour,
@@ -8,9 +10,15 @@ import {
   resetLineIndex,
 } from './line-index'
 import { moduleLengthM } from './metrics'
-import { jointProblems, resetPortMagnet, snapToLineEnd } from './port-magnet'
+import {
+  jointProblems,
+  resetPortMagnet,
+  snapPlacementToLineEnd,
+  snapToLineEnd,
+} from './port-magnet'
 import { conveyorPorts, inletPort, localPorts, outletPort } from './ports'
 import { ConveyorRollerNode } from './schema'
+import { ConveyorTransferNode } from './transfer-schema'
 
 const conveyor = (id: string, overrides: Record<string, unknown> = {}) =>
   ConveyorRollerNode.parse({ id: `conveyor_roller_${id}`, rollers: 40, ...overrides })
@@ -20,6 +28,10 @@ const scene = (...nodes: Array<{ id: string }>) =>
 
 /** The default bed: 40 rollers at 75 mm. */
 const LENGTH = moduleLengthM(conveyor('probe'))
+
+/** Açıyı (−π, π] aralığına indirger — 0 ile 2π'yi aynı saymak için. */
+const wrap = (angle: number) =>
+  ((((angle + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI
 
 describe('ports are geometric, and they point out of the body', () => {
   beforeEach(() => {
@@ -382,5 +394,166 @@ describe("jointProblems — kimlik memo'su bayat cevap vermiyor", () => {
     const metric = jointProblems(low, nodes, 'metric')
     const imperial = jointProblems(low, nodes, 'imperial')
     expect(imperial).not.toEqual(metric)
+  })
+})
+
+describe('yerleştirme mıknatısı modülü ÇEVİREREK de oturtuyor', () => {
+  beforeEach(() => {
+    resetLineIndex()
+    resetPortMagnet()
+  })
+
+  /**
+   * `groupMoveSnap` host kancası yalnız bir KONUM döndürebiliyor, yani sürükleme
+   * mıknatısı modül zaten doğru açıya çevrilmişse yardım ediyor. Yerleştirme
+   * aracında dönüşün sahibi araç — bu blok, oradaki mıknatısın açıyı komşudan
+   * çözdüğünü kilitliyor. Tuttuğu hata sessiz: eski hâlde hayalet hiç kımıldamaz
+   * ve kullanıcı özelliğin bozuk olduğunu sanar.
+   */
+  test('düz modül, açısı 90° yanlışken bile hattın ucuna kareleniyor', () => {
+    const standing = conveyor('standing', { position: [0, 0, 0] })
+    const nodes = scene(standing)
+    const fresh = conveyor('fresh')
+
+    /**
+     * Kullanıcı hayaleti çeyrek tur çevrilmiş hâlde getiriyor ve UCUNU hattın
+     * ucuna nişanlıyor — imleç modülün ortasında olduğu için gövde yana uzanıyor.
+     * Yakınlık ölçüsü portun kendisi: kullanıcının baktığı yer orası.
+     */
+    const half = LENGTH / 2
+    const snap = snapPlacementToLineEnd(fresh, [half - 0.1, 0, -half + 0.05], Math.PI / 2, nodes)
+    expect(snap).not.toBeNull()
+    if (!snap) return
+
+    expect(Math.abs(wrap(snap.rotationY))).toBeCloseTo(0, 9)
+    expect(snap.position[0]).toBeCloseTo(LENGTH, 9)
+    expect(snap.position[2]).toBeCloseTo(0, 9)
+    expect(snap.target).toEqual({ nodeId: standing.id, port: 'b' })
+
+    // Ve ürettiği şey hattın kendi toleransına göre GERÇEK bir eklem.
+    resetLineIndex()
+    const landed = conveyor('fresh', { position: snap.position, rotation: [0, snap.rotationY, 0] })
+    expect(lineOf(scene(standing, landed), standing.id)).toHaveLength(2)
+  })
+
+  test('dirsek de kareleniyor — ucu kendi yayında, ±X’te değil', () => {
+    // Dirseğin girişi yerel +Z'ye bakıyor; düz bir hattın ucuna takmak için
+    // çeyrek tur dönmesi ŞART. Eski mıknatıs bunu hiç yapamıyordu.
+    const standing = conveyor('standing', { position: [0, 0, 0] })
+    const nodes = scene(standing)
+    const bend = ConveyorCurveNode.parse({ id: 'conveyor-curve_fresh' })
+
+    // Dirseğin girişi yerel (0.40, 0.756)'da; imleci öyle koy ki o giriş
+    // hattın çıkışının (+L/2, 0) yanına düşsün.
+    const snap = snapPlacementToLineEnd(bend, [LENGTH / 2 - 0.4, 0, -0.756 + 0.06], 0, nodes)
+    expect(snap).not.toBeNull()
+    if (!snap) return
+
+    resetLineIndex()
+    const landed = ConveyorCurveNode.parse({
+      id: 'conveyor-curve_fresh',
+      position: snap.position,
+      rotation: [0, snap.rotationY, 0],
+    })
+    expect(lineOf(scene(standing, landed), standing.id)).toHaveLength(2)
+  })
+
+  test('kural tutmuyorsa hayalet KIMILDAMIYOR — kullanıcının açısı korunur', () => {
+    /**
+     * Şerit sınıfı tutmayan bir uca çevirerek oturtmak, kurulamayacak bir hattı
+     * kurmak olurdu. Mıknatısın çekemediği eklemi yerleştirme de kuramaz —
+     * kural tek kaynaktan (`blockingRule`) okunuyor.
+     */
+    const standing = conveyor('standing', { position: [0, 0, 0] })
+    const nodes = scene(standing)
+    const narrow = ConveyorTransferNode.parse({ id: 'conveyor-transfer_fresh' })
+    expect(snapPlacementToLineEnd(narrow, [LENGTH / 2 + 0.1, 0, 0], 0, nodes)).toBeNull()
+  })
+
+  test('menzil dışında hiç ateşlemiyor', () => {
+    const standing = conveyor('standing', { position: [0, 0, 0] })
+    const nodes = scene(standing)
+    const fresh = conveyor('fresh')
+    /**
+     * 90 cm — hücre ızgarasının İÇİNDE ama yarım metrelik menzilin dışında.
+     * Uzağa (metrelerce) koymak menzili değil, dokuz hücrelik pencereyi
+     * sınardı: mesafe eşiği kaldırılsa bile o test yeşil kalır ve bekçi
+     * hiçbir şey tutmaz.
+     */
+    expect(
+      snapPlacementToLineEnd(fresh, [LENGTH / 2 + LENGTH / 2 + 0.9, 0, 0], 0, nodes),
+    ).toBeNull()
+    // Ve besbelli uzakta da, doğal olarak.
+    expect(snapPlacementToLineEnd(fresh, [LENGTH + 6, 0, 0], 0, nodes)).toBeNull()
+  })
+
+  test('dolu bir uca yapışmıyor — iki modül aynı yere binmez', () => {
+    const a = conveyor('a', { position: [0, 0, 0] })
+    const b = conveyor('b', { position: [LENGTH, 0, 0] })
+    const nodes = scene(a, b)
+    const fresh = conveyor('fresh')
+    // a'nın çıkışı b ile dolu; kalan boş uçlar a'nın girişi (−X) ve b'nin
+    // çıkışı (+X). Dolu eklemin tam üstüne nişan alan hayalet oraya oturmamalı.
+    const snap = snapPlacementToLineEnd(fresh, [LENGTH, 0, 0], 0, nodes)
+    expect(snap).toBeNull()
+  })
+
+  test('açı zaten doğruysa hayalet dönmüyor', () => {
+    /**
+     * Kullanıcının kendi açısına saygı: hizada yaklaşan bir modül yalnız
+     * ötelenmeli. Dönüşü her seferinde yeniden yazan bir mıknatıs, 180°
+     * simetrik bir modülü kullanıcı ne yaparsa yapsın öbür yöne çevirebilir.
+     */
+    const standing = conveyor('standing', { position: [0, 0, 0] })
+    const nodes = scene(standing)
+    const fresh = conveyor('fresh')
+
+    // Girişi (yerel −L/2) hattın çıkışının (+L/2) 10 cm berisinde.
+    const snap = snapPlacementToLineEnd(fresh, [LENGTH - 0.1, 0, 0.04], 0, nodes)
+    expect(snap).not.toBeNull()
+    expect(wrap(snap?.rotationY ?? 99)).toBeCloseTo(0, 9)
+    expect(snap?.position[0]).toBeCloseTo(LENGTH, 9)
+    expect(snap?.position[2]).toBeCloseTo(0, 9)
+  })
+})
+
+describe('yerleştirme araçlarının hepsi mıknatısı okuyor', () => {
+  /**
+   * Kaynak düzeyinde bekçi, çünkü kusur çalışma zamanında sessiz: bir araç
+   * `placementPose`'u çağırmayı unutursa o kind hâlâ yerleşir, hâlâ hizalama
+   * kılavuzu alır, yalnız hattın ucuna oturmaz. Yedi araç var ve yenisi
+   * eklenirken atlanacak tek satır tam olarak bu.
+   */
+  const TOOLS = [
+    'tool.tsx',
+    'curve-tool.tsx',
+    'booster-tool.tsx',
+    'launcher-tool.tsx',
+    'transfer-tool.tsx',
+    'oblique-tool.tsx',
+    'telescopic-tool.tsx',
+  ]
+
+  for (const file of TOOLS) {
+    test(`${file} mıknatısı çağırıyor ve çizilen açıyı ayrı tutuyor`, () => {
+      const source = readFileSync(join(import.meta.dir, file), 'utf8')
+      expect(source, `${file}: placementPose çağrısı yok`).toContain('placementPose(')
+      // Kullanıcının açısı ile çizilen açı ayrı ref'lerde: birleştirilirse
+      // mıknatıs bir kez ateşledikten sonra kullanıcının R/T açısı kaybolur.
+      expect(source, `${file}: poseRotationRef yok`).toContain('poseRotationRef')
+      // Ve düğüm ÇİZİLEN açıyla kuruluyor — kullanıcının ham açısıyla değil.
+      expect(source, `${file}: düğüm ham açıyla kuruluyor`).not.toContain(
+        'rotation: [0, rotationRef.current, 0]',
+      )
+    })
+  }
+
+  test('araç listesi gerçekten eksiksiz — dosya sistemi sayıyor', () => {
+    // Bekçinin kendini kandırma biçimi: yeni bir araç eklenip listeye
+    // yazılmaması. Klasördeki `*-tool.tsx` sayısı listeyle uyuşmalı.
+    const found = readdirSync(import.meta.dir).filter(
+      (name) => name === 'tool.tsx' || name.endsWith('-tool.tsx'),
+    )
+    expect(found.sort()).toEqual([...TOOLS].sort())
   })
 })

@@ -29,6 +29,7 @@ import {
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
+import { placementPose } from './placement-pose'
 import { footprintM } from './transfer-metrics'
 import ConveyorTransferPreview from './transfer-preview'
 import { ConveyorTransferNode } from './transfer-schema'
@@ -63,6 +64,15 @@ export default function ConveyorTransferTool() {
   const [dischargeSide, setDischargeSide] = useState<'left' | 'right'>('left')
 
   const rotationRef = useRef(0)
+  /**
+   * ÇİZİLEN açı — kullanıcınınki değil.
+   *
+   * Mıknatıs bir uca oturttuğunda hayalet komşunun istediği açıya döner, ama
+   * `rotationRef` kullanıcının R/T ile kurduğu açıyı tutmaya devam eder.
+   * Tek ref'te birleştirmek, uçtan uzaklaşınca kullanıcının açısını kalıcı
+   * olarak kaybetmek olurdu.
+   */
+  const poseRotationRef = useRef(0)
   const validRef = useRef(true)
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
@@ -89,6 +99,7 @@ export default function ConveyorTransferTool() {
     lastPositionRef.current = null
     previousSnapRef.current = null
     rotationRef.current = 0
+    poseRotationRef.current = 0
     altRef.current = false
     validRef.current = true
     setCursorRotationY(0)
@@ -106,7 +117,7 @@ export default function ConveyorTransferTool() {
         return
       }
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const rotationY = rotationRef.current
+      const rotationY = poseRotationRef.current
       const placed = ConveyorTransferNode.parse({
         ...previewRef.current,
         id: undefined,
@@ -119,14 +130,15 @@ export default function ConveyorTransferTool() {
     }
 
     const applyCursor = (position: [number, number, number]) => {
+      const rotationY = poseRotationRef.current
       const visual = getFloorStackPreviewPosition({
         node: previewRef.current as unknown as AnyNode,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, rotationY, 0],
         levelId: activeLevelId,
       })
       cursorRef.current?.position.set(...visual)
-      cursorRef.current?.rotation.set(0, rotationRef.current, 0)
+      cursorRef.current?.rotation.set(0, rotationY, 0)
       // A transfer's body is square and centred on its node, so the box and the
       // ghost share a position.
       // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
@@ -141,21 +153,37 @@ export default function ConveyorTransferTool() {
 
       useFacingPose.getState().set({
         position: visual,
-        rotationY: rotationRef.current,
+        rotationY: rotationY,
         depth: footprintM(previewRef.current)[1],
       })
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
-      const { position, guides } = resolveAlignedPlacement({
+      const aligned = resolveAlignedPlacement({
         candidates: alignmentCandidates,
         node: previewRef.current as unknown as AnyNode,
         rawX,
         rawZ,
         rotationY: rotationRef.current,
       })
-      useAlignmentGuides.getState().set(guides)
+      /**
+       * Mıknatıs hizalamanın ÜSTÜNDE: hizalama kılavuzu ayak izi kenarını
+       * 8 cm'lik bir pencerede yaklaştırıyor, mıknatıs ise ucu uca TAM
+       * oturtuyor ve gerekiyorsa modülü çeviriyor. İkisi aynı anda görünürse
+       * kullanıcı hangisinin karar verdiğini bilemez, o yüzden mıknatıs
+       * ateşlediğinde kılavuzlar temizleniyor.
+       */
+      const pose = placementPose(
+        previewRef.current as unknown as AnyNode,
+        aligned.position,
+        rotationRef.current,
+        useScene.getState().nodes as Readonly<Record<string, unknown>>,
+      )
+      useAlignmentGuides.getState().set(pose.snapped ? [] : aligned.guides)
+      poseRotationRef.current = pose.rotationY
+      setCursorRotationY(pose.rotationY)
+      const position = pose.position
       applyCursor(position)
 
       const nextSnapKey = movementSfxStepKey({
@@ -184,7 +212,7 @@ export default function ConveyorTransferTool() {
         ...previewRef.current,
         id: undefined,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, poseRotationRef.current, 0],
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
       })
@@ -229,6 +257,9 @@ export default function ConveyorTransferTool() {
       event.preventDefault()
       triggerSFX('sfx:item-rotate')
       rotationRef.current += rotationDelta
+      // Kullanıcı çevirdiği an mıknatısın bıraktığı açı düşer; bir sonraki
+      // fare hareketi hâlâ menzildeyse yeniden ateşler.
+      poseRotationRef.current = rotationRef.current
       setCursorRotationY(rotationRef.current)
       const position = lastPositionRef.current
       if (position) applyCursor(position)

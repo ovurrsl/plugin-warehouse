@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f61f677`](https://github.com/ovurrsl/plugin-warehouse/commit/f61f677abcd4d3a825b940b8641f87fdbf6b4966))
 - Refresh generated README blocks [skip ci] ([`0afebaa`](https://github.com/ovurrsl/plugin-warehouse/commit/0afebaa149ceb093aceff44e8251bbf78aec232b))
 - Refresh generated README blocks [skip ci] ([`1209ae0`](https://github.com/ovurrsl/plugin-warehouse/commit/1209ae09363899b2b62101f4962ce31835c89bc3))
 - Refresh generated README blocks [skip ci] ([`c21a058`](https://github.com/ovurrsl/plugin-warehouse/commit/c21a058a1454d98883fca65e5fac8893d91d5db4))
@@ -159,6 +160,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Komşu mıknatısı + paylaşılan dikme hattı (#22) ([`2db6dac`](https://github.com/ovurrsl/plugin-warehouse/commit/2db6dac90581e4c5bf9a10cdff10fa28464839ce))
 - Sahne ağacı satırı ürünün adını söylesin ([`43e1e5c`](https://github.com/ovurrsl/plugin-warehouse/commit/43e1e5c38da63287ffd8a2874a84f474f3f30fdf))
 - Alçak rafın dikmesi 3 m'de duruyor ([`f6a6e9d`](https://github.com/ovurrsl/plugin-warehouse/commit/f6a6e9dca414f7c16d496c7b3963a4eb62734d97))
 - Variant alanı — palet rafı ile alçak raf ayrı ürün ([`32caa5f`](https://github.com/ovurrsl/plugin-warehouse/commit/32caa5f825f07df9e99e4d69c898ccb2af43981b))

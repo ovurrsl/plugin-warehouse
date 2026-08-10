@@ -68,7 +68,6 @@ export function deckTopOf(node: PalletNode): [number, number, number] {
 }
 
 export default makeBakeReplaceRenderer<PalletBakeMember>((nodes, appearance) => {
-  const deckMaterial = getPalletMaterial(appearance)
   const cargoMaterial = getCargoMaterial(appearance)
 
   const members: PalletBakeMember[] = [...nodes]
@@ -89,6 +88,9 @@ export default makeBakeReplaceRenderer<PalletBakeMember>((nodes, appearance) => 
   return groupByGeometry(
     members,
     (member) => member.bake?.geometry ?? getPalletGeometry(member.preset),
-    (member) => member.bake?.material ?? deckMaterial,
+    // Güverte materyali PRESET'e bağlı (plastik palet ahşap atlası kullanmaz),
+    // o yüzden tek bir dış değişken değil, üye başına okunuyor —
+    // `surfaceMaterial` aile başına tekil olduğu için bu bedava.
+    (member) => member.bake?.material ?? getPalletMaterial(appearance, member.preset),
   )
 })

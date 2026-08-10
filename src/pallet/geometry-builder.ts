@@ -48,6 +48,8 @@ const INNER_TOP_Z = 0.16375
 
 /** Height of each horizontal joint. Vertices near one are darkened. */
 const JOINT_PLANES = [BOARD_H, BOARD_H + BLOCK_H, BOARD_H + BLOCK_H + BOARD_H]
+/** Üst güvertenin ÜST yüzü — göğü gören tek kot. */
+const DECK_TOP_Y = BOARD_H * 3 + BLOCK_H
 const JOINT_RADIUS = 0.028
 
 /**
@@ -101,7 +103,7 @@ function findBlock(x: number, z: number): BlockDef | null {
 
 type Corners = { tl: boolean; tr: boolean; br: boolean; bl: boolean }
 
-function buildEPAL1(): THREE.BufferGeometry {
+function buildEPAL1(branded: boolean): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = []
 
   /**
@@ -256,7 +258,7 @@ function buildEPAL1(): THREE.BufferGeometry {
 
   const geometry = merged.index ? merged.toNonIndexed() : merged
   geometry.computeVertexNormals()
-  applyUVs(geometry)
+  applyUVs(geometry, branded)
   applyBakedOcclusion(geometry)
   geometry.computeBoundingBox()
   geometry.computeBoundingSphere()
@@ -271,7 +273,7 @@ function buildEPAL1(): THREE.BufferGeometry {
  * impossible: a triangle is entirely a marking or entirely wood, so no
  * interpolation can ever carry the ink onto a neighbouring face.
  */
-function applyUVs(geo: THREE.BufferGeometry): void {
+function applyUVs(geo: THREE.BufferGeometry, branded: boolean): void {
   const pos = geo.attributes.position as THREE.BufferAttribute | undefined
   const norm = geo.attributes.normal as THREE.BufferAttribute | undefined
   if (!pos || !norm) return
@@ -289,7 +291,7 @@ function applyUVs(geo: THREE.BufferGeometry): void {
     const cy = (pos.getY(i0) + pos.getY(i0 + 1) + pos.getY(i0 + 2)) / 3
     const cz = (pos.getZ(i0) + pos.getZ(i0 + 1) + pos.getZ(i0 + 2)) / 3
 
-    const marking = classifyMarking(cx, cy, cz, nx, ny, nz)
+    const marking = branded ? classifyMarking(cx, cy, cz, nx, ny, nz) : null
 
     for (let v = 0; v < 3; v++) {
       const idx = i0 + v
@@ -455,11 +457,27 @@ function applyBakedOcclusion(geo: THREE.BufferGeometry): void {
 
     let occ = 0
 
-    // Contact shading at the three horizontal joints — but only on surfaces
-    // that can actually see the crevice. The deck's top face lies 22 mm above
-    // the stringer joint, well inside the falloff, yet it faces open sky and
-    // must stay the brightest surface on the pallet.
-    if (ny < 0.7) {
+    /**
+     * Contact shading at the three horizontal joints — but only on surfaces
+     * that can actually see the crevice. The deck's top face lies 22 mm above
+     * the stringer joint, well inside the falloff, yet it faces open sky and
+     * must stay the brightest surface on the pallet.
+     *
+     * The exemption used to be `ny < 0.7` alone, which is "faces up" — and
+     * inside a pallet most surfaces that face up are roofed by the board
+     * above them. That let every one of them off: the fork tunnel's floor
+     * (the bottom deck's top face) came out at shade 1.000, the same as the
+     * open top deck, and the stringer tops at 0.967. The inside of the pallet
+     * was as bright as the outside, and from above the deck read as one
+     * sheet with eight holes punched in it rather than as boards. The test
+     * that guards this only looked at the global min and max, and 1.000 is
+     * the expected max — it just happened to be sitting in the tunnel.
+     *
+     * The gate is now "faces up AND has nothing above it", which is only
+     * true at the top deck's own surface.
+     */
+    const skyFacing = ny > 0.7 && y > DECK_TOP_Y - 1e-4
+    if (!skyFacing) {
       for (const plane of JOINT_PLANES) {
         const d = Math.abs(y - plane)
         if (d < JOINT_RADIUS) occ += (1 - d / JOINT_RADIUS) * 0.45
@@ -468,6 +486,10 @@ function applyBakedOcclusion(geo: THREE.BufferGeometry): void {
 
     // Undersides see almost no sky.
     if (ny < -0.5) occ += 0.22
+    // Neither do the up-facing surfaces that a board roofs over — the tunnel
+    // floor, the stringer tops, the top of the bottom deck. Same term as the
+    // undersides, for the same reason: they are inside a closed volume.
+    if (ny > 0.5 && y < DECK_TOP_Y - 1e-4) occ += 0.22
 
     // Interior surfaces — the tunnel walls and the middle of the underside —
     // are enclosed on more sides than the perimeter is.
@@ -524,18 +546,40 @@ export function getPalletFarGeometry(preset: PalletPreset): THREE.BufferGeometry
   return geo
 }
 
+/**
+ * İki temel gövde: damgalı ve damgasız.
+ *
+ * `PalletSpec.branded` alanı kendi belgesinde "EPAL/EUR/IPPC blok damgaları bu
+ * preset'e uygulanır mı" diyor ve dört preset'te `false` — ama damgayla ilgili
+ * hiçbir okuyucusu yoktu. Damgalar `buildEPAL1` içinde UV'lere PİŞİYOR ve
+ * öteki preset'ler o tamponun klonu olduğu için, bir "GMA 48×40 (US)"
+ * paletinin bloklarında EPAL ovali, EUR ovali ve "DE - XX490000 HT" IPPC
+ * damgası yazıyordu. Uyulmayan bir bayrak, uyulan bir bayrak gibi görünüyor.
+ *
+ * İkinci girdi bedava: önbellek zaten preset başına, ve damgasız gövde tek
+ * kere kuruluyor.
+ */
+const baseCache = new Map<boolean, THREE.BufferGeometry>()
+
+function baseGeometry(branded: boolean): THREE.BufferGeometry {
+  const hit = baseCache.get(branded)
+  if (hit) return hit
+  const built = buildEPAL1(branded)
+  baseCache.set(branded, built)
+  return built
+}
+
 export function getPalletGeometry(preset: PalletPreset): THREE.BufferGeometry {
   const cached = cache.get(preset)
   if (cached) return cached
 
-  let base = cache.get('epal-1')
-  if (!base) {
-    base = buildEPAL1()
-    cache.set('epal-1', base)
-  }
-  if (preset === 'epal-1') return base
-
   const spec = specOf(preset)
+  const base = baseGeometry(spec.branded)
+  if (preset === 'epal-1') {
+    cache.set(preset, base)
+    return base
+  }
+
   const scaled = base.clone()
   scaled.scale(spec.length / L, spec.height / (BOARD_H * 3 + BLOCK_H), spec.width / W)
   scaled.computeBoundingBox()

@@ -318,7 +318,7 @@ function GhostStock({ node }: { node: PalletRackNode }) {
   const spec = specOf(node.palletPreset)
   const geometry = useMemo(() => getPalletGeometry(node.palletPreset), [node.palletPreset])
   const appearance = useAppearance()
-  const material = getPalletMaterial(appearance)
+  const material = getPalletMaterial(appearance, node.palletPreset)
 
   /**
    * The pallet mesh is built with its **length along local X**, and the slot
@@ -455,7 +455,9 @@ function GhostStock({ node }: { node: PalletRackNode }) {
           ? getPalletFarGeometry(node.palletPreset)
           : getPalletGeometry(node.palletPreset)
       pallets.material =
-        next === 'far' ? getPalletFarMaterial(appearance) : getPalletMaterial(appearance)
+        next === 'far'
+          ? getPalletFarMaterial(appearance, node.palletPreset)
+          : getPalletMaterial(appearance, node.palletPreset)
       // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
       // bir öncekinin ölçüsüyle yapmak olurdu.
       pallets.computeBoundingSphere()

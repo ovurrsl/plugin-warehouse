@@ -192,7 +192,9 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
       tier === 'full' ? getPalletGeometry(node.preset) : getPalletFarGeometry(node.preset),
     keyFor: (tier) => `pallet-deck:${node.preset}:${tier}`,
     materialFor: (tier) =>
-      tier === 'full' ? getPalletMaterial(appearance) : getPalletFarMaterial(appearance),
+      tier === 'full'
+        ? getPalletMaterial(appearance, node.preset)
+        : getPalletFarMaterial(appearance, node.preset),
     materialKeyFor: (tier) => `pallet-deck:${tier}:${appearanceKey(appearance)}`,
     castsShadow: false,
     farSq: LOD_FAR_SQ,
@@ -301,7 +303,9 @@ function PalletRendererBody({ node }: { node: PalletNode }) {
              * görünmesi imkânsız olsun diye.
              */
             materialFor={(tier) =>
-              tier === 'full' ? getPalletMaterial(appearance) : getPalletFarMaterial(appearance)
+              tier === 'full'
+                ? getPalletMaterial(appearance, node.preset)
+                : getPalletFarMaterial(appearance, node.preset)
             }
             nearSq={LOD_NEAR_SQ}
             nodeId={node.id}

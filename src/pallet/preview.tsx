@@ -30,7 +30,7 @@ export default function PalletPreview({ node }: { node: PalletNode }) {
   const spec = specOf(node.preset)
   const geometry = useMemo(() => getPalletGeometry(node.preset), [node.preset])
   const appearance = useAppearance()
-  const material = getPalletPreviewMaterial(appearance)
+  const material = getPalletPreviewMaterial(appearance, node.preset)
   /**
    * The real load, at the real fill — **safe only because the tool now hands
    * this node's id to the pallet it creates.**

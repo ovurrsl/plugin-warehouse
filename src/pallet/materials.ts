@@ -3,6 +3,7 @@ import { type Appearance, previewMaterial, type SurfaceSpec, surfaceMaterial } f
 import { getOrCreateCargoAtlas } from './cargo-atlas'
 import { FILM_OPACITY } from './cargo-constants'
 import { getOrCreateEPALTextureAtlas } from './epal-textures'
+import type { PalletPreset } from './presets'
 
 /**
  * Module-level singletons, shared by every pallet in the scene.
@@ -20,7 +21,45 @@ import { getOrCreateEPALTextureAtlas } from './epal-textures'
  * damgalarını göstermeye devam ediyordu.
  */
 
-function deckSpec(): SurfaceSpec {
+/**
+ * Kalıplanmış plastik paletin rengi — SEÇİLMİŞ VARSAYILAN.
+ *
+ * Gerçek plastik euro palet tek parça kalıplanmış, damarsız ve tek renk;
+ * siyah, koyu gri ve mavi hepsi piyasada. Katalog bir renk yayınlamıyor, bu
+ * yüzden nötr koyu gri seçildi — bir standart değil, bir tercih.
+ */
+const PLASTIC_COLOR = 0x4a4f55
+
+/**
+ * Ahşap mı plastik mi.
+ *
+ * `plastic-euro` preset'i EPAL-1'in ölçeklenmiş klonunu alıyor ve TEK bir
+ * `pallet-deck` materyali vardı: `epal-textures.ts`'in prosedürel çam atlası
+ * — #dfab78 taban, damar çizgileri, yedi budak. Yani "Plastic euro" etiketli
+ * fişi seçen kullanıcı ahşap alıyordu, ve katalog bu preset'i "EPAL, GMA and
+ * plastic standards" diye pazarlıyor, yani seçim bilinçli.
+ *
+ * Gövde BİÇİMİ ahşap yaklaşıklığı olarak kalıyor — bu kabul edilmiş bir
+ * yaklaşıklık ve kod da öyle diyor; yazılmamış olan MALZEME gerekçesiydi.
+ */
+function isPlastic(preset: PalletPreset): boolean {
+  return preset === 'plastic-euro'
+}
+
+function plasticSpec(): SurfaceSpec {
+  return {
+    family: 'pallet-deck-plastic',
+    color: PLASTIC_COLOR,
+    roughness: 0.55,
+    metalness: 0,
+    // Pişmiş kapanma gölgesi plastikte de geçerli: o gövdenin kendi
+    // geometrisinden geliyor, ahşaptan değil.
+    vertexColors: true,
+  }
+}
+
+function deckSpec(preset: PalletPreset): SurfaceSpec {
+  if (isPlastic(preset)) return plasticSpec()
   const atlas = getOrCreateEPALTextureAtlas()
   return {
     family: 'pallet-deck',
@@ -39,8 +78,8 @@ function deckSpec(): SurfaceSpec {
   }
 }
 
-export function getPalletMaterial(appearance: Appearance): THREE.Material {
-  return surfaceMaterial(deckSpec(), appearance)
+export function getPalletMaterial(appearance: Appearance, preset: PalletPreset): THREE.Material {
+  return surfaceMaterial(deckSpec(preset), appearance)
 }
 
 /**
@@ -49,8 +88,11 @@ export function getPalletMaterial(appearance: Appearance): THREE.Material {
  * setting `transparent`/`opacity` on the shared instance would leak the
  * translucency into every committed pallet in the scene.
  */
-export function getPalletPreviewMaterial(appearance: Appearance): THREE.Material {
-  return previewMaterial(deckSpec(), appearance)
+export function getPalletPreviewMaterial(
+  appearance: Appearance,
+  preset: PalletPreset,
+): THREE.Material {
+  return previewMaterial(deckSpec(preset), appearance)
 }
 
 /**
@@ -152,9 +194,14 @@ export function getFilmMaterial(appearance: Appearance): THREE.Material {
  * smear the EPAL stamps across a twelve-triangle slab. At the range this tier
  * exists for, a flat colour and the atlas are indistinguishable.
  */
-export function getPalletFarMaterial(appearance: Appearance): THREE.Material {
-  return surfaceMaterial(
-    { family: 'pallet-far', color: 0xb99a6b, metalness: 0, roughness: 0.9 },
-    appearance,
-  )
+export function getPalletFarMaterial(appearance: Appearance, preset: PalletPreset): THREE.Material {
+  return isPlastic(preset)
+    ? surfaceMaterial(
+        { family: 'pallet-far-plastic', color: PLASTIC_COLOR, metalness: 0, roughness: 0.55 },
+        appearance,
+      )
+    : surfaceMaterial(
+        { family: 'pallet-far', color: 0xb99a6b, metalness: 0, roughness: 0.9 },
+        appearance,
+      )
 }

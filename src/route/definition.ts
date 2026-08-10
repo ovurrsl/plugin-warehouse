@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildRouteFloorplan } from './floorplan'
 import { routeParametrics } from './parametrics'
 import { RouteNode } from './schema'
@@ -44,6 +45,13 @@ export const routeDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = RouteNode.parse({})
     return { ...rest, name: 'Yaya Yolu' }
+  },
+
+  tree: {
+    // İki fiş, iki rol. Sabit ad ("Yaya Yolu") araç koridoruna da yapışıyordu.
+    label: treeLabel<RouteNode>((node) =>
+      node.role === 'vehicle' ? 'Araç Koridoru' : 'Yaya Yolu',
+    ),
   },
 
   capabilities: {

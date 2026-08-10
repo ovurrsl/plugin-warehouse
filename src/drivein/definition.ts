@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildDriveInFloorplan } from './floorplan'
 import { frameTopY, lanePitch, totalDepth, totalWidth } from './lanes'
 import { snapToNeighbourSeam } from './magnet'
@@ -27,6 +28,14 @@ export const driveInRackDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = DriveInRackNode.parse({})
     return { ...rest, name: 'Drive-in Lane' }
+  },
+
+  tree: {
+    // İki fiş, iki giriş kipi: drive-in tek uçtan, drive-through iki uçtan
+    // yüklenir. Aynı ada düşmeleri hangisinin yerleştirildiğini gizliyordu.
+    label: treeLabel<DriveInRackNode>((node) =>
+      node.entryMode === 'drive-through' ? 'Drive-through Lane' : 'Drive-in Lane',
+    ),
   },
 
   capabilities: {

@@ -1,4 +1,6 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
+import { BENCH_VARIANTS } from './catalog'
 import { buildBenchFloorplan } from './floorplan'
 import { depthM, overallHeightM, widthM } from './metrics'
 import { benchParametrics } from './parametrics'
@@ -32,6 +34,12 @@ export const benchDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = BenchNode.parse({})
     return { ...rest, name: 'Bench' }
+  },
+
+  tree: {
+    // Altı fişin altı adı — katalogdaki etiketin birebir aynısı, ikinci bir
+    // ad listesi tutmamak için `BENCH_VARIANTS`'tan okunuyor.
+    label: treeLabel<BenchNode>((node) => BENCH_VARIANTS[node.variant].label),
   },
 
   capabilities: {

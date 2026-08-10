@@ -1,8 +1,9 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { unitLoadHeightOf } from './cargo-types'
 import { buildPalletFloorplan } from './floorplan'
 import { palletParametrics } from './parametrics'
-import { specOf } from './presets'
+import { PALLET_PRESETS, specOf } from './presets'
 import { PalletNode } from './schema'
 
 /** Every 45°, the full turn. Written out rather than derived: a mirrored-and-
@@ -42,6 +43,15 @@ export const palletDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = PalletNode.parse({})
     return { ...rest, name: 'Pallet' }
+  },
+
+  tree: {
+    // Standart adı, artı yüklüyse yükü. Boş palet ile yüklü palet katalogda
+    // iki ayrı fiş; ağaçta da ayrı okunmaları gerekiyor.
+    label: treeLabel<PalletNode>((node) => {
+      const preset = PALLET_PRESETS[node.preset].label
+      return node.cargo === 'none' ? preset : `${preset} · ${node.cargo}`
+    }),
   },
 
   capabilities: {

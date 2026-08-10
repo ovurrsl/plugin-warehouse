@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildPalletRackFloorplan } from './floorplan'
 import { snapToNeighbourSeam } from './magnet'
 import { palletRackParametrics } from './parametrics'
@@ -50,6 +51,14 @@ export const palletRackDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = PalletRackNode.parse({})
     return { ...rest, name: 'Pallet Rack' }
+  },
+
+  tree: {
+    // Katalogdaki iki fişin adları birebir. Kullanıcının bildirdiği "ikisi de
+    // aynı isimde görünüyor" hatasının bu kind'daki karşılığı.
+    label: treeLabel<PalletRackNode>((node) =>
+      node.variant === 'low-rack' ? 'Low Rack' : 'Pallet Rack',
+    ),
   },
 
   capabilities: {

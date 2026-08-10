@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildMezzanineFloorplan } from './floorplan'
 import { footprintDepthM, footprintWidthM, totalHeightM } from './metrics'
 import { mezzanineParametrics } from './parametrics'
@@ -24,6 +25,15 @@ export const mezzanineDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = MezzanineNode.parse({})
     return { ...rest, name: 'Mezzanine' }
+  },
+
+  tree: {
+    // Üç yapısal sistem üç ayrı fiş. Kat sayısı da adda: asma katın tek
+    // katlı mı çift katlı mı olduğu ağaçta ilk sorulan şey.
+    label: treeLabel<MezzanineNode>(
+      (node) =>
+        `${node.constructiveSystem} Mezzanine · ${node.tiers.length} tier${node.tiers.length === 1 ? '' : 's'}`,
+    ),
   },
 
   capabilities: {

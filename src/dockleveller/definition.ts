@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildDockLevellerFloorplan } from './floorplan'
 import { aboveFloorHeightM, platformLengthM, widthM } from './metrics'
 import { dockLevellerParametrics } from './parametrics'
@@ -35,6 +36,15 @@ export const dockLevellerDefinition = {
   defaults: () => {
     const { id: _id, type: _type, ...rest } = DockLevellerNode.parse({})
     return { ...rest, name: 'Dock leveller' }
+  },
+
+  tree: {
+    // Dudak türü ile platform boyu: iki fişi ayıran şey bu ikisi, ve ikisi de
+    // sipariş edilen ürünün parçası.
+    label: treeLabel<DockLevellerNode>(
+      (node) =>
+        `${node.lip === 'telescopic' ? 'Telescopic' : 'Hinged'} Dock Leveller · ${node.length} mm`,
+    ),
   },
 
   capabilities: {

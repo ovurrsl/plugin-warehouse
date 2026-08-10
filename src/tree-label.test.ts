@@ -1,0 +1,129 @@
+import { describe, expect, test } from 'bun:test'
+import { CATALOG_ITEMS } from './catalog'
+import { warehousePlugin } from './index'
+
+/**
+ * BEKÇİ: aynı kindʼı kuran iki fiş, sahne ağacında iki AYRI ad üretmeli.
+ *
+ * Kullanıcının bildirdiği hatanın ikinci yarısı bu — "plugin içinde lower rack
+ * seçtiğimde pallet rackı da seçiyor bu diğer bazı nesnelerde de var". Fişler
+ * ayrı, yerleştirilen düğümler ayrı, ama ağaçtaki satır aynı: on iki kindʼın on
+ * ikisi de `defaults()` içinde TEK bir sabit ad yazıyordu ve altı tezgâh fişi
+ * de "Bench" üretiyordu.
+ *
+ * Test fişleri gerçekten UYGULUYOR: her fişin fırçasını kendi kindʼinin
+ * şemasına verip düğümü kuruyor, sonra `def.tree.label`'ı çağırıyor. Yani
+ * ölçtüğü şey "etiket fonksiyonu var mı" değil, "iki fişten iki farklı ad
+ * çıkıyor mu".
+ */
+
+type Definition = {
+  kind: string
+  schema: { parse: (value: unknown) => unknown }
+  tree?: { label?: (node: unknown, nodes: unknown) => string }
+}
+
+const DEFINITIONS = new Map<string, Definition>(
+  (warehousePlugin.nodes ?? []).map((node) => [node.kind, node as unknown as Definition]),
+)
+
+/**
+ * Fişi bir düğüme çeviriyor.
+ *
+ * Fırça anahtarları HER ZAMAN şema alanı değil, ve bu testi yazarken ortaya
+ * çıktı: `m3` ile `longspan` fişlerinde `structure` / `shelfKind` /
+ * `levelCount` düğümün kendi alanları değil, aracın KATLARA açtığı şablon
+ * anahtarları (`m3/tool.tsx`, `ghostNode`). Bunları düz `schema.parse`'a
+ * vermek sessizce hiçbir şey yapmıyordu — iki m3 fişi de aynı düğümü
+ * üretiyor, dolayısıyla test etiket hatası olmadığı hâlde aynı adı görüyordu.
+ *
+ * Kural genel tutuldu, iki kindʼa özel kılınmadı: şemada karşılığı olmayan
+ * anahtar KATLARA uygulanır. Üçüncü bir kind aynı şekli alırsa kendiliğinden
+ * çalışır; hiçbir yere uygulanamayan bir anahtar kalırsa test onu söyler.
+ */
+function chipNode(def: Definition, item: (typeof CATALOG_ITEMS)[number]): unknown {
+  const brush = item.brush
+  if (!brush) return def.schema.parse({})
+  const shape = ('patch' in brush ? brush.patch : brush) as Record<string, unknown>
+  const { kind: _kind, ...fields } = shape
+
+  const schemaKeys = new Set(Object.keys((def.schema as { shape?: object }).shape ?? {}))
+  const own: Record<string, unknown> = {}
+  const forLevels: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(fields)) {
+    if (schemaKeys.has(key)) own[key] = value
+    else forLevels[key] = value
+  }
+
+  const node = def.schema.parse(own) as Record<string, unknown>
+  const { levelCount, ...levelFields } = forLevels
+  if (Object.keys(forLevels).length === 0) return node
+  if (!Array.isArray(node.levels)) {
+    throw new Error(
+      `${item.id}: şemada olmayan ${Object.keys(forLevels).join(', ')} anahtarı var ama düğümün katı yok`,
+    )
+  }
+
+  const levels = node.levels as Record<string, unknown>[]
+  const count = typeof levelCount === 'number' ? levelCount : levels.length
+  return def.schema.parse({
+    ...own,
+    levels: Array.from({ length: count }, (_, index) => ({
+      ...levels[index % levels.length],
+      ...levelFields,
+    })),
+  })
+}
+
+const byKind = new Map<string, typeof CATALOG_ITEMS>()
+for (const item of CATALOG_ITEMS) {
+  byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item])
+}
+const families = [...byKind].filter(([, items]) => items.length > 1)
+
+describe('çok fişli her ailenin ağaç adı fişe göre ayrışıyor', () => {
+  test.each(families)('%s', (kind, items) => {
+    const def = DEFINITIONS.get(kind)
+    expect({ kind, registered: def !== undefined }).toEqual({ kind, registered: true })
+
+    const label = def?.tree?.label
+    // `presentation.label`'a düşmek demek kind başına TEK ad demek: yirmi rafın
+    // yirmi satırı birebir aynı okunur.
+    expect({ kind, hasLabel: typeof label === 'function' }).toEqual({ kind, hasLabel: true })
+    if (typeof label !== 'function') return
+
+    const labels = items.map((item) => {
+      const node = def ? chipNode(def, item) : undefined
+      return { chip: item.id, label: label(node, {}) }
+    })
+
+    // Asıl iddia. Aynı ada düşen iki fiş, kullanıcının gördüğü hatanın kendisi.
+    const seen = new Map<string, string>()
+    const collisions: string[] = []
+    for (const entry of labels) {
+      const previous = seen.get(entry.label)
+      if (previous) collisions.push(`${previous} ↔ ${entry.chip}: "${entry.label}"`)
+      else seen.set(entry.label, entry.chip)
+    }
+    expect(collisions).toEqual([])
+  })
+})
+
+describe('kullanıcının verdiği ad her zaman kazanır', () => {
+  /**
+   * Türetilen ad bir VARSAYILAN, bir dayatma değil. Host'un yedek zinciri
+   * `tree.label(...) || node.name || presentation.label` olduğu için etiket
+   * fonksiyonu adı okumazsa kullanıcının yeniden adlandırması sessizce yok
+   * sayılırdı — ve yeniden adlandırma sahne ağacının en sık kullanılan işi.
+   */
+  const withLabel = [...DEFINITIONS.values()].filter((def) => typeof def.tree?.label === 'function')
+
+  test('en az bir kind ağaç adı bildiriyor', () => {
+    expect(withLabel.length).toBeGreaterThan(0)
+  })
+
+  test.each(withLabel.map((def) => [def.kind, def] as const))('%s', (_kind, def) => {
+    const node = def.schema.parse({ name: 'Depo girişi' })
+    expect(def.tree?.label?.(node, {})).toBe('Depo girişi')
+  })
+})

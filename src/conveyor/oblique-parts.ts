@@ -2,6 +2,7 @@ import {
   FOOTPLATE_OVERHANG_M,
   FOOTPLATE_THICKNESS_M,
   LEG_SECTION_M,
+  OBLIQUE_DIVERTER_PROUD_M,
   ROLLER_DIAMETER_M,
   SIDE_PROFILE_DEPTH_M,
   SIDE_PROFILE_THICKNESS_M,
@@ -120,13 +121,23 @@ export function obliqueParts(
   // Short rollers at the branch angle, sitting on the main line between the
   // divergence and the end. What actually does the diverting, and what a fitter
   // recognises the machine by.
+  //
+  // Saptırıcı ana yatağın ÜSTÜNDE duruyor (`OBLIQUE_DIVERTER_PROUD_M`).
+  // Önceki hâl onu Y'de %10 inceltip yatakla aynı merkeze koyuyordu, yani
+  // parça yatağın diliminin tamamen içinde kalıyor ve hiçbir açıdan
+  // görünmüyordu. İnceltme yanlış eksendeydi: bir parçayı komşusundan
+  // ayırmanın yolu onu kısaltmak değil, yükseltmek.
   const triangleLength = length / 2 - diverge
   if (triangleLength > 0) {
     parts.push(
       box(
         'diverter',
-        [diverge + triangleLength / 2, top - ROLLER_DIAMETER_M / 2, (side * mainLane) / 6],
-        [triangleLength * 0.9, ROLLER_DIAMETER_M * 0.9, mainLane * 0.6],
+        [
+          diverge + triangleLength / 2,
+          top + OBLIQUE_DIVERTER_PROUD_M - ROLLER_DIAMETER_M / 2,
+          (side * mainLane) / 6,
+        ],
+        [triangleLength * 0.9, ROLLER_DIAMETER_M, mainLane * 0.6],
         heading,
         'rollers',
       ),

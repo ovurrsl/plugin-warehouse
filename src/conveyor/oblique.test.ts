@@ -21,6 +21,7 @@ import {
   divergeXM,
   footprintCentreZM,
   footprintM,
+  localBoundsM,
   mainLaneMm,
   mainWidthM,
   moduleLengthM,
@@ -308,6 +309,48 @@ describe('the mesh', () => {
       expect(diverters).toHaveLength(1)
       expect(diverters[0]?.rotationY).not.toBe(0)
       expect(diverters[0]?.pattern).toBe('rollers')
+    }
+  })
+
+  test('the merge triangle stands PROUD of the bed — it is not buried in it', () => {
+    /**
+     * Saptırıcı ana yatakla aynı merkezde ve Y'de %10 ince basılıyordu:
+     * y ∈ [0,7025 , 0,7475], yatak y ∈ [0,7000 , 0,7500]. Yani parça yatağın
+     * diliminin tamamen içindeydi ve plan izdüşümünün %100'ü ya ana yatağın ya
+     * dal yatağının altında kalıyordu — `diverterColor` hiçbir pikselde
+     * görünmüyor, şemanın "the part a fitter recognises the machine by" dediği
+     * parça düz gri bir Y olarak çiziliyordu ve renk seçicisi ölü bir kontroldü.
+     *
+     * Kusurun ekranda bir belirtisi yok: eksik olan şey zaten görünmeyen bir
+     * şey. Ölçülmesi gereken tek şey, saptırıcının üst yüzünün yatağın üst
+     * yüzünün ÜSTÜNDE olması.
+     */
+    for (const angle of ['30', '45'] as const) {
+      const node = oblique({ angle })
+      const parts = obliqueParts(node, 'full')
+      const diverter = parts.find((part) => part.role === 'diverter')
+      const decks = parts.filter((part) => part.role === 'deck')
+      if (!diverter) throw new Error('saptırıcı bekleniyordu')
+      expect(decks.length).toBeGreaterThan(0)
+      const diverterTop = diverter.center[1] + diverter.size[1] / 2
+      for (const deck of decks) {
+        expect(diverterTop, `${angle}°`).toBeGreaterThan(deck.center[1] + deck.size[1] / 2 + 1e-9)
+      }
+    }
+  })
+
+  test('the proud triangle is inside the DECLARED envelope', () => {
+    // Görünür kılmanın kolay yolu yükseltmekti; zarf taşıma kotunda bitseydi
+    // saptırıcı çarpışma kutusunun dışında kalırdı — bu ailede tekrar tekrar
+    // çıkan "çizilen ile bildirilen aynı değil" hatası.
+    for (const angle of ['30', '45'] as const) {
+      const node = oblique({ angle })
+      const bounds = localBoundsM(node)
+      for (const part of obliqueParts(node, 'full')) {
+        expect(part.center[1] + part.size[1] / 2, `${angle}° ${part.role}`).toBeLessThanOrEqual(
+          bounds.max[1] + 1e-9,
+        )
+      }
     }
   })
 })

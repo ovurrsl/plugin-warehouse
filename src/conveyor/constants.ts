@@ -145,6 +145,25 @@ export const MTR_STRIP_WIDTH_M = mm(40)
 export const MTR_ROLLERS_PER_GAP = 2
 
 /**
+ * **Oblique'in saptırma makaralarının ana yataktan yüksekliği.**
+ *
+ * SEÇİLMİŞ VARSAYILAN — katalog bir kot farkı yayınlamıyor. Ama sıfır olamaz:
+ * saptırıcı, kutuyu ana hattan alıp dala çevirmek için onun ALTINA girmek
+ * zorunda, yani makara sırası ana hattın makara sırasından yüksek durur.
+ *
+ * Kodda sıfırdı ve parça ana yatağın diliminin tamamen İÇİNDE kalıyordu:
+ * `diverter` y ∈ [0,7025 , 0,7475], yatak y ∈ [0,7000 , 0,7500]. Üstten
+ * bakışta plan izdüşümünün tamamı yatağın altında, yani `diverterColor`
+ * hiçbir pikselde görünmüyor — makine düz gri bir Y olarak çiziliyordu ve
+ * şemanın "the part a fitter recognises the machine by" dediği parça,
+ * kendine ayrılmış renk alanıyla birlikte, ölü bir kontroldü.
+ *
+ * `MTR_STRIP_STROKE_M` ile aynı büyüklük sınıfı ve aynı gerekçe: bir
+ * yüzeyin öbürünün üstünde olduğunu göstermenin en ucuz yolu.
+ */
+export const OBLIQUE_DIVERTER_PROUD_M = mm(8)
+
+/**
  * **How far a launcher's lateral bed reaches past the main line.**
  *
  * Not published. Read off the render, where the stub is about one box deep —

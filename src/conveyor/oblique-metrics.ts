@@ -1,6 +1,7 @@
 import { OBQ } from './catalog'
 import {
   MIN_ROLLERS_UNDER_A_BOX,
+  OBLIQUE_DIVERTER_PROUD_M,
   OBLIQUE_FRAME_OVERHANG_M,
   ROLLER_DIAMETER_M,
   SIDE_PROFILE_DEPTH_M,
@@ -246,8 +247,15 @@ export function footprintCentreZM(oblique: ConveyorObliqueNode): number {
   return (Math.max(...zs) + Math.min(...zs)) / 2
 }
 
-/** The volume the module occupies, floor to roller top: legs included, because
- *  what fits under a rack's tunnel has to fit with them. */
+/**
+ * The volume the module occupies, floor to the highest steel: legs included,
+ * because what fits under a rack's tunnel has to fit with them.
+ *
+ * En yüksek nokta taşıma kotu DEĞİL: saptırma makaraları ana yatağın
+ * `OBLIQUE_DIVERTER_PROUD_M` kadar üstünde duruyor ve kutuyu oradan alıyorlar.
+ * Zarfı taşıma kotunda bitirmek, çizilen ama bildirilmeyen bir parça
+ * bırakırdı — bu ailede tekrar tekrar çıkan hata.
+ */
 export function localBoundsM(oblique: ConveyorObliqueNode): {
   min: [number, number, number]
   max: [number, number, number]
@@ -256,6 +264,6 @@ export function localBoundsM(oblique: ConveyorObliqueNode): {
   const centreZ = footprintCentreZM(oblique)
   return {
     min: [-width / 2, 0, centreZ - depth / 2],
-    max: [width / 2, oblique.transportHeight, centreZ + depth / 2],
+    max: [width / 2, oblique.transportHeight + OBLIQUE_DIVERTER_PROUD_M, centreZ + depth / 2],
   }
 }

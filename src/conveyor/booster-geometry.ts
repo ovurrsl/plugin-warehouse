@@ -13,6 +13,7 @@ import {
 import { boosterParts } from './booster-parts'
 import type { ConveyorBoosterNode } from './booster-schema'
 import {
+  beltStripeSpan,
   emitPart,
   finish,
   getCachedGeometry,
@@ -41,8 +42,9 @@ function buildFrom(
   const rollerColor = toLinear(booster.rollerColor)
   const profileColor = toLinear(booster.profileColor)
   // One tile per roller pitch, so the painted rollers land where real ones would
-  // however long the bed is.
-  const stripeSpan = moduleLengthM(booster) / rollerPitchM(booster)
+  // however long the bed is. Ters akışta NEGATİF — bandın akış yönü V'nin
+  // işaretinde taşınıyor, bkz. `beltStripeSpan`.
+  const stripeSpan = beltStripeSpan(booster, moduleLengthM(booster) / rollerPitchM(booster))
 
   for (const part of boosterParts(booster, detail, hasDownstreamNeighbour)) {
     const color =
@@ -83,6 +85,10 @@ function buildBoosterGeometryKey(
   return [
     detail,
     hasDownstreamNeighbour ? `U${outletPort(booster)}` : 'UD',
+    // Akış yönü KOŞULSUZ: ters akışta yatağın V'si negatif dokunuyor
+    // (`beltStripeSpan`), yani mesh gerçekten farklı ve iki yön tek buffer'ı
+    // paylaşamaz — paylaşsalardı bandın biri ters yöne akardı.
+    booster.flow === 'reverse' ? 'r' : 'f',
     usefulWidthMm(booster),
     frameWidthM(booster).toFixed(5),
     moduleLengthM(booster).toFixed(5),

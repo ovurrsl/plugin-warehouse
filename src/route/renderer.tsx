@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
 import { useAppearance } from '../appearance'
 import { useAdmitted } from '../instancing/admission'
+import { useStaticTransform } from '../static-transform'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
 import { getRouteMaterials } from './materials'
@@ -56,7 +57,24 @@ function RouteBody({ node }: { node: RouteNode }) {
   // The live position during a drag; the committed one otherwise.
   const live = useLiveTransforms((s) => s.get(node.id))
   const position = live?.position ?? node.position
-  const rotation = live?.rotation ?? node.rotation
+  /**
+   * Kanonik türetim (`longspan/renderer.tsx`) — ve bir hatayı kapatıyor.
+   *
+   * `live.rotation` bir SAYI (yaw), `node.rotation` bir üçlü. Burada
+   * `live?.rotation ?? node.rotation` yazılıydı, yani sürükleme boyunca
+   * `rotation` prop'una çıplak bir sayı gidiyordu. R3F sayıyı `Euler.set(y)`
+   * olarak uyguluyor (`applyProps`: hedefte `setScalar` yoksa `target.set(value)`),
+   * `Euler` de kalan iki bileşeni `undefined` bırakıyor — matris NaN doluyor ve
+   * boya bırakılana kadar EKRANDAN KAYBOLUYOR. Canlı kanal yalnız Y'yi taşır;
+   * X ve Z düğümden gelir.
+   */
+  const rotation: [number, number, number] = live
+    ? [node.rotation[0], live.rotation, node.rotation[2]]
+    : node.rotation
+
+  // Sürüklenmeyen boya, three'nin kare başına matris hesabından çıkar; canlı
+  // kanal yazarken bayrak three'ye geri verilir (`../static-transform`).
+  useStaticTransform(registeredRef, position, rotation, live !== undefined)
 
   const geometry = useMemo(() => getRouteGeometry(node), [node])
   const appearance = useAppearance()

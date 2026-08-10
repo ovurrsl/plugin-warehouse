@@ -11,7 +11,16 @@
  */
 
 import type { ConveyorDetail } from './parts'
-import { beltWidthM, boomSections, frameWidthM, telescopicModelOf } from './telescopic-metrics'
+import {
+  beltWidthM,
+  boomSections,
+  frameWidthM,
+  LAMP_HOUSING_SIZE_M,
+  LAMP_POST_SIZE_M,
+  noseLamp,
+  telescopicModelOf,
+  transportHeightM,
+} from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
 export type TelescopicPartRole =
@@ -48,7 +57,7 @@ export function telescopicBaseParts(
   const model = telescopicModelOf(node.model)
   const a = model.fixedM
   const halfA = a / 2
-  const topY = model.heightM
+  const topY = transportHeightM(node)
   const frame = frameWidthM(node)
   const belt = beltWidthM(node)
   const parts: TelescopicPart[] = []
@@ -135,7 +144,7 @@ export function telescopicSectionParts(
   const sections = boomSections({ ...node, extension: 0 })
   const section = sections[sectionIndex - 1]
   if (!section) return []
-  const topY = model.heightM - section.dropM
+  const topY = transportHeightM(node) - section.dropM
   const width = section.widthM
   const length = section.lengthM
   const parts: TelescopicPart[] = []
@@ -199,19 +208,13 @@ export function telescopicSectionParts(
       center: [noseX - 0.3, topY + 0.36, width / 2 + 0.06],
       size: [0.08, 0.06, 0.08],
     })
-    // Çalışma lambası: gövde + mercek. Mercek kendi materyalini alır
-    // (yayıcı) — makinenin karanlık dorse içini aydınlatan parçası. Ön
-    // aydınlatması hazard bandının içerisinde, konsol tarafında.
-    parts.push({
-      role: 'frame',
-      center: [noseX - 0.16, topY + 0.42, width / 2 - 0.08],
-      size: [0.05, 0.3, 0.05],
-    })
-    parts.push({
-      role: 'lamp-housing',
-      center: [noseX - 0.16, topY + 0.58, width / 2 - 0.08],
-      size: [0.14, 0.12, 0.14],
-    })
+    // Çalışma lambası: direk + gövde burada, MERCEK renderer'da (yayıcı
+    // materyal ister ve bu geometri tek materyalden çiziliyor). Üçünün de
+    // yeri `noseLamp`'ten — iki dosyada iki formül oldukları sürece
+    // ayrışıyorlardı, ve ayrışmışlardı.
+    const lamp = noseLamp(node, section)
+    parts.push({ role: 'frame', center: lamp.post, size: LAMP_POST_SIZE_M })
+    parts.push({ role: 'lamp-housing', center: lamp.housing, size: LAMP_HOUSING_SIZE_M })
     // Burun ikaz bandı — çarpma riski en yüksek nokta.
     parts.push({
       role: 'hazard',

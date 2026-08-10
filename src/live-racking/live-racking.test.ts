@@ -2,19 +2,23 @@ import { describe, expect, test } from 'bun:test'
 import type { GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS } from '../catalog'
 import { boxesOverlap, occupiedVolumes, toWorldBox } from '../clash'
+import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
 import { resetStatsIndex, sceneStats } from '../stats'
 import {
   BAY_SIDE_CLEARANCE_M,
+  CHANNEL_PROFILE_HEIGHT_M,
+  CHANNEL_PROFILE_WIDTH_M,
   CLEARANCE_TABLE,
   DEFAULT_GRADIENT,
+  DYNAMIC_BEAM_HEIGHT_M,
   MAX_PALLETS_DEEP,
   ROLLER_OVER_PALLET_M,
   ROLLER_PITCH_STEP_M,
 } from './catalog'
 import { liveRackingDefinition } from './definition'
 import { buildLiveRackingFloorplan } from './floorplan'
-import { liveRackingGeometryKey } from './geometry'
+import { getLiveRackingGeometry, liveRackingGeometryKey } from './geometry'
 import {
   assignedSkuCount,
   bayWidthM,
@@ -364,23 +368,86 @@ describe('katalog doğrulamaları — Faz 2', () => {
 })
 
 describe('geometri anahtarı', () => {
-  test('şekli değiştiren her girdi anahtarda', () => {
-    const base = node()
-    for (const patch of [
-      { palletsDeep: 9 },
-      { levels: 5 },
-      { gradient: 0.05 },
-      { rollerPitch: 0.15 },
-      { palletPreset: 'euro-1200x1200' },
-      { withRetainers: true },
-      { variant: 'LIFO' },
-      { splitRollers: true },
-      { hingedChannels: true },
-      { uprightColor: '#ff0000' },
-    ]) {
-      expect(liveRackingGeometryKey(node(patch), 'full'), JSON.stringify(patch)).not.toBe(
-        liveRackingGeometryKey(base, 'full'),
-      )
+  /**
+   * İki yönlü kapsama — rafın tablosunun canlı raf hâli, ve HER İKİ katmanda
+   * ayrı ayrı.
+   *
+   * İkinci katmanın kendi turu olmasının sebebi ölçülmüş bir eksik rapordu:
+   * akış donanımının tamamı (makara hattı, bölünmüş makara, tutucu) yalnız
+   * yakın katmanda üretiliyor, ama anahtar bu alanları katmandan bağımsız
+   * yazıyordu — uzaktaki iki kanal birebir aynı şeridi çiziyor, iki ayrı
+   * buffer tutuyordu. Yalnız `'full'` üzerinden koşan bir tablo bunu göremez,
+   * çünkü orada üç alan da gerçekten mesh'i değiştiriyor.
+   */
+  const buildFresh = (target: LiveRackingNode, detail: 'full' | 'simple'): Float32Array => {
+    clearConveyorGeometryCache()
+    const geometry = getLiveRackingGeometry(target, detail)
+    // Konum VE renk: boya tek bir vertex kımıldatmıyor ama mesh'i
+    // değiştiriyor — renkler vertex attribute'unda.
+    const buffers = (['position', 'color'] as const).map(
+      (name) => geometry.getAttribute(name).array as ArrayLike<number>,
+    )
+    const combined = new Float32Array(buffers.reduce((total, part) => total + part.length, 0))
+    let offset = 0
+    for (const part of buffers) {
+      combined.set(Float32Array.from(part), offset)
+      offset += part.length
+    }
+    return combined
+  }
+
+  const sameMesh = (a: Float32Array, b: Float32Array) =>
+    a.length === b.length && a.every((value, index) => value === b[index])
+
+  /**
+   * `[etiket, taban yaması, değişken yaması]`.
+   *
+   * Hangi satırın hangi yöne düştüğü tabloda YAZILI DEĞİL, ölçülüyor: aynı
+   * satır `'full'`de mesh'i değiştirip `'simple'`da değiştirmeyebilir ve
+   * anahtarın da tam olarak öyle davranması gerekiyor.
+   */
+  const CASES: Array<[string, Record<string, unknown>, Record<string, unknown>]> = [
+    ['variant', {}, { variant: 'LIFO' }],
+    ['palletPreset', {}, { palletPreset: 'euro-1200x1200' }],
+    ['palletsDeep', {}, { palletsDeep: 9 }],
+    ['levels', {}, { levels: 5 }],
+    ['firstLevelClear', {}, { firstLevelClear: 1.9 }],
+    // Zemin seviyesi transpalet katı `firstLevelClear`i HİÇ okumuyor.
+    ['firstLevelClear (zemin katı)', { floorSetPalletTruckLevel: true }, { firstLevelClear: 1.9 }],
+    ['levelClear', {}, { levelClear: 1.9 }],
+    // Tek katlı kanalda "katlar arası" diye bir şey yok.
+    ['levelClear (tek kat)', { levels: 1 }, { levelClear: 1.9 }],
+    ['gradient', {}, { gradient: 0.05 }],
+    ['rollerPitch', {}, { rollerPitch: 0.15 }],
+    ['withRetainers', {}, { withRetainers: true }],
+    ['splitRollers', {}, { splitRollers: true }],
+    ['intermediateRetainers (derin)', { palletsDeep: 18 }, { intermediateRetainers: true }],
+    ['intermediateRetainers (eşiğin altında)', { palletsDeep: 8 }, { intermediateRetainers: true }],
+    ['hingedChannels', {}, { hingedChannels: true }],
+    ['floorSetPalletTruckLevel', {}, { floorSetPalletTruckLevel: true }],
+    ['cladRack', {}, { cladRack: true }],
+    ['uprightColor', {}, { uprightColor: '#00ff00' }],
+    ['beamColor', {}, { beamColor: '#ff00ff' }],
+    // Tek bir vertex bile kımıldatmayanlar: kimlik, yerleşim ve kapasite
+    // metadata'sı. Negatif yarı boş bırakılırsa test yalnız "anahtar yeterince
+    // büyük mü" diye sorar, ve onu geçmenin en ucuz yolu her alanı yazmaktır.
+    ['skus', {}, { skus: ['SKU-1'] }],
+    ['name', {}, { name: 'Kanal 3' }],
+    ['position', {}, { position: [12, 0, 4] }],
+    ['rotation', {}, { rotation: [0, Math.PI / 2, 0] }],
+    ['supportSlabId', {}, { supportSlabId: 'slab_abcdefgh' }],
+  ]
+
+  test('her katmanda: mesh’i değiştiren her girdi anahtarı da değiştirir, değiştirmeyen değiştirmez', () => {
+    for (const detail of ['full', 'simple'] as const) {
+      for (const [label, basePatch, variantPatch] of CASES) {
+        const base = node(basePatch)
+        const variant = node({ ...basePatch, ...variantPatch })
+        const changesMesh = !sameMesh(buildFresh(base, detail), buildFresh(variant, detail))
+        const changesKey =
+          liveRackingGeometryKey(variant, detail) !== liveRackingGeometryKey(base, detail)
+        expect({ detail, label, changesKey }).toEqual({ detail, label, changesKey: changesMesh })
+      }
     }
   })
 
@@ -496,6 +563,17 @@ describe('tanım ve manifest', () => {
     expect(CATALOG_ITEMS.filter((i) => i.kind === 'warehouse:live-rack')).toHaveLength(2)
   })
 
+  test('bake politikası replace, ve yerine geçecek çizici bildirilmiş', () => {
+    /**
+     * İkisi ayrı düşerse hata görünmez ve sonuç boş bir sahnedir: `replace`
+     * host'a baked mesh'i GİZLETİYOR, yerine koyacak çiziciyi ise ikinci alan
+     * veriyor. Politika var, çizici yoksa kanallar baked görünümde tümden
+     * kaybolur — konsolda tek satır uyarı olmadan.
+     */
+    expect(liveRackingDefinition.bake).toBe('replace')
+    expect(liveRackingDefinition.bakeReplaceRenderer?.module).toBeDefined()
+  })
+
   test('taban izi türetilmiş ölçüleri okur', () => {
     const resolver = liveRackingDefinition.capabilities.floorPlaced?.footprint
     if (!resolver) throw new Error('footprint yok')
@@ -523,5 +601,97 @@ describe('tanım ve manifest', () => {
       if (BASE.includes(key)) continue
       expect(covered.has(key) || HIDDEN.includes(key), `${key} erişilemez`).toBe(true)
     }
+  })
+})
+
+/**
+ * DENETİMİN BULDUĞU DÖRT KUSUR — hiçbiri ekranda hata üretmiyordu.
+ */
+describe('kanal, kafes ve fren gerçekten çizildikleri yerde', () => {
+  const node = (overrides: Record<string, unknown> = {}) =>
+    LiveRackingNode.parse({ id: 'live-racking_g', ...overrides })
+
+  test('ilk katın altındaki açıklık TAM `firstLevelClear`', () => {
+    /**
+     * `levelExitYM` makara ÜST kotunu döndürüyor; kanalın kendi yapısı
+     * (kiriş + profil = 220 mm) o kotun ALTINDA. Zemin-transpalet dalı bunu
+     * doğru kuruyordu, öteki dal `structure`'ı eklemiyordu: kullanıcı 1,5 m
+     * girdiğinde çizilen açıklık 1,28 m oluyordu.
+     *
+     * Asıl sessizlik panelde: aynı alan katalogun H ≥ 400 mm kuralına karşı
+     * denetleniyor, yani 0,40 girildiğinde panel "uygun" der ve model 0,18 m
+     * çizerdi — sınırın yarısından az.
+     */
+    for (const firstLevelClear of [0.4, 1.0, 1.5, 2.2]) {
+      const lane = node({ firstLevelClear })
+      const structure = DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
+      expect(levelExitYM(lane, 0) - structure, `${firstLevelClear} m`).toBeCloseTo(
+        firstLevelClear,
+        9,
+      )
+    }
+    // Zemin-transpalet katında açıklık YOK ve olmaması kuralın ihlali değil.
+    const floorSet = node({ floorSetPalletTruckLevel: true })
+    expect(levelExitYM(floorSet, 0)).toBeCloseTo(
+      DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M,
+      9,
+    )
+  })
+
+  test('çerçeve çaprazı gerçekten ÇAPRAZ — yatay basamak değil', () => {
+    /**
+     * Rolün adı `diagonal` idi ama üretilen kutu sabit y'de X boyunca yatay
+     * bir çubuktu: uç çerçeveler kafes değil, düz basamaklı bir merdiven
+     * olarak okunuyordu. Paketin öteki üç raf kind'ı gerçek kafes kuruyor.
+     */
+    const diagonals = liveRackingParts(node(), 'full').filter((part) => part.role === 'diagonal')
+    expect(diagonals.length).toBeGreaterThan(2)
+    const leaning = diagonals.filter((part) => (part.tiltX ?? 0) !== 0)
+    expect(leaning.length, 'hiçbir çapraz yatmıyor').toBeGreaterThan(0)
+    // Ve zikzak: ardışık çaprazlar zıt yöne yatıyor.
+    const signs = leaning.map((part) => Math.sign(part.tiltX ?? 0))
+    expect(new Set(signs).size, 'bütün çaprazlar aynı yöne yatıyor').toBe(2)
+  })
+
+  test('fren tamburu kanal profilinin DIŞINDA', () => {
+    /**
+     * Tamburun 35 mm'sinin 30 mm'si rayın içinde kalıyordu; dışarıda kalan
+     * 5 mm üstten görünüşte üçte bir piksel ediyor, yani 32 tamburun hiçbiri
+     * görünmüyordu. Dosyanın kendi yorumu tam tersini söylüyordu.
+     */
+    const lane = node()
+    const parts = liveRackingParts(lane, 'full')
+    const drums = parts.filter((part) => part.role === 'brake-drum')
+    expect(drums.length).toBeGreaterThan(0)
+    const profileOuter = rollerLengthM(lane) / 2 + CHANNEL_PROFILE_WIDTH_M / 2
+    for (const drum of drums) {
+      const inner = Math.abs(drum.center[0]) - drum.size[0] / 2
+      expect(inner, 'tambur profilin içinde').toBeGreaterThanOrEqual(profileOuter - 1e-9)
+    }
+  })
+
+  test('frenli makara sıradan makaranın İÇİNE girmiyor', () => {
+    /**
+     * Frenli makara bir makara POZİSYONUDUR, komşusunun içine sokulmuş ikinci
+     * bir silindir değil. Ham Z ofseti ızgaraya oturmadığı için varsayılan
+     * düğümde 40 çift çakışıyordu.
+     */
+    const parts = liveRackingParts(node(), 'full')
+    const rollers = parts.filter((part) => part.role === 'roller')
+    const brakes = parts.filter((part) => part.role === 'brake-roller')
+    expect(brakes.length).toBeGreaterThan(0)
+
+    let clashes = 0
+    for (const brake of brakes) {
+      for (const roller of rollers) {
+        const hit = ([0, 1, 2] as const).every(
+          (axis) =>
+            Math.abs(brake.center[axis] - roller.center[axis]) <
+            (brake.size[axis] + roller.size[axis]) / 2 - 1e-9,
+        )
+        if (hit) clashes += 1
+      }
+    }
+    expect(clashes, 'frenli makara komşusunun içinde').toBe(0)
   })
 })

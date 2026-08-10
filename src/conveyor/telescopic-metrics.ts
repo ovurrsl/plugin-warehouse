@@ -15,6 +15,18 @@ import {
 } from './telescopic-catalog'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
+/**
+ * Kuyruk ucunun bant kotu — kullanıcının ayarı, yoksa modelin katalog kotu.
+ *
+ * Makinenin bütün yüksekliği buradan türüyor (gövde kirişi, bacaklar, bom
+ * kademeleri, kolider, akış kutuları), yani tek okuma noktası olması şart:
+ * bir yer `model.heightM`'de kalırsa kot değiştiğinde o parça yerinde durur
+ * ve makine kendi içinde ayrışır.
+ */
+export function transportHeightM(node: ConveyorTelescopicNode): number {
+  return node.transportHeight ?? telescopicModelOf(node.model).heightM
+}
+
 export function telescopicModelOf(id: TelescopicModelId): TelescopicModel {
   return TELESCOPIC_MODELS[id]
 }
@@ -95,4 +107,93 @@ export function boomSections(node: ConveyorTelescopicNode): BoomSection[] {
     })
   }
   return sections
+}
+
+// ── Burun çalışma lambası ────────────────────────────────────────────────────
+
+/**
+ * Lambanın gövdesi ve merceği TEK aritmetikten çıkar.
+ *
+ * İkisi iki dosyada yaşamak zorunda: gövde birleştirilmiş geometride
+ * (`telescopic-parts.ts`, ailenin vertex-renkli tek materyali), mercek ise
+ * yayıcı materyaliyle kendi mesh'inde (`telescopic-renderer.tsx`) — çünkü
+ * makinenin tamamının çizildiği materyal yayıcı olsaydı bütün bom parlardı.
+ *
+ * Ayrı hesaplandıkları sürece ayrıştılar, ve ayrışmışlardı: gövde
+ * `+widthM/2 − 0.08`'de, mercek `−widthM/2 − 0.055`'te. Yani parlayan yüzey
+ * bomun ÖTEKİ yanında, boşlukta duruyordu. Hata sessizdi çünkü ekranda bir
+ * şey yanıyor — yalnız lambanın olmadığı yerde.
+ *
+ * Bölüm YEREL çerçevesinde döner (renderer bölümü `centerX`'e taşır); X'ten
+ * başka eksende öteleme olmadığı için Y ve Z doğrudan düğüm çerçevesindeki
+ * değerleridir.
+ */
+export const LAMP_HOUSING_SIZE_M = [0.14, 0.12, 0.14] as const
+
+/**
+ * Mercek gövdenin ÖN yüzünü kaplar — ince eksen X, çünkü lamba +X'e, yani
+ * dorsenin içine bakar. Eski hâli Z'de inceydi: yana bakan bir far.
+ */
+export const LAMP_LENS_SIZE_M = [0.02, 0.09, 0.11] as const
+
+/** Gövdenin burun ucundan geri çekilmesi, bant üstünden yükselişi ve yan
+ *  girintisi — SEÇİLMİŞ VARSAYILAN, katalog rakamı değil. */
+const LAMP_SETBACK_M = 0.16
+const LAMP_RISE_M = 0.58
+const LAMP_SIDE_INSET_M = 0.08
+/** Direğin gövdeye bağlandığı boy: gövde merkezinin bu kadar altında. */
+export const LAMP_POST_DROP_M = 0.16
+export const LAMP_POST_SIZE_M = [0.05, 0.3, 0.05] as const
+
+export type NoseLamp = {
+  /** Direk merkezi. */
+  post: readonly [number, number, number]
+  /** Gövde merkezi. */
+  housing: readonly [number, number, number]
+  /** Mercek merkezi — gövdenin +X yüzüne yapışık. */
+  lens: readonly [number, number, number]
+}
+
+/**
+ * Lambanın üç parçasının yeri.
+ *
+ * Uzamadan BAĞIMSIZ: okuduğu üç alan (`lengthM`, `widthM`, `dropM`) uzamayla
+ * değişmiyor, dolayısıyla parça listesinin dinlenme pozundaki bölümüyle
+ * renderer'ın anlık uzamış bölümü aynı sonucu veriyor. Test bunu kilitliyor —
+ * çünkü ayrışırsa mercek uzama sürüklendikçe gövdeden kayar.
+ */
+/**
+ * Işık hüzmesinin ölçüleri ve yönü — SEÇİLMİŞ VARSAYILAN, katalogda ışık
+ * konisi yayımlanmıyor.
+ *
+ * Koni geometrisi three'de +Y ekseninde doğuyor; tepesi origin'e çekildikten
+ * sonra gövdesi −Y'ye uzanıyor. `lampBeamRotationZ()` o −Y'yi ileri ve
+ * aşağı çeviriyor. Burada durmasının sebebi: işareti ters yazmak hüzmeyi
+ * makinenin İÇİNE ve yukarı gönderir, ve bu hiçbir hata vermez.
+ */
+export const LAMP_BEAM_LENGTH_M = 2.4
+export const LAMP_BEAM_MOUTH_RADIUS_M = 0.55
+export const LAMP_BEAM_TILT_RAD = (12 * Math.PI) / 180
+export const LAMP_BEAM_APEX_ALPHA = 0.3
+
+/** Hüzme mesh'inin Z dönüşü. */
+export function lampBeamRotationZ(): number {
+  return Math.PI / 2 - LAMP_BEAM_TILT_RAD
+}
+
+/** Dönüşten sonra hüzmenin gittiği yön — dinlenmedeki −Y'nin görüntüsü. */
+export function lampBeamDirection(): readonly [number, number] {
+  const theta = lampBeamRotationZ()
+  return [Math.sin(theta), -Math.cos(theta)]
+}
+
+export function noseLamp(node: ConveyorTelescopicNode, nose: BoomSection): NoseLamp {
+  const x = nose.lengthM / 2 - LAMP_SETBACK_M
+  const y = transportHeightM(node) - nose.dropM + LAMP_RISE_M
+  const z = nose.widthM / 2 - LAMP_SIDE_INSET_M
+  return {
+    post: [x, y - LAMP_POST_DROP_M, z],
+    housing: [x, y, z],
+    lens: [x + LAMP_HOUSING_SIZE_M[0] / 2 + LAMP_LENS_SIZE_M[0] / 2, y, z],
+  }
 }

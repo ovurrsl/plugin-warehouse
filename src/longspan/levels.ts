@@ -117,8 +117,11 @@ export function clearAbove(bay: LongspanNode, index: number): number {
 export function lowestSteelOffset(bay: LongspanNode, level: LongspanLevel): number {
   if (level.structure === 'reinforced-hm') return SHELF_KINDS.hm.thickness
   const beam = BEAM_PROFILES[bay.beamProfile]
-  if (level.structure === 'beam-only' || level.structure === 'hanging') return beam.height
-  return beam.height + SHELF_KINDS[level.shelfKind].thickness
+  // Panel artık kirişlerin ARASINA düşüyor ve üstü onlarla aynı düzlemde
+  // bitiyor, yani en alçak çelik her montajda kirişin kendi yüksekliği.
+  // Panel kalınlığını ayrıca eklemek, kirişi panel kadar aşağı iten eski
+  // yerleşimin kalıntısıydı.
+  return beam.height
 }
 
 // ── Beams and shelves ───────────────────────────────────────────────────────

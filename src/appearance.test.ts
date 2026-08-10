@@ -8,6 +8,7 @@ import {
   appearanceKey,
   previewMaterial,
   resetSurfaceMaterials,
+  selectAppearance,
   surfaceMaterial,
   surfaceMaterialCacheSize,
 } from './appearance'
@@ -141,6 +142,47 @@ describe('harmanlama ve derinlik alanları HER modda korunuyor', () => {
   })
 })
 
+describe('yayıcılık: lamba solid modda da yanar', () => {
+  /**
+   * `emissive` `physical` grubunda DEĞİL, ve bu bir tercih değil olgu:
+   * `MeshLambertMaterial` alanı taşıyor
+   * (`three/src/materials/MeshLambertMaterial.js:122,130`). Yanlış grupta
+   * olsaydı hata sessiz olurdu — kullanıcı Solid'e alır, teleskopiğin
+   * çalışma lambası sönerdi ve kimse bunu bir ayarın yan etkisi olarak
+   * okumazdı.
+   */
+  const LENS = {
+    family: 'lens-test',
+    color: '#fff6d8',
+    emissive: '#ffe9a8',
+    emissiveIntensity: 1.6,
+    roughness: 0.4,
+  }
+
+  test('rendered ve solid — ikisinde de yayıcı', () => {
+    resetSurfaceMaterials()
+    for (const appearance of [RENDERED, SOLID]) {
+      const material = surfaceMaterial(
+        { ...LENS, family: `lens-${appearanceKey(appearance)}` },
+        appearance,
+      ) as THREE.MeshStandardMaterial
+      expect({
+        mode: appearanceKey(appearance),
+        emissive: material.emissive?.getHexString(),
+        intensity: material.emissiveIntensity,
+      }).toEqual({ mode: appearanceKey(appearance), emissive: 'ffe9a8', intensity: 1.6 })
+    }
+  })
+
+  test('dokular kapalıyken söner — monokrom modun tek iddiası', () => {
+    resetSurfaceMaterials()
+    const material = surfaceMaterial(LENS, FLAT) as THREE.MeshLambertMaterial
+    // Siyah yayıcı = kapalı. Parlayan bir leke, "sahne tek renge indi"
+    // iddiasını bozan tam olarak o şey olurdu.
+    expect(material.emissive.getHex()).toBe(0x000000)
+  })
+})
+
 describe('materyal sayısı düğümle DEĞİL ayarla ölçekleniyor', () => {
   test('aynı aile ve aynı ayar bin kez sorulsa tek örnek', () => {
     resetSurfaceMaterials()
@@ -158,6 +200,38 @@ describe('materyal sayısı düğümle DEĞİL ayarla ölçekleniyor', () => {
     expect(ghost).not.toBe(real)
     expect(ghost.transparent).toBe(true)
     expect(real.transparent).toBe(false)
+  })
+})
+
+describe('seçicinin kimliği durum değişmedikçe SABİT', () => {
+  /**
+   * Bu, tek aboneliğe geçmenin ödediği bedel — ve ödenmezse hata sessiz
+   * değil, ölümcül: zustand `useSyncExternalStore` üstünde duruyor ve durum
+   * değişmediği hâlde her çağrıda yeni nesne döndüren bir seçici React'e
+   * "değişti" dedirtir, ekran sonsuz render döngüsüne girer.
+   */
+  const state = { colorPreset: 'clay', shading: 'rendered', textures: true } as const
+
+  test('aynı durumun iki okuması AYNI nesneyi verir', () => {
+    const first = selectAppearance(state)
+    // Store durumu her yazımda yeni nesne; okunan üç alan aynı kaldıysa
+    // sonuç yine de aynı referans olmalı.
+    expect(selectAppearance({ ...state })).toBe(first)
+  })
+
+  test('bir alan değişince YENİ nesne verir', () => {
+    const rendered = selectAppearance(state)
+    const solid = selectAppearance({ ...state, shading: 'solid' })
+    expect(solid).not.toBe(rendered)
+    expect(solid.shading).toBe('solid')
+    // Eski nesne yerinde değiştirilmiş olsaydı `useMemo` bağımlılıkları
+    // kımıldamaz, materyal tazelenmez ve Display düğmesi hiçbir şey yapmazdı.
+    expect(rendered.shading).toBe('rendered')
+  })
+
+  test('dokular kapanınca da yeni nesne — boolean alan gözden kaçmıyor', () => {
+    const on = selectAppearance(state)
+    expect(selectAppearance({ ...state, textures: false })).not.toBe(on)
   })
 })
 
@@ -239,4 +313,43 @@ describe('kapsam — havuz anahtarı ayarı taşıyor', () => {
       }
     })
   }
+})
+
+describe('kapsam — çizen dosyalar kendi ışıklı materyalini KURMUYOR', () => {
+  /**
+   * Yukarıdaki bekçi yalnız `src/<aile>/materials.ts` dosyalarını tarıyor,
+   * ve teleskopik tam o boşluktan kaçtı: materyalini `telescopic-renderer.tsx`
+   * ile `telescopic-preview.tsx` içinde modül düzeyinde çıplak
+   * `MeshStandardMaterial` olarak kuruyordu, `useAppearance()` hiç
+   * okumuyordu. Tarayacak bir `materials.ts` yoktu, dolayısıyla kapsam testi
+   * yeşildi ve hiçbir şey söylemedi.
+   *
+   * Kural: ışıklı materyal (Standard / Lambert / Physical / Phong) yalnız
+   * `appearance.ts` kurar. Çizen bir dosya birini kendi kurduysa, o yüzey
+   * Display menüsünün dışında kalmış demektir.
+   *
+   * `MeshBasicMaterial` kapsam DIŞI ve bilerek: gölgelenmeyen bir materyalin
+   * `solid` ile `rendered` arasında değişecek alanı yok. Seçim çarpıştırıcısı
+   * (`collider.tsx`), rota hayaleti ve teleskopiğin ışık hüzmesi o sınıfta —
+   * üçü de yüzey değil, sırasıyla hacim, editör katmanı ve efekt.
+   */
+  const LIT = /new THREE\.Mesh(Standard|Lambert|Physical|Phong)Material/
+
+  const DRAWING_FILES = readdirSync(SRC, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== 'instancing')
+    .flatMap((entry) => {
+      const dir = join(SRC, entry.name)
+      return readdirSync(dir)
+        .filter((name) => /(renderer|preview|system)\.tsx$/.test(name))
+        .map((name) => `${entry.name}/${name}`)
+    })
+
+  test('çizen dosya bulundu — bekçinin kendini kandırma biçimi', () => {
+    expect(DRAWING_FILES.length).toBeGreaterThan(25)
+  })
+
+  test('hiçbiri ışıklı materyal kurmuyor', () => {
+    const offenders = DRAWING_FILES.filter((file) => LIT.test(source(file)))
+    expect(offenders).toEqual([])
+  })
 })

@@ -233,6 +233,23 @@ export type { ConveyorDetail } from './parts'
 
 // ── Builder ─────────────────────────────────────────────────────────────────
 
+/**
+ * Makara deseninin V ekseni boyunca kaç tekrar ettiği — ve İŞARETİ akış yönü.
+ *
+ * Üç kind bunu paylaşıyor (düz hat, hızlandırıcı, transfer): hepsi aynı atlası
+ * kullanıyor ve hepsinin bandı aynı dokunun kaymasıyla hareket ediyor.
+ */
+export function beltStripeSpan(node: { flow: 'forward' | 'reverse' }, tiles: number): number
+export function beltStripeSpan(conveyor: ConveyorRollerNode): number
+export function beltStripeSpan(
+  node: { flow: 'forward' | 'reverse' } & Partial<ConveyorRollerNode>,
+  tiles?: number,
+): number {
+  const span =
+    tiles ?? moduleLengthM(node as ConveyorRollerNode) / rollerPitchM(node as ConveyorRollerNode)
+  return node.flow === 'reverse' ? -span : span
+}
+
 function buildFrom(
   conveyor: ConveyorRollerNode,
   parts: readonly ConveyorPart[],
@@ -244,7 +261,13 @@ function buildFrom(
   // One tile per roller pitch, so the painted rollers land where real ones
   // would however long the module is. This is the number that makes the stripe
   // a bed rather than a texture.
-  const stripeSpan = moduleLengthM(conveyor) / rollerPitchM(conveyor)
+  //
+  // Ters akışta NEGATİF. Bandın hareketi tek bir paylaşılan dokunun offset'ini
+  // kaydırarak yapılıyor (`advanceConveyorBelt`) ve bir offset tek yöne kayar;
+  // yönü modül başına ayırmanın bedelsiz yolu V'yi burada, inşa anında
+  // çevirmek. Alternatifi ikinci bir doku + ikinci bir materyaldi — bu ailenin
+  // tek materyal kuralını, yani bütün çizim maliyeti hikâyesini bozardı.
+  const stripeSpan = beltStripeSpan(conveyor)
 
   for (const part of parts) {
     const color =
@@ -320,6 +343,12 @@ function buildConveyorGeometryKey(
     // module the forward mesh whenever it carried no motor, which was the only
     // other way flow reached this key.
     hasDownstreamNeighbour ? `U${outletPort(conveyor)}` : 'UD',
+    // Akış yönü artık KOŞULSUZ anahtarda: ters akışta yatağın V'si negatif
+    // dokunuyor (`beltStripeSpan`), yani mesh gerçekten farklı. Eskiden yön
+    // yalnız motorun bulunduğu uçtan sızıyordu ve motorsuz iki modül —
+    // biri ileri, biri ters — tek buffer'ı paylaşırdı; şimdi bandı ters yöne
+    // akardı ve hiçbir yerde hata çıkmazdı.
+    conveyor.flow === 'reverse' ? 'r' : 'f',
     usefulWidthMm(conveyor),
     frameWidthM(conveyor).toFixed(5),
     moduleLengthM(conveyor).toFixed(5),
@@ -379,9 +408,13 @@ export function getCachedGeometry(
   build: () => THREE.BufferGeometry,
 ): THREE.BufferGeometry {
   const cached = cache.get(key)
-  if (cached) return cached
+  if (cached) {
+    if ((retained.get(key) ?? 0) === 0) touchUnretained(key)
+    return cached
+  }
   const geometry = build()
   cache.set(key, geometry)
+  touchUnretained(key)
   evict(key)
   return geometry
 }
@@ -424,13 +457,20 @@ function evict(justBuilt: string): void {
  *  cache is: a curve holds its shapes out of this pool too. */
 export function retainGeometry(key: string): string {
   retained.set(key, (retained.get(key) ?? 0) + 1)
+  // Tutulan şekil süpürme adayı değil: damga bir adaylık, karar değil.
+  zeroSince.delete(key)
   return key
 }
 
 export function releaseGeometry(key: string): void {
   const count = (retained.get(key) ?? 0) - 1
-  if (count > 0) retained.set(key, count)
-  else retained.delete(key)
+  if (count > 0) {
+    retained.set(key, count)
+    return
+  }
+  retained.delete(key)
+  // Son tutan da bıraktı: bekleme penceresi buradan başlıyor.
+  if (cache.has(key)) touchUnretained(key)
 }
 
 export function retainConveyorGeometry(
@@ -447,10 +487,78 @@ export function conveyorGeometryCacheSize(): number {
   return cache.size
 }
 
+// ── Sıfır-tutan süpürme ─────────────────────────────────────────────────────
+
+/**
+ * Bir şeklin kimse tutmadan durabileceği süre; sonrasında süpürme onu
+ * serbest bırakır.
+ *
+ * `CACHE_LIMIT` tek başına yetmiyordu: tavan yalnız TAVANA ULAŞILDIĞINDA iş
+ * yapıyor, yani kaydırıcı sürtmesinin bıraktığı şekiller 96'ya kadar birikip
+ * orada kalıyor ve oturum boyunca hiç inmiyordu (rafın kendi ölçümü: oturum
+ * başına onlarca MB). Bu havuzu yedi konveyör kind'ı paylaştığı için tavan
+ * ayrıca aile başına düşen payı da daraltıyordu.
+ *
+ * Pencere iki şey için var. Yarış: renderer anahtarlarını bir efektte
+ * tutuyor, efekt ise geometriyi isteyen render'dan bir tık sonra koşuyor —
+ * "sıfırda hemen bırak" o boşlukta çizilen buffer'ı serbest bırakırdı. Desen:
+ * bir LOD takası ya da yeniden mount aynı anahtarı milisaniyeler içinde
+ * bırakıp yeniden tutuyor. Beş saniye ikisinin de çok üstünde. Rafın
+ * `SWEEP_GRACE_MS`'i ile aynı değer ve aynı gerekçe.
+ */
+const SWEEP_GRACE_MS = 5000
+
+/** Anahtar → tutma sayacının en son sıfıra düştüğü (ya da tutulmadan
+ *  kurulduğu) an. Bir sonraki `retainGeometry` siliyor, süpürme tüketiyor. */
+const zeroSince = new Map<string, number>()
+
+let sweepTimer: ReturnType<typeof setTimeout> | null = null
+
+function touchUnretained(key: string): void {
+  zeroSince.set(key, Date.now())
+  scheduleSweep()
+}
+
+function scheduleSweep(): void {
+  if (sweepTimer !== null) return
+  if (typeof setTimeout !== 'function') return
+  sweepTimer = setTimeout(() => {
+    sweepTimer = null
+    sweepConveyorGeometry()
+  }, SWEEP_GRACE_MS)
+}
+
+/**
+ * Bekleme penceresi boyunca kimsenin tutmadığı her şekli serbest bırakır.
+ *
+ * `now` enjekte edilebilir: test gerçek zamanda beklemeden pencereyi
+ * geçebilsin diye. Damgalandıktan sonra yeniden tutulan anahtar sessizce
+ * unutuluyor.
+ */
+export function sweepConveyorGeometry(now = Date.now()): void {
+  for (const [key, since] of zeroSince) {
+    if ((retained.get(key) ?? 0) > 0) {
+      zeroSince.delete(key)
+      continue
+    }
+    if (now - since < SWEEP_GRACE_MS) continue
+    zeroSince.delete(key)
+    const geometry = cache.get(key)
+    if (geometry) {
+      cache.delete(key)
+      geometry.dispose()
+    }
+  }
+  if (zeroSince.size > 0) scheduleSweep()
+}
+
 export function clearConveyorGeometryCache(): void {
   for (const geometry of new Set(cache.values())) geometry.dispose()
   cache.clear()
   retained.clear()
+  // Damgalar da gitmeli: kalan bir damga, temizlenmiş havuzda artık var
+  // olmayan bir anahtarı süpürtür ve testler birbirinin sayımını bozar.
+  zeroSince.clear()
 }
 
 /** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildConveyorGeometryKey`. */

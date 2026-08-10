@@ -160,10 +160,125 @@ describe('frame sharing', () => {
     for (const post of abutted) expect(post.center[0]).toBeCloseTo(leftX, 9)
   })
 
-  test('and its top beams go with it — the neighbour carries them', () => {
+  test('ama üst kuşaklar GİTMİYOR — kuşak paylaşılan bir parça değil', () => {
+    /**
+     * Bu test bu turda TERSİNE döndü ve eski hâli gerçek bir hatayı
+     * kilitliyordu: kuşaklar `omitRight` bloğunun içindeydi.
+     *
+     * `omitRight` komşusuyla PAYLAŞILAN sağ dikme hattını atlamak için var.
+     * Kuşak paylaşılmıyor — şeridin kendi açıklığını, kendi merkezinde
+     * kapatıyor. Komşunun kuşağı bir `lanePitch` ötede, komşunun açıklığının
+     * üstünde. On şeritlik bir blokta 1–9 arası şeritlerin hepsi
+     * `omitRight: true` alır, yani kuşaklar yalnız EN SAĞDAKİ şeridin üstünde
+     * kalıyordu ve blok boyunca üst bağlantı diye bir şey yoktu.
+     */
+    const abutted = driveInParts(lane(), 'full', { omitRight: true })
+    const beams = abutted.filter((part) => part.role === 'top-beam')
+    expect(beams.length).toBe(
+      driveInParts(lane(), 'full').filter((p) => p.role === 'top-beam').length,
+    )
+    // Ve kendi açıklığının üstünde: merkezleri x = 0.
+    for (const beam of beams) expect(beam.center[0]).toBeCloseTo(0, 9)
+  })
+
+  test('üst kuşak dikmelerin İÇİNDE — tepelerinde havada durmuyor', () => {
+    /**
+     * Kuşak `topBeamUndersideY + yükseklik/2`'ye konuyordu ve varsayılanlarda
+     * o kot tam `uprightHeight`e eşitti: kuşak 6,05–6,17, dikmeler 0–6,05.
+     * Temas alanı sıfır — iki direğin tepesinde yatan bir kiriş. Üstelik
+     * yapının gerçek yüksekliği 6,17 olduğu hâlde kolider 6,05 bildiriyordu.
+     */
+    const node = lane()
+    const parts = driveInParts(node, 'full')
+    const uprightTop = Math.max(
+      ...parts.filter((p) => p.role === 'upright').map((p) => p.center[1] + p.size[1] / 2),
+    )
+    for (const beam of parts.filter((p) => p.role === 'top-beam')) {
+      expect(beam.center[1] + beam.size[1] / 2).toBeLessThanOrEqual(uprightTop + 1e-9)
+    }
+  })
+})
+
+/**
+ * ÇELİK BİRBİRİNE DEĞİYOR MU.
+ *
+ * Denetimin bulduğu üç kusur da aynı sınıftan: parçalar var, renkleri doğru,
+ * anahtar onları taşıyor — yalnız hiçbiri ötekine dokunmuyor. Ekranda hata
+ * çıkmıyor, sahne kusursuz çiziliyor, ve yapı havada duruyor.
+ */
+describe('parçalar birbirine bağlı', () => {
+  test('braket dikme ile ray arasını KÖPRÜLÜYOR', () => {
+    /**
+     * Braket 60 mm'lik bir küptü ve rayın kendi x'inde duruyordu: ray
+     * çerçeveden 58 mm uzakta 3,3 m boyunca hiçbir şeye dokunmuyor, braket de
+     * boşluğu kapatmak yerine raydan bile daha içeride kalıyordu. Boşluk şerit
+     * genişledikçe büyüyor — ölçüyü şeritten okuyoruz, sabit yazmıyoruz.
+     */
+    for (const laneClearWidth of [1.35, 1.45, 1.55]) {
+      for (const railType of ['gp', 'c'] as const) {
+        const node = lane({ laneClearWidth, railType })
+        const parts = driveInParts(node, 'full')
+        const rails = parts.filter((part) => part.role === 'rail')
+        const brackets = parts.filter((part) => part.role === 'bracket')
+        expect(brackets.length, 'braket yok').toBeGreaterThan(0)
+
+        const postInner = node.laneClearWidth / 2
+        for (const bracket of brackets) {
+          const outer = Math.abs(bracket.center[0]) + bracket.size[0] / 2
+          const inner = Math.abs(bracket.center[0]) - bracket.size[0] / 2
+          // Dikme yüzüne değiyor…
+          expect(
+            outer,
+            `${laneClearWidth}/${railType}: braket dikmeye ulaşmıyor`,
+          ).toBeGreaterThanOrEqual(postInner - 1e-9)
+          // …ve rayın dış yüzünün içine giriyor.
+          const railOuter = Math.max(
+            ...rails.map((rail) => Math.abs(rail.center[0]) + rail.size[0] / 2),
+          )
+          expect(inner, `${laneClearWidth}/${railType}: braket raya ulaşmıyor`).toBeLessThanOrEqual(
+            railOuter + 1e-9,
+          )
+        }
+      }
+    }
+  })
+
+  test('en arkadaki dikme şeridin ARKA YÜZÜNDE — adım ne olursa olsun', () => {
+    /**
+     * Dikme sayısı `round()` ile bulunuyor ve son dikme arka yüze düşmüyordu.
+     * Panelin sunduğu üç hazır adımın üçü de varsayılan şeritte tutmuyordu:
+     * ya raylar son çerçevenin 300 mm ilerisine konsol yapıyor, ya dikme
+     * şeridin 300 mm DIŞINDA kalıyordu.
+     */
+    // Alan adı `postPitchZ` ve `null` iken palet adımına düşüyor; elle
+    // seçilen değerler panelin sunduğu üç hazır adım artı iki uç.
+    for (const postPitchZ of [null, 1.0, 1.2, 1.5, 0.9, 2.4]) {
+      for (const palletsDeep of [2, 4, 7]) {
+        const node = lane({ postPitchZ, palletsDeep })
+        const zs = postCentersZ(node)
+        const back = -totalDepth(node) / 2
+        expect(Math.min(...zs), `adım ${postPitchZ}, derinlik ${palletsDeep}`).toBeCloseTo(back, 9)
+        expect(Math.max(...zs)).toBeCloseTo(-back, 9)
+      }
+    }
+  })
+
+  test('giriş ortalayıcıları GERÇEKTEN çiziliyor', () => {
+    /**
+     * Şema alanı `default(true)` idi ve anahtar onun vertex oynattığını iddia
+     * ediyordu, ama parça listesi alanı hiç okumuyordu: açık bir kutu, ölü bir
+     * anahtar girdisi, panelde hiçbir şey yapmayan bir onay kutusu.
+     */
+    const on = driveInParts(lane({ centralisers: true, railType: 'gp' }), 'full')
+    const off = driveInParts(lane({ centralisers: false, railType: 'gp' }), 'full')
+    expect(on.filter((part) => part.role === 'centraliser').length).toBeGreaterThan(0)
+    expect(off.filter((part) => part.role === 'centraliser').length).toBe(0)
+    // C rayı kendi kendine ortalıyor — orada parça yok.
     expect(
-      driveInParts(lane(), 'full', { omitRight: true }).some((part) => part.role === 'top-beam'),
-    ).toBe(false)
+      driveInParts(lane({ centralisers: true, railType: 'c' }), 'full').filter(
+        (part) => part.role === 'centraliser',
+      ).length,
+    ).toBe(0)
   })
 })
 

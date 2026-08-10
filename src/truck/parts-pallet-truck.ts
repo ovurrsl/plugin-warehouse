@@ -16,6 +16,7 @@ import type { TruckModel } from '../handling/models'
 import { forkSpreadM } from './metrics'
 import {
   GROUND_CLEARANCE,
+  pushBodyShell,
   pushWheel,
   type TruckBody,
   type TruckDetail,
@@ -50,12 +51,22 @@ export function palletTruckParts(
   switch (body) {
     case 'chassis': {
       if (powered) {
-        // Sürüş kaportası: batarya + motor, başlığın ön yarısı.
+        // Sürüş kaportası: batarya + motor, başlığın ön yarısı. Tek prizma
+        // DEĞİL — bir metrelik kesintisiz yüz makineyi yeşil bir tuğlaya
+        // çeviriyordu (bkz. `pushBodyShell`).
         const hoodRear = rearX + 0.46
-        parts.push({
+        pushBodyShell(parts, {
           role: 'chassis',
-          center: [(hoodRear + faceX) / 2, 0.55, 0],
-          size: [faceX - hoodRear, 1.0, model.b1 - 0.03],
+          xRear: hoodRear,
+          xFront: faceX,
+          halfWidth: model.b1 / 2 - 0.015,
+          // Eteğin altı destek tekerinin (Ø140) ÜSTÜNDE: daha önce 0.05'ten
+          // başlıyor ve tekerleri yutuyordu. Gerçek makinede kaportanın
+          // altında açık bir boşluk var ve denge tekerleri oradan görünür.
+          yBottom: 0.17,
+          yTop: 1.05,
+          beltY: 0.45,
+          skirtInset: 0.055,
         })
         // Operatör platformu: en arkada, basamak kotunda (0.202).
         parts.push({
@@ -95,11 +106,15 @@ export function palletTruckParts(
           })
         }
       } else {
-        // Manuel başlık: pompa gövdesi — dar, merkezde.
+        // Manuel başlık: pompa gövdesi — dar, merkezde ve dümen tekerinin
+        // ÜSTÜNDE başlıyor. Daha önce y = 0.08'den başlıyordu ve Ø170 mm'lik
+        // ikiz tekeri gövdesinin içine alıyordu: transpalet tekerlek üstünde
+        // durmuyormuş gibi okunuyordu. Gerçek makinede pompa gövdesi tekerin
+        // üstüne oturur ve teker altında açıkta kalır.
         parts.push({
           role: 'chassis',
-          center: [(rearX + faceX) / 2, 0.26, 0],
-          size: [model.l2, 0.36, 0.3],
+          center: [(rearX + faceX) / 2, 0.31, 0],
+          size: [model.l2, 0.26, 0.3],
         })
         if (detail === 'full') {
           // Pompa silindiri + indirme kolu.

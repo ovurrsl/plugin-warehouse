@@ -96,10 +96,29 @@ export function effectivePostPitchZ(lane: DriveInRackNode): number {
  * has five posts.
  */
 export function postCentersZ(lane: DriveInRackNode): number[] {
+  /**
+   * En arkadaki dikme şeridin ARKA YÜZÜNE kilitli.
+   *
+   * Önceki hâl `round(derinlik/adım) + 1` dikmeyi ön yüzden geriye adım adım
+   * diziyordu; adım derinliği tam bölmediğinde son dikme arka yüze düşmüyordu
+   * ve iki ayrı hata doğuyordu. Varsayılan 4 palet derinlikteki şeritte
+   * panelin sunduğu üç hazır adımın ÜÇÜ de tutmuyordu:
+   *
+   *   adım 1,0 / 1,5 → son dikme −1,35: raylar son çerçevenin 300 mm ilerisine
+   *     konsol yapıyor ve en arkadaki palet o boşlukta duruyor.
+   *   adım 1,2 → son dikme −1,95: dikme şeridin arka yüzünün 300 mm DIŞINDA,
+   *     ona değen hiçbir ray yok, ne kolider ne plan dikdörtgeni onu kapsıyor.
+   *
+   * `ceil` ile dikme sayısı yetiyor, son aralık kısa kalıyor — gerçek
+   * çerçevelerde de öyle olur. Değişmez kural: son dikme z'si tam −L/2.
+   */
   const pitch = effectivePostPitchZ(lane)
-  const front = totalDepth(lane) / 2
-  const count = Math.max(2, Math.round(totalDepth(lane) / pitch) + 1)
-  return Array.from({ length: count }, (_, index) => front - index * pitch)
+  const depth = totalDepth(lane)
+  const front = depth / 2
+  const count = Math.max(2, Math.ceil(depth / pitch) + 1)
+  return Array.from({ length: count }, (_, index) =>
+    index === count - 1 ? -front : front - index * pitch,
+  )
 }
 
 /** Local Z of a depth position's centre. Position 1 is the aisle face. */
@@ -177,6 +196,25 @@ export function fittedLevelCount(lane: DriveInRackNode): number {
 /** Underside of the top beam: the catalogue's G above the topmost rail. */
 export function topBeamUndersideY(lane: DriveInRackNode): number {
   return railTopY(lane, fittedLevelCount(lane)) + snapUpToSlot(lane.topClear)
+}
+
+/**
+ * Çerçevenin GERÇEK tepesi — dikmelerin boyu ve zarfın yüksekliği.
+ *
+ * Üst kuşak dikmelerin arasına cıvatalanır, üstlerinde havada durmaz. Önceki
+ * hâlde kuşak `topBeamUndersideY + yükseklik/2`'ye konuyordu ve varsayılanlarda
+ * o kot tam `uprightHeight`e eşitti: kuşak 6,05–6,17 arasında, dikmeler
+ * 0–6,05 arasında — temas alanı SIFIR, kuşak iki direğin tepesinde yatıyordu.
+ * Üstelik yapının gerçek yüksekliği 6,17 olduğu hâlde kolider ve yerleştirme
+ * zarfı 6,05 bildiriyordu.
+ *
+ * İki okumadan biri seçilmek zorundaydı; seçilen: katalog `topClear`
+ * kuşağın ALTINDAKİ boşluk, dikme de kuşağı taşıyacak kadar uzuyor. Böylece
+ * yayımlanmış serbest yükseklik korunuyor — kuşağı aşağı çekmek onu
+ * `topBeamHeight` kadar yerdi.
+ */
+export function frameTopY(lane: DriveInRackNode): number {
+  return Math.max(lane.uprightHeight, topBeamUndersideY(lane) + lane.topBeamHeight)
 }
 
 /** Storage levels the lane really has: the floor, then every fitted rail. */

@@ -19,6 +19,7 @@ import {
   toLinear,
 } from './geometry-builder'
 import type { ConveyorDetail } from './parts'
+import { transportHeightM } from './telescopic-metrics'
 import {
   type TelescopicPart,
   telescopicBaseParts,
@@ -72,9 +73,18 @@ function buildParts(
 }
 
 export function telescopicBaseKey(node: ConveyorTelescopicNode, detail: ConveyorDetail): string {
-  return ['tele-base', node.model, node.beltWidth, detail, node.frameColor, node.beltColor].join(
-    '|',
-  )
+  // Kot geometriye giriyor (gövde, bacaklar, korkuluk hepsi ondan türüyor),
+  // dolayısıyla anahtara da girmek ZORUNDA: girmezse iki farklı kottaki bom
+  // tek buffer'ı paylaşır ve biri yanlış yükseklikte çizilir.
+  return [
+    'tele-base',
+    node.model,
+    node.beltWidth,
+    transportHeightM(node).toFixed(3),
+    detail,
+    node.frameColor,
+    node.beltColor,
+  ].join('|')
 }
 
 export function telescopicSectionKey(
@@ -86,6 +96,7 @@ export function telescopicSectionKey(
     'tele-sec',
     node.model,
     node.beltWidth,
+    transportHeightM(node).toFixed(3),
     sectionIndex,
     detail,
     node.frameColor,

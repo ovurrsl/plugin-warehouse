@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { PalletNode } from '../pallet/schema'
+import { resetRackIndex } from '../pallet/slot-placement'
+import { resetOccupancyIndex } from '../rack/occupancy'
 import { PalletRackNode } from '../rack/schema'
+import { palletSlotsOf } from '../rack/slots'
 import { RouteNode } from '../route/schema'
 import { bindTruck, buildFleet, DWELL_S, FLEET_LIMIT, poseOf, stepFleet } from './fleet'
 import { claimRoute, ROUTE_CLAIM_M } from './route-binding'
@@ -173,6 +176,52 @@ describe('T27 — simülasyon sahneye yazmaz', () => {
     const a = buildFleet(nodes)
     const b = buildFleet(nodes)
     expect(a.trucks.map((t) => t.id)).toEqual(b.trucks.map((t) => t.id))
+  })
+})
+
+describe('istasyon listesi filo kaydında taşınır', () => {
+  /**
+   * Sessiz hata: `stations` boş kalırsa panelin sabitleme listeleri boşalır ve
+   * çevrim koşarken bile kullanıcı kaynak/hedef seçemez — hiçbir yerde hata
+   * çıkmaz, yalnız iki açılır liste "kura (otomatik)"tan ibaret kalır.
+   */
+  test('çevrimi olan aracın istasyonları boş değil ve kaynağıyla hedefini içerir', () => {
+    resetRackIndex()
+    resetOccupancyIndex()
+    const r = route({
+      position: [0, 0, 0],
+      points: [
+        [0, 0],
+        [30, 0],
+      ],
+    })
+    const rack = PalletRackNode.parse({
+      id: 'pallet-rack_a',
+      parentId: LEVEL,
+      position: [5, 0, 2],
+      levels: 3,
+    })
+    // Yuvaların bir kısmı dolu: kaynak da hedef de bulunabilsin.
+    const pallets = palletSlotsOf(rack)
+      .slice(0, 3)
+      .map((slot, index) =>
+        PalletNode.parse({
+          id: `pallet_${index}`,
+          parentId: LEVEL,
+          slotRackId: rack.id,
+          slotAddress: slot.id,
+        }),
+      )
+    const t = truck({ routeId: r.id })
+    const fleet = buildFleet(scene(r, rack, t, ...pallets))
+    const driver = fleet.trucks[0]
+    if (!driver?.cycle) throw new Error('çevrim kurulmadı')
+
+    expect(driver.stations.length).toBeGreaterThan(0)
+    const addresses = driver.stations.map((station) => `${station.rackId}/${station.slot.id}`)
+    const { source, target } = driver.cycle.assignment
+    expect(addresses).toContain(`${source.rackId}/${source.slot.id}`)
+    expect(addresses).toContain(`${target.rackId}/${target.slot.id}`)
   })
 })
 

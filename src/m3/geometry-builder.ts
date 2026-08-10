@@ -96,16 +96,23 @@ function buildM3GeometryKey(
   detail: M3Detail,
   omission: FrameOmission = { omitRight: false },
 ): string {
-  const levels = fittedLevels(bay).map((level, index) =>
-    [
+  const levels = fittedLevels(bay).map((level, index) => {
+    // Emisyon koşulunun BİREBİR aynısı (`parts.ts`: `dividerHeight !== null &&
+    // detail === 'full'`). Sayıyı koşulsuz yazmak, hiç bölücü kurulmayan iki
+    // hâlde — sade katman, ve üstteki açıklığa yayımlanmış hiçbir serinin
+    // sığmaması — aynı mesh'i sayı başına bir kez daha kurduruyordu.
+    const dividerHeight = detail === 'full' ? dividerHeightAt(bay, index) : null
+    return [
       levelElevation(level).toFixed(4),
       level.structure,
       level.model,
       level.structure === 'drawers'
         ? `${level.drawerModel}${level.drawerWidth}x${drawerCount(bay, level)}`
-        : `d${level.dividers}@${(dividerHeightAt(bay, index) ?? 0).toFixed(3)}`,
-    ].join(':'),
-  )
+        : dividerHeight === null
+          ? 'd-'
+          : `d${level.dividers}@${dividerHeight.toFixed(3)}`,
+    ].join(':')
+  })
 
   return [
     detail,

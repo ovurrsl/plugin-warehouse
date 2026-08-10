@@ -13,6 +13,7 @@ import { getObliqueGeometry, obliqueGeometryKey } from './oblique-geometry'
 import {
   angleRad,
   branchBoxWidthM,
+  branchCentreLocal,
   branchEndLocal,
   branchLengthM,
   branchOffsetM,
@@ -20,6 +21,7 @@ import {
   divergeXM,
   footprintCentreZM,
   footprintM,
+  localBoundsM,
   mainLaneMm,
   mainWidthM,
   moduleLengthM,
@@ -309,6 +311,48 @@ describe('the mesh', () => {
       expect(diverters[0]?.pattern).toBe('rollers')
     }
   })
+
+  test('the merge triangle stands PROUD of the bed — it is not buried in it', () => {
+    /**
+     * Saptırıcı ana yatakla aynı merkezde ve Y'de %10 ince basılıyordu:
+     * y ∈ [0,7025 , 0,7475], yatak y ∈ [0,7000 , 0,7500]. Yani parça yatağın
+     * diliminin tamamen içindeydi ve plan izdüşümünün %100'ü ya ana yatağın ya
+     * dal yatağının altında kalıyordu — `diverterColor` hiçbir pikselde
+     * görünmüyor, şemanın "the part a fitter recognises the machine by" dediği
+     * parça düz gri bir Y olarak çiziliyordu ve renk seçicisi ölü bir kontroldü.
+     *
+     * Kusurun ekranda bir belirtisi yok: eksik olan şey zaten görünmeyen bir
+     * şey. Ölçülmesi gereken tek şey, saptırıcının üst yüzünün yatağın üst
+     * yüzünün ÜSTÜNDE olması.
+     */
+    for (const angle of ['30', '45'] as const) {
+      const node = oblique({ angle })
+      const parts = obliqueParts(node, 'full')
+      const diverter = parts.find((part) => part.role === 'diverter')
+      const decks = parts.filter((part) => part.role === 'deck')
+      if (!diverter) throw new Error('saptırıcı bekleniyordu')
+      expect(decks.length).toBeGreaterThan(0)
+      const diverterTop = diverter.center[1] + diverter.size[1] / 2
+      for (const deck of decks) {
+        expect(diverterTop, `${angle}°`).toBeGreaterThan(deck.center[1] + deck.size[1] / 2 + 1e-9)
+      }
+    }
+  })
+
+  test('the proud triangle is inside the DECLARED envelope', () => {
+    // Görünür kılmanın kolay yolu yükseltmekti; zarf taşıma kotunda bitseydi
+    // saptırıcı çarpışma kutusunun dışında kalırdı — bu ailede tekrar tekrar
+    // çıkan "çizilen ile bildirilen aynı değil" hatası.
+    for (const angle of ['30', '45'] as const) {
+      const node = oblique({ angle })
+      const bounds = localBoundsM(node)
+      for (const part of obliqueParts(node, 'full')) {
+        expect(part.center[1] + part.size[1] / 2, `${angle}° ${part.role}`).toBeLessThanOrEqual(
+          bounds.max[1] + 1e-9,
+        )
+      }
+    }
+  })
 })
 
 describe('the inspector can reach every field, and every option it writes parses back', () => {
@@ -350,5 +394,61 @@ describe('the inspector can reach every field, and every option it writes parses
       (key) => !shown.has(key as never) && !DELIBERATELY_HIDDEN.has(key),
     )
     expect(missing).toEqual([])
+  })
+})
+
+describe('kolun portu, kolun ÇİZİLDİĞİ yönü gösteriyor', () => {
+  /**
+   * Bildirilen hata: "simülasyon, konveyör kol ayrımı ile ters yönde
+   * çalışıyor."
+   *
+   * Sebebi port `c`'nin dış yönünün `flow`'u hiç okumamasıydı: yön
+   * `(cos θ, side · sin θ)` ile sabit +X'e bakıyordu, oysa ters akışlı bir
+   * modülde kol fiziksel olarak −X'e gidiyor. Kol doğru çiziliyordu, akış
+   * rotası da doğruydu — ayrışan yalnız porttu, ve o da ekranda hiçbir şey
+   * göstermiyordu: mıknatıs komşu hattı kolun arkasına matelıyor, kutular
+   * çizilen kolun ters yönünde devrediliyordu.
+   *
+   * Bu yüzden test bayrağa ya da açıya değil, İKİ VEKTÖRÜN UYUŞMASINA
+   * bakıyor: kolun çizilen ekseni (merkezden uca) ile portun dış yönü.
+   */
+  const axisOf = (node: ReturnType<typeof oblique>): [number, number] => {
+    const [ex, ez] = branchEndLocal(node)
+    const [cx, cz] = branchCentreLocal(node)
+    const length = Math.hypot(ex - cx, ez - cz)
+    return [(ex - cx) / length, (ez - cz) / length]
+  }
+
+  for (const branchSide of ['left', 'right'] as const) {
+    for (const flow of ['forward', 'reverse'] as const) {
+      test(`${branchSide} kol, ${flow} akış: port yönü kolun ekseniyle aynı`, () => {
+        const node = oblique({ branchSide, flow, branchMode: 'divert' })
+        const port = localPorts(node).find((entry) => entry.id === 'c')
+        if (!port) throw new Error('kol portu yok')
+
+        const [ax, az] = axisOf(node)
+        expect(port.dx).toBeCloseTo(ax, 6)
+        expect(port.dz).toBeCloseTo(az, 6)
+      })
+    }
+  }
+
+  test('ters akışta kol portu geriye bakıyor — ileri akışın aynısı DEĞİL', () => {
+    // Hatanın tam biçimi buydu: dört yapılandırmanın dördü de aynı +X'i
+    // bildiriyordu. Yukarıdaki döngü yönü doğrularken, bu test iki hâlin
+    // birbirinden gerçekten AYRIŞTIĞINI sabitliyor — tek bir sabit vektör
+    // yazan bir gerileme yukarıdakileri de geçebilirdi.
+    const forward = localPorts(oblique({ branchSide: 'left', flow: 'forward' })).find(
+      (entry) => entry.id === 'c',
+    )
+    const reverse = localPorts(oblique({ branchSide: 'left', flow: 'reverse' })).find(
+      (entry) => entry.id === 'c',
+    )
+    if (!forward || !reverse) throw new Error('kol portu yok')
+
+    expect(Math.sign(forward.dx)).toBe(1)
+    expect(Math.sign(reverse.dx)).toBe(-1)
+    // Kol hangi tarafa ayrıldıysa orada kalıyor; tersine dönen yalnız uzunlamasına yön.
+    expect(Math.sign(forward.dz)).toBe(Math.sign(reverse.dz))
   })
 })

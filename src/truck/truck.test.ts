@@ -15,7 +15,7 @@ import {
 import { mastPose, mastTopY } from './kinematics'
 import * as materials from './materials'
 import { forkFaceX, forkTipX, overallHeightM, planWidthM, waPivotLocalX } from './metrics'
-import { bodiesOf } from './parts'
+import { bodiesOf, TRUCK_ROLE_COLORS, truckParts } from './parts'
 import { TruckNode } from './schema'
 
 const CTX_UNSELECTED = {} as GeometryContext
@@ -276,6 +276,186 @@ describe('T24/T25 — plan bütçesi ve tıklama hijyeni', () => {
       (child) => child.kind === 'rect' && 'fillOpacity' in child && child.fillOpacity !== undefined,
     )
     expect(bands.length).toBe(0)
+  })
+})
+
+/**
+ * T27 — gövdenin BELİ var: alt bant en geniş banttan dar.
+ *
+ * Beş ailenin beşi de gövdesini tek bir prizma olarak çiziyordu. Bir metre
+ * yüksekliğinde, izin tamamı kadar geniş, kesintisiz bir yüz iki şeyi birden
+ * yapıyor: siluete hiçbir yatay kırılma bırakmıyor (düz bir renk lekesi) ve
+ * lastiği kendi genişliğinin içine alıyor (araç yere basmıyor gibi duruyor).
+ *
+ * Ölçülen şey kabuğun ta kendisi: en alttaki 250 mm'lik bantta gövdenin en
+ * geniş yarı-Z'si, makinenin en geniş bandından belirgin biçimde dar olmalı.
+ * `skirtInset` sıfırlanırsa bu kırmızı yanar — ekranda hiçbir hata çıkmadan
+ * eski görünüme dönüleceği için tek uyarı burası.
+ *
+ * Manuel transpalet kapsam dışı: onun "gövdesi" 300 mm'lik bir pompa kutusu,
+ * bel verecek bir yüzü yok.
+ */
+describe('T27 — gövdenin beli var, alt bant dar', () => {
+  /**
+   * Forklift kapsam dışı ve sebebi kabuğu terk etmesi: o makinenin gövdesi
+   * artık ürün fotoğrafından çiziliyor ve gerçek EFG'de bel kuşağı diye bir
+   * çıta YOK — siluet kırılmasını arka teker arkı, alt köşe pahı ve ayak
+   * boşluğu basamağı taşıyor. Onları T29 ölçüyor.
+   */
+  const SHELLED = TRUCK_MODEL_ID_LIST.filter(
+    (id) => TRUCK_MODELS[id].variant !== 'hand-pallet' && TRUCK_MODELS[id].variant !== 'forklift',
+  )
+
+  test('kabuk taşıyan üç ailede etek en geniş banttan dar', () => {
+    expect(SHELLED.length).toBe(3)
+
+    for (const id of SHELLED) {
+      const model = TRUCK_MODELS[id]
+      const parts = bodiesOf(model)
+        .flatMap((body) => truckParts(model, null, body, 'full'))
+        .filter(
+          (part) =>
+            part.kind !== 'cyl' &&
+            part.kind !== 'beam' &&
+            (part.role === 'chassis' || part.role === 'cowl' || part.role === 'counterweight'),
+        )
+
+      const bandHalfWidth = (yLow: number, yHigh: number): number => {
+        let widest = 0
+        for (const part of parts) {
+          if (part.kind === 'cyl' || part.kind === 'beam') continue
+          const [, cy, cz] = part.center
+          const [, sy, sz] = part.size
+          if (cy + sy / 2 <= yLow || cy - sy / 2 >= yHigh) continue
+          widest = Math.max(widest, Math.abs(cz) + sz / 2)
+        }
+        return widest
+      }
+
+      const widest = bandHalfWidth(0, 10)
+      const skirt = bandHalfWidth(0, 0.25)
+      expect(widest, `${id}: gövde parçası bulunamadı`).toBeGreaterThan(0)
+      expect(skirt, `${id}: etek en geniş bantla aynı — gövde tek prizma`).toBeLessThan(
+        widest - 0.04,
+      )
+    }
+  })
+})
+
+/**
+ * T29 — forkliftin gövdesi ÜRÜN FOTOĞRAFINDAKİ makineye uyuyor.
+ *
+ * Üç madde de görülerek bulundu (üreticinin EFG 213–220 stüdyo çekimleri) ve
+ * üçü de ekranda hatasız görünen türden: makine her hâlükârda çiziliyordu,
+ * yalnız başka bir makine çiziliyordu.
+ */
+describe('T29 — forklift gövdesi referansa uyuyor', () => {
+  const model = TRUCK_MODELS['forklift-1300']
+  const chassis = truckParts(model, null, 'chassis', 'full')
+  const steer = truckParts(model, null, 'steer', 'full')
+  const boxes = chassis.filter((part) => part.kind !== 'cyl' && part.kind !== 'beam')
+
+  test('ikiz dümen tekeri gövdenin ARKINDA — orta hat açık', () => {
+    /**
+     * Gerçek makinenin arkadan en tanınır hattı: karşı ağırlığın altındaki
+     * orta ark ve içinde duran ikiz teker. Önceki hâlde karşı ağırlık tam
+     * genişlikte dolu bir bloktu ve teker onun içinde kalıyordu.
+     */
+    const wheels = steer.filter((part) => part.kind === 'cyl' && part.role === 'wheel')
+    expect(wheels.length, 'ikiz teker bekleniyordu').toBe(2)
+
+    for (const wheel of wheels) {
+      if (wheel.kind !== 'cyl') continue
+      const [wx, wy] = wheel.center
+      const crossing = boxes.filter((part) => {
+        const [cx, cy, cz] = part.center
+        const [sx, sy, sz] = part.size
+        // Tekerin bulunduğu boyuna ve dikey banda giren, ve tekerin Z'sini
+        // kapsayan bir gövde parçası varsa ark yok demektir.
+        if (cx + sx / 2 <= wx || cx - sx / 2 >= wx) return false
+        if (cy + sy / 2 <= wheel.radius * 0.4 || cy - sy / 2 >= wy + wheel.radius) return false
+        return Math.abs(cz - wheel.center[2]) < sz / 2
+      })
+      expect(
+        crossing.map((p) => p.role),
+        'teker gövdenin içinde — ark yok',
+      ).toEqual([])
+    }
+  })
+
+  test('tahrik lastiği çamurluğun altında AÇIKTA', () => {
+    /**
+     * Fotoğrafta gövde tekerin üstünde çamurluk olarak kıvrılıyor ve altında
+     * belden içeri çekiliyor; lastik o boşluktan çıkıyor. Ölçü lastikten
+     * okunuyor, sabit yazılmıyor.
+     */
+    const tyre = chassis.find((part) => part.kind === 'cyl' && part.role === 'wheel')
+    if (tyre?.kind !== 'cyl') throw new Error('tahrik lastiği yok')
+    const outer = Math.abs(tyre.center[2]) + tyre.length / 2
+
+    let widest = 0
+    for (const part of boxes) {
+      const [cx, cy, cz] = part.center
+      const [sx, sy, sz] = part.size
+      if (cx + sx / 2 <= tyre.center[0] || cx - sx / 2 >= tyre.center[0]) continue
+      // Lastiğin ALT yarısı — çamurluk zaten üstünü örtüyor, mesele altı.
+      if (cy - sy / 2 >= tyre.radius) continue
+      widest = Math.max(widest, Math.abs(cz) + sz / 2)
+    }
+    expect(widest, 'lastik hizasında gövde lastikten geniş').toBeLessThan(outer - 0.05)
+  })
+
+  test('karşı ağırlık KOYU bir kütle değil — gövdeyle aynı sarı', () => {
+    // Fotoğrafta koyu gri bir karşı ağırlık yok; o kütle gövdenin kendisi.
+    // Rol paleti `counterweight`'i koyu boyuyor, o yüzden forklift onu hiç
+    // kullanmamalı.
+    expect(chassis.map((part) => part.role)).not.toContain('counterweight')
+  })
+
+  test('mast ve koruyucu tavan ORTA gri — neredeyse siyah değil', () => {
+    /**
+     * Ölçülen ton #878787–#979797. Palet `#2e333a`/`#3d434b` yazıyordu: mast
+     * ve tavan neredeyse siyah çiziliyordu ve makine bütünüyle koyu bir
+     * gölge olarak okunuyordu. Eşik, ölçülen bandın epey altında — amaç tonu
+     * kilitlemek değil, bir daha siyaha kaymasını engellemek.
+     */
+    const luminance = (hex: string) => {
+      const n = Number.parseInt(hex.slice(1), 16)
+      return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255
+    }
+    for (const role of ['mast-rail', 'overhead-guard'] as const) {
+      expect(luminance(TRUCK_ROLE_COLORS[role]), role).toBeGreaterThan(0.35)
+    }
+    // Çatal ve taşıyıcı KOYU kalmalı — fotoğrafta ikisi de siyaha yakın.
+    for (const role of ['fork', 'carriage'] as const) {
+      expect(luminance(TRUCK_ROLE_COLORS[role]), role).toBeLessThan(0.2)
+    }
+  })
+})
+
+/**
+ * T28 — siluetteki kırılma katmandan bağımsız.
+ *
+ * Bel kuşağı bir "ayrıntı" değil: gövdeyi iki kütleye bölen şey o. Yalnız
+ * yakın katmanda çizilseydi araç uzaklaşırken şekil değiştirirdi — LOD'un
+ * yapmaması gereken tek şey.
+ */
+describe('T28 — bel kuşağı iki katmanda da var', () => {
+  test('kabuk taşıyan üç ailede kuşak hem full hem simple’da', () => {
+    const withShell = TRUCK_MODEL_ID_LIST.filter(
+      (id) => TRUCK_MODELS[id].variant !== 'hand-pallet' && TRUCK_MODELS[id].variant !== 'forklift',
+    )
+    expect(withShell.length).toBe(3)
+
+    for (const id of withShell) {
+      const model = TRUCK_MODELS[id]
+      for (const detail of ['full', 'simple'] as const) {
+        const belts = bodiesOf(model)
+          .flatMap((body) => truckParts(model, null, body, detail))
+          .filter((part) => part.role === 'belt')
+        expect(belts.length, `${id}/${detail}`).toBeGreaterThan(0)
+      }
+    }
   })
 })
 

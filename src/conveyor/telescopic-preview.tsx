@@ -2,30 +2,14 @@
 
 import { EDITOR_LAYER } from '@pascal-app/editor'
 import { useLayoutEffect, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
+import { useAppearance } from '../appearance'
+import { getTelescopicPreviewMaterial } from './materials'
 import { getTelescopicBaseGeometry, getTelescopicSectionGeometry } from './telescopic-geometry'
 import { boomSections } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
 const NO_RAYCAST = () => {}
-
-let previewMaterial: THREE.MeshStandardMaterial | null = null
-
-/** Hayaletin materyali: paylaşılan örneğin mutasyonu değil, ayrı klon —
- *  şeffaflık yerleştirilmiş her konveyöre sızardı. */
-function getPreviewMaterial(): THREE.MeshStandardMaterial {
-  if (!previewMaterial) {
-    previewMaterial = new THREE.MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.8,
-      metalness: 0.2,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false,
-    })
-  }
-  return previewMaterial
-}
 
 /**
  * Yerleştirme hayaleti — ayrı bileşen, renderer'da bayrak değil (pallet'in
@@ -34,7 +18,9 @@ function getPreviewMaterial(): THREE.MeshStandardMaterial {
  */
 export default function TelescopicPreview({ node }: { node: ConveyorTelescopicNode }) {
   const ref = useRef<THREE.Group>(null)
-  const material = getPreviewMaterial()
+  // Ayrı önbellek girdisi, gerçek materyalin mutasyonu DEĞİL: şeffaflığı
+  // paylaşılan örneğe yazmak yerleştirilmiş her bomu saydamlaştırırdı.
+  const material = getTelescopicPreviewMaterial(useAppearance())
 
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))

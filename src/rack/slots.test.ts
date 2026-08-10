@@ -537,3 +537,32 @@ describe('kat başına açıklık geçersiz kılmaları', () => {
     }
   })
 })
+
+describe('yuva enumerasyonu düğüm nesnesine memoize', () => {
+  test('aynı düğüm ikinci kez enumerate edilmiyor', () => {
+    // Memo'nun dışarıdan gözlemlenebilir tek kanıtı dönüş kimliği. Bu yol
+    // palet aracının fare hareketi başına çağırdığı yol; enumerasyon yuva
+    // başına bir nesne ve bir adres dizgesi ayırıyor.
+    const rack = PalletRackNode.parse({ id: 'pallet_rack_memo', levels: 3, bayClearWidth: 2.7 })
+    expect(palletSlotsOf(rack)).toBe(palletSlotsOf(rack))
+    expect(pickingSlotsOf(rack)).toBe(pickingSlotsOf(rack))
+  })
+
+  test('YENİ düğüm nesnesi bayat liste almıyor', () => {
+    /**
+     * Asıl tehlike: memo düğüm kimliğini değil de kind'ı ya da id'yi
+     * gözetseydi, kullanıcı seviye sayısını değiştirdikten sonra panel eski
+     * yuva sayısını göstermeye devam ederdi ve palet aracı olmayan yuvalara
+     * nişan alırdı. Host düğümü yerinde değiştirmiyor, yenisiyle
+     * değiştiriyor — memo tam olarak buna dayanıyor.
+     */
+    const single = PalletRackNode.parse({ id: 'pallet_rack_memo', depthPositions: 1 })
+    const double = PalletRackNode.parse({ id: 'pallet_rack_memo', depthPositions: 2 })
+
+    const first = palletSlotsOf(single)
+    const second = palletSlotsOf(double)
+
+    expect(second).not.toBe(first)
+    expect(second.length).toBeGreaterThan(first.length)
+  })
+})

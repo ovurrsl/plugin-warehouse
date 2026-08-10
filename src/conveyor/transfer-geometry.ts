@@ -2,6 +2,7 @@ import type * as THREE from 'three'
 import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './constants'
 import {
+  beltStripeSpan,
   emitPart,
   finish,
   getCachedGeometry,
@@ -62,7 +63,7 @@ function buildFrom(
             : toLinear(FIXED_COLORS[part.role])
     // Each bed segment carries exactly the rollers that are really in it, so
     // the paint and `rollerOffsetsX` cannot drift apart.
-    emitPart(sink, part, color, part.stripeSpan ?? 0)
+    emitPart(sink, part, color, beltStripeSpan(transfer, part.stripeSpan ?? 0))
   }
 
   return finish(sink)
@@ -89,6 +90,10 @@ function buildTransferGeometryKey(
   return [
     detail,
     hasDownstreamNeighbour ? `U${outletPort(transfer)}` : 'UD',
+    // Akış yönü KOŞULSUZ: ters akışta yatağın V'si negatif dokunuyor
+    // (`beltStripeSpan`), yani mesh gerçekten farklı ve iki yön tek buffer'ı
+    // paylaşamaz — paylaşsalardı bandın biri ters yöne akardı.
+    transfer.flow === 'reverse' ? 'r' : 'f',
     moduleLengthM(transfer).toFixed(5),
     frameWidthM(transfer).toFixed(5),
     stripOffsetsX(transfer)

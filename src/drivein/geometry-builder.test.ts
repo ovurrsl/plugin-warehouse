@@ -117,3 +117,36 @@ describe('tier and frame omission', () => {
     )
   })
 })
+
+/**
+ * Anahtar düğüm nesnesine memoize (`geometry-key-memo.ts`), ve yukarıdaki
+ * kapsama bloğu da o sarmalayıcı üzerinden koşuyor — her çağrı yeni bir düğüm
+ * nesnesi kurduğu için memo hep soğuk, yani alan taraması gerçekten yapılıyor.
+ *
+ * Buradaki iki test memo'nun kendi sessiz hatalarını tutuyor. Katman ve
+ * komşuluk ekseni ayrıca sınanmıyor: üstteki blok ikisini de TEK düğüm
+ * nesnesiyle soruyor, yani memo o eksenleri yutarsa orası kırılır.
+ */
+describe('şekil anahtarı memoizasyonu', () => {
+  test('YERİNDE mutasyon anahtarı tazelemez — memo nesne kimliğine bağlı', () => {
+    // İki iş görüyor. Birincisi sözleşmeyi sabitlemek: host düğümü değiştirmez,
+    // yenisiyle DEĞİŞTİRİR (`neighbours.ts` de aynı değişmeze dayanıyor) ve
+    // yerinde mutasyon desteklenmiyor. İkincisi memo'nun kendisini yakalamak:
+    // memo kaldırılırsa anahtar mutasyondan sonra yeniden kurulur, DEĞİŞİR, ve
+    // bu beklenti düşer.
+    const node = lane()
+    const before = driveInGeometryKey(node, 'full')
+    ;(node as unknown as { laneClearWidth: number }).laneClearWidth = 1.5
+    expect(driveInGeometryKey(node, 'full')).toBe(before)
+
+    // Yeni nesne = yeni kimlik → yeni anahtar. Host'un gerçekte yaptığı bu.
+    expect(driveInGeometryKey(lane({ laneClearWidth: 1.5 }), 'full')).not.toBe(before)
+  })
+
+  test('yapıca aynı iki AYRI şerit aynı anahtarı alıyor — paylaşım korunuyor', () => {
+    // Memo'nun bozmaması gereken şey bu: paylaşım düğüm kimliğine değil
+    // alanlara bakar. Bozulsaydı on şeritlik bir blok on ayrı geometri
+    // tahsis ederdi — kindin tüm çizim maliyeti hikâyesi burada duruyor.
+    expect(driveInGeometryKey(lane(), 'full')).toBe(driveInGeometryKey(lane(), 'full'))
+  })
+})

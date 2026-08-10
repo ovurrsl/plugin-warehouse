@@ -9,12 +9,15 @@ import {
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
+import { Collider } from '../collider'
+import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
 import { getRackMaterial } from '../rack/materials'
+import { isSelected } from '../selection'
 import { useStaticTransform } from '../static-transform'
 import {
   getLongspanGeometry,
@@ -35,12 +38,6 @@ import type { LongspanNode } from './schema'
  */
 const LOD_FAR_SQ = 70 * 70
 const LOD_NEAR_SQ = 55 * 55
-
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/** Invisible, and deliberately so — `visible = false` takes the collider out of
- *  `projectObject` entirely while the raycaster keeps hitting it. */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 /**
  * Mounted through `def.renderer` rather than `def.geometry`: `<GeometrySystem>`
@@ -65,6 +62,13 @@ function LongspanRendererBody({ node }: { node: LongspanNode }) {
   const registeredRef = useRef<THREE.Object3D>(null!)
   const handlers = useNodeEvents(node as never, node.type as never)
   useRegistry(node.id as AnyNodeId, node.type, registeredRef)
+
+  // Olay sarmalayıcısı: dönüşümsüz, ama auto-update açık kaldığı sürece bedava
+  // değil — her karede kendi `compose`'unu yapıp `force`'u çocuklara yayar ve
+  // altındaki donmuş çarpıştırıcı ile kayıtlı grubun kazandığını geri verir.
+  // Bkz. `../frozen-matrix`.
+  const wrapperRef = useRef<THREE.Object3D>(null)
+  useFrozenMatrix(wrapperRef)
 
   const isExporting = useViewer(
     (s) => (s as typeof s & { isExporting?: boolean }).isExporting ?? false,
@@ -94,7 +98,7 @@ function LongspanRendererBody({ node }: { node: LongspanNode }) {
   const appearance = useAppearance()
   const material = getRackMaterial(appearance)
 
-  const selected = useViewer((s) => s.selection.selectedIds.includes(node.id as AnyNodeId))
+  const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
@@ -122,20 +126,35 @@ function LongspanRendererBody({ node }: { node: LongspanNode }) {
   const width = totalWidth(node)
   const depth = totalDepth(node)
 
+  /**
+   * Havuz bu bayı çiziyorken alt ağaç render gezinişinden tümden DÜŞER:
+   * `_projectObject` özyinelemeyi `visible === false`'ta, çocuklara hiç inmeden
+   * kesiyor. Ölçüm ve tam gerekçe rafın renderer'ında — kaybedilen bir şey yok,
+   * çünkü ne three'nin ışın testi ne de gölge frustum'unun
+   * `Box3.expandByObject` birleşimi `visible`'a bakıyor.
+   *
+   * `drawsSelf` true olduğunda — seçili, sürükleniyor, dışa aktarım ya da toplu
+   * çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde hiç
+   * çizilmez.
+   */
+
   return (
-    <group visible={node.visible !== false} {...handlers}>
-      {/* Selection collider. A shelving bay is mostly air; without one a click
-          aimed between the shelves selects whatever is behind. Outside the
-          registered group so the outline still traces the real silhouette. */}
-      <group position={position} ref={registeredRef} rotation={rotation}>
+    <group {...handlers} ref={wrapperRef}>
+      {/* Seçim çarpıştırıcısı — bir bay çoğunlukla hava, ona nişan alan tıklama
+          rafların arasından geçip arkadakini vurur. Kayıtlı grubun İÇİNDE:
+          dışarıda dururken havuz açıkken grubun içi boş kaldığı için bay gölge
+          frustum'u birleşimine hiç katkı vermiyordu; ölçümü
+          `rack/renderer.tsx`'te. */}
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={node.visible !== false}
+      >
         {!isExporting && (
-          <mesh
-            dispose={null}
-            geometry={UNIT_COLLIDER}
-            material={COLLIDER_MATERIAL}
+          <Collider
             position={[0, node.frameHeight / 2, 0]}
-            scale={[width, node.frameHeight, depth]}
-            visible={false}
+            size={[width, node.frameHeight, depth]}
           />
         )}
         {drawsSelf && (

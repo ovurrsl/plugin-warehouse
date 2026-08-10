@@ -55,38 +55,46 @@ const rackOnDeck = (
 
 const rackOnGround = (patch: Record<string, unknown> = {}) => PalletRackNode.parse(patch)
 
+/**
+ * `racksOnMezzanine` çözülmüş katları ÇAĞIRANDAN alıyor — tek çağıran olan
+ * panel zinciri zaten kendi tablosu için çözüyor. Testlerde o çözüm tek
+ * yerden veriliyor.
+ */
+const supportedOn = (nodes: Record<string, unknown>, mezz: ReturnType<typeof mezzanine>) =>
+  racksOnMezzanine(nodes, mezz, resolveTierElevations(mezz.tiers))
+
 describe('mezzanine üstündeki rafları bulmak', () => {
   test('güvertesine oturan raf sayılır', () => {
     const mezz = mezzanine()
-    const found = racksOnMezzanine({ 'rack-1': rackOnDeck(mezz, 0) }, mezz)
+    const found = supportedOn({ 'rack-1': rackOnDeck(mezz, 0) }, mezz)
     expect(found).toHaveLength(1)
     expect(found[0]?.tierIndex).toBe(0)
   })
 
   test('mezzanine ALTINDA duran raf sayılmaz — orası zaten rafa açık hacim', () => {
     const mezz = mezzanine()
-    expect(racksOnMezzanine({ 'rack-1': rackOnGround() }, mezz)).toHaveLength(0)
+    expect(supportedOn({ 'rack-1': rackOnGround() }, mezz)).toHaveLength(0)
   })
 
   test('başka bir slab üstündeki raf sayılmaz', () => {
     const mezz = mezzanine()
     const rack = PalletRackNode.parse({ supportSlabId: 'slab_zemin' })
-    expect(racksOnMezzanine({ r: rack }, mezz)).toHaveLength(0)
+    expect(supportedOn({ r: rack }, mezz)).toHaveLength(0)
   })
 
   test('BAŞKA bir mezzanine’in güvertesindeki raf bu mezzanine’e sayılmaz', () => {
     const mine = mezzanine()
     const other = mezzanine({ id: 'mezzanine_other' })
     const rack = PalletRackNode.parse({ supportSlabId: deckSlabId(other.id, 0) })
-    expect(racksOnMezzanine({ r: rack }, mine)).toHaveLength(0)
-    expect(racksOnMezzanine({ r: rack }, other)).toHaveLength(1)
+    expect(supportedOn({ r: rack }, mine)).toHaveLength(0)
+    expect(supportedOn({ r: rack }, other)).toHaveLength(1)
   })
 
   test('çok katlı mezzanine: raf hangi tier’e oturduysa o sayılır', () => {
     const mezz = mezzanine({
       tiers: [tier(), tier({ index: 1, loadClass: 750, floorType: 'METAL_GRID' })],
     })
-    const found = racksOnMezzanine({ r: rackOnDeck(mezz, 1) }, mezz)
+    const found = supportedOn({ r: rackOnDeck(mezz, 1) }, mezz)
     expect(found).toHaveLength(1)
     expect(found[0]?.tierIndex).toBe(1)
     // İzin üst tier'in yük sınıfından gelir, alttakinden değil.
@@ -95,7 +103,7 @@ describe('mezzanine üstündeki rafları bulmak', () => {
 
   test('sahnedeki raf olmayan düğümler yok sayılır', () => {
     const mezz = mezzanine()
-    expect(racksOnMezzanine({ x: { type: 'warehouse:pallet' }, y: null }, mezz)).toHaveLength(0)
+    expect(supportedOn({ x: { type: 'warehouse:pallet' }, y: null }, mezz)).toHaveLength(0)
   })
 })
 
@@ -112,20 +120,14 @@ describe('yük sınıfı — oran, FEM değil', () => {
 
   test('hafif raf sınırı aşmaz', () => {
     const mezz = mezzanine()
-    const found = racksOnMezzanine(
-      { r: rackOnDeck(mezz, 0, { levelCapacity: 200, levels: 1 }) },
-      mezz,
-    )
+    const found = supportedOn({ r: rackOnDeck(mezz, 0, { levelCapacity: 200, levels: 1 }) }, mezz)
     expect(overloadedRacks(found)).toHaveLength(0)
   })
 
   test('ağır raf aşar ve uyarı üretir', () => {
     const mezz = mezzanine()
     // 500 kg/m² × ~3.1 m² ≈ 1552 kg izin; 4 kat × 3000 kg = 12000 kg beyan.
-    const found = racksOnMezzanine(
-      { r: rackOnDeck(mezz, 0, { levelCapacity: 3000, levels: 3 }) },
-      mezz,
-    )
+    const found = supportedOn({ r: rackOnDeck(mezz, 0, { levelCapacity: 3000, levels: 3 }) }, mezz)
     expect(overloadedRacks(found)).toHaveLength(1)
   })
 
@@ -136,13 +138,13 @@ describe('yük sınıfı — oran, FEM değil', () => {
     const light = mezzanine()
     const rack = (m: ReturnType<typeof mezzanine>) =>
       rackOnDeck(m, 0, { levelCapacity: 900, levels: 1 })
-    expect(overloadedRacks(racksOnMezzanine({ r: rack(light) }, light))).toHaveLength(1)
-    expect(overloadedRacks(racksOnMezzanine({ r: rack(heavy) }, heavy))).toHaveLength(0)
+    expect(overloadedRacks(supportedOn({ r: rack(light) }, light))).toHaveLength(1)
+    expect(overloadedRacks(supportedOn({ r: rack(heavy) }, heavy))).toHaveLength(0)
   })
 
   test('tier özeti rafları toplar', () => {
     const mezz = mezzanine()
-    const found = racksOnMezzanine(
+    const found = supportedOn(
       {
         a: rackOnDeck(mezz, 0, { levelCapacity: 1000, levels: 1 }),
         b: rackOnDeck(mezz, 0, { levelCapacity: 1000, levels: 1 }),

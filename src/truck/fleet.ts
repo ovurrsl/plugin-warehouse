@@ -13,7 +13,7 @@ import type { RouteNode } from '../route/schema'
 import { buildCycle, carriesPallet, cycleSeconds, type PhaseStep, stepAt } from './duty'
 import { buildTrack, type RouteTrack, sampleTrack } from './route-index'
 import type { TruckNode } from './schema'
-import { type Assignment, assignmentFor, stationsAlong } from './stations'
+import { type Assignment, assignmentFor, type Station, stationsAlong } from './stations'
 
 /**
  * Aynı anda hareket eden araç tavanı.
@@ -66,6 +66,17 @@ export type FleetTruck = {
   } | null
   /** Park hâlindeki çatal kotu — çevrim bunu sürer. */
   forkY: number
+  /**
+   * Bu aracın rotasından erişilebilen yuvalar — `buildFleet`'in çevrimi
+   * kurarken ZATEN taradığı liste.
+   *
+   * Dışarı verilmesinin sebebi paneldi: `truck-panel.tsx` sabitleme
+   * listelerini doldurmak için `stationsAlong`'u ikinci kez koşuyordu, yani
+   * her store yazımında aynı raf taraması iki kez ödeniyordu. Filo kaydı
+   * kural olarak canlı durum taşır, konfigürasyon değil — bu alan da
+   * konfigürasyon değil, o karede yapılmış taramanın sonucu.
+   */
+  stations: Station[]
   /** Taşınan paletin DÜĞÜM kimliği, ya da null. Sahneye YAZILMAZ —
    *  yalnız canlı transform kanalına yazılır. */
   carryingPalletId: string | null
@@ -162,6 +173,7 @@ export function buildFleet(nodes: Readonly<Record<string, unknown>>): Fleet {
       speedMps: bound.speedMps,
       cycle: null,
       forkY: node.forkHeight,
+      stations: [],
       carryingPalletId: null,
     })
   }
@@ -177,6 +189,7 @@ export function buildFleet(nodes: Readonly<Record<string, unknown>>): Fleet {
   for (const truck of trucks) {
     const model = TRUCK_MODELS[truck.modelId]
     const stations = stationsAlong(nodes, truck.track, model)
+    truck.stations = stations
     // Kullanıcının sabitlediği yuvalar kurayı geçersiz kılar — düğümden
     // burada okunuyor, FleetTruck'a kopyalanmıyor: sabit sahne verisi ve
     // filo kaydı canlı durum taşır, konfigürasyon değil.

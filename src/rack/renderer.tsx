@@ -11,8 +11,8 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { type Appearance, appearanceKey, surfaceMaterial, useAppearance } from '../appearance'
+import { Collider } from '../collider'
 import { useAdmitted } from '../instancing/admission'
-import { HIDDEN_FOR_COLLECTIVE } from '../instancing/collective'
 import { registerGhostLod } from '../instancing/ghost-lod'
 import { SelfDrawnBody } from '../instancing/self-drawn'
 import { useCollective } from '../instancing/use-collective'
@@ -54,21 +54,6 @@ const NO_RAYCAST = () => {}
  */
 const LOD_FAR_SQ = 70 * 70
 const LOD_NEAR_SQ = 55 * 55
-
-/** Shared by every rack's picking collider, scaled per node. A box geometry per
- *  rack is a thousand allocations that all describe the same cube. */
-const UNIT_COLLIDER = new THREE.BoxGeometry(1, 1, 1)
-
-/**
- * Invisible, and deliberately so.
- *
- * `visible = false` takes the collider out of `WebGLRenderer.projectObject`
- * entirely — no colour pass, no shadow pass — while three's raycaster and R3F's
- * event layer both ignore `visible` and keep hitting it. A `colorWrite: false`
- * material still costs a draw call per rack in both passes, which on a thousand
- * racks is a thousand draws that paint nothing.
- */
-const COLLIDER_MATERIAL = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
 
 /**
  * Mounted through `def.renderer: { kind: 'parametric' }` rather than
@@ -193,46 +178,28 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
   const depth = totalDepth(node)
 
   /**
-   * Kolektif havuz bu rafı çiziyorken alt ağaç render gezinişinden DÜŞER.
+   * Kayıtlı grup YALNIZ kullanıcı gizlediğinde gizlenir.
    *
-   * `_projectObject` özyinelemeyi yalnız `visible === false`'ta kesiyor
-   * (`three/Renderer.js:3082`), ilk satırda, çocuklara inmeden. Havuz açıkken
-   * bu alt ağacın çizdiği hiçbir şey yok — gövde sahne kökündeki
-   * `InstancedMesh`'ten geliyor — yani three'nin her karede, her geçitte
-   * (renk + gölge) buraya inip "çizeyim mi?" diye sorması tamamen boşa iş.
+   * Burada bir zamanlar kolektif budaması vardı: havuz çizerken alt ağaç
+   * `visible = false` ile render gezinişinden düşüyordu (ölçülmüş kazanç,
+   * gezilen nesne 3.582 raflık sahnede 10.746 → 3.582). İKİ kullanıcı
+   * şikâyeti onu geri aldırdı ve ikisi de aynı kökten geliyordu:
    *
-   * Ölçüm: 3.582 raflık bir sahnede gezilen nesne sayısı 10.746 → 3.582, ve
-   * kare 70,4 → ~31 ms. Nesne başına ~2,7 µs sabiti beş ayrı `?disable`
-   * koşusundan türedi (`docs/olcum-sonuclari.md`).
+   *  - Kutu-seçimi (V modu) rafı hiç görmüyordu. Host'un `isObjectVisible`'ı
+   *    ata zincirinde `visible === false` gören düğümü eliyor, yani gizlenen
+   *    raf marquee'ye görünmez oluyordu — tıklama çalıştığı için hata
+   *    sessizdi.
+   *  - **Hayalet stok yalnız raf SEÇİLİYKEN görünüyordu.** `GhostStock`
+   *    `drawsSelf`'e bağlı değil, ama bu grubun içinde; grup gizlenince o da
+   *    gizleniyordu, ve grup tam olarak "raf seçili değilken" gizliydi.
    *
-   * Kaybedilen bir şey yok: three'nin `Raycaster`'ı `visible`'a bakmıyor
-   * (seçme ve fare olayları çalışır — görünmez çarpıştırıcı zaten tam bu
-   * yüzden `visible={false}`), `Box3.expandByObject` de bakmıyor (gölge
-   * frustum birleşimi bozulmaz). `layers` maskesi bu işi göremezdi: maske
-   * testi başarısız olsa bile çocuklar yine geziliyor.
+   * İkincisi budamanın kendi ölçümünü de şüpheli kılıyor: hayalet stok o
+   * pencerede hiç çizilmiyordu, yani kazancın bir kısmı çizilmeyen bir
+   * şeyden geliyordu.
    *
-   * `drawsSelf` true olduğunda — seçili, sürükleniyor, dışa aktarım, ya da
-   * toplu çizim kapalı — grup yeniden görünür olmak ZORUNDA, yoksa o hâlde
-   * hiç çizilmez.
+   * Gerekçenin tamamı ve geri gelmesini engelleyen bekçi
+   * `src/collective-visibility.test.ts`'te.
    */
-  const hidden = !drawsSelf
-  const userHidden = node.visible === false
-
-  /**
-   * Havuzun görünürlük taraması bu bayrakla "kolektif gizledi"yi "kullanıcı
-   * gizledi"den ayırıyor — ayıramazsa her raf havuzdan düşer ve sahne boşalır.
-   * Bkz. `collective.ts` `HIDDEN_FOR_COLLECTIVE`.
-   *
-   * JSX prop'u olarak DEĞİL, elle yazılıyor: R3F `userData={{...}}` prop'unu
-   * nesnenin tamamıyla değiştiriyor ve host'un kayıtlı nesneye yazdığı
-   * anahtarlar (`excludeFromBvh` gibi) her renderda silinirdi. `useLayoutEffect`
-   * kolektif sistemin `useFrame`'inden önce koşuyor, yani havuz bayrağı hep
-   * güncel okuyor.
-   */
-  useLayoutEffect(() => {
-    const object = registeredRef.current
-    if (object) object.userData[HIDDEN_FOR_COLLECTIVE] = hidden && !userHidden
-  }, [hidden, userHidden])
 
   return (
     <group
@@ -240,7 +207,7 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
       position={position}
       ref={registeredRef}
       rotation={rotation}
-      visible={!userHidden && !hidden}
+      visible={node.visible !== false}
     >
       {/*
           Selection collider. A rack is mostly air — clicks aimed at it fall
@@ -283,13 +250,9 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
           grup konumu ve dönüşü zaten taşıyor.
         */}
       {!isExporting && (
-        <mesh
-          dispose={null}
-          geometry={UNIT_COLLIDER}
-          material={COLLIDER_MATERIAL}
+        <Collider
           position={[0, node.uprightHeight / 2, 0]}
-          scale={[width, node.uprightHeight, depth]}
-          visible={false}
+          size={[width, node.uprightHeight, depth]}
         />
       )}
       {/* Kolektif çizici kapalıyken ya da bu düğüm seçili/sürükleniyorken
@@ -355,7 +318,7 @@ function GhostStock({ node }: { node: PalletRackNode }) {
   const spec = specOf(node.palletPreset)
   const geometry = useMemo(() => getPalletGeometry(node.palletPreset), [node.palletPreset])
   const appearance = useAppearance()
-  const material = getPalletMaterial(appearance)
+  const material = getPalletMaterial(appearance, node.palletPreset)
 
   /**
    * The pallet mesh is built with its **length along local X**, and the slot
@@ -492,7 +455,9 @@ function GhostStock({ node }: { node: PalletRackNode }) {
           ? getPalletFarGeometry(node.palletPreset)
           : getPalletGeometry(node.palletPreset)
       pallets.material =
-        next === 'far' ? getPalletFarMaterial(appearance) : getPalletMaterial(appearance)
+        next === 'far'
+          ? getPalletFarMaterial(appearance, node.palletPreset)
+          : getPalletMaterial(appearance, node.palletPreset)
       // Küre geometrinin uzanımından türüyor: takas edip tazelememek, kırpmayı
       // bir öncekinin ölçüsüyle yapmak olurdu.
       pallets.computeBoundingSphere()

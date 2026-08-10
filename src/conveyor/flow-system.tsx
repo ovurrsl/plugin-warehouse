@@ -5,7 +5,9 @@ import { useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useAppearance } from '../appearance'
 import { useWarehouseStore } from '../store'
+import { advanceConveyorBelt, resetConveyorBelt } from './conveyor-texture'
 import {
   buildNetwork,
   EMPTY_NETWORK,
@@ -16,6 +18,7 @@ import {
   resetReleases,
   step,
 } from './flow-simulation'
+import { getFlowBoxMaterial } from './materials'
 
 /**
  * Every box on every conveyor in the scene, in one draw call.
@@ -65,24 +68,18 @@ export default function ConveyorFlowSystem() {
   const seedRef = useRef(1)
 
   const geometry = useMemo(() => new THREE.BoxGeometry(...FLOW_BOX_M), [])
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        // Kraft, so a box reads as goods rather than as machinery — the whole
-        // conveyor family is blue steel and zinc.
-        color: '#c8a06a',
-        metalness: 0,
-        roughness: 0.85,
-      }),
-    [],
-  )
+  // Kutunun kraft rengi `materials.ts`'te, teleskopik bomun kendi havuzuyla
+  // PAYLAŞILAN bir aile olarak: ikisi de kendi çıplak materyalini kurarken
+  // aynı rengin iki kopyası vardı ve ikisi de Display menüsünü duymuyordu.
+  const material = getFlowBoxMaterial(useAppearance())
 
+  // Materyal artık paylaşılan önbellekten; onu burada dispose etmek sahnedeki
+  // ÖTEKİ kutuları da karartırdı. Geometri hâlâ bu bileşenin kendi malı.
   useEffect(() => {
     return () => {
       geometry.dispose()
-      material.dispose()
     }
-  }, [geometry, material])
+  }, [geometry])
 
   // A network with nothing to release into is a network with no boxes; drop
   // them rather than leaving the last frame's stranded on deleted modules.
@@ -101,8 +98,24 @@ export default function ConveyorFlowSystem() {
     if (!running || isExporting) {
       mesh.count = 0
       publishLifting(network, [])
+      // Bant da dursun ve BAŞA dönsün: duran bir hattın rastgele bir fazda
+      // donmuş kalması, iki kez çalıştırılan sahnenin farklı görünmesi demek.
+      resetConveyorBelt()
       return
     }
+
+    /**
+     * Yatağın kendisi de aksın.
+     *
+     * Kutular hareket ediyordu ama makaralar duruyordu: hat çalışırken kutular
+     * hareketsiz bir yüzeyin üstünde KAYIYORDU. Makara deseni bir dokuda ve
+     * hareketi o dokunun offset'ini kaydırmak — sahnedeki bütün modülleri tek
+     * uniform güncellemesiyle sürüyor, kare başına ek bir maliyeti yok.
+     *
+     * Burada, simülasyonun yanında: ikisini aynı kapıya bağlamak, bandın
+     * kutular dururken akmasını imkânsız kılıyor.
+     */
+    advanceConveyorBelt(Math.min(delta, MAX_STEP_S))
 
     boxesRef.current = step(network, boxesRef.current, Math.min(delta, MAX_STEP_S), () => {
       seedRef.current += 1
@@ -141,6 +154,13 @@ export default function ConveyorFlowSystem() {
   return (
     <instancedMesh
       args={[geometry, material, CAPACITY]}
+      /**
+       * Sıfırdan başla. `InstancedMesh` kurucusu `count`'u kapasiteye
+       * eşitliyor, yani ilk kare çizilene kadar altı yüz kutu origin'de
+       * üst üste duruyor — mount anında bir karelik bir yumru, ve materyal
+       * ayara bağlandığından beri Display düğmesine her basışta yeniden.
+       */
+      count={0}
       /**
        * Kutular gölge DÜŞÜRMEZ — aşağıdaki gerekçenin devamı.
        *

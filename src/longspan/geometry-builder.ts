@@ -92,16 +92,21 @@ function buildLongspanGeometryKey(
   detail: LongspanDetail,
   omission: FrameOmission = { omitRight: false },
 ): string {
-  const levels = fittedLevels(bay).map((level) =>
-    [
+  const levels = fittedLevels(bay).map((level) => {
+    // Panel alanları YALNIZ `beam-shelf` katmanında vertex kımıldatıyor:
+    // `beam-only` ve `hanging` hiç panel emit etmiyor, `reinforced-hm` ise
+    // panelini her zaman tek parça HM sacından kuruyor (`parts.ts` `hmLevel`)
+    // ve seviyenin `shelfKind`/`panels` alanlarına hiç bakmıyor.
+    const carriesPanel = level.structure === 'beam-shelf'
+    return [
       levelElevation(level).toFixed(4),
       level.structure,
-      level.structure === 'beam-only' || level.structure === 'hanging' ? '-' : level.shelfKind,
-      level.panels,
+      carriesPanel ? level.shelfKind : '-',
+      carriesPanel ? level.panels : '-',
       beamOffsetsZ(bay, level).length,
       levelNeedsZtam(bay, level) ? 'z' : '-',
-    ].join(':'),
-  )
+    ].join(':')
+  })
 
   return [
     detail,
@@ -111,7 +116,11 @@ function buildLongspanGeometryKey(
     bay.frameHeight.toFixed(5),
     bay.uprightProfile,
     bay.beamProfile,
-    bay.crossBracing ? 'x' : '-',
+    // Emisyon koşulunun BİREBİR aynısı (`parts.ts`: `crossBracing && detail ===
+    // 'full' && !omitRight`). Koşulsuz yazmak, çaprazın hiç kurulmadığı iki
+    // hâlde — sade katman ve paylaşılan çerçeve — önbelleği tek vertex
+    // kımıldamadan ikiye bölüyordu.
+    bay.crossBracing && detail === 'full' && !omission.omitRight ? 'x' : '-',
     bay.uprightColor,
     bay.beamColor,
     levels.join('|'),

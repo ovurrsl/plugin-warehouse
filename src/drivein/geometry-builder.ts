@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { getCachedGeometry, releaseGeometry, retainGeometry } from '../conveyor/geometry-builder'
+import { memoiseGeometryKey } from '../geometry-key-memo'
 import { emitRackPart, type Sink, toLinear } from '../rack/geometry-builder'
 import {
   clearOpening,
@@ -48,6 +49,9 @@ const ROLE_COLORS: Record<Exclude<DriveInPartRole, 'upright' | 'top-beam' | 'rai
   guide: '#8b9299',
   /** The impact reinforcer is the one part a driver is meant to notice. */
   reinforcer: '#eab308',
+  /** Giriş ortalayıcısı: sürücünün nişan aldığı ağız, uyarı sarısı ailesinden
+   *  ama takviyeden sönük — ikisi yan yana duruyor ve karışmamalılar. */
+  centraliser: '#ca8a04',
 }
 
 function buildFrom(
@@ -101,8 +105,11 @@ function buildFrom(
  *
  * Id, name, position, rotation, `supportSlabId` and `ghostFill` are absent on
  * purpose: two lanes that look the same must share one geometry.
+ *
+ * Çıplak üretici — dışarıya çıkan `driveInGeometryKey` bunun düğüm nesnesine
+ * memoize edilmiş hâli (dosyanın sonunda).
  */
-export function driveInGeometryKey(
+function buildDriveInGeometryKey(
   lane: DriveInRackNode,
   detail: DriveInDetail,
   omission: FrameOmission = { omitRight: false },
@@ -162,3 +169,9 @@ export function retainDriveInGeometry(
 
 export type { DriveInDetail }
 export { releaseGeometry as releaseDriveInGeometry }
+
+/** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildDriveInGeometryKey`. */
+export const driveInGeometryKey = memoiseGeometryKey(
+  buildDriveInGeometryKey,
+  (detail, omission) => `${detail}:${omission?.omitRight ? 'L' : 'LR'}`,
+)

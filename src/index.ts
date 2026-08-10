@@ -1,5 +1,6 @@
 import type { AnyNodeDefinition, Plugin } from '@pascal-app/core'
 import type { EditorHostPanel } from '@pascal-app/editor'
+import { benchDefinition } from './bench/definition'
 import { conveyorBoosterDefinition } from './conveyor/booster-definition'
 import { conveyorCurveDefinition } from './conveyor/curve-definition'
 import { conveyorRollerDefinition } from './conveyor/definition'
@@ -7,6 +8,7 @@ import { conveyorLauncherDefinition } from './conveyor/launcher-definition'
 import { conveyorObliqueDefinition } from './conveyor/oblique-definition'
 import { conveyorTelescopicDefinition } from './conveyor/telescopic-definition'
 import { conveyorTransferDefinition } from './conveyor/transfer-definition'
+import { dockLevellerDefinition } from './dockleveller/definition'
 import { driveInRackDefinition } from './drivein/definition'
 import { liveRackingDefinition } from './live-racking/definition'
 import { longspanDefinition } from './longspan/definition'
@@ -16,6 +18,7 @@ import { palletDefinition } from './pallet/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
+import { toteCartDefinition } from './totecart/definition'
 import { truckDefinition } from './truck/definition'
 
 /**
@@ -57,6 +60,9 @@ export const warehousePlugin: Plugin = {
     driveInRackDefinition as unknown as AnyNodeDefinition,
     longspanDefinition as unknown as AnyNodeDefinition,
     m3ShelvingDefinition as unknown as AnyNodeDefinition,
+    benchDefinition as unknown as AnyNodeDefinition,
+    dockLevellerDefinition as unknown as AnyNodeDefinition,
+    toteCartDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -95,6 +101,9 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:drive-in-rack',
     'warehouse:longspan-rack',
     'warehouse:m3-rack',
+    'warehouse:bench',
+    'warehouse:dock-leveller',
+    'warehouse:tote-cart',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

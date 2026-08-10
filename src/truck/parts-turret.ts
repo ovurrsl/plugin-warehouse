@@ -19,6 +19,8 @@
 import type { TruckModel } from '../handling/models'
 import { visualForkFaceX } from './metrics'
 import {
+  pushBeacon,
+  pushBodyShell,
   pushForkPair,
   pushMastStage,
   pushWheel,
@@ -48,12 +50,38 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
 
   switch (body) {
     case 'chassis': {
-      // Uzun gövde: batarya bölmesi + şasi, arka yüzden mast'a.
-      parts.push({
-        role: 'chassis',
-        center: [(rearX + bodyFrontX) / 2, 0.75, 0],
-        size: [bodyFrontX - rearX, 1.3, model.b1 - 0.02],
+      // Uzun gövde: batarya bölmesi + şasi, arka yüzden mast'a. Tek prizma
+      // DEĞİL — 1,3 m'lik kesintisiz bir yüz düz bir renk lekesi olarak
+      // okunuyordu ve lastikler tamamen içinde kalıyordu (bkz. `pushBodyShell`).
+      // Arka blok KOYU: gerçek makinede orası karşı ağırlık ve batarya kapağı,
+      // gövde saclarıyla aynı rengi taşımıyor. İki tonu iki katmanda da
+      // tutmak, 1,6 m'lik gövdeyi iki kütleye bölen şey.
+      const ballastFrontX = rearX + 0.42
+      pushBodyShell(parts, {
+        role: 'counterweight',
+        xRear: rearX,
+        xFront: ballastFrontX,
+        halfWidth: bodyHalfZ - 0.01,
+        yBottom: 0.1,
+        yTop: 1.4,
+        // Kuşak gövdeninkiyle AYNI kotta: iki kütlenin çıtası hizalanmazsa
+        // makine iki ayrı parçadan yapıştırılmış gibi okunur.
+        beltY: 0.78,
+        skirtInset: 0.075,
       })
+      pushBodyShell(parts, {
+        role: 'chassis',
+        xRear: ballastFrontX,
+        xFront: bodyFrontX,
+        halfWidth: bodyHalfZ - 0.01,
+        yBottom: 0.1,
+        yTop: 1.4,
+        beltY: 0.78,
+        skirtInset: 0.075,
+      })
+      // Çakar gövdenin tepesinde — kabin tavanı h6 zarfın kendisi, oraya
+      // konsaydı makine kataloğun söylediğinden yüksek olurdu.
+      pushBeacon(parts, { x: rearX + 0.3, yBase: 1.4, z: 0, detail })
       if (detail === 'full') {
         // Batarya kapağı + arka tampon + kılavuz makaraları (ray kılavuzlu
         // koridorun donanımı — dört köşede).
@@ -61,11 +89,6 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
           role: 'chassis',
           center: [rearX + 0.5, 1.47, 0],
           size: [0.9, 0.06, model.b1 - 0.2],
-        })
-        parts.push({
-          role: 'counterweight',
-          center: [rearX + 0.08, 0.55, 0],
-          size: [0.16, 0.9, model.b1 - 0.06],
         })
         for (const sx of [rearX + 0.25, bodyFrontX - 0.15]) {
           for (const side of [-1, 1] as const) {

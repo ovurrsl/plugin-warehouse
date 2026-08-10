@@ -532,7 +532,46 @@ export function pickingOffsetsZ(rack: PalletRackNode): number[] {
  * holding the old string, and `GhostStock` draws a ghost straight through the
  * real pallet because it cannot match them.
  */
-export function palletSlotsOf(rack: PalletRackNode): Slot[] {
+/**
+ * Yuva enumerasyonu, düğüm nesnesine memoize.
+ *
+ * `palletSlotsOf` yuva başına bir `Slot` nesnesi ve bir adres dizgesi
+ * ayırıyor, ve dört ayrı yerden çağrılıyor: sahne istatistikleri, filo
+ * istasyon kurulumu, palet aracının FARE HAREKETİ başına koşan hedef
+ * araması (`pallet/slot-placement.ts`) ve raf paneli — panel tek renderda
+ * üç enumerasyon yapıyor. `stats.ts` maliyeti ölçüp kendi `WeakMap`'ini
+ * kurmuştu ("iki bin gözlük bir depoda bir sürükleme tıkı yaklaşık yirmi
+ * dört bin dizge ayırıyordu"), ama önbellek oraya özeldi; kalan üç çağıran
+ * ham yola düşüyordu.
+ *
+ * Dayandığı değişmez `geometry-key-memo.ts`'inkiyle aynı: host store düğümü
+ * YERİNDE değiştirmiyor, yenisiyle değiştiriyor. Yerinde değiştirilen bir
+ * düğüm bayat liste döndürür.
+ *
+ * Dönen dizi artık PAYLAŞILIYOR. `readonly` dönüş tipi bunu çağıranlara
+ * söylüyor: listeyi sıralayan ya da eleyen biri, aynı düğümü okuyan
+ * herkesin cevabını değiştirirdi.
+ */
+const slotCache = new WeakMap<object, readonly Slot[]>()
+const pickingSlotCache = new WeakMap<object, readonly Slot[]>()
+
+export function palletSlotsOf(rack: PalletRackNode): readonly Slot[] {
+  const hit = slotCache.get(rack)
+  if (hit) return hit
+  const slots = buildPalletSlots(rack)
+  slotCache.set(rack, slots)
+  return slots
+}
+
+export function pickingSlotsOf(rack: PalletRackNode): readonly Slot[] {
+  const hit = pickingSlotCache.get(rack)
+  if (hit) return hit
+  const slots = buildPickingSlots(rack)
+  pickingSlotCache.set(rack, slots)
+  return slots
+}
+
+function buildPalletSlots(rack: PalletRackNode): Slot[] {
   const offsets = slotOffsetsX(rack)
   const present = new Set(storageLevelsPresent(rack))
   const footprint = orientedPalletFootprint(rack)
@@ -589,7 +628,7 @@ export function directAccessSlotCount(rack: PalletRackNode): number {
  * changes with the level's type, which is why a single address parser serves
  * both and a stored location never has to say which kind it was.
  */
-export function pickingSlotsOf(rack: PalletRackNode): Slot[] {
+function buildPickingSlots(rack: PalletRackNode): Slot[] {
   const offsetsX = pickingOffsetsX(rack)
   const offsetsZ = pickingOffsetsZ(rack)
   const present = new Set(storageLevelsPresent(rack))

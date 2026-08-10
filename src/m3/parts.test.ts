@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { bayPitch, crossBraceSets, drawerCount, UPRIGHT_SECTION } from './bays'
+import { bayPitch, crossBraceSets, drawerCount, totalDepth, UPRIGHT_SECTION } from './bays'
 import { type M3Part, m3Parts } from './parts'
 import { M3ShelvingNode } from './schema'
 
@@ -314,5 +314,60 @@ describe('uzak katman', () => {
     expect(roles(simple, 'frame-diagonal')).toHaveLength(0)
     expect(roles(simple, 'brace')).toHaveLength(0)
     expect(simple.length).toBeLessThan(m3Parts(node, 'full').length)
+  })
+})
+
+/**
+ * DENETİMİN BULDUĞU İKİ KUSUR.
+ */
+describe('çapraz gözün arkasında, braketler iki uçta', () => {
+  test('koridor çaprazı rafların İÇİNDEN geçmiyor', () => {
+    /**
+     * `-shelfDepth/2 + postDepth` çaprazı arka dikmenin ÖN yüzüne koyuyordu,
+     * yani rafın derinlik ayak izinin tam içine: 18 mm'lik çubuk dört katın
+     * hepsini kesiyordu. Çapraz gerçek üründe arka dikmelerin ARKA yüzüne
+     * cıvatalanır.
+     */
+    const node = bay({ frameHeight: 2.5, backPanel: 'none' })
+    const parts = m3Parts(node, 'full')
+    const braces = parts.filter((part) => part.role === 'brace')
+    const shelves = parts.filter((part) => part.role === 'shelf')
+    expect(braces.length, 'çapraz yok').toBeGreaterThan(0)
+    expect(shelves.length).toBeGreaterThan(0)
+
+    for (const brace of braces) {
+      for (const shelf of shelves) {
+        const hitZ =
+          Math.abs(brace.center[2] - shelf.center[2]) < (brace.size[2] + shelf.size[2]) / 2 - 1e-9
+        expect(hitZ, 'çapraz rafın derinliğine giriyor').toBe(false)
+      }
+      // Ve gerçekten ARKADA: rafın arka yüzünün gerisinde.
+      expect(brace.center[2]).toBeLessThan(-node.shelfDepth / 2)
+    }
+  })
+
+  test('zarf çaprazı SAYIYOR — görünür ama tıklanamaz bir parça bırakmıyor', () => {
+    // Çapraz ayak izinin dışına çıktı; zarf onu saymazsa görünür ama
+    // tıklanamaz olur ve komşusuyla çakıştığı görülmez.
+    const braced = bay({ frameHeight: 2.5, backPanel: 'none' })
+    const panelled = bay({ frameHeight: 2.5, backPanel: 'metal' })
+    expect(totalDepth(braced)).toBeGreaterThan(braced.shelfDepth)
+    // Arka panelli gözde çapraz YOK, zarf da büyümüyor.
+    expect(totalDepth(panelled)).toBeCloseTo(panelled.shelfDepth, 9)
+  })
+
+  test('komşusu olan göz KENDİ raflarını iki uçtan da braketliyor', () => {
+    /**
+     * Braket çerçevenin değil RAFIN parçası: paylaşılan çerçeveye takılıp bu
+     * gözün rafını taşıyor. `lines` üzerinde dönerken sıraya eklenen her göz
+     * dört rafını yalnız sol uçtan braketli çiziyordu — rafın sağ ucu havada.
+     */
+    const alone = m3Parts(bay(), 'full').filter((part) => part.role === 'shelf-support')
+    const abutted = m3Parts(bay(), 'full', { omitRight: true }).filter(
+      (part) => part.role === 'shelf-support',
+    )
+    expect(abutted.length).toBe(alone.length)
+    // Ve iki farklı X'te duruyorlar.
+    expect(new Set(abutted.map((part) => Math.sign(part.center[0]))).size).toBe(2)
   })
 })

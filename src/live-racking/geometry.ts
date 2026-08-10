@@ -74,23 +74,39 @@ function buildParts(
 }
 
 function buildLiveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingDetail): string {
+  /**
+   * Makara hattı ve akış donanımı YALNIZ yakın katmanda üretiliyor
+   * (`liveRackingParts`): uzak katmanda kanal tek bir eğik şerit, ve o şerit
+   * ne makara aralığını, ne bölünmüş makarayı, ne tutucuyu görüyor. Bu üç
+   * alanı katmandan bağımsız yazmak, birebir aynı buffer'ı birden çok anahtar
+   * altında saklamak — anahtarın CLAUDE.md'de adlandırılan öteki yönü.
+   */
+  const full = detail === 'full'
   return [
     'live',
     node.variant,
     node.palletPreset,
     node.palletsDeep,
     node.levels,
-    node.firstLevelClear,
-    node.levelClear,
+    // Zemin seviyesi transpalet katında ilk kanal doğrudan zemine oturuyor ve
+    // `firstLevelClear` hiç okunmuyor (`levelExitYM`) — kot zinciri zeminden
+    // başlıyor.
+    node.floorSetPalletTruckLevel ? 0 : node.firstLevelClear,
+    // Katlar arası açıklık ancak ÜSTÜNE bir kat varsa bir şey taşıyor: tek
+    // katlı kanalda `levelExitYM`'in döngüsü hiç dönmüyor.
+    node.levels > 1 ? node.levelClear : 0,
     node.gradient,
-    node.rollerPitch,
+    full ? node.rollerPitch : 0,
+    // Bu, katmandan bağımsız: tutucu görünür parçasının yanında kanal
+    // DERİNLİĞİNİ de uzatıyor (`channelDepthM`), yani uzak katmanın tek
+    // şeridi bile ondan uzuyor.
     node.withRetainers,
-    node.splitRollers,
+    full && node.splitRollers,
     // Ham bayrak değil ETKİN değer: ara tutucu eşiğin altında hiçbir parça
     // üretmiyor, dolayısıyla o iki kanalın geometrisi birebir aynı ve aynı
     // buffer'ı paylaşmalılar. Ham bayrağı koymak, hiç farkı olmayan iki
     // kanal için iki ayrı mesh üretirdi.
-    hasIntermediateRetainers(node),
+    full && hasIntermediateRetainers(node),
     node.hingedChannels,
     node.floorSetPalletTruckLevel,
     node.cladRack,

@@ -91,15 +91,40 @@ export function longspanParts(
         size: [upright.width * 1.5, FOOTPLATE_THICKNESS, upright.depth * 1.4],
       })
     }
-    // The frame's own diagonal, in its Y–Z plane. Always present: a frame
-    // without it is two loose posts, which is not a product.
-    if (detail === 'full') {
-      const rise = Math.min(bay.frameHeight * 0.9, bay.frameDepth * 3)
+    /**
+     * Çerçeve kafesi, kendi Y–Z düzleminde: altta ve üstte yatay bağ, arada
+     * yükseklikten türeyen zikzak çapraz dizisi.
+     *
+     * Önceki hâl TEK bir çaprazdı ve yükselişi derinliğe kilitliydi
+     * (`min(h·0.9, derinlik·3)`): varsayılan bayda cap zaten devredeydi ve
+     * altta 0,35 m, üstte 0,35 m çıplak dikme kalıyordu. 6 m'lik bir çerçevede
+     * ortada havada asılı 1,9 m'lik tek bir çubuk, altında 2,1 m ve üstünde
+     * 2,1 m tamamen boş dikme oluyordu. Yatay bağ hiç yoktu.
+     *
+     * Yükseklik artık çapraz SAYISINI büyütüyor, tek çaprazın açısını değil —
+     * `rack/parts.ts`'in `pushFrameBracing` deseni. İKİ katmanda da
+     * kuruluyor: kendi eski yorumu da bunu söylüyordu ("a frame without it is
+     * two loose posts, which is not a product") ama kod `full`'e kapamıştı,
+     * yani 70 m'nin ötesinde her çerçeve gerçekten iki çıplak dikmeydi.
+     */
+    const tieY = [BRACE_SECTION, bay.frameHeight - BRACE_SECTION]
+    for (const y of tieY) {
       parts.push({
         role: 'brace',
-        center: [x, bay.frameHeight / 2, 0],
-        size: [BRACE_SECTION, BRACE_SECTION, Math.hypot(bay.frameDepth, rise)],
-        tiltX: Math.atan2(rise, bay.frameDepth),
+        center: [x, y, 0],
+        size: [BRACE_SECTION, BRACE_SECTION, bay.frameDepth - upright.depth],
+      })
+    }
+    const braced = tieY[1]! - tieY[0]!
+    const bays = Math.max(2, Math.round(braced / 0.9))
+    const rise = braced / bays
+    for (let i = 0; i < bays; i++) {
+      parts.push({
+        role: 'brace',
+        center: [x, tieY[0]! + (i + 0.5) * rise, 0],
+        size: [BRACE_SECTION, BRACE_SECTION, Math.hypot(bay.frameDepth - upright.depth, rise)],
+        // Ardışık çaprazlar zıt yöne — zikzak bu.
+        tiltX: (i % 2 === 0 ? 1 : -1) * Math.atan2(rise, bay.frameDepth - upright.depth),
       })
     }
   }
@@ -116,10 +141,18 @@ export function longspanParts(
     // Beams. Length is the CLEAR bay length: a beam sized to the pitch runs
     // centre to centre and buries half an upright at each end — the bug
     // `rack/parts.ts` documents, invisible without flying the camera inside.
-    const beamTop =
-      level.structure === 'beam-only' || level.structure === 'hanging'
-        ? surface
-        : surface - SHELF_KINDS[level.shelfKind].thickness
+    /**
+     * Kirişin ÜSTÜ = yük yüzeyi, her montajda.
+     *
+     * Önceki hâl sunta montajında kirişi panel kalınlığı kadar aşağı
+     * indiriyordu: panel kirişin üstünde bir eşik gibi duruyor ve 22 mm'lik
+     * göbek kenarı koridora tamamen açık kalıyordu. Bu, paketin kendi kaynak
+     * notuyla çelişiyordu — `standards.ts`: "Sits between two ZE/ZS beams; the
+     * beam's vertical edge conceals the front edge." Panel artık kirişlerin
+     * ARASINA düşüyor ve üstü onlarla aynı düzlemde bitiyor; `rack/parts.ts`
+     * aynı kararı aynı gerekçeyle veriyor ("pallets do not float on a lip").
+     */
+    const beamTop = surface
 
     for (const z of beamOffsetsZ(bay, level)) {
       parts.push({
@@ -165,7 +198,11 @@ export function longspanParts(
       parts.push({
         role: 'shelf',
         center: [cursor + width / 2, surface - shelf.thickness / 2, 0],
-        size: [width, shelf.thickness, bay.frameDepth - beam.depth],
+        // Derinlik iki kirişin ARASI: kiriş kalınlığı bir kere değil İKİ kere
+        // çıkıyor. Önceki hâl (`frameDepth - beam.depth`) panelin ön kenarını
+        // tam kirişin orta düzlemine oturtuyordu — üstten bakınca her iki uzun
+        // kenarda 15 mm'lik turuncu şerit.
+        size: [width, shelf.thickness, bay.frameDepth - 2 * beam.depth],
         pattern: level.shelfKind === 'mesh' ? 'mesh' : undefined,
         shelfKind: level.shelfKind,
       })
@@ -178,10 +215,23 @@ export function longspanParts(
     if (detail === 'full' && levelNeedsZtam(bay, level)) {
       for (const z of beamOffsetsZ(bay, level)) {
         for (const sign of [-1, 1] as const) {
+          /**
+           * Kelepçe kirişin üst flanşıyla panelin kenarını KUCAKLIYOR.
+           *
+           * Önceki hâlde küp Y'de tamamen kirişin içindeydi ve Z'de her
+           * yüzden yalnız 5 mm taşıyordu: turuncu kirişin koridora bakan
+           * yüzünde 40×5 mm'lik koyu lekeler. İşlevsel olarak da yanlış
+           * yerdeydi — suntayı kirişe bastıran parça paneli hiç kesmiyor,
+           * altında kalıyordu.
+           */
           parts.push({
             role: 'ztam-clamp',
-            center: [sign * bay.bayLength * 0.25, surface - shelf.thickness - ZTAM_SIZE / 2, z],
-            size: [ZTAM_SIZE, ZTAM_SIZE, ZTAM_SIZE],
+            center: [
+              sign * bay.bayLength * 0.25,
+              surface - shelf.thickness / 2,
+              z + Math.sign(z) * (beam.depth / 2),
+            ],
+            size: [ZTAM_SIZE, shelf.thickness + ZTAM_SIZE, beam.depth],
           })
         }
       }

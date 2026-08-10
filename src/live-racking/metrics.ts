@@ -81,9 +81,20 @@ export function channelDropM(node: LiveRackingNode): number {
 export function levelExitYM(node: LiveRackingNode, level: number): number {
   const structure = DYNAMIC_BEAM_HEIGHT_M + CHANNEL_PROFILE_HEIGHT_M
   const drop = channelDropM(node)
-  // Zemin seviyesi transpalet katında ilk kanal doğrudan zemine oturur:
-  // altında serbest yükseklik yok, yalnız kanalın kendi yapısı var.
-  let y = node.floorSetPalletTruckLevel ? structure : node.firstLevelClear
+  /**
+   * Zemin seviyesi transpalet katında ilk kanal doğrudan zemine oturur:
+   * altında serbest yükseklik yok, yalnız kanalın kendi yapısı var.
+   *
+   * Öteki dal `structure`'ı EKLEMİYORDU ve iki dal aynı sözleşmeyi
+   * kullanmıyordu: `firstLevelClear` kanalın ALTINDAKİ açıklık, ama o dalda
+   * doğrudan makara ÜST kotu olarak yazılıyordu. Sonuç: kullanıcı 1,5 m
+   * girdiğinde çizilen gerçek açıklık 1,5 − 0,22 = 1,28 m.
+   *
+   * Sessizin ötesinde: panel aynı alanı katalogun H ≥ 400 mm kuralına karşı
+   * denetliyor, yani kullanıcı tam 0,40 girdiğinde panel "uygun" diyor ve
+   * model 0,18 m'lik bir açıklık çiziyordu — katalog sınırının yarısından az.
+   */
+  let y = node.floorSetPalletTruckLevel ? structure : node.firstLevelClear + structure
   for (let i = 0; i < level; i++) {
     y += drop + structure + node.levelClear
   }

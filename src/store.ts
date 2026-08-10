@@ -1,6 +1,8 @@
 import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
+import type { BenchNode } from './bench/schema'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
+import type { DockLevellerNode } from './dockleveller/schema'
 import type { DriveInRackNode } from './drivein/schema'
 import type { LiveRackingNode } from './live-racking/schema'
 import type { LongspanLevel, LongspanNode } from './longspan/schema'
@@ -12,6 +14,7 @@ import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 import { defaultWidthM } from './route/metrics'
 import type { RouteNode } from './route/schema'
+import type { ToteCartNode } from './totecart/schema'
 import type { TruckNode } from './truck/schema'
 
 /**
@@ -220,6 +223,15 @@ type WarehouseStore = {
   liveRackingBrush: LiveRackingBrush
   setLiveRackingBrush: (patch: Partial<LiveRackingBrush>) => void
 
+  benchBrush: BenchBrush
+  setBenchBrush: (patch: Partial<BenchBrush>) => void
+
+  dockLevellerBrush: DockLevellerBrush
+  setDockLevellerBrush: (patch: Partial<DockLevellerBrush>) => void
+
+  toteCartBrush: ToteCartBrush
+  setToteCartBrush: (patch: Partial<ToteCartBrush>) => void
+
   driveInBrush: DriveInBrush
   setDriveInBrush: (patch: Partial<DriveInBrush>) => void
 
@@ -243,6 +255,35 @@ export type RouteBrush = Pick<
 export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
 
 export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth' | 'extension'>
+
+/**
+ * Tezgâh yerleştirme fırçası.
+ *
+ * Varyantla birlikte ÜÇ ölçü de fırçada: ölçüler ayarlanabilir olduğu için
+ * arka arkaya beş masa koyan kullanıcı beşini de aynı ölçüde ister, ve
+ * varyanta geri dönmek bir alanı temizlemek kadar kolay.
+ */
+export type BenchBrush = Pick<BenchNode, 'variant' | 'width' | 'height' | 'depth'>
+
+/**
+ * Rampa fırçası — `inclination` YOK ve olmaması bilinçli.
+ *
+ * Fırça "bir sonraki nesne neye benzeyecek" demek, ve rampa her zaman
+ * dinlenmede konuyor: kalkmış bir tabla yerleştirilecek izi olduğundan büyük
+ * gösterir, ve kullanıcı çukuru koyuyor, makineyi çalıştırmıyor. Eğim
+ * yerleştirmeden SONRA panelden ayarlanan bir poz.
+ */
+/** Araba fırçası — `loadedTiers` YOK: yeni araba dolu konur, kısmen
+ *  toplanmış hâli yerleştirmeden SONRA panelden ayarlanan bir durum. */
+export type ToteCartBrush = Pick<
+  ToteCartNode,
+  'toteFootprint' | 'toteHeight' | 'tiers' | 'castorDiameter' | 'tilt' | 'hasHandle'
+>
+
+export type DockLevellerBrush = Pick<
+  DockLevellerNode,
+  'width' | 'length' | 'lip' | 'lipLength' | 'capacity' | 'frameHeight'
+>
 
 export type LiveRackingBrush = Pick<
   LiveRackingNode,
@@ -492,6 +533,38 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   },
   setLiveRackingBrush: (patch) =>
     set((state) => ({ liveRackingBrush: { ...state.liveRackingBrush, ...patch } })),
+
+  // Ölçüler BOŞ başlıyor: varyant seçmek zarfı da seçiyor demek. Buraya sayı
+  // yazmak, altı varyanttan beşini ilk yerleştirmede yanlış ölçüde koyardı.
+  benchBrush: { variant: 'processing' },
+  setBenchBrush: (patch) => set((state) => ({ benchBrush: { ...state.benchBrush, ...patch } })),
+
+  // Kataloğun en yaygın satırı: 2500 × 2000 mm, menteşeli dudak (Armo,
+  // "ready in stock"). Yerleştirme her zaman DİNLENMEDE — kullanıcı çukuru
+  // koyuyor, rampayı çalıştırmıyor.
+  dockLevellerBrush: {
+    width: '2000',
+    length: '2500',
+    lip: 'hinged',
+    lipLength: '400',
+    capacity: '60',
+    frameHeight: '585',
+  },
+  setDockLevellerBrush: (patch) =>
+    set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
+
+  // Kullanıcının kendi spec'inin arabası: 5 kat x 220 mm kasa, ki toplam
+  // yükseklik onun yayımladigi 1,5 m'ye çıksın.
+  toteCartBrush: {
+    toteFootprint: '600x400',
+    toteHeight: '220',
+    tiers: 5,
+    castorDiameter: '100',
+    tilt: false,
+    hasHandle: true,
+  },
+  setToteCartBrush: (patch) =>
+    set((state) => ({ toteCartBrush: { ...state.toteCartBrush, ...patch } })),
 
   driveInBrush: {
     laneClearWidth: 1.35,

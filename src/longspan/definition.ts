@@ -80,6 +80,18 @@ export const longspanDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Baked `/viewer` sözleşmesi — rafla ve şeritle aynı.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyor: on baylık bir
+   * run on ayrı mesh, hepsi aynı şekli çiziyor. `replace` baked mesh'i
+   * gizletip seviyenin bay'lerini canlı statik instancing'le çizdiriyor, yani
+   * run şekil başına tek çizim çağrısına iniyor. Eklenti yüklü değilse politika
+   * `static`'e düşer ve baked mesh görünür kalır — veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
+
   floorplan: buildLongspanFloorplan,
 
   tool: () => import('./tool'),

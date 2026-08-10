@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { clashesWith } from '../clash'
 import { PalletRackNode } from '../rack/schema'
 import { CAR, exteriorWidthM, SPEEDS_M_PER_MIN } from './catalog'
 import { MIN_ROLLERS_UNDER_A_BOX, ROLLER_PITCHES_MM } from './constants'
+import { BELT_PITCHES_PER_SECOND } from './conveyor-texture'
 import {
   clearConveyorGeometryCache,
   conveyorGeometryCacheSize,
   conveyorGeometryKey,
   getConveyorGeometry,
+  releaseGeometry,
+  retainGeometry,
+  sweepConveyorGeometry,
 } from './geometry-builder'
 import {
   carriesShortestBox,
@@ -15,6 +21,7 @@ import {
   moduleLengthM,
   rollerOffsetsX,
   rollerPitchM,
+  speedMPerSec,
   supportOffsetsX,
   withinCatalogueLength,
 } from './metrics'
@@ -197,8 +204,66 @@ describe('geometry', () => {
     expect(conveyorGeometryKey(forward, 'full', true)).not.toBe(
       conveyorGeometryKey(reverse, 'full', true),
     )
-    // And unabutted they are the same mesh, because nothing is dropped.
-    expect(conveyorGeometryKey(forward, 'full')).toBe(conveyorGeometryKey(reverse, 'full'))
+    // Dayanmamışken de AYRI, ve bu bu turda değişti: yatağın makara deseni
+    // artık akış yönünde kayıyor, yön de V'nin işaretinde taşınıyor
+    // (`beltStripeSpan`). İki yön tek buffer'ı paylaşsaydı ters modülün bandı
+    // kutuların tersine akardı — ekranda hata yok, yalnız yanlış yöne dönen
+    // bir hat. Eskiden burada `toBe` yazıyordu ve o zaman doğruydu: yön hiçbir
+    // vertex'i kımıldatmıyordu.
+    expect(conveyorGeometryKey(forward, 'full')).not.toBe(conveyorGeometryKey(reverse, 'full'))
+  })
+
+  /**
+   * BANT GERÇEKTEN AKIYOR MU.
+   *
+   * Bildirilen hata: hat çalışırken kutular gidiyordu ama makaralar
+   * duruyordu — kutular hareketsiz bir yüzeyin üstünde kayıyordu. Sessiz:
+   * konsolda tek satır yok, sahne kusursuz çiziliyor, yalnız duran bir
+   * makinenin üstünde yük taşınıyor.
+   *
+   * Kaydırmanın kendisi bir `CanvasTexture` üstünde çalışıyor ve canvas
+   * `document` istiyor, yani test ortamında doku hiç doğmuyor. O yüzden
+   * ölçülebilen iki şey ölçülüyor: hızın katalogla tutarlılığı, ve KABLONUN
+   * takılı olduğu — çünkü hız doğru olup döngünün çağırmaması tam da
+   * düzeltilen hata.
+   */
+  test('bant hızı katalog varsayılanından geliyor', () => {
+    // 45 m/dk ve 75 mm adım → saniyede 10 makara adımı. Sabit elle yazılsaydı
+    // katalog değişince sessizce ayrışırdı.
+    const node = conveyor({})
+    const expected = speedMPerSec(node) / rollerPitchM(node)
+    expect(BELT_PITCHES_PER_SECOND).toBeCloseTo(expected, 9)
+    expect(BELT_PITCHES_PER_SECOND).toBeGreaterThan(0)
+  })
+
+  test('akış döngüsü bandı gerçekten sürüyor ve durunca sıfırlıyor', () => {
+    const source = readFileSync(join(import.meta.dir, 'flow-system.tsx'), 'utf8')
+    const frame = source.slice(source.indexOf('useFrame('))
+    expect(frame, 'kare döngüsü bandı ilerletmiyor').toContain('advanceConveyorBelt(')
+    // Durma dalı `running` kapısının içinde; orada sıfırlanmazsa hat rastgele
+    // bir fazda donmuş kalıyor.
+    const stopped = frame.slice(frame.indexOf('if (!running'), frame.indexOf('boxesRef.current ='))
+    expect(stopped, 'akış durunca bant başa dönmüyor').toContain('resetConveyorBelt()')
+  })
+
+  test('ters akışın yatak UV’si ileri akışın AYNASI', () => {
+    // Anahtarın ayrışması yetmez: mesh'in gerçekten aynalandığını ölçmek
+    // gerekiyor, yoksa anahtar boşuna bölünmüş olurdu.
+    clearConveyorGeometryCache()
+    const uvOf = (flow: 'forward' | 'reverse') => {
+      clearConveyorGeometryCache()
+      const geometry = getConveyorGeometry(conveyor({ flow, hasDrive: false }), 'full')
+      const uv = geometry.getAttribute('uv')
+      const vs: number[] = []
+      for (let i = 0; i < uv.count; i++) vs.push(uv.getY(i))
+      return vs
+    }
+    const forward = uvOf('forward')
+    const reverse = uvOf('reverse')
+    expect(reverse.length).toBe(forward.length)
+    expect(Math.max(...forward)).toBeGreaterThan(1)
+    expect(Math.min(...reverse)).toBeLessThan(-1)
+    for (const [index, v] of forward.entries()) expect(reverse[index]).toBeCloseTo(-v, 9)
   })
 })
 
@@ -468,5 +533,67 @@ describe('the catalogue is the source, and it is not paraphrased', () => {
     for (const pitch of ROLLER_PITCHES_MM) {
       expect(pitch * MIN_ROLLERS_UNDER_A_BOX).toBeLessThanOrEqual(800)
     }
+  })
+})
+
+describe('sıfır-tutan süpürme — paylaşılan konveyör havuzu', () => {
+  const GRACE = 5000
+
+  beforeEach(() => {
+    clearConveyorGeometryCache()
+  })
+
+  test('kimsenin tutmadığı şekil pencere dolunca silinir, tutulan asla', () => {
+    /**
+     * İki sessiz hata. Pencere dolduğu hâlde silinmeyen şekil, kaydırıcı
+     * sürtmesinin artığını oturum boyunca taşır — ve bu havuzu yedi kind
+     * paylaştığı için tavan (`CACHE_LIMIT`) tek başına yetmiyordu, yalnız
+     * TAVANA ULAŞILDIĞINDA iş yapıyordu. TUTULAN bir şekli silmek ise o
+     * şekli paylaşan her modülü aynı anda karartır ve hiçbir yerde hata
+     * görünmez.
+     */
+    const held = conveyor()
+    const scrub = conveyor({ rollers: 30 })
+
+    const key = retainGeometry(conveyorGeometryKey(held, 'full', false))
+    const heldGeometry = getConveyorGeometry(held, 'full')
+    const scrubGeometry = getConveyorGeometry(scrub, 'full')
+    expect(conveyorGeometryCacheSize()).toBe(2)
+
+    // Saat şekiller kurulduktan SONRA okunuyor: damgayı `getCachedGeometry`
+    // kendi `Date.now()`'ıyla basıyor, yani önce okunursa test iki
+    // birleştirilmiş buffer'ın inşa süresine yarışır ve yüklü bir süitte
+    // rastgele kırılır.
+    const now = Date.now()
+
+    sweepConveyorGeometry(now + GRACE - 1)
+    expect(conveyorGeometryCacheSize()).toBe(2)
+
+    sweepConveyorGeometry(now + GRACE + 1)
+    expect(conveyorGeometryCacheSize()).toBe(1)
+    // Silindiğinin kanıtı kimlikten okunur: three'nin `dispose()`'u tamponu
+    // yerinde bırakır, yalnız GPU tarafını boşaltır.
+    expect(getConveyorGeometry(scrub, 'full')).not.toBe(scrubGeometry)
+    expect(getConveyorGeometry(held, 'full')).toBe(heldGeometry)
+
+    releaseGeometry(key)
+  })
+
+  test('bırakılan şekil pencereyi YENİDEN başlatır, silinme anında olmaz', () => {
+    // Sıfıra düşen sayaç anında dispose etseydi, React'in commit boşluğunda
+    // (renderer anahtarını bir efektte tutuyor) çizilen buffer serbest
+    // kalırdı — `evict`'in belgelediği yarışın aynısı.
+    const module = conveyor({ rollers: 34 })
+    const key = retainGeometry(conveyorGeometryKey(module, 'full', false))
+    getConveyorGeometry(module, 'full')
+
+    releaseGeometry(key)
+    const now = Date.now()
+
+    sweepConveyorGeometry(now + GRACE - 1)
+    expect(conveyorGeometryCacheSize()).toBe(1)
+
+    sweepConveyorGeometry(now + GRACE + 1)
+    expect(conveyorGeometryCacheSize()).toBe(0)
   })
 })

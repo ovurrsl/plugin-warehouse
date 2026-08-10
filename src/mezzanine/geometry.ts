@@ -22,6 +22,14 @@ import {
   toLinear,
 } from '../conveyor/geometry-builder'
 import { memoiseGeometryKey } from '../geometry-key-memo'
+import type { IBeamProfile } from './catalog'
+import {
+  hasCustomOutline,
+  outlinePolygon,
+  resolveColumnProfile,
+  resolveMainBeamProfile,
+  resolveSecondaryBeamProfile,
+} from './metrics'
 import { type MezzaninePart, mezzanineParts } from './parts'
 import type { MezzanineNode } from './schema'
 
@@ -82,6 +90,32 @@ function buildParts(node: MezzanineNode, parts: readonly MezzaninePart[]): THREE
 }
 
 /**
+ * Anahat, builder'ın GÖRDÜĞÜ hâliyle.
+ *
+ * Ham `node.polygon` yetmez, ve iki yönden birden: poligonsuz bir düğümde
+ * `outlinePolygon` `grid`den bir dikdörtgen üretiyor (yani "poligon yok" da
+ * bir şekildir), ve poligon VARKEN kolon süzme (`gridColumnPositions`) ile
+ * döşeme kırpma (`parts.ts` `pushFloorPanels`) tamamen başka bir daldan
+ * geçiyor — `hasCustomOutline`. Bu yüzden ikisi de yazılıyor: türetilmiş
+ * köşeler ve hangi daldan geçildiği.
+ *
+ * Poligon anahtarda hiç yoktu ve sonuç sessiz bir yanlıştı: L ile T aynı
+ * ızgarada aynı anahtara çözülüyor, ikincisi ekranda birincinin mesh'iyle
+ * çiziliyordu.
+ */
+function outlineKey(node: MezzanineNode): string {
+  const corners = outlinePolygon(node)
+    .map(([x, z]) => `${x},${z}`)
+    .join(';')
+  return `${hasCustomOutline(node) ? 'P' : 'R'}${corners}`
+}
+
+/** Profil anahtara ÇÖZÜLMÜŞ kesitiyle girer — bkz. `buildMezzanineGeometryKey`. */
+function profileKey(profile: IBeamProfile): string {
+  return `${profile.h}/${profile.b}/${profile.tw}/${profile.tf}`
+}
+
+/**
  * Şekli GERÇEKTEN belirleyen her girdi — `loadClass` hariç: yalnız kapasite
  * metadata'sı, geometriye hiç girmez (kapı testiyle aynı ayrım).
  *
@@ -89,16 +123,25 @@ function buildParts(node: MezzanineNode, parts: readonly MezzaninePart[]): THREE
  * açıklık, bir merdivenin yeri döşemede bir boşluk demek — ikisi de şekil.
  * Bunu unutmak, `hasGroundBeam`'in bir kez düştüğü hata sınıfı (bir alan
  * geometriyi değiştirir ama anahtarda yoktur, ve ekranda eski mesh kalır).
+ *
+ * Profiller HAM alanlarıyla değil `resolve*Profile` çıktısıyla yazılıyor,
+ * çünkü builder'ın okuduğu şey o: SIGMA ailesinde override tümden yok
+ * sayılıyor ve bilinmeyen bir profil adı varsayılana düşüyor. Ham alan
+ * yazıldığında bu iki hâl de aynı mesh'i iki ayrı anahtar altında
+ * saklıyordu — hiçbir vertex kımıldamadan bölünen önbellek.
  */
 function buildMezzanineGeometryKey(node: MezzanineNode): string {
   const tierKey = node.tiers
     .map((t) => {
       const stairs = t.accessories.staircases
-        .map((s) =>
-          s.placement.mode === 'edge'
-            ? `E${s.placement.edge}${s.placement.offsetM}w${s.widthM}l${s.landing}s${s.steps}`
-            : `X${s.placement.xM},${s.placement.zM},${s.placement.rotationDeg}w${s.widthM}l${s.landing}s${s.steps}`,
-        )
+        .map((s) => {
+          // `railings` kolun AÇIK kenar sayısı: 1'de tek yanda küpeşte,
+          // dikme ve ara kayıt çiziliyor, 2'de iki yanda. Anahtarda yoktu.
+          const shape = `w${s.widthM}l${s.landing}r${s.railings}s${s.steps}`
+          return s.placement.mode === 'edge'
+            ? `E${s.placement.edge}${s.placement.offsetM}${shape}`
+            : `X${s.placement.xM},${s.placement.zM},${s.placement.rotationDeg}${shape}`
+        })
         .join(';')
       const gates = [
         ...t.accessories.swingGates.map((g) => `S${g.edge}${g.offsetM}w${g.widthM}`),
@@ -116,9 +159,10 @@ function buildMezzanineGeometryKey(node: MezzanineNode): string {
     node.grid.bayWidthM,
     node.grid.bayDepthM,
     node.columnType,
-    node.mainBeamProfile ?? '',
-    node.secondaryBeamProfile ?? '',
-    node.columnProfile ?? '',
+    profileKey(resolveMainBeamProfile(node)),
+    profileKey(resolveSecondaryBeamProfile(node)),
+    profileKey(resolveColumnProfile(node)),
+    outlineKey(node),
     node.frameColor,
     node.intumescentPaint,
     tierKey,

@@ -324,11 +324,45 @@ export function mateBlockers(
   return messages
 }
 
+/**
+ * Son cevap, girdi ÜÇLÜSÜNÜN kimliğine göre.
+ *
+ * `jointProblems` yedi konveyör panelinin render gövdesinden çağrılıyor ve
+ * paneller `s.nodes` sözlüğüne çıplak abone — yani sözlük kimliği her store
+ * yazımında değiştiği için panel her yazımda render oluyor ve bu tarama
+ * yeniden koşuyordu. Taramanın kendisi ucuz değil: eşleşmiş port başına tüm
+ * sözlük geziliyor ve komşu başına iki Map kuruluyor.
+ *
+ * Kimlik memo'su paketin başka üç yerinde zaten kullanılan desen
+ * (`rack/neighbours.ts`, `line-index.ts`, `geometry-key-memo.ts`) ve aynı
+ * değişmeze dayanıyor: host store düğümü yerinde değiştirmiyor, yenisiyle
+ * değiştiriyor. Tek girişlik, çünkü aynı anda tek modül inceleniyor —
+ * seçim değişince önbellek zaten ıskalıyor.
+ */
+let memoModule: unknown = null
+let memoNodes: unknown = null
+let memoUnit: unknown = null
+let memoProblems: string[] = []
+
 export function jointProblems(
   module: ConveyorModule,
   nodes: Readonly<Record<string, unknown>>,
   /** Yalnız mesajları etkiler; teşhisin kendisi metre ile çalışır. */
   unit: LinearUnit = DEFAULT_UNIT,
+): string[] {
+  if (module === memoModule && nodes === memoNodes && unit === memoUnit) return memoProblems
+  const answer = computeJointProblems(module, nodes, unit)
+  memoModule = module
+  memoNodes = nodes
+  memoUnit = unit
+  memoProblems = answer
+  return answer
+}
+
+function computeJointProblems(
+  module: ConveyorModule,
+  nodes: Readonly<Record<string, unknown>>,
+  unit: LinearUnit,
 ): string[] {
   const problems: string[] = []
   const mineLocal = new Map(localPorts(module).map((local) => [local.id, local]))

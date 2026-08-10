@@ -87,6 +87,18 @@ export const palletDefinition = {
     module: () => import('./renderer'),
   },
 
+  /**
+   * Baked `/viewer` sözleşmesi — rafın bildirdiğinin aynısı.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyor; `replace` onu
+   * gizletip seviyenin paletlerini canlı statik instancing'le çizdiriyor. Palet
+   * paketin en kalabalık kind'ı olduğu için kazanç da en büyük burada. Eklenti
+   * yüklü değilse politika `static`'e düşer ve baked mesh görünür kalır —
+   * veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
+
   floorplan: buildPalletFloorplan,
 
   tool: () => import('./tool'),

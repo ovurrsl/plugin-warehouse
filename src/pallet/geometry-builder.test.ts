@@ -240,3 +240,97 @@ describe('presets', () => {
     }
   })
 })
+
+// ── Kapanma gölgesi paletin İÇİNİ dışından parlak bırakmıyor ─────────────────
+
+describe('pişmiş kapanma gölgesi', () => {
+  /** Verilen kotta YUKARI bakan köşelerin gölge aralığı. */
+  const upwardShadeAt = (y: number) => {
+    const pos = geo.attributes.position as {
+      count: number
+      getY: (i: number) => number
+    }
+    const norm = geo.attributes.normal as typeof pos
+    const color = geo.attributes.color as { getX: (i: number) => number }
+    let min = 1
+    let max = 0
+    let found = 0
+    for (let i = 0; i < pos.count; i++) {
+      if (norm.getY(i) < 0.7) continue
+      if (Math.abs(pos.getY(i) - y) > 1e-4) continue
+      const c = color.getX(i)
+      min = Math.min(min, c)
+      max = Math.max(max, c)
+      found++
+    }
+    return { min, max, found }
+  }
+
+  test('çatal tünelinin TABANI güvertenin üstünden koyu', () => {
+    /**
+     * Muafiyet kapısı `ny < 0.7` idi, yani "yukarı bakıyor" — oysa paletin
+     * içinde yukarı bakan her yüzeyin üstünü bir tahta örtüyor. Hepsi muaf
+     * kalıyordu: alt güvertenin üst yüzü (= çatal tünelinin tabanı) 1,000,
+     * kirişlerin üstü 0,967, yani açık güverteyle (1,000) aynı. Paletin içi
+     * dışından parlaktı ve üstten bakışta güverte, tahtalardan değil, sekiz
+     * delik açılmış tek parça levhadan yapılmış gibi okunuyordu.
+     *
+     * Mevcut bekçi yalnız global min/max'a bakıyor ve max = 1,0 zaten
+     * beklenen değer — o 1,0'ın tünelin tabanında oturması görünmüyordu.
+     */
+    const deckTop = upwardShadeAt(0.144)
+    const tunnelFloor = upwardShadeAt(0.022)
+    expect(deckTop.found).toBeGreaterThan(0)
+    expect(tunnelFloor.found).toBeGreaterThan(0)
+    expect(deckTop.min).toBeCloseTo(1, 5)
+    expect(tunnelFloor.max).toBeLessThan(0.9)
+  })
+
+  test('kirişlerin üstü de koyu — üstünde tahta var', () => {
+    const stringerTop = upwardShadeAt(0.122)
+    expect(stringerTop.found).toBeGreaterThan(0)
+    expect(stringerTop.max).toBeLessThan(0.9)
+  })
+})
+
+// ── `branded` bayrağı gerçekten uygulanıyor mu ───────────────────────────────
+
+describe('EPAL/EUR/IPPC damgaları yalnız damgalı preset’lerde', () => {
+  /** Bir preset'in gövdesindeki damga üçgeni sayısı. */
+  const markingCount = (preset: keyof typeof PALLET_PRESETS) => {
+    const g = getPalletGeometry(preset)
+    const uv = g.attributes.uv as {
+      count: number
+      getX: (i: number) => number
+      getY: (i: number) => number
+    }
+    let marked = 0
+    for (let t = 0; t < uv.count / 3; t++) {
+      const region = regionOf(uv.getX(t * 3), uv.getY(t * 3))
+      if (region === 'epal' || region === 'eur' || region === 'ippc') marked++
+    }
+    return marked
+  }
+
+  for (const [preset, spec] of Object.entries(PALLET_PRESETS)) {
+    test(`${preset}: damga ${spec.branded ? 'var' : 'YOK'}`, () => {
+      /**
+       * `branded` alanı kendi belgesinde "EPAL/EUR/IPPC blok damgaları bu
+       * preset'e uygulanır mı" diyor, ama damgayla ilgili hiçbir okuyucusu
+       * yoktu: damgalar `buildEPAL1`'de UV'lere pişiyor ve öteki preset'ler o
+       * tamponun klonu. Bir "GMA 48×40 (US)" paletinin bloklarında EPAL ovali,
+       * EUR ovali ve "DE - XX490000 HT" IPPC damgası yazıyordu. Uyulmayan bir
+       * bayrak, uyulan bir bayrak gibi görünür.
+       */
+      const count = markingCount(preset as keyof typeof PALLET_PRESETS)
+      if (spec.branded) expect(count).toBeGreaterThan(0)
+      else expect(count).toBe(0)
+    })
+  }
+
+  test('damgasız gövde damgalıyla AYNI tamponu paylaşmıyor', () => {
+    // Paylaşsalardı bayrak yine hiçbir şey yapmazdı — ve önbellek preset
+    // başına olduğu için hata sessizce geri gelebilirdi.
+    expect(getPalletGeometry('epal-1')).not.toBe(getPalletGeometry('gma-48x40'))
+  })
+})

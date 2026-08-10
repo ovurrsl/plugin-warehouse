@@ -3,6 +3,7 @@ import { useWarehouseStore } from '../store'
 import { lengthLabel, lengthValue, millimetreLabel, unitOf } from '../units'
 import { FLOOR_TYPES } from './catalog'
 import {
+  doubleColumnOffsetM,
   footprintDepthM,
   footprintWidthM,
   gridColumnPositions,
@@ -229,12 +230,18 @@ export function buildMezzanineFloorplan(
   }
 
   // ── Kolonlar ───────────────────────────────────────────────────────────
+  //
+  // Kesit KARE değil: 3B ayak izi X'te `b`, Z'de `h` (`parts.ts`'in yazılı
+  // konvansiyonu). Plan `max(h, b)`'yi kare basıyordu — varsayılan SIGMA'da
+  // 300×300, yani gerçek kolonun X yönünde 2,7 katı. 5 m'lik bir gözde
+  // plandan raf yerleşimi ölçen biri her kolonda 190 mm fazla engel görüyordu,
+  // üstelik dosyanın kendi başlığı "3B ile AYNI hesaplayıcılardan" diyor.
   const profile = resolveColumnProfile(node)
-  const columnSide = Math.max(profile.h, profile.b)
+  const offset = doubleColumnOffsetM(profile)
   for (const point of gridColumnPositions(node)) {
-    children.push(columnRect(point.x, point.z, columnSide, columnFill))
+    children.push(columnRect(point.x, point.z, profile.b, profile.h, columnFill))
     if (node.columnType === 'double') {
-      children.push(columnRect(point.x, point.z + profile.b, columnSide, columnFill))
+      children.push(columnRect(point.x, point.z + offset, profile.b, profile.h, columnFill))
     }
   }
 
@@ -530,13 +537,19 @@ export function buildMezzanineFloorplan(
   }
 }
 
-function columnRect(x: number, z: number, side: number, fill: string): FloorplanGeometry {
+function columnRect(
+  x: number,
+  z: number,
+  widthX: number,
+  depthZ: number,
+  fill: string,
+): FloorplanGeometry {
   return {
     kind: 'rect',
-    x: x - side / 2,
-    y: z - side / 2,
-    width: side,
-    height: side,
+    x: x - widthX / 2,
+    y: z - depthZ / 2,
+    width: widthX,
+    height: depthZ,
     fill,
     stroke: fill,
     strokeWidth: 0.004,

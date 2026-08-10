@@ -1,6 +1,6 @@
 import type { NodeDefinition } from '@pascal-app/core'
 import { buildDriveInFloorplan } from './floorplan'
-import { lanePitch, totalDepth, totalWidth } from './lanes'
+import { frameTopY, lanePitch, totalDepth, totalWidth } from './lanes'
 import { snapToNeighbourSeam } from './magnet'
 import { driveInParametrics } from './parametrics'
 import { DriveInRackNode } from './schema'
@@ -74,7 +74,7 @@ export const driveInRackDefinition = {
       footprint: (node) => {
         const lane = node as unknown as DriveInRackNode
         return {
-          dimensions: [lanePitch(lane), lane.uprightHeight, totalDepth(lane)],
+          dimensions: [lanePitch(lane), frameTopY(lane), totalDepth(lane)],
           rotation: lane.rotation ?? [0, 0, 0],
         }
       },
@@ -87,8 +87,8 @@ export const driveInRackDefinition = {
     dragBounds: (node) => {
       const lane = node as unknown as DriveInRackNode
       return {
-        size: [totalWidth(lane), lane.uprightHeight, totalDepth(lane)],
-        centerY: lane.uprightHeight / 2,
+        size: [totalWidth(lane), frameTopY(lane), totalDepth(lane)],
+        centerY: frameTopY(lane) / 2,
       }
     },
   },
@@ -102,6 +102,18 @@ export const driveInRackDefinition = {
     kind: 'parametric',
     module: () => import('./renderer'),
   },
+
+  /**
+   * Baked `/viewer` sözleşmesi — rafla aynı, ve bir blok için farkı daha büyük.
+   *
+   * Politikasız kind baked sahnede donmuş mesh olarak kalıyor: on şeritlik bir
+   * blok on ayrı mesh, hepsi aynı şekli çiziyor. `replace` baked mesh'i
+   * gizletip seviyenin şeritlerini canlı statik instancing'le çizdiriyor, yani
+   * blok şekil başına tek çizim çağrısına iniyor. Eklenti yüklü değilse
+   * politika `static`'e düşer ve baked mesh görünür kalır — veri kaybı yok.
+   */
+  bake: 'replace',
+  bakeReplaceRenderer: { module: () => import('./bake-replace') },
 
   floorplan: buildDriveInFloorplan,
 

@@ -3,27 +3,31 @@
 import { groupByGeometry, makeBakeReplaceRenderer } from '../instancing/bake-replace'
 import { getLiveRackingGeometry } from './geometry'
 import { getLiveRackingMaterial } from './materials'
+import { hasRightNeighbour } from './neighbours'
 import type { LiveRackingNode } from './schema'
 
 /**
  * Baked `/viewer` için canlı raf kanalının kolektif statik çizicisi — rafın
  * muadili.
  *
- * Öteki raf kind'larının bake yolundan tek farkı burada bir komşuluk
- * hesabının OLMAMASI, ve bu bir eksik değil: canlı raf kanalları çerçeve
- * paylaşmıyor, her kanal kendi dört dikmesini taşıyor (`definition.ts`).
- * Dolayısıyla yan yana dizilmiş bir sıranın her kanalı aynı şekle çözülüyor
- * ve sıra tek çizim çağrısına iniyor.
+ * Komşuluk bake'te de aynı kaynaktan: seviyenin kanal listesi bir kayda
+ * dönüştürülüp `hasRightNeighbour`'ın kendisine veriliyor. Bunu atlayıp her
+ * kanala kendi sağ çerçevesini kurdurmak baked görünümde her ek yerine iki sıra
+ * dikme koyardı — editörün çözdüğü çift-dikme z-fighting'inin bake'e sızmış
+ * hâli, ve orada düzeltilecek bir yeri yok.
  *
  * Katman hep `full`: bake mesafeye bağlı bir katmanı dosyaya pişirmemeli (dışa
  * aktarım yolunun kuralıyla aynı). Materyal de canlı hâldekinin aynısı —
  * ayarı `useAppearance` üzerinden jenerik çizici veriyor.
  */
 export default makeBakeReplaceRenderer<LiveRackingNode>((nodes, appearance) => {
+  const record: Record<string, unknown> = {}
+  for (const node of nodes) record[node.id] = node
   const material = getLiveRackingMaterial(appearance)
   return groupByGeometry(
     nodes,
-    (node) => getLiveRackingGeometry(node, 'full'),
+    (node) =>
+      getLiveRackingGeometry(node, 'full', { omitRight: hasRightNeighbour(record, node.id) }),
     () => material,
   )
 })

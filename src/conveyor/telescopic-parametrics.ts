@@ -58,7 +58,7 @@ export const conveyorTelescopicParametrics: ParametricDescriptor<ConveyorTelesco
         // modelin katalog kotu (800/900/950/1050 mm). Ayarlanabilir olması
         // makinenin birleşebilmesinin ŞARTI — mıknatıs bant kotunda sıfır
         // tolerans istiyor ve ailenin varsayılanı 0,75 m.
-        { key: 'transportHeight', kind: 'number', min: 0.37, max: 3, step: 0.01 },
+        { key: 'transportHeight', kind: 'number', unit: 'm', min: 0.37, max: 3, step: 0.01 },
       ],
     },
     {

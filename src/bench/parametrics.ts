@@ -37,9 +37,9 @@ export const benchParametrics: ParametricDescriptor<BenchNode> = {
       fields: [
         // Üçü de metre. Adım 10 mm: mobilya ölçüsü santimetreye yuvarlanır,
         // milimetrelik bir adım kaydırıcıyı kullanılmaz yapardı.
-        { key: 'width', kind: 'number', min: 0.6, max: 4, step: 0.01 },
-        { key: 'height', kind: 'number', min: 0.6, max: 1.2, step: 0.01 },
-        { key: 'depth', kind: 'number', min: 0.4, max: 1.4, step: 0.01 },
+        { key: 'width', kind: 'number', unit: 'm', min: 0.6, max: 4, step: 0.01 },
+        { key: 'height', kind: 'number', unit: 'm', min: 0.6, max: 1.2, step: 0.01 },
+        { key: 'depth', kind: 'number', unit: 'm', min: 0.4, max: 1.4, step: 0.01 },
       ],
     },
     {

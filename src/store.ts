@@ -327,6 +327,7 @@ export type MezzanineBrush = Pick<
 
 export type RackBrush = Pick<
   PalletRackNode,
+  | 'variant'
   | 'bayClearWidth'
   | 'depth'
   | 'uprightHeight'
@@ -423,6 +424,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     }),
 
   rackBrush: {
+    variant: 'pallet-rack',
     bayClearWidth: 2.7,
     depth: 1.1,
     uprightHeight: 5,
@@ -432,6 +434,23 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     pickingLevels: 0,
     ghostFill: 0,
   },
+  /**
+   * Sığ birleştirme, ve YAPIŞKAN: yamanın yazmadığı alan bir öncekinden
+   * taşınır. Bilinçli — kullanıcı 1.2 m derinlik kurup art arda on raf
+   * koyduğunda derinliği her seferinde yeniden girmez.
+   *
+   * Bedeli, aynı kind'ı kuran iki fişten YALNIZ BİRİNİN bir alanı yazmasıdır:
+   * o alan artık hangi fişe basıldığına değil, en son hangisine basıldığına
+   * bağlanır. Alçak raf tam olarak böyle sızıyordu — "Pallet Rack" fişinin hiç
+   * fırçası yoktu, dolayısıyla alçak raftan sonra basılan palet rafı onun
+   * 2.5 m dikmesini ve toplama gözünü giyerek geliyordu, ve hiçbir şey bunu
+   * söylemiyordu.
+   *
+   * Sözleşme bu yüzden tek tek alanlar değil ANAHTAR KÜMESİ üzerine: **bir
+   * ailenin fişlerinden biri bir alanı yazıyorsa hepsi yazmalı.**
+   * `catalog.test.ts` bunu her aile için tutuyor, yani kural rafa özel değil
+   * ve bir sonraki ikinci fişte kendiliğinden geçerli.
+   */
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
 
   multiply: DEFAULT_MULTIPLY,

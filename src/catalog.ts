@@ -285,11 +285,23 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Low Rack',
     sectionId: 'storage',
     description:
-      'Alçak raf şablonu: 2.5 m dikme, iki kat, alt kat toplama rafı. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
+      'Alçak raf şablonu: 2.5 m dikme, iki kat, ikisi de kutu raflı toplama gözü. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
     icon: 'lucide:rows-2',
+    /**
+     * `pickingLevels` DEPOLAMA konumlarını sayıyor ve sayım ZEMİNDEN başlıyor:
+     * `levelTypeOf` `level < pickingLevels` diyor, zemin de 0. `levels: 2` +
+     * `groundLevelStorage` üç depolama konumu demek (zemin + iki kiriş katı),
+     * dolayısıyla üçünü de toplama gözü yapan değer 3.
+     *
+     * Burada bir kez `1` yazılmıştı ve sonucu sessizdi: yalnız ZEMİNİ toplama
+     * gözü ilan ediyor, `levelHasShelf` ise `level <= 0` için `false` dönüyor —
+     * zemin kiriş de raf da taşımaz. Yani fiş "alt kat toplama rafı" diyor,
+     * hiçbir kutu rafı çizilmiyor ve alçak raf iki katlı sıradan bir palet rafı
+     * olarak iniyordu. Hata vermeyen, yalnız yanlış ürünü teslim eden cinsten.
+     */
     brush: {
       kind: 'rack',
-      patch: { variant: 'low-rack', uprightHeight: 2.5, levels: 2, pickingLevels: 1 },
+      patch: { variant: 'low-rack', uprightHeight: 2.5, levels: 2, pickingLevels: 3 },
     },
   },
   {

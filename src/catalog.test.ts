@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { CATALOG_ITEMS, CATALOG_SECTIONS, chipIsArmed } from './catalog'
 import { warehousePlugin } from './index'
+import { PalletRackNode } from './rack/schema'
+import { deckFinishOf, drawnPickingLevels, levelHasShelf } from './rack/slots'
 import { useWarehouseStore } from './store'
 
 /**
@@ -115,7 +117,49 @@ describe('fırça yapışkanlığı — aynı kindʼı kuran fişler aynı alanl
     const afterLowRack = apply('pallet-rack-low')
     expect(afterLowRack.variant).toBe('low-rack')
     expect(afterLowRack.uprightHeight).toBe(2.5)
-    expect(afterLowRack.pickingLevels).toBe(1)
+    expect(afterLowRack.pickingLevels).toBe(3)
+  })
+})
+
+describe('toplama gözü vaat eden fiş gerçekten kutu rafı çizmeli', () => {
+  /**
+   * `pickingLevels` DEPOLAMA konumlarını ZEMİNDEN sayıyor, ama zemin ne kiriş
+   * ne raf taşır (`levelHasShelf`, `level <= 0`). İkisinin arasındaki bir
+   * birimlik kayma, "toplama gözü" yazan bir fişin hiç kutu rafı çizmemesine
+   * yetiyor: alçak raf fişi `pickingLevels: 1` ile geliyordu, yalnız zemini
+   * işaretliyordu, ve iki kirişli sıradan bir palet rafı olarak iniyordu.
+   *
+   * Sessiz olan yanı şu: şema değeri kabul ediyor, panel alanı gösteriyor,
+   * geometri hatasız kuruluyor. Tek belirti, kullanıcının katalogda okuduğu
+   * ürünle sahneye inenin farklı olması — ve fark ancak yan yana konursa
+   * görülüyor.
+   *
+   * Bekçi tek fişe değil KURALA bağlı: `pickingLevels` yazan her fiş en az bir
+   * ÇİZİLEN toplama gözü üretmeli. Aileye yarın eklenen fiş de bakım
+   * istemeden kapsanıyor.
+   */
+  const promising = CATALOG_ITEMS.filter((item) => {
+    const patch = item.brush && 'patch' in item.brush ? item.brush.patch : undefined
+    return typeof (patch as { pickingLevels?: unknown } | undefined)?.pickingLevels === 'number'
+      ? ((patch as { pickingLevels: number }).pickingLevels ?? 0) > 0
+      : false
+  })
+
+  test('kapsanan fiş var', () => {
+    expect(promising.map((item) => item.id)).toContain('pallet-rack-low')
+  })
+
+  test.each(promising)('$id', (item) => {
+    const patch = (item.brush as { patch: Record<string, unknown> }).patch
+    const rack = PalletRackNode.parse({ ...patch, position: [0, 0, 0], rotation: [0, 0, 0] })
+    const drawn = drawnPickingLevels(rack)
+
+    expect(drawn.length).toBeGreaterThan(0)
+    // Ve çizilenin gerçekten toplama rafı olduğu: palet güvertesi değil.
+    for (const level of drawn) {
+      expect(levelHasShelf(rack, level)).toBe(true)
+      expect(deckFinishOf(rack, level)).toBe('picking')
+    }
   })
 })
 

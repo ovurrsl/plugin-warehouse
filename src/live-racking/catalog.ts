@@ -105,6 +105,16 @@ export const UPRIGHT_WIDTH_M = mm(90)
 export const UPRIGHT_DEPTH_M = mm(100)
 /** Çerçeve çaprazı kalınlığı (ASSUMPTION). */
 export const DIAGONAL_THICKNESS_M = mm(40)
+/**
+ * Uzun kenar kafesinin göz boyu hedefi — ara dikmeler bu aralıkla konuyor.
+ *
+ * SEÇİLMİŞ varsayılan, katalog ölçüsü DEĞİL: bir üreticinin canlı raf yan
+ * kafesi için yayımlanmış göz boyu bulamadım. 2,5 m, palet raf çerçevesinin
+ * tipik dikme aralığıyla aynı mertebede ve kanalı 8–10 m'de dört göze bölüyor.
+ * Gerçek açıklık `span / round(span / bu)` ile hesaplanıyor, yani sayı bir
+ * hedef; kanal boyu ona tam bölünmek zorunda değil.
+ */
+export const BRACE_BAY_TARGET_M = 2.5
 /** Dinamik kiriş — kanalı taşıyan kiriş (ASSUMPTION). */
 export const DYNAMIC_BEAM_HEIGHT_M = mm(120)
 export const DYNAMIC_BEAM_THICKNESS_M = mm(50)

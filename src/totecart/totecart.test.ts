@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS, CATALOG_SECTIONS } from '../catalog'
 import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
@@ -15,6 +16,7 @@ import {
   toteHeightIds,
 } from './catalog'
 import { toteCartDefinition } from './definition'
+import { buildToteCartFloorplan } from './floorplan'
 import {
   getToteCartFrameGeometry,
   getToteGeometry,
@@ -27,6 +29,7 @@ import {
   cartLengthM,
   cartWidthM,
   footprintM,
+  handleXM,
   loadedTiersOf,
   overallHeightM,
   tierPitchM,
@@ -38,7 +41,7 @@ import {
   toteSizeOf,
 } from './metrics'
 import { toteCartParametrics } from './parametrics'
-import { type ToteCartDetail, toteCartFrameParts, toteParts } from './parts'
+import { type ToteCartDetail, type ToteCartPart, toteCartFrameParts, toteParts } from './parts'
 import { ToteCartNode } from './schema'
 
 const cart = (overrides: Record<string, unknown> = {}) =>
@@ -783,5 +786,117 @@ describe('tanım ve manifest', () => {
     const parsed = cart() as Record<string, unknown>
     expect('height' in parsed).toBe(false)
     expect('overallHeight' in parsed).toBe(false)
+  })
+})
+
+// ── Tekerlek düzeneği ve kol ─────────────────────────────────────────────────
+
+describe('tekerlek düzeneği ve kol', () => {
+  const CTX = {} as GeometryContext
+  const DIAMETERS = ['100', '125', '160'] as const
+
+  /** `a`, `b`'nin kutusunun tamamen İÇİNDE mi — yani hiç görünmüyor mu. */
+  const buried = (a: ToteCartPart, b: ToteCartPart) =>
+    ([0, 1, 2] as const).every(
+      (axis) =>
+        a.center[axis] - a.size[axis] / 2 >= b.center[axis] - b.size[axis] / 2 - 1e-9 &&
+        a.center[axis] + a.size[axis] / 2 <= b.center[axis] + b.size[axis] / 2 + 1e-9,
+    )
+
+  test('fren pedalı lastiğin içine gömülü DEĞİL', () => {
+    /**
+     * Eski yerinde pedal her çapta lastik kutusunun tamamen içindeydi:
+     * çiziliyor, üçgen ödeniyor, hiç görünmüyor. Bu testin tuttuğu hatanın
+     * ekranda hiçbir belirtisi yok — eksik olan şey zaten görünmeyen bir şey.
+     */
+    for (const diameter of DIAMETERS) {
+      const parts = toteCartFrameParts(cart({ castorDiameter: diameter }), 'full')
+      const tyres = parts.filter((part) => part.role === 'tyre')
+      // Pedal: kolun ucundaki iki tekerleğin yanında, ince (12 mm) plaka.
+      const pedals = parts.filter(
+        (part) => part.role === 'joint' && part.size[1] < 0.02 && part.center[0] < 0,
+      )
+      expect(pedals.length, `Ø${diameter}`).toBe(2)
+      for (const pedal of pedals) {
+        for (const tyre of tyres) {
+          expect(buried(pedal, tyre), `Ø${diameter}: pedal lastiğin içinde`).toBe(false)
+        }
+      }
+    }
+  })
+
+  test('pedal izin dışına taşmıyor', () => {
+    // Görünür kılmanın kolay yolu dışarı taşırmaktı; o zaman pedal çarpışma
+    // kutusunun dışında kalırdı — bu ailede tekrar tekrar çıkan hata.
+    for (const diameter of DIAMETERS) {
+      const node = cart({ castorDiameter: diameter })
+      const [length, width] = footprintM(node)
+      for (const part of toteCartFrameParts(node, 'full')) {
+        expect(
+          part.center[0] - part.size[0] / 2,
+          `Ø${diameter} ${part.role}`,
+        ).toBeGreaterThanOrEqual(-length / 2 - 1e-9)
+        expect(
+          Math.abs(part.center[2]) + part.size[2] / 2,
+          `Ø${diameter} ${part.role}`,
+        ).toBeLessThanOrEqual(width / 2 + 1e-9)
+      }
+    }
+  })
+
+  test('tekerlek arabaya BAĞLI — iki katmanda da', () => {
+    /**
+     * Lastiğin tepesi `diameterM`, şasenin altı `buildHeightM`; aradaki
+     * 25–35 mm'yi yalnız mafsal plakası kapatıyor. Uzak katmanda düşünce
+     * dört tekerlek arabadan kopuk, havada asılı duruyordu — hem de tam
+     * bütün yerleşime bakılan mesafede.
+     */
+    for (const diameter of DIAMETERS) {
+      for (const detail of ['full', 'simple'] as const) {
+        const node = cart({ castorDiameter: diameter })
+        const parts = toteCartFrameParts(node, detail)
+        const frameBottom = Math.min(
+          ...parts.filter((p) => p.role === 'frame').map((p) => p.center[1] - p.size[1] / 2),
+        )
+        for (const tyre of parts.filter((p) => p.role === 'tyre')) {
+          const bridge = parts.find(
+            (p) =>
+              p.role === 'joint' &&
+              Math.abs(p.center[0] - tyre.center[0]) < 1e-9 &&
+              Math.abs(p.center[2] - tyre.center[2]) < 1e-9 &&
+              p.center[1] - p.size[1] / 2 <= tyre.center[1] + tyre.size[1] / 2 + 1e-9 &&
+              p.center[1] + p.size[1] / 2 >= frameBottom - 1e-9,
+          )
+          expect(bridge, `Ø${diameter} ${detail}: tekerlek havada`).toBeDefined()
+        }
+      }
+    }
+  })
+
+  test('kolun yeri 3B ile PLANDA aynı, ve iz içinde', () => {
+    /**
+     * Plan `−L/2 − FRAME_M` yazıyordu: dikdörtgenin 30 mm dışında. 3B kol
+     * ise dikmenin üstünde, izin 15 mm içinde. 45 mm'lik ayrım ve yönü
+     * kötüsü — plandan koridor genişliği ölçen biri arabaya olmayan bir yer
+     * payı ayırıyordu.
+     */
+    for (const overrides of [{}, { toteFamily: 'ec6432' }, { hasHandle: true }] as const) {
+      const node = cart({ ...overrides, hasHandle: true })
+      const length = cartLengthM(node)
+      const bar = toteCartFrameParts(node, 'full').find(
+        (part) => part.role === 'frame' && part.size[2] > part.size[0] && part.center[1] > 0.8,
+      )
+      if (!bar) throw new Error('itme kolu bekleniyordu')
+      expect(bar.center[0]).toBeCloseTo(handleXM(node), 9)
+      expect(bar.center[0] - bar.size[0] / 2).toBeGreaterThanOrEqual(-length / 2 - 1e-9)
+
+      const plan = buildToteCartFloorplan(node, CTX)
+      const line = (plan?.kind === 'group' ? plan.children : []).find(
+        (child): child is Extract<FloorplanGeometry, { kind: 'line' }> => child.kind === 'line',
+      )
+      if (!line) throw new Error('plan sembolünde kol çizgisi bekleniyordu')
+      expect(line.x1).toBeCloseTo(handleXM(node), 9)
+      expect(line.x2).toBeCloseTo(handleXM(node), 9)
+    }
   })
 })

@@ -24,6 +24,7 @@ import {
   deckM,
   familyOf,
   footprintM,
+  handleXM,
   handleYM,
   tierYM,
   tiltRad,
@@ -138,17 +139,25 @@ export function toteCartFrameParts(node: ToteCartNode, detail: ToteCartDetail): 
       center: [cx, radius, cz],
       size: [castor.diameterM, castor.diameterM, castor.treadM],
     })
+    /**
+     * Döner mafsal ve bağlantı plakası — HER İKİ katmanda.
+     *
+     * Lastiğin tepesi `diameterM`, şasenin altı `buildHeightM`: aralarında
+     * çapa göre 25–35 mm boşluk var ve o boşluğu kapatan tek parça bu.
+     * Uzak katmanda düşünce dört tekerlek arabadan kopuk, havada asılı
+     * duruyordu — ve bu tam da arabanın uzaktan görüldüğü, yani bütün
+     * yerleşime bakılan mesafede oluyordu.
+     */
+    parts.push({
+      role: 'joint',
+      center: [cx, castor.buildHeightM - 0.02, cz],
+      size: [0.08, 0.04, 0.07],
+    })
     if (detail === 'full') {
       parts.push({
         role: 'hub',
         center: [cx, radius, cz],
         size: [castor.diameterM * 0.45, castor.diameterM * 0.45, castor.treadM + 0.004],
-      })
-      // Döner mafsal ve bağlantı plakası.
-      parts.push({
-        role: 'joint',
-        center: [cx, castor.buildHeightM - 0.02, cz],
-        size: [0.08, 0.04, 0.07],
       })
       // Çatal bacakları.
       for (const sz of [-1, 1] as const) {
@@ -166,15 +175,27 @@ export function toteCartFrameParts(node: ToteCartNode, detail: ToteCartDetail): 
   // ikisi frenli. (Avrupa raf arabalarının 2 döner + 2 sabit düzeni BAŞKA
   // bir sınıf; bu araba o sınıfta değil.)
   if (detail === 'full') {
-    // Pedal TEKERLEĞİN kendisinde, çerçeve köşesinde değil: tekerlekler
-    // köşeden içeri kaçık ve köşeye konan bir pedal frenleyeceği tekerleğin
-    // yanında durmuyordu.
+    /**
+     * Pedal ÇATALIN üstünde, lastiğin dışında ve üstünde.
+     *
+     * Önceki yeri `cx − treadM`, `radius · 0,55` idi: 45 × 10 × 20 mm'lik
+     * blok her çapta lastik kutusunun TAMAMEN içinde kalıyordu — çizilen ama
+     * hiç görünmeyen bir parça, ve renk seçicisi onu boyayan ölü bir kol.
+     * Gerçek toplam-kilit pedalı tekerleğin tepesinde, çatala bağlı ve dışa
+     * bakar: ayakla basılabilmesi için başka yeri yok.
+     *
+     * Dış ucu tam iz kenarında bitiyor. Taşırmak kolay olurdu ama pedal
+     * çarpışma kutusunun dışına çıkardı — bu ailede tekrar tekrar çıkan
+     * "çizilen ile bildirilen aynı değil" hatası.
+     */
     for (const [cx, cz] of castorCentres(node)) {
       if (cx > 0) continue
+      const outer = -length / 2
+      const inner = cx - radius * 0.45
       parts.push({
         role: 'joint',
-        center: [cx - castor.treadM, radius * 0.55, cz],
-        size: [0.045, 0.01, 0.02],
+        center: [(outer + inner) / 2, castor.buildHeightM - 0.018, cz],
+        size: [inner - outer, 0.012, castor.treadM + 0.02],
       })
     }
   }
@@ -184,7 +205,7 @@ export function toteCartFrameParts(node: ToteCartNode, detail: ToteCartDetail): 
     const y = handleYM()
     parts.push({
       role: 'frame',
-      center: [-frameFootX, y, 0],
+      center: [handleXM(node), y, 0],
       size: [HANDLE_TUBE_M, HANDLE_TUBE_M, width - 2 * FRAME_M],
     })
     if (detail === 'full') {
@@ -201,7 +222,7 @@ export function toteCartFrameParts(node: ToteCartNode, detail: ToteCartDetail): 
       for (const sz of [-1, 1] as const) {
         parts.push({
           role: 'joint',
-          center: [-frameFootX, y, sz * (width / 2 - FRAME_M)],
+          center: [handleXM(node), y, sz * (width / 2 - FRAME_M)],
           size: [FRAME_M, HANDLE_TUBE_M, 0.03],
         })
       }

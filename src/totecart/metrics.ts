@@ -210,6 +210,19 @@ export function handleYM(): number {
   return HANDLE_HEIGHT_M
 }
 
+/**
+ * İtme kolunun yerel X'i — 3B ve plan sembolünün TEK kaynağı.
+ *
+ * Kol dikmenin ÜSTÜNDE, yani izin İÇİNDE: dikme ayağı `L/2 − FRAME_M/2`'de
+ * ve kol o dikmeye oturuyor. Plan bunu bilmiyordu ve çizgiyi `−L/2 − FRAME_M`
+ * yazıyordu — yani dikdörtgenin 30 mm DIŞINDA. İki okuma 45 mm ayrıydı ve
+ * ayrılmanın yönü kötüsüydü: plandan koridor genişliği ölçen biri arabaya
+ * olmayan bir yer payı ayırıyordu.
+ */
+export function handleXM(node: ToteCartNode): number {
+  return -(cartLengthM(node) / 2 - FRAME_M / 2)
+}
+
 /** Gerçekten kasa taşıyan kat sayısı. Boş bırakılmışsa hepsi. */
 export function loadedTiersOf(node: ToteCartNode): number {
   return Math.min(node.tiers, node.loadedTiers ?? node.tiers)

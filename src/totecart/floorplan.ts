@@ -1,7 +1,7 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { lengthLabel, unitOf } from '../units'
 import { FRAME_M, PALETTE } from './catalog'
-import { cartLengthM, cartWidthM, deckM, loadedTiersOf, toteSizeOf } from './metrics'
+import { cartLengthM, cartWidthM, deckM, handleXM, loadedTiersOf, toteSizeOf } from './metrics'
 import type { ToteCartNode } from './schema'
 
 /**
@@ -62,13 +62,16 @@ export function buildToteCartFloorplan(
     })
   }
 
-  // İtme kolu, arka kenarın (−X) dışında: operatörün durduğu taraf.
+  // İtme kolu, arka kenarda (−X): operatörün durduğu taraf. Yer 3B ile TEK
+  // kaynaktan — çizgi izin dışına taşıyordu, oysa kol dikmenin üstünde ve
+  // izin içinde. Plandan koridor ölçen biri arabaya olmayan bir pay ayırırdı.
   if (node.hasHandle) {
+    const handleX = handleXM(node)
     children.push({
       kind: 'line',
-      x1: -length / 2 - FRAME_M,
+      x1: handleX,
       y1: -width / 2 + FRAME_M,
-      x2: -length / 2 - FRAME_M,
+      x2: handleX,
       y2: width / 2 - FRAME_M,
       stroke: ink,
       strokeWidth: 0.03,

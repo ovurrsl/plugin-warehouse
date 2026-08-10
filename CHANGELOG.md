@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`14053d7`](https://github.com/ovurrsl/plugin-warehouse/commit/14053d725f9d8128082b7d39b31fdcef8723ae08))
 - Hayalet stoğun seçime bağlılığını bekçiye bağla ([`bc3432f`](https://github.com/ovurrsl/plugin-warehouse/commit/bc3432f327eba632caf1f3a3d4a0e1e4ab02474d))
 - Refresh generated README blocks [skip ci] ([`349e388`](https://github.com/ovurrsl/plugin-warehouse/commit/349e38863098393870e4c5aa653a768a31537b07))
 - Refresh generated README blocks [skip ci] ([`01a0b87`](https://github.com/ovurrsl/plugin-warehouse/commit/01a0b87774eb048642dee61f0e3a0582c72a89f0))
@@ -155,6 +156,10 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Sahne ağacı satırı ürünün adını söylesin ([`43e1e5c`](https://github.com/ovurrsl/plugin-warehouse/commit/43e1e5c38da63287ffd8a2874a84f474f3f30fdf))
+- Alçak rafın dikmesi 3 m'de duruyor ([`f6a6e9d`](https://github.com/ovurrsl/plugin-warehouse/commit/f6a6e9dca414f7c16d496c7b3963a4eb62734d97))
+- Variant alanı — palet rafı ile alçak raf ayrı ürün ([`32caa5f`](https://github.com/ovurrsl/plugin-warehouse/commit/32caa5f825f07df9e99e4d69c898ccb2af43981b))
+- Yerleştirme mıknatısı — modülü hattın ucuna çevirerek oturtuyor ([`c43d1fb`](https://github.com/ovurrsl/plugin-warehouse/commit/c43d1fb34d0aebbca3e72d43de469286535fd4c1))
 - Forklift artık üretici fotoğrafındaki makine ([`16491b8`](https://github.com/ovurrsl/plugin-warehouse/commit/16491b81922c598250088d56cf6b0f7bf46c5657))
 - Iş makinelerinin gövdesi tek prizma olmaktan çıktı ([`5b194dc`](https://github.com/ovurrsl/plugin-warehouse/commit/5b194dc0cce7e90f188ae0c401fd3af0e15f80f2))
 - Sipariş toplama arabası — yükseklik alan değil, kasadan hesaplanıyor ([`d3ec385`](https://github.com/ovurrsl/plugin-warehouse/commit/d3ec385a3d6f171b1971d37c96063dc3e1334b9a))
@@ -262,6 +267,10 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- `defaults()` içindeki sabit ad ağaç etiketini eziyordu ([`e9cd3d3`](https://github.com/ovurrsl/plugin-warehouse/commit/e9cd3d337fd6251d19405ca78f95e8f8997e1858))
+- Alçak raf fişi gerçekten toplama gözü indirsin ([`e03cd96`](https://github.com/ovurrsl/plugin-warehouse/commit/e03cd96ca5d42737c0746fbbb7b6f8153ac6ec59))
+- Bir seferde tek fiş yansın ([`2b421ce`](https://github.com/ovurrsl/plugin-warehouse/commit/2b421ce46c2ea2569ac4884fc8c09595415c057c))
+- "Pallet Rack" fişi kendi ön ayarını yazsın ([`3e1cb27`](https://github.com/ovurrsl/plugin-warehouse/commit/3e1cb27faf90252078c39b7075b3f28eac5fcfe4))
 - Oblique'in saptırma üçgeni yatağın içine gömülüydü ([`18ae9cc`](https://github.com/ovurrsl/plugin-warehouse/commit/18ae9ccb6001b64df00eb6906f3e0781e174cbfa))
 - Paletin içi dışından parlaktı, damga bayrağı okunmuyordu, plastik palet ahşaptı ([`73ed9db`](https://github.com/ovurrsl/plugin-warehouse/commit/73ed9db2d116dd9362c42f5e26608d4680763e92))
 - Ikiz kolon iç içeydi, plan kolonu 2,7 kat genişti, merdiven boşluğu yanlış yerdeydi ([`f16ecef`](https://github.com/ovurrsl/plugin-warehouse/commit/f16ecefad61b5b56b475ca28eaa71a8a6866a17b))
@@ -315,6 +324,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #18 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`6211ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/6211ce2bf7d5198e6254706336654fd064a772cc))
 - Merge pull request #17 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e952b93`](https://github.com/ovurrsl/plugin-warehouse/commit/e952b93b824126bbc14425302edf1e3bcc7d143a))
 - Merge pull request #16 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`4e2414b`](https://github.com/ovurrsl/plugin-warehouse/commit/4e2414b4fbca6cf95926dfc3f47060dc7fb881f4))
 - Merge pull request #15 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`5d42057`](https://github.com/ovurrsl/plugin-warehouse/commit/5d420578bfe52c6e6d591191d86ec03c3b019c4c))
@@ -371,6 +381,7 @@ index to it, not a replacement for it.
 
 ### Refactors
 
+- Eklentiden gölge ayarlarını ve makinesini kaldır ([`19c73bc`](https://github.com/ovurrsl/plugin-warehouse/commit/19c73bcbff1dcf1d4dda72a0876930439ccc2a6c))
 - Performans modu düğmesi kaldırıldı — paket yalnız gölge kapatma ([`59f43a3`](https://github.com/ovurrsl/plugin-warehouse/commit/59f43a3b46f39505ea9229e1f69e28b11517e2a1))
 - 3B kompozisyon sadeleşti — iki katman aynı çelik, fark yalnız desen ([`253eb38`](https://github.com/ovurrsl/plugin-warehouse/commit/253eb38093cb966b1859bf46ea85c9b563e9b3ec))
 - One naming standard, read off the editor's own kind list ([`7c25751`](https://github.com/ovurrsl/plugin-warehouse/commit/7c2575187203aa7ad62938a45d31d74758909f7f))

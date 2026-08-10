@@ -1,12 +1,20 @@
 'use client'
 
-import { type AnyNode, type AnyNodeId, spatialGridManager, useScene } from '@pascal-app/core'
+import {
+  type AlignmentAnchor,
+  type AnyNode,
+  type AnyNodeId,
+  collectAlignmentAnchors,
+  spatialGridManager,
+  useScene,
+} from '@pascal-app/core'
 import {
   EDITOR_LAYER,
   isGridSnapActive,
   movementSfxStepKey,
   PlacementBox,
   triggerSFX,
+  useAlignmentGuides,
   useEditor,
   useFacingPose,
 } from '@pascal-app/editor'
@@ -16,6 +24,7 @@ import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
   electSupportSlab,
+  resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
@@ -92,6 +101,22 @@ export default function BenchTool() {
     validRef.current = true
     setCursorRotationY(0)
 
+    /**
+     * Hizalama çıpaları efekt başına BİR kez toplanıyor, `const` olarak.
+     *
+     * Yerleştirmeden sonra yeniden toplamak akla yakın ve YANLIŞ: bu araç
+     * `id: previewNode.id` ile taahhüt ediyor, yani `collectAlignmentAnchors`'ın
+     * dışladığı kimlik tam da az önce konan düğümün kimliği. Yeni toplama onu
+     * ekleyemez, yalnız her tıklamada bütün sahneyi bir kez daha gezer.
+     * Gerek de yok: taahhüt `placementSerial`'ı artırıyor → `previewNode`
+     * yenileniyor → bu efekt zaten baştan koşuyor.
+     */
+    const alignmentCandidates: AlignmentAnchor[] = collectAlignmentAnchors(
+      useScene.getState().nodes,
+      previewNode.id,
+      activeLevelId,
+    )
+
     const recomputeValidity = (position: [number, number, number]) => {
       if (altRef.current) {
         validRef.current = true
@@ -142,10 +167,26 @@ export default function BenchTool() {
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
-      applyCursor([rawX, 0, rawZ])
+      /**
+       * Ham imleç BURADA çözülüyor, `applyCursor`'a çözülmüş nokta gidiyor.
+       *
+       * Önceki hâl `applyCursor([rawX, 0, rawZ])` yazıyordu ve ızgara ayarı
+       * yerleştirmeye hiç ulaşmıyordu. Yanıltıcı olan, aracın
+       * `isGridSnapActive()`'i zaten OKUYOR olmasıydı — ama okuduğu yer aşağıdaki
+       * ses anahtarı. Izgaraya oturunca "tık" sesi çıkıyor, nesne oturmuyordu.
+       */
+      const { position, guides } = resolveAlignedPlacement({
+        candidates: alignmentCandidates,
+        node: previewNode as unknown as AnyNode,
+        rawX,
+        rawZ,
+        rotationY: rotationRef.current,
+      })
+      useAlignmentGuides.getState().set(guides)
+      applyCursor(position)
 
       const nextSnapKey = movementSfxStepKey({
-        coords: [rawX, rawZ],
+        coords: [position[0], position[2]],
         gridSnapActive: isGridSnapActive(),
         gridStep: useEditor.getState().gridSnapStep,
       })
@@ -231,8 +272,10 @@ export default function BenchTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       // Taahhüt, Esc, kind değişimi ve unmount'u tek elden karşılıyor —
-      // sahipsiz kalan bir yön üçgeni tuvalin üstünde asılı kalır.
+      // sahipsiz kalan bir yön üçgeni tuvalin üstünde asılı kalır. Aynısı
+      // hizalama kılavuzları için: araç bırakılınca tuvalde asılı kalırlardı.
       useFacingPose.getState().clear()
+      useAlignmentGuides.getState().clear()
     }
   }, [activeLevelId, previewNode, setBrush])
 

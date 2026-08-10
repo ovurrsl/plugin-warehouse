@@ -35,7 +35,7 @@ export const dockLevellerDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = DockLevellerNode.parse({})
-    return { ...rest, name: 'Dock leveller' }
+    return rest
   },
 
   tree: {

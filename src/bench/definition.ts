@@ -33,7 +33,7 @@ export const benchDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = BenchNode.parse({})
-    return { ...rest, name: 'Bench' }
+    return rest
   },
 
   tree: {

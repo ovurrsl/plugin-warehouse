@@ -109,6 +109,33 @@ describe('çok fişli her ailenin ağaç adı fişe göre ayrışıyor', () => {
   })
 })
 
+describe('hiçbir kind `defaults()` içinde sabit ad yazmıyor', () => {
+  /**
+   * Türetmeyi ezen tek şey bu, ve ezerken hiç ses çıkarmıyor.
+   *
+   * `treeLabel` düğümün `name`'i doluysa onu kullanıcının verdiği ad sayıp
+   * türetmeyi atlıyor — doğru davranış, ama `defaults()` bir ad YAZARSA o ad
+   * kullanıcıdan gelmiş gibi görünür. On iki kindʼin on ikisi de böyleydi:
+   * etiket fonksiyonları eklendikten sonra bile, host `defaults()` üzerinden
+   * kurduğu her düğüme "Pallet Rack" yazıyor, alçak raf da o adla açılıyordu.
+   *
+   * Bekçi kind listesine değil manifestin kendisine bağlı: yarın eklenen
+   * kind, ada dair hiçbir şey bilmeden kapsanıyor.
+   */
+  const withDefaults = [...DEFINITIONS.values()].filter(
+    (def) => typeof (def as { defaults?: unknown }).defaults === 'function',
+  )
+
+  test('en az bir kind `defaults()` bildiriyor', () => {
+    expect(withDefaults.length).toBeGreaterThan(0)
+  })
+
+  test.each(withDefaults.map((def) => [def.kind, def] as const))('%s', (_kind, def) => {
+    const defaults = (def as unknown as { defaults: () => Record<string, unknown> }).defaults()
+    expect('name' in defaults).toBe(false)
+  })
+})
+
 describe('kullanıcının verdiği ad her zaman kazanır', () => {
   /**
    * Türetilen ad bir VARSAYILAN, bir dayatma değil. Host'un yedek zinciri

@@ -50,7 +50,7 @@ export const palletRackDefinition = {
    */
   defaults: () => {
     const { id: _id, type: _type, ...rest } = PalletRackNode.parse({})
-    return { ...rest, name: 'Pallet Rack' }
+    return rest
   },
 
   tree: {

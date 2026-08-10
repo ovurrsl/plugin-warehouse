@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { snapToLineEnd } from './port-magnet'
 import { conveyorPorts } from './ports'
 import { TELESCOPIC_MODELS } from './telescopic-catalog'
@@ -43,7 +44,19 @@ export const conveyorTelescopicDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorTelescopicNode.parse({})
-    return { ...rest, name: `Telescopic ${TELESCOPIC_MODELS[rest.model].label}` }
+    return rest
+  },
+
+  tree: {
+    /**
+     * Model adı `defaults()`'tan buraya taşındı, ve taşınmakla dinamikleşti:
+     * orada YERLEŞTİRME ANINDA donuyordu, yani panelden modeli değiştiren
+     * kullanıcının satırı eski makineyi söylemeye devam ediyordu. Bir de hiç
+     * yazılmıyordu — eklentinin kendi aracı düğümü şemadan kuruyor.
+     */
+    label: treeLabel<ConveyorTelescopicNode>(
+      (node) => `Telescopic ${TELESCOPIC_MODELS[node.model].label}`,
+    ),
   },
 
   capabilities: {

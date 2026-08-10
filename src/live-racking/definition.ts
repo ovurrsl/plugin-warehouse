@@ -26,7 +26,7 @@ export const liveRackingDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = LiveRackingNode.parse({})
-    return { ...rest, name: 'Live Racking' }
+    return rest
   },
 
   tree: {

@@ -24,7 +24,7 @@ export const mezzanineDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = MezzanineNode.parse({})
-    return { ...rest, name: 'Mezzanine' }
+    return rest
   },
 
   tree: {

@@ -33,7 +33,7 @@ export const conveyorObliqueDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorObliqueNode.parse({})
-    return { ...rest, name: 'Oblique Transfer' }
+    return rest
   },
 
   capabilities: {

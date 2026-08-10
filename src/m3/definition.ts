@@ -24,7 +24,7 @@ export const m3ShelvingDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = M3ShelvingNode.parse({})
-    return { ...rest, name: 'M3 Bay' }
+    return rest
   },
 
   tree: {

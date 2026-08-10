@@ -33,7 +33,7 @@ export const toteCartDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ToteCartNode.parse({})
-    return { ...rest, name: 'Tote cart' }
+    return rest
   },
 
   tree: {

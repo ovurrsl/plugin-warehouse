@@ -44,7 +44,7 @@ export const routeDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = RouteNode.parse({})
-    return { ...rest, name: 'Yaya Yolu' }
+    return rest
   },
 
   tree: {

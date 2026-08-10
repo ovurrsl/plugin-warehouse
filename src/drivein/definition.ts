@@ -27,7 +27,7 @@ export const driveInRackDefinition = {
    */
   defaults: () => {
     const { id: _id, type: _type, ...rest } = DriveInRackNode.parse({})
-    return { ...rest, name: 'Drive-in Lane' }
+    return rest
   },
 
   tree: {

@@ -34,7 +34,7 @@ export const conveyorLauncherDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorLauncherNode.parse({})
-    return { ...rest, name: 'Launcher Conveyor' }
+    return rest
   },
 
   capabilities: {

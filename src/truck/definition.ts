@@ -34,7 +34,7 @@ export const truckDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = TruckNode.parse({})
-    return { ...rest, name: displayNameOf(TRUCK_MODELS[rest.model]) }
+    return rest
   },
 
   tree: {

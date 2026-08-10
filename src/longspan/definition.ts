@@ -35,7 +35,7 @@ export const longspanDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = LongspanNode.parse({})
-    return { ...rest, name: 'Longspan Bay' }
+    return rest
   },
 
   tree: {

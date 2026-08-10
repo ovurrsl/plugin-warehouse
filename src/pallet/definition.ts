@@ -42,7 +42,7 @@ export const palletDefinition = {
    */
   defaults: () => {
     const { id: _id, type: _type, ...rest } = PalletNode.parse({})
-    return { ...rest, name: 'Pallet' }
+    return rest
   },
 
   tree: {

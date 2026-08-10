@@ -217,6 +217,18 @@ export const SIGMA_DEFAULT_WIDTH_M = mm(110)
 /** ASSUMPTION — katalog yayınlamıyor. */
 export const SECONDARY_BEAM_SPACING_M = mm(1250)
 
+/**
+ * İkiz kolonun iki gövdesi arasındaki NET boşluk.
+ *
+ * ASSUMPTION — katalog ikiz kolon aks aralığı yayınlamıyor. Öteleme,
+ * kolonların ayrıldığı eksendeki kesit ölçüsünden (`h`) türetiliyor;
+ * bu sabit yalnız aradaki montaj boşluğu. Tek yerde durmasının sebebi
+ * 2B ile 3B'nin aynı sayıyı okuması: önceki hâlde 3B `b` kadar (yani
+ * ÖTEKİ eksenin ölçüsü kadar) öteliyordu ve varsayılan SIGMA'da iki
+ * kolon 190 mm iç içe geçiyordu.
+ */
+export const DOUBLE_COLUMN_GAP_M = mm(20)
+
 // ── Malzeme ───────────────────────────────────────────────────────────────
 
 /** RAL 5010-benzeri yapısal mavi — ASSUMPTION, v1.0'ın renk kararı. */

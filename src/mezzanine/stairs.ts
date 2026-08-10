@@ -213,41 +213,181 @@ export function resolveSteps(
   }
 }
 
+/**
+ * Bir merdiven kolunun yerel çerçevesi.
+ *
+ * Kol kendi yönünde uzanır ve yön sahanlık tipine göre değişir; bu yüzden
+ * her kol kendi YAW'ıyla taşınıyor ve parçalar `rotationY` ile emit
+ * ediliyor. Eksen hizalı kutu yaklaşıklığı ile çizilseydi, geri katlanan
+ * ya da yana dönen bir kol yanlış yerde durur.
+ */
+export type FlightFrame = {
+  /** Kolun başlangıcı, merdiven-yerel (x, z). */
+  ox: number
+  oz: number
+  /** Kolun yönü, birim vektör (merdiven-yerel). */
+  dx: number
+  dz: number
+  /** Kolun kendi yaw'ı — yerel +Z'yi kol yönüne çeviren dönüş. */
+  yaw: number
+  steps: number
+  /** Kolun ilk basamağının altındaki kot. */
+  baseY: number
+}
+
+/**
+ * Kolların yerleşimi — sahanlık tipinin geometriye döküldüğü yer.
+ *
+ *   - `continuous` (ve 15 basamak kuralıyla otomatik bölünen): kollar aynı
+ *     doğrultuda devam eder, aralarına sahanlık girer.
+ *   - `turn180` (dog-leg): ikinci kol GERİ katlanır ve birincinin yanına
+ *     gelir — bu yüzden `lateralM` iki kol genişliği.
+ *   - `turn90`: ikinci kol yana döner.
+ */
+export function flightFrames(
+  stair: StaircaseSpec,
+  geometry: StepGeometry,
+  fromY: number,
+): FlightFrame[] {
+  const { flights, stepsPerFlight, steps, riseM, flightRunM } = geometry
+  const landing = STAIRCASE_GEOMETRY.landingLengthMinM
+  const frames: FlightFrame[] = []
+
+  for (let f = 0; f < flights; f++) {
+    const stepsHere = Math.min(stepsPerFlight, steps - f * stepsPerFlight)
+    if (stepsHere <= 0) break
+    const baseY = fromY + riseM * stepsPerFlight * f
+
+    if (stair.landing === 'turn180' && f % 2 === 1) {
+      // Geri katlanır: yanına kayar ve ters yöne iner.
+      frames.push({
+        ox: stair.widthM,
+        oz: flightRunM,
+        dx: 0,
+        dz: -1,
+        yaw: Math.PI,
+        steps: stepsHere,
+        baseY,
+      })
+      continue
+    }
+    if (stair.landing === 'turn90' && f % 2 === 1) {
+      // Yana döner: sahanlıktan +X yönünde devam eder.
+      frames.push({
+        ox: stair.widthM / 2 + landing / 2,
+        oz: flightRunM + landing / 2,
+        dx: 1,
+        dz: 0,
+        yaw: -Math.PI / 2,
+        steps: stepsHere,
+        baseY,
+      })
+      continue
+    }
+    // Düz devam: her kol bir önceki kolun ve sahanlığın ötesinde başlar.
+    frames.push({
+      ox: 0,
+      oz: f * (flightRunM + landing),
+      dx: 0,
+      dz: 1,
+      yaw: 0,
+      steps: stepsHere,
+      baseY,
+    })
+  }
+  return frames
+}
+
 export type Rect = { x0: number; z0: number; x1: number; z1: number }
 
 /**
- * Merdivenin döşemede açtığı boşluk.
+ * Merdivenin YEREL sınır kutusu — kolları ÇİZEN yerleşimden türetiliyor.
  *
- * Genişlik katalogun açıklık diyagramından: `80 + genişlik + 80` mm.
- * Derinlik yatay uzanım + emniyet payı. Bu dikdörtgenle ÇAKIŞAN döşeme
- * panelleri çizilmez (CSG değil, panel dışlama — 15.000 m² ölçekte boolean
- * kesim kabul edilemez).
+ * Bu fonksiyonun `flightFrames`'i okumasının sebebi, boşluğun ikinci bir
+ * hesapla tahmin edilmesinin daha önce sessizce yanlış çıkması: dikdörtgen
+ * `origin ± yarım ölçü` diye kuruluyordu, oysa `flightFrames` bütün kolları
+ * origin'in TEK tarafına koyuyor (`z ∈ [0, …]`) ve dönüşlü sahanlıklarda
+ * ikinci kol yana da kayıyor. Varsayılan merdivende boşluk yerel
+ * z −1,71…+1,71 çıkıyordu, merdiven ise 0…3,26: boşluğun yarısı güvertenin
+ * DIŞINDA hiçbir paneli silmiyor, merdivenin üst yarısı ise sağlam bir
+ * panelin ALTINDA kalıyordu. 5 m'lik varsayılan göz ızgarası hatayı yutuyor
+ * (silinen 5 m'lik satır merdivenin tamamını kapsıyor); şemanın izin verdiği
+ * 2 m'lik gözde merdivenin üstü döşemeden çıkıyor — yani bu dosyanın kendi
+ * yorumunun "kaçınılacak sonuç" diye adlandırdığı şey. Planda da aynı kayma
+ * görünüyordu: kesikli beyaz kutu anahattın yarısı kadar dışarı taşıyordu.
+ *
+ * Basamak bindirmesi, limon kirişi ve dikme kesitleri buraya GİRMİYOR:
+ * hepsi 60 mm'nin altında taşıyor ve katalogun 80 mm'lik açıklığı onları
+ * zaten yutuyor. Kolun kendi ekseni ve boyu ise tam.
+ */
+function stairLocalBounds(spec: StaircaseSpec, geometry: StepGeometry): Rect {
+  const frames = flightFrames(spec, geometry, 0)
+  const landing = STAIRCASE_GEOMETRY.landingLengthMinM
+  const half = spec.widthM / 2
+  const xs: number[] = []
+  const zs: number[] = []
+
+  for (const [index, frame] of frames.entries()) {
+    const run = geometry.goingM * frame.steps
+    // Kolun kendisi: boyuna 0…run, yanal ±yarım genişlik — kol çerçevesinde.
+    const alongs = [0, run]
+    // Ara sahanlık kolun ucunun ötesinde.
+    if (index < frames.length - 1) alongs.push(run + landing)
+    for (const along of alongs) {
+      for (const lateral of [-half, half]) {
+        xs.push(frame.ox + frame.dx * along - frame.dz * lateral)
+        zs.push(frame.oz + frame.dz * along + frame.dx * lateral)
+      }
+    }
+    // turn180'in sahanlığı İKİ kolu birden örtüyor ve `pushStaircase` onu
+    // kol çerçevesinde değil, doğrudan merdiven-yerel +X'te yarım genişlik
+    // kaydırıp iki kol eninde basıyor. Kol çerçevesinden geçirmek onu ters
+    // yöne kaydırırdı — boşluk merdivenin bir kolu kadar yanlış tarafa
+    // taşardı.
+    if (index < frames.length - 1 && spec.landing === 'turn180') {
+      xs.push(-half, -half + 2 * spec.widthM)
+      zs.push(frame.oz + run, frame.oz + run + landing)
+    }
+  }
+
+  return { x0: Math.min(...xs), z0: Math.min(...zs), x1: Math.max(...xs), z1: Math.max(...zs) }
+}
+
+/**
+ * Merdivenin döşemede açtığı boşluk, dünya çerçevesinde.
+ *
+ * Katalogun açıklık diyagramı her yanda 80 mm istiyor. Bu dikdörtgenle
+ * ÇAKIŞAN döşeme panelleri çizilmez (CSG değil, panel dışlama — 15.000 m²
+ * ölçekte boolean kesim kabul edilemez).
  */
 export function stairVoidRect(
+  spec: StaircaseSpec,
   geometry: StepGeometry,
   origin: { x: number; z: number; rotationRad: number },
 ): Rect {
   const clearance = 0.08 // katalog açıklık diyagramı: her yanda 80 mm
-  // Genişlik merdivenin YANAL uzanımından — sahanlık tipi burada okunuyor.
-  // `spec.widthM` kullanmak, dönen kolun döşemenin içinden çıkması demekti.
-  const halfWidth = geometry.lateralM / 2 + clearance
-  const depth = geometry.runM + clearance * 2
+  const local = stairLocalBounds(spec, geometry)
 
-  // Yerel çerçevede: genişlik X'te, uzanım Z'de. Dünya çerçevesine
-  // döndürülür — 90°'nin katları dışında eksen hizalı bir dikdörtgen
-  // yaklaşıklığı kalır ve bu KASITLI: panel dışlama testi eksen hizalı,
-  // ve döndürülmüş bir boşluk için biraz fazla panel düşmesi, az panel
-  // düşmesinden (merdivenin döşemenin içinden çıkması) iyidir.
-  const cos = Math.abs(Math.cos(origin.rotationRad))
-  const sin = Math.abs(Math.sin(origin.rotationRad))
-  const halfX = halfWidth * cos + (depth / 2) * sin
-  const halfZ = halfWidth * sin + (depth / 2) * cos
+  // Yerel kutu dünya çerçevesine KÖŞE köşe taşınıyor — 90°'nin katları
+  // dışında eksen hizalı bir yaklaşıklık kalıyor ve bu KASITLI: panel
+  // dışlama testi eksen hizalı, ve fazla panel düşmesi az düşmesinden
+  // (merdivenin döşemenin içinden çıkmasından) iyidir.
+  const cos = Math.cos(origin.rotationRad)
+  const sin = Math.sin(origin.rotationRad)
+  const xs: number[] = []
+  const zs: number[] = []
+  for (const lx of [local.x0 - clearance, local.x1 + clearance]) {
+    for (const lz of [local.z0 - clearance, local.z1 + clearance]) {
+      xs.push(origin.x + lx * cos - lz * sin)
+      zs.push(origin.z + lx * sin + lz * cos)
+    }
+  }
 
   return {
-    x0: origin.x - halfX,
-    z0: origin.z - halfZ,
-    x1: origin.x + halfX,
-    z1: origin.z + halfZ,
+    x0: Math.min(...xs),
+    z0: Math.min(...zs),
+    x1: Math.max(...xs),
+    z1: Math.max(...zs),
   }
 }
 

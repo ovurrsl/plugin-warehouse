@@ -254,7 +254,7 @@ export function tierVoidRects(
   for (const stair of tier.accessories.staircases) {
     const { geometry } = resolveSteps(stair, elevationDeltaM)
     const origin = stairOrigin(node, stair)
-    rects.push(stairVoidRect(geometry, origin))
+    rects.push(stairVoidRect(stair, geometry, origin))
   }
   return rects
 }

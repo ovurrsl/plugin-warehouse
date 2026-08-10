@@ -18,6 +18,7 @@ import {
   STAIRCASE_GEOMETRY,
 } from './catalog'
 import {
+  doubleColumnOffsetM,
   footprintDepthM,
   footprintWidthM,
   gridColumnPositions,
@@ -40,6 +41,7 @@ import {
 } from './railing'
 import type { MezzanineNode } from './schema'
 import {
+  flightFrames,
   HANDRAIL_HEIGHT_M,
   KICKBOARD_HEIGHT_M,
   type Rect,
@@ -430,91 +432,6 @@ const STRINGER_THICKNESS_M = 0.05
 /** Kol boyunca korkuluk dikmesi aralığı — küpeşte sarkmasın. */
 const STAIR_POST_SPACING_M = 1.2
 
-/**
- * Bir merdiven kolunun yerel çerçevesi.
- *
- * Kol kendi yönünde uzanır ve yön sahanlık tipine göre değişir; bu yüzden
- * her kol kendi YAW'ıyla taşınıyor ve parçalar `rotationY` ile emit
- * ediliyor. Eksen hizalı kutu yaklaşıklığı ile çizilseydi, geri katlanan
- * ya da yana dönen bir kol yanlış yerde durur.
- */
-type FlightFrame = {
-  /** Kolun başlangıcı, merdiven-yerel (x, z). */
-  ox: number
-  oz: number
-  /** Kolun yönü, birim vektör (merdiven-yerel). */
-  dx: number
-  dz: number
-  /** Kolun kendi yaw'ı — yerel +Z'yi kol yönüne çeviren dönüş. */
-  yaw: number
-  steps: number
-  /** Kolun ilk basamağının altındaki kot. */
-  baseY: number
-}
-
-/**
- * Kolların yerleşimi — sahanlık tipinin geometriye döküldüğü yer.
- *
- *   - `continuous` (ve 15 basamak kuralıyla otomatik bölünen): kollar aynı
- *     doğrultuda devam eder, aralarına sahanlık girer.
- *   - `turn180` (dog-leg): ikinci kol GERİ katlanır ve birincinin yanına
- *     gelir — bu yüzden `lateralM` iki kol genişliği.
- *   - `turn90`: ikinci kol yana döner.
- */
-function flightFrames(
-  stair: MezzanineNode['tiers'][number]['accessories']['staircases'][number],
-  geometry: ReturnType<typeof resolveSteps>['geometry'],
-  fromY: number,
-): FlightFrame[] {
-  const { flights, stepsPerFlight, steps, riseM, flightRunM } = geometry
-  const landing = STAIRCASE_GEOMETRY.landingLengthMinM
-  const frames: FlightFrame[] = []
-
-  for (let f = 0; f < flights; f++) {
-    const stepsHere = Math.min(stepsPerFlight, steps - f * stepsPerFlight)
-    if (stepsHere <= 0) break
-    const baseY = fromY + riseM * stepsPerFlight * f
-
-    if (stair.landing === 'turn180' && f % 2 === 1) {
-      // Geri katlanır: yanına kayar ve ters yöne iner.
-      frames.push({
-        ox: stair.widthM,
-        oz: flightRunM,
-        dx: 0,
-        dz: -1,
-        yaw: Math.PI,
-        steps: stepsHere,
-        baseY,
-      })
-      continue
-    }
-    if (stair.landing === 'turn90' && f % 2 === 1) {
-      // Yana döner: sahanlıktan +X yönünde devam eder.
-      frames.push({
-        ox: stair.widthM / 2 + landing / 2,
-        oz: flightRunM + landing / 2,
-        dx: 1,
-        dz: 0,
-        yaw: -Math.PI / 2,
-        steps: stepsHere,
-        baseY,
-      })
-      continue
-    }
-    // Düz devam: her kol bir önceki kolun ve sahanlığın ötesinde başlar.
-    frames.push({
-      ox: 0,
-      oz: f * (flightRunM + landing),
-      dx: 0,
-      dz: 1,
-      yaw: 0,
-      steps: stepsHere,
-      baseY,
-    })
-  }
-  return frames
-}
-
 function pushStaircase(
   parts: MezzaninePartDraft[],
   node: MezzanineNode,
@@ -754,10 +671,12 @@ export function mezzanineParts(node: MezzanineNode): MezzaninePart[] {
     for (const point of columnPoints) {
       pushColumn(parts, point.x, point.z, y0, tier.deckTopM, columnProfile, order)
       if (node.columnType === 'double') {
+        // Öteleme Z ölçüsünden (`h`), X ölçüsünden değil — bkz.
+        // `doubleColumnOffsetM`. Plan da aynı fonksiyonu okuyor.
         pushColumn(
           parts,
           point.x,
-          point.z + columnProfile.b,
+          point.z + doubleColumnOffsetM(columnProfile),
           y0,
           tier.deckTopM,
           columnProfile,

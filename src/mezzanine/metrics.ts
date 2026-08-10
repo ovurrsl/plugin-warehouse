@@ -5,6 +5,7 @@
 
 import {
   CONSTRUCTIVE_SYSTEMS,
+  DOUBLE_COLUMN_GAP_M,
   FLOOR_TYPES,
   HEA_PROFILES,
   type IBeamProfile,
@@ -247,6 +248,21 @@ function resolveIBeam(
 export function resolveColumnProfile(node: MezzanineNode): IBeamProfile {
   const system = CONSTRUCTIVE_SYSTEMS[node.constructiveSystem]
   return resolveIBeam(node.columnProfile, system.columnFamily, 'HEA240')
+}
+
+/**
+ * İkiz kolonun ikinci gövdesinin Z ötelemesi — 3B ve planın TEK kaynağı.
+ *
+ * Kolon kesiti X-Z düzleminde `h → Z`, `b → X` olarak basılıyor
+ * (`parts.ts`'in kendi yazılı konvansiyonu). İkinci nüsha Z'de ayrıldığına
+ * göre öteleme Z ölçüsünden, yani `h`'den gelmeli. Eski hâl `b` kullanıyordu:
+ * varsayılan SIGMA'da (h=300, b=110) ikinci kolon birincinin 190 mm içine
+ * giriyordu — iki ayrı kolon değil, 410 mm derinliğinde tek bir kaynaşmış
+ * blok. HEA240'ta b=240 > h=230 olduğu için tesadüfen 10 mm boşluk kalıyor
+ * ve hata görünmüyordu; tam da VARSAYILAN sistemde patlıyordu.
+ */
+export function doubleColumnOffsetM(profile: IBeamProfile): number {
+  return profile.h + DOUBLE_COLUMN_GAP_M
 }
 
 export function resolveMainBeamProfile(node: MezzanineNode): IBeamProfile {

@@ -19,6 +19,8 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Hayalet stoğun seçime bağlılığını bekçiye bağla ([`bc3432f`](https://github.com/ovurrsl/plugin-warehouse/commit/bc3432f327eba632caf1f3a3d4a0e1e4ab02474d))
+- Refresh generated README blocks [skip ci] ([`349e388`](https://github.com/ovurrsl/plugin-warehouse/commit/349e38863098393870e4c5aa653a768a31537b07))
 - Refresh generated README blocks [skip ci] ([`01a0b87`](https://github.com/ovurrsl/plugin-warehouse/commit/01a0b87774eb048642dee61f0e3a0582c72a89f0))
 - Refresh generated README blocks [skip ci] ([`7297951`](https://github.com/ovurrsl/plugin-warehouse/commit/7297951664d837761f213de9bd5464cf3bc510a6))
 - Refresh generated README blocks [skip ci] ([`60b02f7`](https://github.com/ovurrsl/plugin-warehouse/commit/60b02f793d1b17b56358e2883189283fac002583))
@@ -153,6 +155,14 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Forklift artık üretici fotoğrafındaki makine ([`16491b8`](https://github.com/ovurrsl/plugin-warehouse/commit/16491b81922c598250088d56cf6b0f7bf46c5657))
+- Iş makinelerinin gövdesi tek prizma olmaktan çıktı ([`5b194dc`](https://github.com/ovurrsl/plugin-warehouse/commit/5b194dc0cce7e90f188ae0c401fd3af0e15f80f2))
+- Sipariş toplama arabası — yükseklik alan değil, kasadan hesaplanıyor ([`d3ec385`](https://github.com/ovurrsl/plugin-warehouse/commit/d3ec385a3d6f171b1971d37c96063dc3e1334b9a))
+- Kapı çukuruna gömülü yükleme rampası — dinlenmede zeminle aynı kotta ([`367e845`](https://github.com/ovurrsl/plugin-warehouse/commit/367e845603156d0aab65878477c650a91cc52827))
+- Tezgâh kind'ı kayıtlı — renderer, araç, plan, altı katalog fişi ([`23882dc`](https://github.com/ovurrsl/plugin-warehouse/commit/23882dc9b95400212515b75d719165f8d19c402a))
+- Ölçüler panelden ayarlanabilir + fiziksel sınır uyarıları ([`1dc0c1e`](https://github.com/ovurrsl/plugin-warehouse/commit/1dc0c1e7d22cc96899f41d1acbf562c9ee9af396))
+- Tezgâh ailesinin model katmanı — altı varyant, tek kind ([`d1cf2c7`](https://github.com/ovurrsl/plugin-warehouse/commit/d1cf2c7ac50bc0cfbd30307316229ac1664b3a10))
+- Ayarlanabilir kuyruk kotu — bom artık bir hatta birleşebiliyor ([`0e29902`](https://github.com/ovurrsl/plugin-warehouse/commit/0e299027859d7de5959fc3f3985eb0c5d4935228))
 - Furnish paletine katıl + marquee damgası + upstream öneri paketi ([`0c21b84`](https://github.com/ovurrsl/plugin-warehouse/commit/0c21b848fbdfaca6452478fb6682b154cdece742))
 - Kabul dalgasını yavaşlat — kare başına 64 → 24 raf ([`43e4c4b`](https://github.com/ovurrsl/plugin-warehouse/commit/43e4c4b62dd2d608eceaaff317ffad18f58f0d43))
 - Boyalı delikler geri, taban plakası gitti, ek yerlerine dikiş payı, şekiller süpürülüyor ([`49f7307`](https://github.com/ovurrsl/plugin-warehouse/commit/49f730771eac572f7fbe9af9896ed080c8c742e3))
@@ -252,6 +262,22 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Oblique'in saptırma üçgeni yatağın içine gömülüydü ([`18ae9cc`](https://github.com/ovurrsl/plugin-warehouse/commit/18ae9ccb6001b64df00eb6906f3e0781e174cbfa))
+- Paletin içi dışından parlaktı, damga bayrağı okunmuyordu, plastik palet ahşaptı ([`73ed9db`](https://github.com/ovurrsl/plugin-warehouse/commit/73ed9db2d116dd9362c42f5e26608d4680763e92))
+- Ikiz kolon iç içeydi, plan kolonu 2,7 kat genişti, merdiven boşluğu yanlış yerdeydi ([`f16ecef`](https://github.com/ovurrsl/plugin-warehouse/commit/f16ecefad61b5b56b475ca28eaa71a8a6866a17b))
+- Pedal lastiğin içindeydi, tekerlek uzakta arabadan kopuyordu ([`6be5100`](https://github.com/ovurrsl/plugin-warehouse/commit/6be510030cdc96fb79cd648c2c102b01b22e972d))
+- Tampon zeminin altına indi, seçim kutusu görüneni sarıyor ([`e8d2dd9`](https://github.com/ovurrsl/plugin-warehouse/commit/e8d2dd9c0b9877f70434358b431369740f39c7ea))
+- Çerçeve artık kafes, panel kirişle hizalı, çapraz gözün arkasında ([`0e22f2a`](https://github.com/ovurrsl/plugin-warehouse/commit/0e22f2adb11f2825878e0901c4b4181d4f3b2117))
+- Ilk kat açıklığı 220 mm eksikti, çerçevede çapraz yoktu ([`b664df5`](https://github.com/ovurrsl/plugin-warehouse/commit/b664df53d97839dde14ea6a8dc4eb3c96c26ca39))
+- Raylar, kuşaklar ve dikmeler artık birbirine değiyor ([`214f7b9`](https://github.com/ovurrsl/plugin-warehouse/commit/214f7b90d2c2f3daee2859d49349064a659c4658))
+- Masa artık yere basıyor — teker ayağın altında, çekmece ayağın dışında ([`794d04b`](https://github.com/ovurrsl/plugin-warehouse/commit/794d04b15888fcd533963c1f17e4abf161474e42))
+- Hat çalışırken yatak da aksın — makaralar duruyordu ([`aebf1e6`](https://github.com/ovurrsl/plugin-warehouse/commit/aebf1e67ee6016407dd1cd41a42a9b744de85e09))
+- Tampon ve kumanda direği tıklanamıyordu ([`99feb22`](https://github.com/ovurrsl/plugin-warehouse/commit/99feb225ac4aa7d9390ccd92a30e0b934af1bde1))
+- Tezgâhın ön yüzü tanımlandı, zarfı artık çizdiği her şeyi sayıyor ([`81fbfb7`](https://github.com/ovurrsl/plugin-warehouse/commit/81fbfb733b431154fad355ce4820583688a3bb3c))
+- Çizilen geometri bildirilen kutunun dışına taşıyordu ([`6ca5e0a`](https://github.com/ovurrsl/plugin-warehouse/commit/6ca5e0ac7b8d18bf0b18abe674e9d4bcdc83f35e))
+- Çalışma lambası gövdesinin üstüne oturdu + hüzme, ve bom Display menüsünü duyuyor ([`17f4942`](https://github.com/ovurrsl/plugin-warehouse/commit/17f49422a51d5c766099371fb848b80900626bde))
+- Kayıtlı nesneyi havuz için gizleme — kutu-seçim onu eliyordu ([`6302058`](https://github.com/ovurrsl/plugin-warehouse/commit/6302058b2602cbd460960f2783d5a3d69dc874b4))
+- Kol portu ters akışta kolun ters yönünü gösteriyordu ([`e35a2e4`](https://github.com/ovurrsl/plugin-warehouse/commit/e35a2e42a1d34c1800f0b5f8695975af8b91876b))
 - Doğrulanmış kalan zayıf noktalar — bodiesOf memo, NaN çifti, mezzanine key'leri, kat yoklaması scratch'i ([`519fbb8`](https://github.com/ovurrsl/plugin-warehouse/commit/519fbb884c84fe41de46e8dedb17bd93eef1154a))
 - PeerDependencies aralığını host'un gerçek sürümüne aç ([`8051690`](https://github.com/ovurrsl/plugin-warehouse/commit/8051690f6558b5d130abc1e82b241cc0502f2c4e))
 - Call useUnit above the early return, and convert the ES-only height ([`2e3640d`](https://github.com/ovurrsl/plugin-warehouse/commit/2e3640dd73d2ab47f70b2a5a44b8f3d5cedd0f40))
@@ -289,6 +315,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #17 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e952b93`](https://github.com/ovurrsl/plugin-warehouse/commit/e952b93b824126bbc14425302edf1e3bcc7d143a))
 - Merge pull request #16 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`4e2414b`](https://github.com/ovurrsl/plugin-warehouse/commit/4e2414b4fbca6cf95926dfc3f47060dc7fb881f4))
 - Merge pull request #15 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`5d42057`](https://github.com/ovurrsl/plugin-warehouse/commit/5d420578bfe52c6e6d591191d86ec03c3b019c4c))
 - Revert "Merge pull request #14 from ovurrsl/claude/camera-stutter-measurements-5tfsm2" ([`1e208a3`](https://github.com/ovurrsl/plugin-warehouse/commit/1e208a333bb1fd97a117e06b2b189d6fd2260145))
@@ -313,6 +340,11 @@ index to it, not a replacement for it.
 
 ### Performance
 
+- Konveyör panel taraması ve yuva enumerasyonu kimliğe memoize ([`3a4c77a`](https://github.com/ovurrsl/plugin-warehouse/commit/3a4c77acb706f2fd4cf9c798522b62820fbb4cc2))
+- Kayma taraması kendi kümesine, konveyör havuzuna süpürme, teleskopiğe detay kolu ([`d5708b6`](https://github.com/ovurrsl/plugin-warehouse/commit/d5708b6ca799404914dc7a549160dc113490bfc6))
+- Konveyör ailesi desenleri aldı + 12 yerleştirme aracına imleç kapısı ([`78b2b6c`](https://github.com/ovurrsl/plugin-warehouse/commit/78b2b6c8a9027b644934f33a64470922f96ea864))
+- Rafın desenlerini 10 kind'a yay — ölü ağaç gezinişi, donmuş sarmalayıcı, merkezî LOD ([`e8bde65`](https://github.com/ovurrsl/plugin-warehouse/commit/e8bde65956c6c26d23325c08fa819ab707b28875))
+- Seçim çarpıştırıcılarının matrisi donduruldu — kare başına 3.582 compose + multiply gitti ([`863f4f2`](https://github.com/ovurrsl/plugin-warehouse/commit/863f4f2c46c5381ef6f8f973616ffb7287bce7e3))
 - Katman takası kısıtı — kamera uçuşu havuzları her kare yeniden kurduramaz ([`dcb2158`](https://github.com/ovurrsl/plugin-warehouse/commit/dcb215877d710840be7d517e3544627d535b605e))
 - Eklenti nesnelerinin gölgeleri tamamen kalktı + performans modu düğmesi ([`515b47b`](https://github.com/ovurrsl/plugin-warehouse/commit/515b47bc78510bbf0066e63705c79402ae195501))
 - Host döşeme-desteği sorgusuna eklenti-tarafı memo — editöre dokunmadan ([`a2dc544`](https://github.com/ovurrsl/plugin-warehouse/commit/a2dc5445f9b52de76d95fb00f1e9630f1f194978))

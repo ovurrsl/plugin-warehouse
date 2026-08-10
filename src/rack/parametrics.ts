@@ -59,8 +59,11 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
    * settings that moved nothing.
    *
    * `visibleIf` does that work, and it reads the *same predicates the geometry
-   * cache key reads*. So a field is shown exactly when it changes the mesh — a
-   * control can never be visible, adjustable, and inert.
+   * cache key reads*. The rule it enforces is that a control can never be
+   * visible, adjustable, and inert; "shown exactly when it changes the mesh" is
+   * how that rule is spelled for every field here but one. `variant` changes no
+   * vertex and is still shown, because it drives the height cap and the tree
+   * label — see its own note below.
    *
    * There is no bay or row count here, and that is the shape of the kind rather
    * than an omission: a bay is a node, so "twenty bays" is twenty nodes and the
@@ -71,6 +74,23 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
     {
       label: 'Size',
       fields: [
+        /**
+         * Mesh'i değiştirmeyen tek görünür alan, ve istisnanın gerekçesi
+         * yukarıdaki kuralın KENDİSİNDE yazılı: yasak olan "görünür,
+         * ayarlanabilir ve ETKİSİZ" kontrol. Bu etkisiz değil — altındaki
+         * yükseklik slider'ının tavanını ve ağaçtaki adı o belirliyor.
+         * Mesh yüklemi o kuralın vekiliydi, kuralın kendisi değil.
+         *
+         * Görünür olması ayrıca 3 m tavanını AÇIKLIYOR: tavanın sebebi
+         * sliderın hemen üstünde duruyor, yoksa kullanıcı rafı neden
+         * yükseltemediğini hiçbir yerde okuyamazdı.
+         */
+        {
+          key: 'variant',
+          kind: 'enum',
+          options: ['pallet-rack', 'low-rack'],
+          display: 'segmented',
+        },
         { key: 'bayClearWidth', kind: 'number', unit: 'm', min: 0.6, max: 6, step: 0.05 },
         { key: 'depth', kind: 'number', unit: 'm', min: 0.4, max: 2.5, step: 0.05 },
         { key: 'uprightHeight', kind: 'number', unit: 'm', min: 1, max: 20, step: 0.1 },

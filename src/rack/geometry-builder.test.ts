@@ -273,6 +273,11 @@ describe('cache key coverage', () => {
   // two different keys, and the table said nothing because it only ever tried
   // `timber`. `ENUMS` below sweeps every value against every other.
   const VARIANTS: Array<[string, unknown]> = [
+    // Ürün adı, çelik değil: alçak raf palet rafının başka ölçülere kurulmuş
+    // hâli. Tek başına hiçbir vertex oynatmıyor, dolayısıyla anahtara da
+    // GİRMEMELİ — girseydi aynı ölçülerdeki iki rafın mesh'i boşuna ikiye
+    // bölünürdü. Sweep bunu iki yönlü tutuyor.
+    ['variant', 'low-rack'],
     ['bayClearWidth', 3.3],
     ['depth', 1.2],
     ['uprightHeight', 8],

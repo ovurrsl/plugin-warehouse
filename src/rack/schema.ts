@@ -29,6 +29,27 @@ export const PalletRackNode = BaseNode.extend({
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
 
+  /**
+   * Hangi ürün olarak sipariş edildi — palet rafı mı, alçak toplama rafı mı.
+   *
+   * **Geometriyi tek başına DEĞİŞTİRMİYOR** ve bu bilinçli: alçak raf, palet
+   * rafının başka ölçülere kurulmuş hâli, başka bir çelik değil. Alan yalnız
+   * üç şeye hükmediyor — fişin yazdığı ön ayar, panelin izin verdiği azami
+   * yükseklik, ve ağaçtaki ad. Dolayısıyla **geometri anahtarına girmiyor**;
+   * girseydi aynı ölçülerdeki iki rafın mesh'i boşuna ikiye bölünürdü ve
+   * iki yönlü kapsama testi bunu hata sayardı.
+   *
+   * Ayrı bir kind DEĞİL, çünkü ikisinin çeliği ortak. Bir gün yapısal olarak
+   * ayrışırlarsa terfi normal bir göç işi — `m3` ile `longspan` bunun örneği.
+   *
+   * Değerler katalog fişlerinin etiketleriyle BİREBİR aynı ("Pallet Rack",
+   * "Low Rack"): host enum seçeneğini `prettifyEnumValue` ile çizdiği için
+   * panelde okunan ad, fişte tıklanan adla aynı çıkıyor.
+   *
+   * Eski sahneler `'pallet-rack'` varsayılanıyla açılır; göç gerekmiyor.
+   */
+  variant: z.enum(['pallet-rack', 'low-rack']).default('pallet-rack'),
+
   // ── The bay ───────────────────────────────────────────────────────────────
 
   /** Clear entry width of the bay, measured between the two uprights. */

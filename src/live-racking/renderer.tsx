@@ -92,7 +92,6 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
     keyFor: (tier) => liveRackingGeometryKey(node, tier === 'full' ? 'full' : 'simple'),
     materialFor: () => material,
     materialKeyFor: () => `live-racking:${appearanceKey(appearance)}`,
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

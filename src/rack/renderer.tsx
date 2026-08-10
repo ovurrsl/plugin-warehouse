@@ -147,7 +147,6 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
     // binlerce rafın gölge geçidi maliyeti, kazandırdığı görsel derinliğe
     // değmedi. Tüm kind'larda aynı; bina duvarları gölge düşürmeye devam
     // ediyor, raflar ÜZERLERİNE düşen gölgeyi almayı da sürdürüyor.
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

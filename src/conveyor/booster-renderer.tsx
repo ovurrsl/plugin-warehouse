@@ -105,7 +105,6 @@ function ConveyorBoosterRendererBody({ node }: { node: ConveyorBoosterNode }) {
     keyFor: (tier) => boosterGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

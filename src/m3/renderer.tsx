@@ -108,7 +108,6 @@ function M3RendererBody({ node }: { node: M3ShelvingNode }) {
     // The same pool as the other racking kinds: identical material, and
     // splitting them would double the draw calls of a mixed scene.
     materialKeyFor: () => `rack:${appearanceKey(appearance)}`,
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

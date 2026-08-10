@@ -18,7 +18,6 @@ export type CollectiveOptions = {
   keyFor: (tier: InstanceTier) => string
   materialFor: (tier: InstanceTier) => THREE.Material
   materialKeyFor: (tier: InstanceTier) => string
-  castsShadow: boolean
   farSq: number
   nearSq: number
   /** Kendi mesh'ini çizmesi gereken hâller: seçili ya da canlı sürükleniyor. */
@@ -53,7 +52,6 @@ export function useCollective(options: CollectiveOptions): boolean {
       keyFor: current.keyFor,
       materialFor: current.materialFor,
       materialKeyFor: current.materialKeyFor,
-      castsShadow: current.castsShadow,
       farSq: current.farSq,
       nearSq: current.nearSq,
       excluded: current.excluded,

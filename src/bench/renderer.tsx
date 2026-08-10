@@ -107,7 +107,6 @@ function BenchRendererBody({ node }: { node: BenchNode }) {
     materialFor: () => material,
     materialKeyFor: () => `bench:${appearanceKey(appearance)}`,
     // Ailenin kararı: eklenti nesneleri gölge düşürmüyor (515b47b).
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

@@ -68,24 +68,43 @@ describe('number fields', () => {
     }
   })
 
-  test("declare the schema's own bounds, not a narrower or wider pair", () => {
-    // A slider that stops short of what the schema allows hides settings; one
-    // that goes past it produces a value the schema rejects, and the write is
-    // simply dropped — the control moves and nothing happens.
+  test("and together they cover the schema's whole range", () => {
+    /**
+     * Öteki yön. "Şemanın ötesine taşmasın" yönünü yukarıdaki test zaten
+     * kapatıyor: şema kontrolün kendi `max`'ını kabul ediyorsa o `max`
+     * şemanınkini aşamaz. Burada tutulan şey ters durum — şemanın izin
+     * verdiği bir değere HİÇBİR kontrolden ulaşılamıyorsa o ayar saklanmış
+     * olur.
+     *
+     * Kural anahtar BAŞINA, tek tek kontrol başına değil, ve bu turda öyle
+     * oldu: `uprightHeight` artık iki kez yazılı, biri 20 m tavanlı (palet
+     * rafı), biri 3 m tavanlı (alçak raf), `visibleIf` ikisini birbirini
+     * dışlar kılıyor. Kontrol başına bakan eski hâli alçak raf slider'ını
+     * "şemayı daraltıyor" diye düşürüyordu — oysa 4 m'lik bir raf hâlâ
+     * erişilebilir, yalnız varyantı değiştirerek.
+     */
+    const byKey = new Map<string, { min?: number; max?: number; step?: number }[]>()
     for (const { field } of numbers) {
       const key = String(field.key)
-      const { min, max, step } = field as { min?: number; max?: number; step?: number }
-      const nudge = (step ?? 0.01) / 2
-      if (min !== undefined) {
-        expect({ key, belowMin: shape[key]?.safeParse(min - nudge).success }).toEqual({
+      byKey.set(key, [...(byKey.get(key) ?? []), field as { min?: number; max?: number }])
+    }
+
+    for (const [key, controls] of byKey) {
+      const mins = controls.map((control) => control.min).filter((value) => value !== undefined)
+      const maxes = controls.map((control) => control.max).filter((value) => value !== undefined)
+      const step = controls[0]?.step ?? 0.01
+      if (mins.length === controls.length) {
+        const lowest = Math.min(...mins)
+        expect({ key, reachesMin: shape[key]?.safeParse(lowest - step / 2).success }).toEqual({
           key,
-          belowMin: false,
+          reachesMin: false,
         })
       }
-      if (max !== undefined) {
-        expect({ key, aboveMax: shape[key]?.safeParse(max + nudge).success }).toEqual({
+      if (maxes.length === controls.length) {
+        const highest = Math.max(...maxes)
+        expect({ key, reachesMax: shape[key]?.safeParse(highest + step / 2).success }).toEqual({
           key,
-          aboveMax: false,
+          reachesMax: false,
         })
       }
     }
@@ -369,5 +388,60 @@ describe('the derived fields are reachable and correctly bounded', () => {
       })
       expect({ key, over: field?.safeParse(bounds.max + 1).success }).toEqual({ key, over: false })
     }
+  })
+})
+
+describe('alçak raf 3 m tavanı', () => {
+  /**
+   * Kullanıcının şartı ("lower rack seçtiğimde en fazla 3 metre
+   * yapabildiğim ... rack gelmeli"), ve şartın panelde nasıl karşılandığının
+   * bekçisi.
+   *
+   * Tavan ŞEMADA değil PANELDE, bilerek: MCP'den ya da elle düzenlenmiş bir
+   * sahneden gelen 3 m üstü bir alçak raf reddedilmiyor, uyarılıyor. İki
+   * yön de burada tutuluyor, çünkü ikisinden birini kaybetmek sessiz: tavan
+   * kaybolursa slider yine çalışır, uyarı kaybolursa sahne yine açılır.
+   */
+  const uprightFields = fields
+    .filter(({ field }) => field.key === 'uprightHeight')
+    .map(({ field }) => field as { max?: number; visibleIf?: (n: PalletRackNode) => boolean })
+
+  const lowRack = (uprightHeight: number) =>
+    PalletRackNode.parse({ id: 'pallet_rack_low', variant: 'low-rack', uprightHeight })
+  const palletRack = (uprightHeight: number) =>
+    PalletRackNode.parse({ id: 'pallet_rack_tall', variant: 'pallet-rack', uprightHeight })
+
+  const visible = (node: PalletRackNode) =>
+    uprightFields.filter((field) => field.visibleIf?.(node) ?? true)
+
+  test('her varyantta TEK bir yükseklik kontrolü görünür', () => {
+    // İkisi birden görünürse panel aynı sayıyı iki kez, iki farklı tavanla
+    // gösterir; hiçbiri görünmezse yükseklik hiç ayarlanamaz. Sessiz olan
+    // ikinci hâl, çünkü panel yine dolu görünür.
+    expect(visible(lowRack(2.5)).length).toBe(1)
+    expect(visible(palletRack(5)).length).toBe(1)
+  })
+
+  test('ve tavanı varyantın tavanı', () => {
+    expect(visible(lowRack(2.5))[0]?.max).toBe(3)
+    expect(visible(palletRack(5))[0]?.max).toBe(20)
+  })
+
+  test('şema 3 mʼyi aşan alçak rafı REDDETMİYOR', () => {
+    // Kural: sayı reddedilmez, uyarılır. Şema kapansaydı MCP'nin yazdığı
+    // sahne hiç açılmazdı.
+    expect(lowRack(4.2).uprightHeight).toBe(4.2)
+  })
+
+  test('ama panel onu uyarı olarak söylüyor', () => {
+    const warn = (node: PalletRackNode) =>
+      (palletRackParametrics.invariants ?? [])
+        .flatMap((check) => check(node))
+        .filter((issue) => issue.field === 'uprightHeight')
+
+    expect(warn(lowRack(4.2)).length).toBe(1)
+    expect(warn(lowRack(3)).length).toBe(0)
+    // Palet rafı 4.2 m'de tamamen normal — uyarı varyanta bağlı, boya değil.
+    expect(warn(palletRack(4.2)).length).toBe(0)
   })
 })

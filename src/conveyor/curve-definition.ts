@@ -34,7 +34,7 @@ export const conveyorCurveDefinition = {
    *  default to go stale. */
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorCurveNode.parse({})
-    return { ...rest, name: 'Curved Conveyor' }
+    return rest
   },
 
   capabilities: {

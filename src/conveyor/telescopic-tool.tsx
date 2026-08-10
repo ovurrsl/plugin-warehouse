@@ -30,6 +30,7 @@ import {
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
+import { placementPose } from './placement-pose'
 import { TELESCOPIC_MODELS } from './telescopic-catalog'
 import {
   currentLengthM,
@@ -64,6 +65,12 @@ export default function TelescopicTool() {
   const [extension, setExtension] = useState(brush.extension)
 
   const rotationRef = useRef(0)
+  /**
+   * ÇİZİLEN açı — kullanıcınınki değil. Mıknatıs bir uca oturttuğunda hayalet
+   * komşunun istediği açıya döner, ama `rotationRef` kullanıcının R/T ile
+   * kurduğu açıyı tutmaya devam eder; uçtan uzaklaşınca o açı geri gelir.
+   */
+  const poseRotationRef = useRef(0)
   const extensionRef = useRef(brush.extension)
   const validRef = useRef(true)
   const altRef = useRef(false)
@@ -114,6 +121,7 @@ export default function TelescopicTool() {
     lastPositionRef.current = null
     previousSnapRef.current = null
     rotationRef.current = 0
+    poseRotationRef.current = 0
     altRef.current = false
     validRef.current = true
     setCursorRotationY(0)
@@ -135,13 +143,17 @@ export default function TelescopicTool() {
         activeLevelId,
         visual,
         [currentLengthM(live), telescopicModelOf(live.model).heightM + 0.12, frameWidthM(live)],
-        [0, rotationRef.current, 0],
+        [0, poseRotationRef.current, 0],
         [],
       )
       const clear = isClearAt({
-        node: { ...ghostNodeRef.current, position: visual, rotation: [0, rotationRef.current, 0] },
+        node: {
+          ...ghostNodeRef.current,
+          position: visual,
+          rotation: [0, poseRotationRef.current, 0],
+        },
         position: visual,
-        rotationY: rotationRef.current,
+        rotationY: poseRotationRef.current,
         nodes: useScene.getState().nodes as Readonly<Record<string, unknown>>,
       })
       validRef.current = placeable && clear
@@ -152,11 +164,11 @@ export default function TelescopicTool() {
       const visual = getFloorStackPreviewPosition({
         node: previewNode as unknown as AnyNode,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, poseRotationRef.current, 0],
         levelId: activeLevelId,
       })
       cursorRef.current?.position.set(...visual)
-      cursorRef.current?.rotation.set(0, rotationRef.current, 0)
+      cursorRef.current?.rotation.set(0, poseRotationRef.current, 0)
       // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
       // her fare hareketinde kaçamayacağı bir render ettiriyor; ızgaraya
       // oturmuş imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
@@ -164,21 +176,36 @@ export default function TelescopicTool() {
         cursorPositionRef.current = visual
         setCursorPosition(visual)
       }
-      setCursorRotationY(rotationRef.current)
+      setCursorRotationY(poseRotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(visual)
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
-      const { position, guides } = resolveAlignedPlacement({
+      const aligned = resolveAlignedPlacement({
         candidates: alignmentCandidates,
         node: previewNode as unknown as AnyNode,
         rawX,
         rawZ,
         rotationY: rotationRef.current,
       })
-      useAlignmentGuides.getState().set(guides)
+      /**
+       * Mıknatıs hizalamanın ÜSTÜNDE. Teleskopikte bu özellikle görünür:
+       * makinenin TEK portu var (kuyruk) ve bom ucu bilerek port değil, yani
+       * hattın ucuna oturması gereken tek bir uç var ve onu elle tutturmak
+       * en zoru.
+       */
+      const pose = placementPose(
+        ghostNodeRef.current,
+        aligned.position,
+        rotationRef.current,
+        useScene.getState().nodes as Readonly<Record<string, unknown>>,
+      )
+      useAlignmentGuides.getState().set(pose.snapped ? [] : aligned.guides)
+      poseRotationRef.current = pose.rotationY
+      setCursorRotationY(pose.rotationY)
+      const position = pose.position
       applyCursor(position)
 
       const nextSnapKey = movementSfxStepKey({
@@ -206,7 +233,7 @@ export default function TelescopicTool() {
         id: previewNode.id,
         name: `Telescopic ${TELESCOPIC_MODELS[previewNode.model].label}`,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, poseRotationRef.current, 0],
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
       })
@@ -259,6 +286,8 @@ export default function TelescopicTool() {
       event.preventDefault()
       triggerSFX('sfx:item-rotate')
       rotationRef.current += delta
+      // Kullanıcı çevirdiği an mıknatısın bıraktığı açı düşer.
+      poseRotationRef.current = rotationRef.current
       setCursorRotationY(rotationRef.current)
       const position = lastPositionRef.current
       if (position) applyCursor(position)

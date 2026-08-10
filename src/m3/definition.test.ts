@@ -28,7 +28,8 @@ const ctx = { viewState: undefined } as unknown as GeometryContext
 describe('definition', () => {
   test('defaults parse', () => {
     const defaults = m3ShelvingDefinition.defaults()
-    expect(defaults.name).toBe('M3 Bay')
+    // Sabit ad YOK — bkz. `src/tree-label.ts`.
+    expect('name' in defaults).toBe(false)
     expect(() => M3ShelvingNode.parse({ id: 'm3_x', ...defaults })).not.toThrow()
   })
 

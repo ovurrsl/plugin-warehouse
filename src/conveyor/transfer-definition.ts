@@ -34,7 +34,7 @@ export const conveyorTransferDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorTransferNode.parse({})
-    return { ...rest, name: 'Mixed Transfer' }
+    return rest
   },
 
   capabilities: {

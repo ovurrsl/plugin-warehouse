@@ -42,6 +42,23 @@ type WarehouseStore = {
   tab: PanelTab
   setTab: (tab: PanelTab) => void
 
+  /**
+   * Katalogda en son basılan fişin kimliği, ya da katalog dışından silahlanan
+   * bir araç için `null`.
+   *
+   * Vurgulamanın TEK doğru kaynağı bu. Önceki hâli `activeTool === item.kind`
+   * idi, artı fişleri ayırt etmek için elle yazılmış altı yüklem
+   * (`wantsLoad`, `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`,
+   * `wantsTilt`). Yüklemi yazılmamış her aile aynı anda birden çok fişi
+   * yakıyordu — raf, longspan, m3, drive-in, live-rack ve mezzanine, yani
+   * çok fişli ailelerin yarısından fazlası — ve yedincisi de unutulacaktı.
+   *
+   * Kimlik karşılaştırması aile başına bakım istemiyor: fiş eklenir, doğru
+   * yanar.
+   */
+  armedChipId: string | null
+  setArmedChipId: (id: string | null) => void
+
   scope: StatsScope
   setScope: (scope: StatsScope) => void
 
@@ -106,27 +123,6 @@ type WarehouseStore = {
    */
   lodQuality: LodQuality
   setLodQuality: (quality: LodQuality) => void
-
-  /**
-   * Gölge kısıcı — VARSAYILAN AÇIK, `instancingEnabled` gerekçesiyle.
-   *
-   * Gölge geçidi ölçülmüş en büyük kalemdi (eski tabanda ~29 ms/kare) ve
-   * sahne karelerin çoğunda durağan. Kısıcı haritayı talep üzerine +
-   * 4 karelik kalp atışıyla tazeliyor (`instancing/shadow-throttle.ts`).
-   * Kapatınca ışıklar three'nin kendi temposuna geri verilir — iki hâl
-   * yan yana ölçülebilir.
-   */
-  shadowThrottleEnabled: boolean
-  setShadowThrottleEnabled: (enabled: boolean) => void
-
-  /**
-   * Uzak gölge kısma — 85 m ötesindeki örnekler gölgesiz havuza taşınır
-   * (`collective.ts`: bayrak havuz anahtarında, canlı mesh'te asla
-   * çevrilmez). VARSAYILAN AÇIK, kullanıcı kararı; kapatınca bayraklar
-   * ≤8 karede temizlenir ve her örnek yeniden gölgeli havuzda.
-   */
-  farShadowCullEnabled: boolean
-  setFarShadowCullEnabled: (enabled: boolean) => void
 
   // ── Placement brush ────────────────────────────────────────────────────
   /**
@@ -348,6 +344,7 @@ export type MezzanineBrush = Pick<
 
 export type RackBrush = Pick<
   PalletRackNode,
+  | 'variant'
   | 'bayClearWidth'
   | 'depth'
   | 'uprightHeight'
@@ -361,6 +358,9 @@ export type RackBrush = Pick<
 export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   tab: 'catalog',
   setTab: (tab) => set({ tab }),
+
+  armedChipId: null,
+  setArmedChipId: (armedChipId) => set({ armedChipId }),
 
   scope: 'building',
   setScope: (scope) => set({ scope, slabFilter: null }),
@@ -396,12 +396,6 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
 
   lodQuality: 'balanced',
   setLodQuality: (lodQuality) => set({ lodQuality }),
-
-  shadowThrottleEnabled: true,
-  setShadowThrottleEnabled: (shadowThrottleEnabled) => set({ shadowThrottleEnabled }),
-
-  farShadowCullEnabled: true,
-  setFarShadowCullEnabled: (farShadowCullEnabled) => set({ farShadowCullEnabled }),
 
   palletBrush: {
     preset: 'epal-1',
@@ -450,6 +444,7 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     }),
 
   rackBrush: {
+    variant: 'pallet-rack',
     bayClearWidth: 2.7,
     depth: 1.1,
     uprightHeight: 5,
@@ -459,6 +454,23 @@ export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
     pickingLevels: 0,
     ghostFill: 0,
   },
+  /**
+   * Sığ birleştirme, ve YAPIŞKAN: yamanın yazmadığı alan bir öncekinden
+   * taşınır. Bilinçli — kullanıcı 1.2 m derinlik kurup art arda on raf
+   * koyduğunda derinliği her seferinde yeniden girmez.
+   *
+   * Bedeli, aynı kind'ı kuran iki fişten YALNIZ BİRİNİN bir alanı yazmasıdır:
+   * o alan artık hangi fişe basıldığına değil, en son hangisine basıldığına
+   * bağlanır. Alçak raf tam olarak böyle sızıyordu — "Pallet Rack" fişinin hiç
+   * fırçası yoktu, dolayısıyla alçak raftan sonra basılan palet rafı onun
+   * 2.5 m dikmesini ve toplama gözünü giyerek geliyordu, ve hiçbir şey bunu
+   * söylemiyordu.
+   *
+   * Sözleşme bu yüzden tek tek alanlar değil ANAHTAR KÜMESİ üzerine: **bir
+   * ailenin fişlerinden biri bir alanı yazıyorsa hepsi yazmalı.**
+   * `catalog.test.ts` bunu her aile için tutuyor, yani kural rafa özel değil
+   * ve bir sonraki ikinci fişte kendiliğinden geçerli.
+   */
   setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
 
   multiply: DEFAULT_MULTIPLY,

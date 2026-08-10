@@ -1,14 +1,27 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildLongspanFloorplan } from './floorplan'
 import { bayPitch, totalDepth, totalWidth } from './levels'
 import { snapToNeighbourSeam } from './magnet'
 import { longspanParametrics } from './parametrics'
-import { LongspanNode } from './schema'
+import { LongspanNode, type ShelfKind } from './schema'
 
 /** Every 45°, the full turn. Written out rather than derived: a mirrored-and-
  *  filtered list drops 0 as well as -0, which silently removes the one angle a
  *  user most expects to snap back to. */
 const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
+
+/**
+ * Raf türlerinin okunur adları. Ağaç satırı için, ve yalnız onun için — panel
+ * kendi seçicisinde host'un `prettifyEnumValue`'suna güveniyor, ama o
+ * `galvanised-picking`'i "Galvanised picking" yapıyor ve satırda uzun kalıyor.
+ */
+const SHELF_KIND_LABELS: Record<ShelfKind, string> = {
+  chipboard: 'chipboard',
+  mesh: 'mesh',
+  'galvanised-picking': 'galvanised',
+  hm: 'HM beams',
+}
 
 export const longspanDefinition = {
   kind: 'warehouse:longspan-rack',
@@ -22,7 +35,25 @@ export const longspanDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = LongspanNode.parse({})
-    return { ...rest, name: 'Longspan Bay' }
+    return rest
+  },
+
+  tree: {
+    /**
+     * Kat sayısı ve baskın raf türü. İki fişi ayıran şey bu ikisi —
+     * toplama gözü sunta raflı ve dört katlı, dökme yük ızgara raflı ve üç
+     * katlı — ve ikisi de düğümün kendi katlarından okunuyor, ikinci bir
+     * yerde saklanmıyor.
+     */
+    label: treeLabel<LongspanNode>((node) => {
+      const tally = new Map<ShelfKind, number>()
+      for (const level of node.levels) {
+        if (level.shelfKind) tally.set(level.shelfKind, (tally.get(level.shelfKind) ?? 0) + 1)
+      }
+      const dominant = [...tally].sort((a, b) => b[1] - a[1])[0]?.[0]
+      const suffix = dominant ? ` · ${SHELF_KIND_LABELS[dominant]}` : ''
+      return `Longspan Bay · ${node.levels.length} levels${suffix}`
+    }),
   },
 
   capabilities: {

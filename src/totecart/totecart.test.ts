@@ -773,9 +773,10 @@ describe('tanım ve manifest', () => {
     for (const tile of tiles) expect(sections.has(tile.sectionId)).toBe(true)
   })
 
-  test('varsayılanlar şemadan geliyor ve ad taşıyor', () => {
+  test('varsayılanlar şemadan geliyor ve sabit ad TAŞIMIYOR', () => {
     const defaults = toteCartDefinition.defaults() as Record<string, unknown>
-    expect(defaults.name).toBe('Tote cart')
+    // Sabit ad `treeLabel`'ın türetmesini ezerdi — bkz. `src/tree-label.ts`.
+    expect('name' in defaults).toBe(false)
     expect(defaults.tiers).toBe(5)
     expect(defaults.toteHeight).toBe('220')
   })

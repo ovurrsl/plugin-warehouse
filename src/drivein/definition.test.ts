@@ -23,7 +23,10 @@ const lane = (patch: Partial<DriveInRackNode> = {}) =>
 describe('definition', () => {
   test('defaults parse', () => {
     const defaults = driveInRackDefinition.defaults()
-    expect(defaults.name).toBe('Drive-in Lane')
+    // Sabit ad YOK — bkz. `src/tree-label.ts`. `defaults()` bir ad yazarsa
+    // `treeLabel` onu kullanıcının verdiği ad sanıp türetmeyi atlar, ve iki
+    // fiş ağaçta yine aynı adla görünür.
+    expect('name' in defaults).toBe(false)
     expect(() => DriveInRackNode.parse({ id: 'drive-in-rack_x', ...defaults })).not.toThrow()
   })
 

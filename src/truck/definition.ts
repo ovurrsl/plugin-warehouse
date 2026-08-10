@@ -1,5 +1,6 @@
 import type { AnyNode, NodeDefinition } from '@pascal-app/core'
 import { displayNameOf, TRUCK_MODELS } from '../handling/models'
+import { treeLabel } from '../tree-label'
 import { buildTruckFloorplan } from './floorplan'
 import { mastRowOf, modelOf, overallHeightM, planLengthM, planWidthM } from './metrics'
 import { truckParametrics } from './parametrics'
@@ -33,7 +34,17 @@ export const truckDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = TruckNode.parse({})
-    return { ...rest, name: displayNameOf(TRUCK_MODELS[rest.model]) }
+    return rest
+  },
+
+  tree: {
+    /**
+     * `defaults()` aynı adı zaten türetiyor ama YALNIZ yerleştirme anında, ve
+     * yalnız host'un kendi araçları onu çağırdığında — eklentinin aracı
+     * düğümü şemadan kuruyor, yani `name` boş kalıyor. Beş makine fişi
+     * ağaçta tek "Handling Truck" satırına düşüyordu.
+     */
+    label: treeLabel<TruckNode>((node) => displayNameOf(TRUCK_MODELS[node.model])),
   },
 
   capabilities: {

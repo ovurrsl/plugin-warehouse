@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { bayPitch, totalDepth, totalWidth } from './bays'
 import { buildM3Floorplan } from './floorplan'
 import { snapToNeighbourSeam } from './magnet'
@@ -23,7 +24,20 @@ export const m3ShelvingDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = M3ShelvingNode.parse({})
-    return { ...rest, name: 'M3 Bay' }
+    return rest
+  },
+
+  tree: {
+    /**
+     * Üç fiş üç ürün: raflı göz, çekmeceli göz, kapaklı dolap. Ayrım
+     * düğümün kendi alanlarından okunuyor — çekmece katlarda, kapak
+     * düğümde — çünkü fişin hangisi olduğu hiçbir yere yazılmıyor.
+     */
+    label: treeLabel<M3ShelvingNode>((node) => {
+      if (node.levels.some((level) => level.structure === 'drawers')) return 'M3 Drawer Unit'
+      if (node.door !== 'none') return 'M3 Cabinet'
+      return 'M3 Shelving Bay'
+    }),
   },
 
   capabilities: {

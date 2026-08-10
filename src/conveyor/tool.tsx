@@ -30,6 +30,7 @@ import {
 } from '../placement'
 import { frameWidthM, moduleLengthM } from './metrics'
 import { extendConveyorRun, moduleOffsets } from './multiply'
+import { placementPose } from './placement-pose'
 import ConveyorRollerPreview from './preview'
 import { ConveyorRollerNode } from './schema'
 
@@ -67,6 +68,15 @@ export default function ConveyorRollerTool() {
   const [modules, setModules] = useState(1)
 
   const rotationRef = useRef(0)
+  /**
+   * ÇİZİLEN açı — kullanıcınınki değil.
+   *
+   * Mıknatıs bir uca oturttuğunda hayalet komşunun istediği açıya döner, ama
+   * `rotationRef` kullanıcının R/T ile kurduğu açıyı tutmaya devam eder.
+   * Tek ref'te birleştirmek, uçtan uzaklaşınca kullanıcının açısını kalıcı
+   * olarak kaybetmek olurdu.
+   */
+  const poseRotationRef = useRef(0)
   const validRef = useRef(true)
   const altRef = useRef(false)
   const lastPositionRef = useRef<[number, number, number] | null>(null)
@@ -131,6 +141,7 @@ export default function ConveyorRollerTool() {
     lastPositionRef.current = null
     previousSnapRef.current = null
     rotationRef.current = 0
+    poseRotationRef.current = 0
     altRef.current = false
     validRef.current = true
     setCursorRotationY(0)
@@ -164,7 +175,7 @@ export default function ConveyorRollerTool() {
       // host's plan test: it has no height at all, and height is the whole
       // question — under a rack's tunnel is fine, through its legs is not.
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
-      const rotationY = rotationRef.current
+      const rotationY = poseRotationRef.current
       const placed = ConveyorRollerNode.parse({
         ...previewNode,
         id: undefined,
@@ -182,18 +193,19 @@ export default function ConveyorRollerTool() {
     }
 
     const applyCursor = (position: [number, number, number]) => {
+      const rotationY = poseRotationRef.current
       const visual = getFloorStackPreviewPosition({
         node: previewNode as unknown as AnyNode,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, rotationY, 0],
         levelId: activeLevelId,
       })
       cursorRef.current?.position.set(...visual)
-      cursorRef.current?.rotation.set(0, rotationRef.current, 0)
+      cursorRef.current?.rotation.set(0, rotationY, 0)
       // Rafın aynı gerekçesi: taze dizi kimliği her harekette kaçınılmaz bir
       // render ettiriyordu, ızgaraya oturmuş imleç için çoğu aynı kareyi üretmek
       // üzere.
-      const center = runCenter(visual, rotationRef.current)
+      const center = runCenter(visual, rotationY)
       if (!samePlacementPoint(cursorPositionRef.current, center)) {
         cursorPositionRef.current = center
         setCursorPosition(center)
@@ -203,7 +215,7 @@ export default function ConveyorRollerTool() {
 
       useFacingPose.getState().set({
         position: visual,
-        rotationY: rotationRef.current,
+        rotationY,
         depth: frameWidthM(previewNode),
       })
     }
@@ -213,14 +225,31 @@ export default function ConveyorRollerTool() {
       // No centre offset: the cursor carries the *first module*, and a module is
       // centred on its own node. Aligning that one footprint is what makes a
       // module land flush against an existing one.
-      const { position, guides } = resolveAlignedPlacement({
+      const aligned = resolveAlignedPlacement({
         candidates: alignmentCandidates,
         node: previewNode as unknown as AnyNode,
         rawX,
         rawZ,
         rotationY: rotationRef.current,
       })
-      useAlignmentGuides.getState().set(guides)
+      /**
+       * Mıknatıs hizalamanın ÜSTÜNDE: hizalama kılavuzu ayak izi kenarını
+       * 8 cm'lik bir pencerede yaklaştırıyor, mıknatıs ise ucu uca TAM
+       * oturtuyor ve gerekiyorsa modülü çeviriyor. İkisi aynı anda görünürse
+       * kullanıcı hangisinin karar verdiğini bilemez, o yüzden mıknatıs
+       * ateşlediğinde kılavuzlar temizleniyor — host'un `groupMoveSnap`
+       * ateşlediğinde yaptığının aynısı.
+       */
+      const pose = placementPose(
+        previewNode,
+        aligned.position,
+        rotationRef.current,
+        useScene.getState().nodes as Readonly<Record<string, unknown>>,
+      )
+      useAlignmentGuides.getState().set(pose.snapped ? [] : aligned.guides)
+      poseRotationRef.current = pose.rotationY
+      setCursorRotationY(pose.rotationY)
+      const position = pose.position
       applyCursor(position)
 
       const nextSnapKey = movementSfxStepKey({
@@ -249,7 +278,7 @@ export default function ConveyorRollerTool() {
         ...previewNode,
         id: undefined,
         position,
-        rotation: [0, rotationRef.current, 0],
+        rotation: [0, poseRotationRef.current, 0],
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, position[0], position[2]),
       })
@@ -303,6 +332,9 @@ export default function ConveyorRollerTool() {
       event.preventDefault()
       triggerSFX('sfx:item-rotate')
       rotationRef.current += rotationDelta
+      // Kullanıcı çevirdiği an mıknatısın bıraktığı açı düşer; bir sonraki
+      // fare hareketi hâlâ menzildeyse yeniden ateşler.
+      poseRotationRef.current = rotationRef.current
       setCursorRotationY(rotationRef.current)
       const position = lastPositionRef.current
       if (position) applyCursor(position)

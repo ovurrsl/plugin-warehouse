@@ -5,7 +5,7 @@ import { useScene } from '@pascal-app/core'
 import { SegmentedControl, useEditor } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useState } from 'react'
-import { CATALOG_SECTIONS, type CatalogItem, itemsInSection } from '../catalog'
+import { CATALOG_SECTIONS, type CatalogItem, chipIsArmed, itemsInSection } from '../catalog'
 import { reportHostCompatibility } from '../compat'
 import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
@@ -98,46 +98,8 @@ function CatalogTab() {
         )
       })}
       <InstancingSwitch />
-      <ShadowThrottleSwitch />
       <DetailRangeSwitch />
     </div>
-  )
-}
-
-/**
- * Gölge kısıcı anahtarı — `InstancingSwitch` deseninin aynısı ve aynı
- * gerekçeyle: render yolunun ölçülmüş en büyük kalemine dokunuyor (gölge
- * geçidi eski tabanda ~29 ms/kare), bozulursa tek tıkla eski davranış
- * geri gelir ve iki hâl yan yana ölçülebilir.
- */
-function ShadowThrottleSwitch() {
-  const enabled = useWarehouseStore((s) => s.shadowThrottleEnabled)
-  const setEnabled = useWarehouseStore((s) => s.setShadowThrottleEnabled)
-
-  return (
-    <button
-      onClick={() => setEnabled(!enabled)}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.375rem',
-        width: '100%',
-        marginTop: '0.25rem',
-        borderRadius: '0.375rem',
-        border: '1px solid var(--border)',
-        background: 'transparent',
-        padding: '0.375rem 0.5rem',
-        fontSize: '0.6875rem',
-        color: 'var(--muted-foreground)',
-        cursor: 'pointer',
-      }}
-      title="Gölge haritasını her kare yerine yalnız sahne değişince (+ saniyede ~12 kez) tazeler. Kapatmak three'nin kendi temposuna döner."
-      type="button"
-    >
-      <Icon height={13} icon={enabled ? 'lucide:sun-dim' : 'lucide:sun'} width={13} />
-      <span>Gölge kısıcı {enabled ? 'açık' : 'kapalı'}</span>
-      <span style={{ marginLeft: 'auto' }}>{enabled ? 'talep üzerine' : 'her kare'}</span>
-    </button>
   )
 }
 
@@ -440,39 +402,30 @@ function LoadBrush() {
 
 function CatalogTile({ item }: { item: CatalogItem }) {
   const activeTool = useEditor((s) => s.tool)
-  const cargo = useWarehouseStore((s) => s.palletBrush.cargo)
   const setBrush = useWarehouseStore((s) => s.setPalletBrush)
-  const routeRole = useWarehouseStore((s) => s.routeBrush.role)
   const setRouteBrush = useWarehouseStore((s) => s.setRouteBrush)
 
-  // Two tiles arm the same kind, so the lit one is the tile whose brush the
-  // store is currently wearing.
-  // Two tiles arm the same kind, so the lit one is the tile whose brush the
-  // store is currently wearing. Only the pallet's two differ that way; a route
-  // tile lights on its kind alone, because both of its tiles set a role the
-  // panel below then shows.
-  const wantsLoad = item.brush?.kind === 'pallet' ? item.brush.cargo !== 'none' : null
-  const wantsRole = item.brush?.kind === 'route' ? item.brush.role : null
-  const wantsModel = item.brush?.kind === 'truck' ? item.brush.model : null
-  const truckModel = useWarehouseStore((s) => s.truckBrush.model)
-  // Tezgâhın altı fişi ve rampanın iki fişi de aynı kind'ı kuruyor; yanan
-  // fiş, mağazanın şu an giydiği fırçanınki.
-  const wantsVariant = item.brush?.kind === 'bench' ? item.brush.patch.variant : null
-  const benchVariant = useWarehouseStore((s) => s.benchBrush.variant)
-  const wantsLip = item.brush?.kind === 'dockleveller' ? item.brush.patch.lip : null
-  const levellerLip = useWarehouseStore((s) => s.dockLevellerBrush.lip)
-  const wantsTilt = item.brush?.kind === 'totecart' ? item.brush.patch.tilt : null
-  const cartTilt = useWarehouseStore((s) => s.toteCartBrush.tilt)
-  const arming =
-    activeTool === item.kind &&
-    (wantsLoad === null || wantsLoad === (cargo !== 'none')) &&
-    (wantsRole === null || wantsRole === routeRole) &&
-    (wantsModel === null || wantsModel === truckModel) &&
-    (wantsVariant === null || wantsVariant === benchVariant) &&
-    (wantsLip === null || wantsLip === levellerLip) &&
-    (wantsTilt === null || wantsTilt === cartTilt)
+  /**
+   * Yanan fiş, en son BASILAN fiş.
+   *
+   * Buraya kadar vurgulama `activeTool === item.kind`'a, artı fişleri ayırt
+   * etmek için elle yazılmış altı yükleme dayanıyordu (`wantsLoad`,
+   * `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`, `wantsTilt`).
+   * Yüklemi yazılmamış her aile aynı anda birden çok fişi yakıyordu — raf,
+   * longspan, m3, drive-in, live-rack ve mezzanine — ve listeye yedincisini
+   * eklemek yalnız bir sonraki ailenin unutulmasını geciktirirdi.
+   *
+   * Fişin KİMLİĞİ tek karşılaştırma, ve aile başına bakım istemiyor.
+   *
+   * Katalog dışından (kısayol, host paleti) silahlanmış bir araçta kimlik
+   * ya boş ya başka bir kind'a ait kalır; o hâlde eski davranışa —
+   * kind eşleşmesine — düşülüyor, yoksa araç açıkken hiçbir fiş yanmazdı.
+   */
+  const armedChipId = useWarehouseStore((s) => s.armedChipId)
+  const arming = chipIsArmed(item, activeTool, armedChipId)
 
   const arm = () => {
+    useWarehouseStore.getState().setArmedChipId(item.id)
     if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
     if (item.brush?.kind === 'route') {
       setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })

@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildLiveRackingFloorplan } from './floorplan'
 import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
 import { liveRackingParametrics } from './parametrics'
@@ -25,7 +26,16 @@ export const liveRackingDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = LiveRackingNode.parse({})
-    return { ...rest, name: 'Live Racking' }
+    return rest
+  },
+
+  tree: {
+    // FIFO ile LIFO aynı çeliğin iki akış yönü, ve fişleri ayrı. Derinlik de
+    // adda, çünkü bir kanalın kaç palet aldığı bu kind'ın en çok bakılan
+    // sayısı.
+    label: treeLabel<LiveRackingNode>(
+      (node) => `${node.variant} Live Racking · ${node.palletsDeep} deep`,
+    ),
   },
 
   capabilities: {

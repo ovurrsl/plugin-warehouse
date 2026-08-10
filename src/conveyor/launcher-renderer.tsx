@@ -92,7 +92,6 @@ function ConveyorLauncherRendererBody({ node }: { node: ConveyorLauncherNode }) 
     keyFor: (tier) => launcherGeometryKey(node, tier, abutted),
     materialFor: () => material,
     materialKeyFor: () => `conveyor:${appearanceKey(appearance)}`,
-    castsShadow: false,
     farSq: LOD_FAR_SQ,
     nearSq: LOD_NEAR_SQ,
     excluded: selected || live !== undefined || override !== undefined || isExporting,

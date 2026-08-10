@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { treeLabel } from '../tree-label'
 import { buildToteCartFloorplan } from './floorplan'
 import { cartLengthM, cartWidthM, overallHeightM } from './metrics'
 import { toteCartParametrics } from './parametrics'
@@ -32,7 +33,15 @@ export const toteCartDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ToteCartNode.parse({})
-    return { ...rest, name: 'Tote cart' }
+    return rest
+  },
+
+  tree: {
+    // Eğimli raflı toplama arabası ile düz olan ayrı iki üründür; kat sayısı
+    // da adda, çünkü iki fiş kat sayısıyla da ayrılıyor.
+    label: treeLabel<ToteCartNode>(
+      (node) => `${node.tilt ? 'Tilted ' : ''}Tote Cart · ${node.tiers} tiers`,
+    ),
   },
 
   capabilities: {

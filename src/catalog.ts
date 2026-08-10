@@ -40,7 +40,23 @@ export type CatalogItem = {
     | { kind: 'pallet'; cargo: 'none' | 'carton' | 'drum' }
     | { kind: 'route'; role: 'pedestrian' | 'vehicle'; traffic: 'one-way' | 'two-way' }
     | { kind: 'truck'; model: string }
-    | { kind: 'rack'; patch: { uprightHeight: number; levels: number; pickingLevels: number } }
+    /**
+     * Rafın iki fişi. `variant` DAHİL, ve dahil olması bu turdaki hatanın
+     * kendisi: "Pallet Rack" fişinin hiç fırçası yoktu, dolayısıyla alçak
+     * raftan sonra basılan palet rafı onun 2.5 m dikmesini ve toplama gözünü
+     * giyerek geliyordu. Fırça yapışkan (bkz. `store.ts`, `setRackBrush`), o
+     * yüzden bir alanı ailenin fişlerinden yalnız biri yazarsa o alan hangi
+     * fişe basıldığına değil en son hangisine basıldığına bağlanır.
+     */
+    | {
+        kind: 'rack'
+        patch: {
+          variant: 'pallet-rack' | 'low-rack'
+          uprightHeight: number
+          levels: number
+          pickingLevels: number
+        }
+      }
     | { kind: 'telescopic'; model: string }
     | {
         kind: 'totecart'
@@ -258,6 +274,10 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
     icon: 'lucide:rows-3',
+    brush: {
+      kind: 'rack',
+      patch: { variant: 'pallet-rack', uprightHeight: 5, levels: 3, pickingLevels: 0 },
+    },
   },
   {
     id: 'pallet-rack-low',
@@ -265,9 +285,24 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Low Rack',
     sectionId: 'storage',
     description:
-      'Alçak raf şablonu: 2.5 m dikme, iki kat, alt kat toplama rafı. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
+      'Alçak raf şablonu: 2.5 m dikme, iki kat, ikisi de kutu raflı toplama gözü. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
     icon: 'lucide:rows-2',
-    brush: { kind: 'rack', patch: { uprightHeight: 2.5, levels: 2, pickingLevels: 1 } },
+    /**
+     * `pickingLevels` DEPOLAMA konumlarını sayıyor ve sayım ZEMİNDEN başlıyor:
+     * `levelTypeOf` `level < pickingLevels` diyor, zemin de 0. `levels: 2` +
+     * `groundLevelStorage` üç depolama konumu demek (zemin + iki kiriş katı),
+     * dolayısıyla üçünü de toplama gözü yapan değer 3.
+     *
+     * Burada bir kez `1` yazılmıştı ve sonucu sessizdi: yalnız ZEMİNİ toplama
+     * gözü ilan ediyor, `levelHasShelf` ise `level <= 0` için `false` dönüyor —
+     * zemin kiriş de raf da taşımaz. Yani fiş "alt kat toplama rafı" diyor,
+     * hiçbir kutu rafı çizilmiyor ve alçak raf iki katlı sıradan bir palet rafı
+     * olarak iniyordu. Hata vermeyen, yalnız yanlış ürünü teslim eden cinsten.
+     */
+    brush: {
+      kind: 'rack',
+      patch: { variant: 'low-rack', uprightHeight: 2.5, levels: 2, pickingLevels: 3 },
+    },
   },
   {
     id: 'route-pedestrian',
@@ -837,4 +872,29 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
 
 export function itemsInSection(sectionId: string): CatalogItem[] {
   return CATALOG_ITEMS.filter((item) => item.sectionId === sectionId)
+}
+
+/**
+ * Bir fiş yanıyor mu — yani bir sonraki tıklama TAM OLARAK bunu mu koyar.
+ *
+ * Panelden ayrı bir saf fonksiyon, çünkü asıl değeri test edilebilir olması:
+ * önceki hâli JSX'in içinde altı elle yazılmış yüklemdi (`wantsLoad`,
+ * `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`, `wantsTilt`) ve
+ * yüklemi yazılmamış her aile aynı anda birden çok fişi yakıyordu — raf,
+ * longspan, m3, drive-in, live-rack, mezzanine. Hiçbir test bunu göremiyordu.
+ *
+ * Kimlik tek karşılaştırma ve aile başına bakım istemiyor.
+ *
+ * Katalog dışından silahlanan araç (kısayol, host paleti) kimlik yazmıyor;
+ * o hâlde kind eşleşmesine düşülüyor, yoksa araç açıkken hiçbir fiş yanmaz
+ * ve panel silahlı aracı hiç göstermez.
+ */
+export function chipIsArmed(
+  item: CatalogItem,
+  activeTool: string | null | undefined,
+  armedChipId: string | null,
+): boolean {
+  if (activeTool !== item.kind) return false
+  const armed = CATALOG_ITEMS.find((chip) => chip.id === armedChipId)
+  return armed?.kind === item.kind ? armed.id === item.id : true
 }

@@ -109,7 +109,6 @@ function MezzanineRendererBody({ node }: { node: MezzanineNode }) {
     keyFor: () => mezzanineGeometryKey(node),
     materialFor: () => material,
     materialKeyFor: () => `mezzanine:${appearanceKey(appearance)}`,
-    castsShadow: false,
     /**
      * Bu kind'ın LOD'u YOK — ve eşikleri sonsuz yapmak bir ihmal değil, bir
      * düzeltme.

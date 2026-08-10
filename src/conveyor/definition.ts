@@ -42,7 +42,7 @@ export const conveyorRollerDefinition = {
    */
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorRollerNode.parse({})
-    return { ...rest, name: 'Roller Conveyor' }
+    return rest
   },
 
   capabilities: {

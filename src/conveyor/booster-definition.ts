@@ -30,7 +30,7 @@ export const conveyorBoosterDefinition = {
 
   defaults: () => {
     const { id: _id, type: _type, ...rest } = ConveyorBoosterNode.parse({})
-    return { ...rest, name: 'Booster Conveyor' }
+    return rest
   },
 
   capabilities: {

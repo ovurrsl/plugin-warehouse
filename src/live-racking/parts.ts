@@ -15,6 +15,7 @@
 import {
   ANCHOR_BOLT_HEIGHT_M,
   ANCHOR_BOLT_M,
+  BRACE_BAY_TARGET_M,
   BRAKE_DRUM_DIAMETER_M,
   BRAKE_DRUM_WIDTH_M,
   BRAKE_ROLLER_RAISE_M,
@@ -85,11 +86,41 @@ export type LiveRackingPart = {
 export type LiveRackingDetail = 'full' | 'simple'
 
 /**
- * Dört dikme + çaprazlar + taban plakaları + ankrajlar.
+ * Bir dikme, plakası ve ankrajlarıyla birlikte.
  *
- * Kanal derinliği boyunca iki çerçeve: giriş (+Z) ve çıkış (−Z) uçlarında.
- * Gerçek bir kanal daha fazla ara çerçeve taşır ama görsel olarak uçlar
- * yapının okunmasına yetiyor ve ara çerçeveler makaraları gizliyor.
+ * Üçü tek yerde, çünkü ayrıyken ayrılabiliyorlardı: yan kafesin ara dikmeleri
+ * plaka alıp ankraj almadan eklenmişti. Zemine bağlanmamış bir plaka hiçbir
+ * hata vermiyor, yalnız testin saydığı ankraj sayısı tutmuyor — ve o test
+ * olmasa kimse fark etmezdi.
+ */
+function pushPost(parts: LiveRackingPart[], x: number, z: number, height: number): void {
+  parts.push({
+    role: 'upright',
+    center: [x, height / 2, z],
+    size: [UPRIGHT_WIDTH_M, height, UPRIGHT_DEPTH_M],
+  })
+  parts.push({
+    role: 'footplate',
+    center: [x, LEVELLING_PLATE_THICKNESS_M / 2, z],
+    size: [UPRIGHT_WIDTH_M * 1.6, LEVELLING_PLATE_THICKNESS_M, UPRIGHT_DEPTH_M * 1.6],
+  })
+  // Ankraj: plakanın iki ucundan zemine. Silindir değil kutu — bu paketin
+  // bütün geometrisi kutu-listesi ve emitter silindir üretmiyor.
+  for (const bolt of [-1, 1] as const) {
+    parts.push({
+      role: 'anchor',
+      center: [x, ANCHOR_BOLT_HEIGHT_M / 2, z + bolt * UPRIGHT_DEPTH_M * 0.6],
+      size: [ANCHOR_BOLT_M, ANCHOR_BOLT_HEIGHT_M, ANCHOR_BOLT_M],
+    })
+  }
+}
+
+/**
+ * Dikmeler + taban plakaları + ankrajlar. Kafes AYRI (`pushSideBracing`).
+ *
+ * Kanal derinliği boyunca iki dikme hattı: giriş (+Z) ve çıkış (−Z) uçlarında.
+ * Gerçek bir kanal daha fazla ara dikme taşır ama görsel olarak uçlar yapının
+ * okunmasına yetiyor ve ara ÇERÇEVELER makaraları gizliyor.
  */
 function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
   const halfWidth = bayWidthM(node) / 2
@@ -98,68 +129,8 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
 
   for (const z of [-halfDepth, halfDepth] as const) {
     for (const side of [-1, 1] as const) {
-      const x = side * (halfWidth - UPRIGHT_WIDTH_M / 2)
-      parts.push({
-        role: 'upright',
-        center: [x, height / 2, z],
-        size: [UPRIGHT_WIDTH_M, height, UPRIGHT_DEPTH_M],
-      })
-      parts.push({
-        role: 'footplate',
-        center: [x, LEVELLING_PLATE_THICKNESS_M / 2, z],
-        size: [UPRIGHT_WIDTH_M * 1.6, LEVELLING_PLATE_THICKNESS_M, UPRIGHT_DEPTH_M * 1.6],
-      })
-      // Ankraj: plakanın iki ucundan zemine. Silindir değil kutu — bu
-      // paketin bütün geometrisi kutu-listesi ve emitter silindir üretmiyor.
-      for (const bolt of [-1, 1] as const) {
-        parts.push({
-          role: 'anchor',
-          center: [x, ANCHOR_BOLT_HEIGHT_M / 2, z + bolt * UPRIGHT_DEPTH_M * 0.6],
-          size: [ANCHOR_BOLT_M, ANCHOR_BOLT_HEIGHT_M, ANCHOR_BOLT_M],
-        })
-      }
+      pushPost(parts, side * (halfWidth - UPRIGHT_WIDTH_M / 2), z, height)
     }
-    /**
-     * Çerçeve kafesi: ZİKZAK çapraz + üstte ve altta birer yatay bağ.
-     *
-     * Rolün adı `'diagonal'` idi ama üretilen kutu sabit y'de, X boyunca
-     * YATAY bir çubuktu — çerçeve başına yedi tane, eşit aralıkla. Uç
-     * çerçeveler bu yüzden kafes değil, düz basamaklı bir merdiven olarak
-     * okunuyordu. Oysa bir raf çerçevesinin siluetini tanımlayan şey
-     * çaprazlardır, ve paketin öteki üç raf kind'ı (rack, longspan, drivein)
-     * gerçek kafes kuruyor — canlı raf tek istisnaydı.
-     *
-     * Çapraz çerçevenin kendi düzleminde (X–Y) duruyor ama `emitPart` Z ekseni
-     * etrafında döndüremiyor — yalnız ZY düzleminde yatırıyor (`tiltX`) ve
-     * sonra yaw uyguluyor (`rotationY`). Sıra tam da bunu mümkün kılıyor:
-     * Z boyunca uzanan bir çubuğu önce ZY'de yatırıp sonra çeyrek tur
-     * çevirmek, X–Y düzleminde eğik bir çubuk veriyor. Emitter'a yeni bir
-     * eksen eklemekten ucuz ve aynı sonucu veriyor.
-     */
-    const span = halfWidth * 2 - UPRIGHT_WIDTH_M
-    const bays = Math.max(2, Math.round(height / 1.2))
-    const step = height / (bays + 1)
-    const lean = Math.atan2(step, span)
-    for (let i = 0; i < bays; i++) {
-      parts.push({
-        role: 'diagonal',
-        center: [0, (i + 1) * step, z],
-        size: [DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M, Math.hypot(span, step)],
-        // Ardışık çaprazlar zıt yöne yatıyor — zikzak bu.
-        tiltX: (i % 2 === 0 ? -1 : 1) * lean,
-        rotationY: -Math.PI / 2,
-      })
-    }
-    // Kafesi kapatan iki yatay bağ: altta ve üstte. Zikzak tek başına
-    // çerçeveyi bağlamıyor, uçlarda serbest kalıyor.
-    for (const tieY of [step / 2, height - step / 2]) {
-      parts.push({
-        role: 'diagonal',
-        center: [0, tieY, z],
-        size: [span, DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M],
-      })
-    }
-
     // Giydirme rafta dikmeler çatıyı taşıyor: tepede onları bağlayan başlık
     // kirişi olmadan yük aktaracak bir yol yok, ve raf gözle de bir bina
     // gibi okunmaz.
@@ -169,6 +140,98 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
         center: [0, height - CLAD_RACK_HEADER_M / 2, z],
         size: [halfWidth * 2, CLAD_RACK_HEADER_M, CLAD_RACK_HEADER_M],
       })
+    }
+  }
+}
+
+/**
+ * Kafes, kanalın UZUN kenarlarında — giriş ve çıkış yüzleri açık kalıyor.
+ *
+ * ## Neden burası, orası değil
+ *
+ * Kafes önce giriş (+Z) ve çıkış (−Z) yüzlerine kuruluyordu: çaprazlar X
+ * boyunca, iki dikme hattının arasında geriliyordu. Yani paletin İÇERİ
+ * girdiği ve dışarı çıktığı iki yüz çelikle kapatılmıştı. Canlı rafta o iki
+ * yüz forkliftin geçtiği yer; kapalı olamaz.
+ *
+ * Doğrusu paketin kendi palet rafında zaten yazılı (`rack/parts.ts`,
+ * `pushFrameBracing`): kafes DERİNLİK düzleminde, dikme hattı boyunca durur;
+ * koridora bakan yüzü kirişler bağlar, çaprazlar değil. Canlı raf da aynı
+ * ailenin üyesi — tek farkı derinliğin bir palet değil bir kanal boyu olması.
+ *
+ * ## Neden Z boyunca bölünüyor
+ *
+ * Palet rafında derinlik ~1,1 m, yükseklik ~5 m, dolayısıyla zikzak yalnız
+ * yüksekliğe bölünür ve her çapraz derinliği bir adımda geçer. Burada tam
+ * tersi: kanal 8–10 m, çerçeve 2–4 m. Aynı formül neredeyse YATAY çubuklar
+ * üretirdi — kafes değil, korkuluk.
+ *
+ * Bu yüzden kafes bir IZGARA: kanal önce Z'de gözlere bölünüyor
+ * (`BRACE_BAY_TARGET_M`), sonra her göz kendi boyu kadar yüksek katlara. İki
+ * bölme birbirini izlediği için hücreler kareye yakın kalıyor ve çaprazlar
+ * ~45°'ye oturuyor. Oran SEÇİLMİŞ bir varsayılan, katalog ölçüsü değil —
+ * kaynağı çaprazlı gözün standart pratiği; belirli bir üreticinin canlı raf
+ * yan kafesi için yayımlanmış göz boyunu bulamadım.
+ *
+ * Göz sınırlarına ara dikme giriyor, yoksa çapraz hiçbir şeye bağlanmadan
+ * havada biterdi. Bunlar kanalın yanında duruyor, karşıdan karşıya geçmiyor,
+ * yani uç ÇERÇEVELERİN aksine makaraları gizlemiyorlar.
+ */
+function pushSideBracing(parts: LiveRackingPart[], node: LiveRackingNode): void {
+  const halfWidth = bayWidthM(node) / 2
+  const halfDepth = channelDepthM(node) / 2
+  const height = frameHeightM(node)
+
+  // Rafınkiyle aynı pay: en alttaki bağ taban plakasının üstünde, en üstteki
+  // dikmenin tepesinin altında kalıyor. Döndürülmüş kesiti uçlarından taşan
+  // çaprazın zeminden çıkmasını da bu engelliyor.
+  const braceBottom = 0.15
+  const braceTop = Math.max(braceBottom + 0.3, height - 0.1)
+  const bracedHeight = braceTop - braceBottom
+
+  // Dikme yüzleri arasındaki net açıklık — dikmelerin kendi kalınlığı düşülmüş.
+  const span = 2 * halfDepth - UPRIGHT_DEPTH_M
+  const bays = Math.max(1, Math.round(span / BRACE_BAY_TARGET_M))
+  const bayLength = span / bays
+  // Düşey bölme göz boyunu İZLİYOR, sabit bir modülü değil: gözler kareye
+  // yakın kalınca çaprazlar ~45°'ye oturuyor. Sabit modül (rafın 0,9 m'si)
+  // burada 2,4 m'lik bir gözde neredeyse yatay çubuk üretirdi.
+  const lifts = Math.max(2, Math.round(bracedHeight / bayLength))
+  const liftHeight = bracedHeight / lifts
+  // Çubuğun yerel +Y'si (bayLength, liftHeight) köşegenine oturmalı, yani açı
+  // atan2(yatay, düşey). Tümleyeni — kolay hata — iki izdüşümü takas edip
+  // çaprazı kafesin dışına savuruyor.
+  const lean = Math.atan2(bayLength, liftHeight)
+  const diagonal = Math.hypot(bayLength, liftHeight)
+
+  for (const side of [-1, 1] as const) {
+    const x = side * (halfWidth - UPRIGHT_WIDTH_M / 2)
+
+    // Kafesi kapatan iki yatay bağ, kanal boyu.
+    for (const tieY of [braceBottom, braceTop]) {
+      parts.push({
+        role: 'diagonal',
+        center: [x, tieY, 0],
+        size: [DIAGONAL_THICKNESS_M, DIAGONAL_THICKNESS_M, span],
+      })
+    }
+
+    for (let bay = 0; bay < bays; bay++) {
+      const centerZ = -span / 2 + (bay + 0.5) * bayLength
+      for (let lift = 0; lift < lifts; lift++) {
+        parts.push({
+          role: 'diagonal',
+          center: [x, braceBottom + (lift + 0.5) * liftHeight, centerZ],
+          size: [DIAGONAL_THICKNESS_M, diagonal, DIAGONAL_THICKNESS_M],
+          // Üst üste binen gözler zıt yöne yatıyor — zikzak bu. Göz sütunu da
+          // kaydırılıyor, yoksa komşu sütunlar birbirinin aynası olurdu.
+          tiltX: ((bay + lift) % 2 === 0 ? 1 : -1) * lean,
+        })
+      }
+
+      // Gözü kapatan ara dikme. Son gözün öteki kenarı zaten uç dikmesi.
+      if (bay === bays - 1) continue
+      pushPost(parts, x, -span / 2 + (bay + 1) * bayLength, height)
     }
   }
 }
@@ -550,6 +613,7 @@ export function liveRackingParts(
 ): LiveRackingPart[] {
   const parts: LiveRackingPart[] = []
   pushFrames(parts, node)
+  pushSideBracing(parts, node)
   pushHinges(parts, node)
   for (let level = 0; level < node.levels; level++) {
     pushLevelBeams(parts, node, level)

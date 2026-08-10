@@ -15,6 +15,7 @@ import {
   MAX_PALLETS_DEEP,
   ROLLER_OVER_PALLET_M,
   ROLLER_PITCH_STEP_M,
+  UPRIGHT_WIDTH_M,
 } from './catalog'
 import { liveRackingDefinition } from './definition'
 import { buildLiveRackingFloorplan } from './floorplan'
@@ -651,6 +652,73 @@ describe('kanal, kafes ve fren gerçekten çizildikleri yerde', () => {
     // Ve zikzak: ardışık çaprazlar zıt yöne yatıyor.
     const signs = leaning.map((part) => Math.sign(part.tiltX ?? 0))
     expect(new Set(signs).size, 'bütün çaprazlar aynı yöne yatıyor').toBe(2)
+  })
+
+  test('giriş ve çıkış yüzleri AÇIK — kafes uzun kenarlarda', () => {
+    /**
+     * Kullanıcının bildirdiği hata: "live rackın palet atılan yerleri
+     * çaprazlar ile kapalı". Kafes giriş (+Z) ve çıkış (−Z) yüzlerine
+     * kuruluyordu, yani forkliftin paleti soktuğu iki yüz çelikle örülüydü.
+     *
+     * Sessizliği şurada: kapalı bir yüz hata vermiyor, model kurulmaya devam
+     * ediyor, kafes de kendi başına DOĞRU görünüyor — yalnız yanlış düzlemde.
+     * Belirti ancak "bu palet oraya nasıl girecek" diye sorulunca çıkıyor.
+     *
+     * Bekçi iki yönlü, çünkü tek yön yetmez: çaprazları uzun kenara taşıyıp
+     * uçlarda unutulmuş bir tanesini bırakmak da, hepsini silmek de ilk
+     * iddiayı geçerdi.
+     */
+    const lane = node()
+    const halfDepth = channelDepthM(lane) / 2
+    const halfWidth = bayWidthM(lane) / 2
+    const diagonals = liveRackingParts(lane, 'full').filter((part) => part.role === 'diagonal')
+
+    // 1) Hiçbir kafes elemanı uç düzlemlerinde durmuyor.
+    const onEndFace = diagonals.filter(
+      (part) => Math.abs(Math.abs(part.center[2]) - halfDepth) < 0.05,
+    )
+    expect(onEndFace.length, 'giriş/çıkış yüzünde kafes var').toBe(0)
+
+    // 2) Ve hepsi iki dikme hattının üstünde — yani gerçekten uzun kenarda.
+    const sideLine = halfWidth - UPRIGHT_WIDTH_M / 2
+    const offSide = diagonals.filter((part) => Math.abs(Math.abs(part.center[0]) - sideLine) > 0.05)
+    expect(offSide.length, 'kafes dikme hattının dışında').toBe(0)
+
+    // 3) Uç yüzler boş kalmıyor: paleti taşıyan kirişler orada duruyor. Kafesi
+    //    kaldırıp yerine hiçbir şey koymamak yapıyı çözerdi.
+    const beams = liveRackingParts(lane, 'full').filter((part) => part.role === 'beam')
+    expect(beams.length, 'uç yüzlerde kiriş yok').toBeGreaterThan(0)
+  })
+
+  test('yan kafesin çaprazı gözünün içinde kalıyor', () => {
+    /**
+     * `atan2`'nin iki izdüşümünü takas etmek — palet rafında adı konmuş "kolay
+     * hata" — çaprazı gözünün dışına savuruyor: çubuk kafesten taşıyor, uzun
+     * kenar boyunca komşu gözlere giriyor ve alttaki zeminden çıkıyor. Hiçbir
+     * hata vermiyor, yalnız çelik yanlış yerde duruyor.
+     */
+    const lane = node()
+    const height = frameHeightM(lane)
+    const halfDepth = channelDepthM(lane) / 2
+    const leaning = liveRackingParts(lane, 'full').filter(
+      (part) => part.role === 'diagonal' && (part.tiltX ?? 0) !== 0,
+    )
+    expect(leaning.length).toBeGreaterThan(0)
+
+    for (const part of leaning) {
+      const lean = part.tiltX ?? 0
+      const length = part.size[1]
+      // Yatırılmış çubuğun izdüşümleri: düşeyde cos, uzun eksende sin.
+      const rise = Math.abs(length * Math.cos(lean))
+      const run = Math.abs(length * Math.sin(lean))
+      const top = part.center[1] + rise / 2
+      const bottom = part.center[1] - rise / 2
+      const far = Math.abs(part.center[2]) + run / 2
+
+      expect(bottom, 'çapraz zeminin altına iniyor').toBeGreaterThan(-1e-9)
+      expect(top, 'çapraz çerçevenin tepesini aşıyor').toBeLessThanOrEqual(height + 1e-9)
+      expect(far, 'çapraz kanalın dışına taşıyor').toBeLessThanOrEqual(halfDepth + 1e-9)
+    }
   })
 
   test('fren tamburu kanal profilinin DIŞINDA', () => {

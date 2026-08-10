@@ -192,7 +192,6 @@ export default function M3Tool() {
       const committed = M3ShelvingNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'M3 Bay',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

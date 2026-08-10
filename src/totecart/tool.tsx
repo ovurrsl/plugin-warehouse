@@ -146,7 +146,6 @@ export default function ToteCartTool() {
       const committed = ToteCartNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Tote cart',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

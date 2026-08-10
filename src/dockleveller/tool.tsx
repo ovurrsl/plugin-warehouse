@@ -159,7 +159,6 @@ export default function DockLevellerTool() {
       const committed = DockLevellerNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Dock leveller',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

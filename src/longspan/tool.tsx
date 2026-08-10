@@ -184,7 +184,6 @@ export default function LongspanTool() {
       const committed = LongspanNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Longspan Bay',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

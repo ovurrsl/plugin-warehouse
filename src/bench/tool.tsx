@@ -167,7 +167,6 @@ export default function BenchTool() {
       const committed = BenchNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Bench',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

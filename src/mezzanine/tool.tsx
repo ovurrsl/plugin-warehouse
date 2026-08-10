@@ -102,7 +102,6 @@ export default function MezzanineTool() {
       const committed = MezzanineNode.parse({
         ...previewNode,
         id: previewNode.id,
-        name: 'Mezzanine',
         position: finished.position,
         rotation: [0, 0, 0],
         polygon: finished.polygon,

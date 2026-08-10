@@ -156,7 +156,6 @@ export default function LiveRackingTool() {
       const committed = LiveRackingNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Live Racking',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

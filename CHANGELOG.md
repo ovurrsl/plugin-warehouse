@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`c21a058`](https://github.com/ovurrsl/plugin-warehouse/commit/c21a058a1454d98883fca65e5fac8893d91d5db4))
 - Refresh generated README blocks [skip ci] ([`14053d7`](https://github.com/ovurrsl/plugin-warehouse/commit/14053d725f9d8128082b7d39b31fdcef8723ae08))
 - Hayalet stoğun seçime bağlılığını bekçiye bağla ([`bc3432f`](https://github.com/ovurrsl/plugin-warehouse/commit/bc3432f327eba632caf1f3a3d4a0e1e4ab02474d))
 - Refresh generated README blocks [skip ci] ([`349e388`](https://github.com/ovurrsl/plugin-warehouse/commit/349e38863098393870e4c5aa653a768a31537b07))
@@ -267,6 +268,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Metre tutan dört alan birim bildirmiyordu — mm yazımı sessizce kırpılıyordu ([`104155e`](https://github.com/ovurrsl/plugin-warehouse/commit/104155e4d60b9f67beafad8a0d4d0a3cd41cd4e1))
 - `defaults()` içindeki sabit ad ağaç etiketini eziyordu ([`e9cd3d3`](https://github.com/ovurrsl/plugin-warehouse/commit/e9cd3d337fd6251d19405ca78f95e8f8997e1858))
 - Alçak raf fişi gerçekten toplama gözü indirsin ([`e03cd96`](https://github.com/ovurrsl/plugin-warehouse/commit/e03cd96ca5d42737c0746fbbb7b6f8153ac6ec59))
 - Bir seferde tek fiş yansın ([`2b421ce`](https://github.com/ovurrsl/plugin-warehouse/commit/2b421ce46c2ea2569ac4884fc8c09595415c057c))
@@ -324,6 +326,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Merge pull request #19 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`9da5fbc`](https://github.com/ovurrsl/plugin-warehouse/commit/9da5fbca81025562830293632f017d2ca312623b))
 - Merge pull request #18 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`6211ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/6211ce2bf7d5198e6254706336654fd064a772cc))
 - Merge pull request #17 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`e952b93`](https://github.com/ovurrsl/plugin-warehouse/commit/e952b93b824126bbc14425302edf1e3bcc7d143a))
 - Merge pull request #16 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`4e2414b`](https://github.com/ovurrsl/plugin-warehouse/commit/4e2414b4fbca6cf95926dfc3f47060dc7fb881f4))

@@ -1,7 +1,8 @@
 import type { NodeDefinition } from '@pascal-app/core'
 import { treeLabel } from '../tree-label'
 import { buildLiveRackingFloorplan } from './floorplan'
-import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
+import { snapToNeighbourSeam } from './magnet'
+import { bayWidthM, channelDepthM, channelPitchM, frameHeightM } from './metrics'
 import { liveRackingParametrics } from './parametrics'
 import { LiveRackingNode } from './schema'
 
@@ -10,9 +11,10 @@ const SNAP_ANGLES = Array.from({ length: 8 }, (_, i) => (i * Math.PI) / 4)
 /**
  * Mecalux Canlı Palet Rafı — bir yerçekimi kanalı sütunu.
  *
- * Selective rafla aynı yerleşim davranışı (bir düğüm bir bay, yan yana
- * dizilir) ama komşu MIKNATISI yok: canlı raf kanalları çerçeve
- * paylaşmıyor, her kanal kendi dikmelerini taşıyor.
+ * Selective rafla aynı yerleşim davranışı (bir düğüm bir bay, yan yana dizilir)
+ * ve aynı komşu mıknatısı: kanallar blok hâlinde kuruluyor ve her dikme hattı
+ * iki yanındaki kanalın ortak taşıyıcısı. On kanal on bir hatta oturuyor.
+ * Gerekçe ve paylaşımın nasıl yapıldığı `neighbours.ts`'te.
  */
 export const liveRackingDefinition = {
   kind: 'warehouse:live-rack',
@@ -43,15 +45,47 @@ export const liveRackingDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: {
+      axes: ['x', 'z'],
+      gridSnap: true,
+      /**
+       * Mıknatıs, ve bir bloğun elle kurulabilmesinin tek sebebi.
+       *
+       * Kanallar dikme hattını yalnız TAM olarak bir aralıkta paylaşıyor —
+       * yarım milimetre tolerans — ve host'un sunduğu hiçbir şey oraya
+       * ulaşmıyor. Hizalama kılavuzları 8 cm'lik pencerede kenardan kenara
+       * çekiyor; ızgara yapışması karşı çalışıyor, çünkü 0,870 m hiçbir ızgara
+       * adımının katı değil; Çoğalt da kopyayı dünya X ve Z'de sabit bir metre
+       * ötelerken ne aralığı ne dönüşü görüyor. Bkz. `./magnet`.
+       */
+      groupMoveSnap: ({ node, candidatePosition, movingIds, nodes }) =>
+        snapToNeighbourSeam(
+          node as unknown as LiveRackingNode,
+          candidatePosition,
+          movingIds as readonly string[],
+          nodes as Readonly<Record<string, unknown>>,
+        ),
+    },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},
 
     floorPlaced: {
+      /**
+       * **Aralık, dış genişlik değil.**
+       *
+       * Bir kanal dünya açısından `channelPitchM` genişliğinde; çeliği bunu her
+       * yandan yarım dikme aşıyor — komşunun paylaştığı yarım dikme. Yerine dış
+       * genişliği bildirmek, paylaşım aralığında duran iki kanalı bir dikme
+       * kadar üst üste bindiriyor ve `spatialGridManager` bunu sert çakışma
+       * okuyor: yerleştirme kutusu kırmızıya dönüyor ve kanal bir başkasına
+       * dayanınca tıklama yutuluyor. Yani kindʼin etrafında kurulduğu tek
+       * hareket, yapamadığı tek şey oluyordu. Selective raf bu hatayı bir kez
+       * yayınladı, drive-in bir kez daha; aynı sayı, aynı gerekçe.
+       */
       footprint: (node) => {
         const live = node as unknown as LiveRackingNode
         return {
-          dimensions: [bayWidthM(live), frameHeightM(live), channelDepthM(live)],
+          dimensions: [channelPitchM(live), frameHeightM(live), channelDepthM(live)],
           rotation: live.rotation ?? [0, 0, 0],
         }
       },

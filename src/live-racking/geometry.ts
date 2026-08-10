@@ -23,7 +23,12 @@ import {
 import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './catalog'
 import { hasIntermediateRetainers } from './metrics'
-import { type LiveRackingDetail, type LiveRackingPart, liveRackingParts } from './parts'
+import {
+  type FrameOmission,
+  type LiveRackingDetail,
+  type LiveRackingPart,
+  liveRackingParts,
+} from './parts'
 import type { LiveRackingNode } from './schema'
 
 function colorOf(node: LiveRackingNode, role: LiveRackingPart['role']): string {
@@ -73,7 +78,11 @@ function buildParts(
   return finish(sink)
 }
 
-function buildLiveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingDetail): string {
+function buildLiveRackingGeometryKey(
+  node: LiveRackingNode,
+  detail: LiveRackingDetail,
+  omission: FrameOmission = { omitRight: false },
+): string {
   /**
    * Makara hattı ve akış donanımı YALNIZ yakın katmanda üretiliyor
    * (`liveRackingParts`): uzak katmanda kanal tek bir eğik şerit, ve o şerit
@@ -84,6 +93,12 @@ function buildLiveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingD
   const full = detail === 'full'
   return [
     'live',
+    // Bitişik komşusu olan kanal sağ dikme hattını KURMUYOR (`neighbours.ts`).
+    // Anahtarda olmazsa bir bloğun içi ile ucu aynı mesh'i paylaşır: ya bütün
+    // blok dikmesiz kalır, ya ek yerlerinde çift dikme belirir — hangisinin
+    // önce çizildiğine bağlı olarak, yani sahne yüklenme sırasına göre değişen
+    // bir hata.
+    omission.omitRight ? 'L' : 'LR',
     node.variant,
     node.palletPreset,
     node.palletsDeep,
@@ -119,10 +134,22 @@ function buildLiveRackingGeometryKey(node: LiveRackingNode, detail: LiveRackingD
 export function getLiveRackingGeometry(
   node: LiveRackingNode,
   detail: LiveRackingDetail,
+  omission: FrameOmission = { omitRight: false },
 ): THREE.BufferGeometry {
-  return getCachedGeometry(liveRackingGeometryKey(node, detail), () =>
-    buildParts(node, liveRackingParts(node, detail)),
+  return getCachedGeometry(liveRackingGeometryKey(node, detail, omission), () =>
+    buildParts(node, liveRackingParts(node, detail, omission)),
   )
+}
+
+/** Katmanı ve komşuluğu birlikte tutan retain — çağıranın anahtarı ikinci kez
+ *  kurmasına gerek kalmıyor, ve tutulan anahtar ile çizilen anahtarın ayrışması
+ *  (tutulmayan bir buffer'ın süpürülmesi) böyle imkânsız oluyor. */
+export function retainLiveRackingGeometry(
+  node: LiveRackingNode,
+  detail: LiveRackingDetail,
+  omission: FrameOmission = { omitRight: false },
+): string {
+  return retainGeometry(liveRackingGeometryKey(node, detail, omission))
 }
 
 export { releaseGeometry, retainGeometry }
@@ -130,5 +157,5 @@ export { releaseGeometry, retainGeometry }
 /** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`; çıplak üretici: `buildLiveRackingGeometryKey`. */
 export const liveRackingGeometryKey = memoiseGeometryKey(
   buildLiveRackingGeometryKey,
-  (detail) => detail,
+  (detail, omission) => `${detail}:${omission?.omitRight ? 'L' : 'LR'}`,
 )

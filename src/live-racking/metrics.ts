@@ -18,6 +18,7 @@ import {
   RETAINER_GAP_M,
   ROLLER_OVER_PALLET_M,
   ROLLER_PITCH_STEP_M,
+  UPRIGHT_WIDTH_M,
 } from './catalog'
 import type { LiveRackingNode } from './schema'
 
@@ -42,6 +43,23 @@ export function palletRunDepthM(node: LiveRackingNode): number {
 /** Bay genişliği E = A + 160 mm (her yanda 80). Katalog formülü. */
 export function bayWidthM(node: LiveRackingNode): number {
   return palletFaceWidthM(node) + 2 * BAY_SIDE_CLEARANCE_M
+}
+
+/**
+ * İki kanalın yan yana durduğu merkez-merkez aralık — ve aynı sayı, bir
+ * kanalın KENDİ iki dikme hattı arasındaki mesafe.
+ *
+ * `bayWidthM` dikme YÜZLERİ üzerinden dış genişlik: dikmeler bay kenarından
+ * yarım dikme içeri kaçık duruyor (`parts.ts`, `pushFrames`). Dolayısıyla iki
+ * kanal bir `bayWidthM` aralıkla dizilirse yüz yüze gelen İKİ ayrı dikme hattı
+ * oluyor — 90 mm arayla iki sıra çelik. Bir dikme daha dar dizilince hatlar
+ * ÇAKIŞIYOR, ve paylaşılan hattı sağdaki komşuya bırakmak mümkün oluyor.
+ *
+ * Tek sayının iki işi birden görmesi kasıtlı: tam bu aralığa konan bir kardeş,
+ * sol hattını komşusunun sağ hattının olacağı yere indiriyor.
+ */
+export function channelPitchM(node: LiveRackingNode): number {
+  return bayWidthM(node) - UPRIGHT_WIDTH_M
 }
 
 /** Makara boyu D = A + 30 mm. Katalog formülü. */

@@ -5,9 +5,10 @@ import {
   useLiveNodeOverrides,
   useLiveTransforms,
   useRegistry,
+  useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type * as THREE from 'three'
 import { appearanceKey, useAppearance } from '../appearance'
 import { Collider } from '../collider'
@@ -21,10 +22,11 @@ import {
   getLiveRackingGeometry,
   liveRackingGeometryKey,
   releaseGeometry,
-  retainGeometry,
+  retainLiveRackingGeometry,
 } from './geometry'
 import { getLiveRackingMaterial } from './materials'
 import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
+import { hasRightNeighbour } from './neighbours'
 import type { LiveRackingNode } from './schema'
 
 /**
@@ -84,12 +86,20 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   const appearance = useAppearance()
   const material = getLiveRackingMaterial(appearance)
 
+  // Bitişik komşusu olan kanal sağ dikme hattını ona bırakıyor — blok bir sıra
+  // dikmeyle çiziliyor, iki sırayla değil. Abonelik boolean'a indirgenmiş
+  // durumda: `s.nodes`'a abone olmak sahnedeki her yazımda her kanalı yeniden
+  // çizerdi.
+  const abutted = useScene((s) => hasRightNeighbour(s.nodes as Record<string, unknown>, node.id))
+  const omission = useMemo(() => ({ omitRight: abutted }), [abutted])
+
   const selected = useViewer((s) => isSelected(s.selection.selectedIds, node.id))
   const drawsSelf = useCollective({
     nodeId: node.id,
     objectRef: registeredRef,
-    geometryFor: (tier) => getLiveRackingGeometry(node, tier === 'full' ? 'full' : 'simple'),
-    keyFor: (tier) => liveRackingGeometryKey(node, tier === 'full' ? 'full' : 'simple'),
+    geometryFor: (tier) =>
+      getLiveRackingGeometry(node, tier === 'full' ? 'full' : 'simple', omission),
+    keyFor: (tier) => liveRackingGeometryKey(node, tier === 'full' ? 'full' : 'simple', omission),
     materialFor: () => material,
     materialKeyFor: () => `live-racking:${appearanceKey(appearance)}`,
     farSq: LOD_FAR_SQ,
@@ -100,13 +110,13 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
   // İki katman da ekranda sayılır: tahliye çizileni boşaltamaz.
   useEffect(() => {
     const keys = [
-      retainGeometry(liveRackingGeometryKey(node, 'full')),
-      retainGeometry(liveRackingGeometryKey(node, 'simple')),
+      retainLiveRackingGeometry(node, 'full', omission),
+      retainLiveRackingGeometry(node, 'simple', omission),
     ]
     return () => {
       for (const key of keys) releaseGeometry(key)
     }
-  }, [node])
+  }, [node, omission])
 
   const width = bayWidthM(node)
   const depth = channelDepthM(node)
@@ -138,7 +148,7 @@ function LiveRackingRendererBody({ node }: { node: LiveRackingNode }) {
         {drawsSelf && (
           <SelfDrawnBody
             farSq={LOD_FAR_SQ}
-            geometryFor={(tier) => getLiveRackingGeometry(node, tier)}
+            geometryFor={(tier) => getLiveRackingGeometry(node, tier, omission)}
             isExporting={isExporting}
             materialFor={() => material}
             nearSq={LOD_NEAR_SQ}

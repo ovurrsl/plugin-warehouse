@@ -20,11 +20,13 @@ import {
 import { liveRackingDefinition } from './definition'
 import { buildLiveRackingFloorplan } from './floorplan'
 import { getLiveRackingGeometry, liveRackingGeometryKey } from './geometry'
+import { resetSeamIndex, snapToNeighbourSeam } from './magnet'
 import {
   assignedSkuCount,
   bayWidthM,
   channelDepthM,
   channelDropM,
+  channelPitchM,
   exceedsLaneDatum,
   frameHeightIsValid,
   frameHeightM,
@@ -36,6 +38,7 @@ import {
   rollerPitchIsValid,
   skuOfLevel,
 } from './metrics'
+import { hasRightNeighbour, resetNeighbourIndex, rightNeighbourPosition } from './neighbours'
 import { liveRackingParametrics } from './parametrics'
 import { liveRackingParts } from './parts'
 import { LiveRackingNode } from './schema'
@@ -575,12 +578,25 @@ describe('tanım ve manifest', () => {
     expect(liveRackingDefinition.bakeReplaceRenderer?.module).toBeDefined()
   })
 
-  test('taban izi türetilmiş ölçüleri okur', () => {
+  /**
+   * BEKÇİ: ayak izi ARALIK, dış genişlik değil.
+   *
+   * Test bu turda tersini iddia ediyordu — `bayWidthM` — ve doğru görünüyordu,
+   * çünkü kanallar o gün çerçeve paylaşmıyordu. Paylaşınca dış genişlik iki
+   * komşuyu tam bir dikme kadar bindiriyor, `spatialGridManager` bunu sert
+   * çakışma okuyor, ve kanal bloğun yanına konamıyor. Selective rafın ve
+   * drive-in'in bir kez yayınladığı hata.
+   *
+   * Farkın tam olarak bir dikme olduğu ayrıca sabitleniyor: "biraz daha küçük"
+   * bir sayı da bu testi geçerdi ama hatları çakıştırmazdı.
+   */
+  test('taban izi ARALIK — dış genişlik iki komşuyu bindirirdi', () => {
     const resolver = liveRackingDefinition.capabilities.floorPlaced?.footprint
     if (!resolver) throw new Error('footprint yok')
     const channel = node()
     const dims = resolver(channel as never).dimensions
-    expect(dims[0]).toBeCloseTo(bayWidthM(channel), 9)
+    expect(dims[0]).toBeCloseTo(channelPitchM(channel), 9)
+    expect(dims[0]).toBeCloseTo(bayWidthM(channel) - UPRIGHT_WIDTH_M, 9)
     expect(dims[1]).toBeCloseTo(frameHeightM(channel), 9)
     expect(dims[2]).toBeCloseTo(channelDepthM(channel), 9)
   })
@@ -761,5 +777,240 @@ describe('kanal, kafes ve fren gerçekten çizildikleri yerde', () => {
       }
     }
     expect(clashes, 'frenli makara komşusunun içinde').toBe(0)
+  })
+})
+
+/**
+ * BEKÇİ: kanallar bir BLOK kuruyor — paylaşılan dikme hattı ve onu bulan
+ * mıknatıs.
+ *
+ * Buradaki testlerin hiçbiri "doğru kod doğru" demiyor. Her biri belirli bir
+ * YANLIŞ cevabın üretilmediğini söylüyor, ve o yanlış cevapların hepsi makul
+ * görünüyor:
+ *
+ * - Aralık dış genişlik olsaydı, iki kanal yan yana dizilir ve ek yerinde
+ *   90 mm arayla iki sıra dikme dururdu. Uzaktan doğru görünür.
+ * - Kafes hattı izlemeseydi, dikme tek sıraya inerdi ama çapraz panelleri iki
+ *   kalırdı — birbirine giren iki kafes.
+ * - Geometri anahtarı komşuluğu taşımasaydı, bloğun içiyle ucu aynı mesh'i
+ *   paylaşırdı ve sonucu sahnenin YÜKLENME SIRASI belirlerdi.
+ * - Mıknatıs şekle bakmasaydı, farklı yükseklikteki iki kanalı hiçbir üreticinin
+ *   birleştirmeyeceği bir ek yerine çekerdi.
+ */
+describe('paylaşılan dikme hattı ve mıknatıs', () => {
+  const uprightXs = (n: ReturnType<typeof node>, omission?: { omitRight: boolean }) =>
+    [
+      ...new Set(
+        liveRackingParts(n, 'full', omission)
+          .filter((p) => p.role === 'upright')
+          .map((p) => Number(p.center[0].toFixed(6))),
+      ),
+    ].sort((a, b) => a - b)
+
+  const sceneOf = (...channels: ReturnType<typeof node>[]) => {
+    resetNeighbourIndex()
+    resetSeamIndex()
+    const record: Record<string, unknown> = {}
+    for (const channel of channels) record[channel.id] = channel
+    return record
+  }
+
+  const at = (x: number, patch: Record<string, unknown> = {}) =>
+    node({ position: [x, 0, 0], rotation: [0, 0, 0], ...patch })
+
+  /**
+   * Her şeyin dayandığı sayı. Aralık yanlışsa öteki testlerin hepsi hâlâ yeşil
+   * yanabilir — komşuluk kendi aralığıyla tutarlı olur, yalnız çelik çakışmaz.
+   */
+  test('aralık iki dikme hattını GERÇEKTEN çakıştırıyor', () => {
+    const left = at(0)
+    const pitch = channelPitchM(left)
+    const right = at(pitch)
+
+    const leftPosts = uprightXs(left)
+    const rightPosts = uprightXs(right).map((x) => x + pitch - pitch)
+    // Sağdaki kanalın direkleri kendi yerel çerçevesinde; dünyaya taşı.
+    const rightWorld = uprightXs(right).map((x) => Number((x + pitch).toFixed(6)))
+
+    expect(leftPosts.length).toBe(2)
+    expect(rightPosts.length).toBe(2)
+    // Soldakinin SAĞ hattı ile sağdakinin SOL hattı aynı x'te.
+    expect(rightWorld[0]).toBeCloseTo(leftPosts[1] as number, 9)
+    // Ve bu, "yaklaşık" değil: fark tam olarak bir dikme genişliği kadar.
+    expect(pitch).toBeCloseTo(bayWidthM(left) - UPRIGHT_WIDTH_M, 9)
+  })
+
+  test('bir aralıkta duran kanal komşusunu görüyor, bir dikme fazlada görmüyor', () => {
+    const left = at(0)
+    const pitch = channelPitchM(left)
+
+    const abutting = sceneOf(left, at(pitch))
+    expect(hasRightNeighbour(abutting, left.id)).toBe(true)
+
+    // Dış genişlikte dizmek — yani eski, paylaşımsız aralık — komşu SAYILMAMALI.
+    const apart = sceneOf(left, at(bayWidthM(left)))
+    expect(hasRightNeighbour(apart, left.id)).toBe(false)
+  })
+
+  test('sağdaki kanal komşu saymıyor — paylaşım tek yönlü', () => {
+    const left = at(0)
+    const right = at(channelPitchM(left))
+    const scene = sceneOf(left, right)
+    // Sol hattını herkes kurar; sağ hattı yalnız en sağdaki kurar. Çift yönlü
+    // olsaydı ikisi de sağ hattını atlar ve bloğun sağ ucu açık kalırdı.
+    expect(hasRightNeighbour(scene, right.id)).toBe(false)
+  })
+
+  test('şekli tutmayan komşu paylaşmıyor', () => {
+    const left = at(0)
+    const pitch = channelPitchM(left)
+    // Aynı yerde, ama farklı yükseklikte: dikmeler çakışmaz, hattı bırakmak
+    // çeliği toparlamaz — açıkta bırakır.
+    const taller = sceneOf(left, at(pitch, { levels: 6 }))
+    expect(hasRightNeighbour(taller, left.id)).toBe(false)
+
+    // Ve döndürülmüş bir komşu da: çerçeveleri kesişir, çakışmaz.
+    const turned = sceneOf(left, at(pitch, { rotation: [0, Math.PI / 2, 0] }))
+    expect(hasRightNeighbour(turned, left.id)).toBe(false)
+  })
+
+  test('iki bitişik kanal ÜÇ dikme hattı üretiyor, dört değil', () => {
+    const left = at(0)
+    const pitch = channelPitchM(left)
+    const right = at(pitch)
+
+    const lines = new Set<number>()
+    for (const x of uprightXs(left, { omitRight: true })) lines.add(Number(x.toFixed(6)))
+    for (const x of uprightXs(right, { omitRight: false }))
+      lines.add(Number((x + pitch).toFixed(6)))
+
+    expect([...lines].sort((a, b) => a - b).length).toBe(3)
+  })
+
+  test('kafes de hattı izliyor — tek sıra dikme, tek panel', () => {
+    const channel = at(0)
+    const both = liveRackingParts(channel, 'full').filter((p) => p.role === 'diagonal')
+    const shared = liveRackingParts(channel, 'full', { omitRight: true }).filter(
+      (p) => p.role === 'diagonal',
+    )
+
+    // Yarıya iniyor, ve kalanların hepsi SOL hatta.
+    expect(shared.length).toBe(both.length / 2)
+    const rightX = (bayWidthM(channel) - UPRIGHT_WIDTH_M) / 2
+    for (const part of shared) {
+      expect(part.center[0]).toBeCloseTo(-rightX, 9)
+    }
+  })
+
+  /**
+   * Yorumun işaret ettiği tuzak. Başlık kirişi iki hattı BAĞLIYOR; hattı
+   * bırakmak kirişi de bıraktırsaydı, bloğun içindeki her kanalın üstü açık
+   * kalır ve giydirme rafın çatısını taşıyacak hiçbir şey olmazdı.
+   */
+  test('giydirme rafın başlık kirişi paylaşımdan etkilenmiyor', () => {
+    const clad = at(0, { cladRack: true })
+    const beams = (omitRight: boolean) =>
+      liveRackingParts(clad, 'full', { omitRight }).filter(
+        (p) => p.role === 'beam' && p.size[1] === p.size[2],
+      ).length
+
+    expect(beams(true)).toBe(beams(false))
+    expect(beams(true)).toBeGreaterThan(0)
+  })
+
+  test('geometri anahtarı komşuluğu taşıyor — iki yönlü', () => {
+    const channel = at(0)
+    expect(liveRackingGeometryKey(channel, 'full', { omitRight: true })).not.toBe(
+      liveRackingGeometryKey(channel, 'full', { omitRight: false }),
+    )
+    // Ve bölmediği yerde bölmüyor: aynı komşuluk aynı anahtar.
+    expect(liveRackingGeometryKey(channel, 'full', { omitRight: true })).toBe(
+      liveRackingGeometryKey(channel, 'full', { omitRight: true }),
+    )
+    // Katman ile komşuluk BAĞIMSIZ eksenler; memo varyantı ikisini de taşımalı.
+    expect(liveRackingGeometryKey(channel, 'simple', { omitRight: true })).not.toBe(
+      liveRackingGeometryKey(channel, 'full', { omitRight: true }),
+    )
+  })
+
+  test('mıknatıs ek yerine tam aralıkla oturuyor', () => {
+    const anchor = at(0)
+    const pitch = channelPitchM(anchor)
+    const dragged = node({ position: [0, 0, 0], rotation: [0, 0, 0] })
+    const scene = sceneOf(anchor)
+
+    // 12 cm şaşı bırakılmış bir imleç — hizalama kılavuzunun penceresinden
+    // geniş, mıknatıs yarıçapından dar.
+    const snapped = snapToNeighbourSeam(dragged, [pitch + 0.12, 0, 0.05], [dragged.id], scene)
+    expect(snapped).not.toBeNull()
+    expect((snapped as [number, number, number])[0]).toBeCloseTo(pitch, 9)
+    expect((snapped as [number, number, number])[2]).toBeCloseTo(0, 9)
+  })
+
+  test('mıknatıs yarıçapın dışına uzanmıyor', () => {
+    const anchor = at(0)
+    const pitch = channelPitchM(anchor)
+    const dragged = node({ position: [0, 0, 0], rotation: [0, 0, 0] })
+    const scene = sceneOf(anchor)
+
+    expect(snapToNeighbourSeam(dragged, [pitch + 0.9, 0, 0], [dragged.id], scene)).toBeNull()
+  })
+
+  test('mıknatıs şekli tutmayan bloğa çekmiyor', () => {
+    const anchor = at(0, { levels: 6 })
+    const pitch = channelPitchM(anchor)
+    const dragged = node({ position: [0, 0, 0], rotation: [0, 0, 0] })
+    const scene = sceneOf(anchor)
+
+    expect(snapToNeighbourSeam(dragged, [pitch + 0.1, 0, 0], [dragged.id], scene)).toBeNull()
+  })
+
+  test('mıknatıs kendine ve birlikte taşınana yapışmıyor', () => {
+    const a = at(0)
+    const pitch = channelPitchM(a)
+    const b = at(pitch)
+    const scene = sceneOf(a, b)
+
+    // İkisi birlikte sürükleniyor: blok bir bütün olarak kımıldamalı, kanallar
+    // birbirini çekmemeli.
+    expect(snapToNeighbourSeam(a, [0.05, 0, 0], [a.id, b.id], scene)).toBeNull()
+  })
+
+  test('mıknatıs dolu yere çekmiyor', () => {
+    const a = at(0)
+    const pitch = channelPitchM(a)
+    const b = at(pitch)
+    const dragged = node({ position: [0, 0, 0], rotation: [0, 0, 0] })
+    const scene = sceneOf(a, b)
+
+    // İmleç a'nın sağ ek yerinin tam üstünde — ama orada b duruyor. Yapışırsa
+    // üçüncü kanal ikincinin içine oturur ve blok bir kanal eksik görünür.
+    expect(snapToNeighbourSeam(dragged, [pitch + 0.02, 0, 0], [dragged.id], scene)).toBeNull()
+  })
+
+  test('mıknatıs bloğun UCUNDAKİ boş ek yerine oturuyor', () => {
+    const a = at(0)
+    const pitch = channelPitchM(a)
+    const b = at(pitch)
+    const dragged = node({ position: [0, 0, 0], rotation: [0, 0, 0] })
+    const scene = sceneOf(a, b)
+
+    const snapped = snapToNeighbourSeam(dragged, [2 * pitch + 0.1, 0, 0.06], [dragged.id], scene)
+    expect(snapped).not.toBeNull()
+    expect((snapped as [number, number, number])[0]).toBeCloseTo(2 * pitch, 9)
+  })
+
+  /**
+   * İşaret uzlaşımı: +Y dönüşü yerel +X'i dünya (cos, −sin)'e taşıyor. Ters
+   * yazmak kanalı komşusunun YANLIŞ tarafına mıknatıslar ve neredeyse doğru
+   * görünür — 90°'de fark yalnız Z'nin işareti.
+   */
+  test('döndürülmüş kanalın ek yeri kendi yerel +X ekseninde', () => {
+    const turned = at(0, { rotation: [0, Math.PI / 2, 0] })
+    const pitch = channelPitchM(turned)
+    const [x, z] = rightNeighbourPosition(turned)
+
+    expect(x).toBeCloseTo(0, 9)
+    expect(z).toBeCloseTo(-pitch, 9)
   })
 })

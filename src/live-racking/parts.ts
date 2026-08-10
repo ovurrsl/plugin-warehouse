@@ -86,6 +86,23 @@ export type LiveRackingPart = {
 export type LiveRackingDetail = 'full' | 'simple'
 
 /**
+ * Sağ (+X) dikme hattı bitişikteki komşuya bırakıldı mı.
+ *
+ * Kanallar blok hâlinde kuruluyor ve her dikme hattı iki yanındaki kanalın
+ * ortak taşıyıcısı — gerekçenin tamamı `neighbours.ts`. Bayrak yalnız hattı
+ * kısıyor: kanalın kendi makara hattı, kirişleri ve akış donanımı olduğu gibi
+ * kalıyor, çünkü onlar paylaşılan bir şey değil.
+ */
+export type FrameOmission = { omitRight: boolean }
+
+const KEEP_BOTH: FrameOmission = { omitRight: false }
+
+/** Bu kanalın kurduğu dikme hattı taraflarını verir: hep sol, koşullu sağ. */
+function frameSides(omission: FrameOmission): readonly (-1 | 1)[] {
+  return omission.omitRight ? ([-1] as const) : ([-1, 1] as const)
+}
+
+/**
  * Bir dikme, plakası ve ankrajlarıyla birlikte.
  *
  * Üçü tek yerde, çünkü ayrıyken ayrılabiliyorlardı: yan kafesin ara dikmeleri
@@ -122,18 +139,27 @@ function pushPost(parts: LiveRackingPart[], x: number, z: number, height: number
  * Gerçek bir kanal daha fazla ara dikme taşır ama görsel olarak uçlar yapının
  * okunmasına yetiyor ve ara ÇERÇEVELER makaraları gizliyor.
  */
-function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
+function pushFrames(
+  parts: LiveRackingPart[],
+  node: LiveRackingNode,
+  omission: FrameOmission,
+): void {
   const halfWidth = bayWidthM(node) / 2
   const halfDepth = channelDepthM(node) / 2
   const height = frameHeightM(node)
 
   for (const z of [-halfDepth, halfDepth] as const) {
-    for (const side of [-1, 1] as const) {
+    for (const side of frameSides(omission)) {
       pushPost(parts, side * (halfWidth - UPRIGHT_WIDTH_M / 2), z, height)
     }
     // Giydirme rafta dikmeler çatıyı taşıyor: tepede onları bağlayan başlık
     // kirişi olmadan yük aktaracak bir yol yok, ve raf gözle de bir bina
     // gibi okunmaz.
+    //
+    // Başlık kirişi `omitRight`'tan ETKİLENMİYOR ve etkilenmemeli: kiriş
+    // kanalın kendi açıklığını geçiyor, komşunun hattına oturuyor. Hattı
+    // bırakmak kirişi de bıraktırsaydı, bloğun içindeki her kanalın üstü açık
+    // kalırdı.
     if (node.cladRack) {
       parts.push({
         role: 'beam',
@@ -177,7 +203,11 @@ function pushFrames(parts: LiveRackingPart[], node: LiveRackingNode): void {
  * havada biterdi. Bunlar kanalın yanında duruyor, karşıdan karşıya geçmiyor,
  * yani uç ÇERÇEVELERİN aksine makaraları gizlemiyorlar.
  */
-function pushSideBracing(parts: LiveRackingPart[], node: LiveRackingNode): void {
+function pushSideBracing(
+  parts: LiveRackingPart[],
+  node: LiveRackingNode,
+  omission: FrameOmission,
+): void {
   const halfWidth = bayWidthM(node) / 2
   const halfDepth = channelDepthM(node) / 2
   const height = frameHeightM(node)
@@ -204,7 +234,11 @@ function pushSideBracing(parts: LiveRackingPart[], node: LiveRackingNode): void 
   const lean = Math.atan2(bayLength, liftHeight)
   const diagonal = Math.hypot(bayLength, liftHeight)
 
-  for (const side of [-1, 1] as const) {
+  // Kafes dikme hattının ÜSTÜNDE duruyor, iki hattın arasında değil — yani
+  // paylaşılan hattın kafesi de paylaşılıyor. Bunu atlayıp kafesi her zaman iki
+  // yana kurmak, ek yerinde 90 mm arayla iki panel bırakırdı: `omitRight`'ın
+  // önlemek için var olduğu şeyin kendisi, yalnız dikmede değil çaprazda.
+  for (const side of frameSides(omission)) {
     const x = side * (halfWidth - UPRIGHT_WIDTH_M / 2)
 
     // Kafesi kapatan iki yatay bağ, kanal boyu.
@@ -610,10 +644,11 @@ function pushHinges(parts: LiveRackingPart[], node: LiveRackingNode): void {
 export function liveRackingParts(
   node: LiveRackingNode,
   detail: LiveRackingDetail,
+  omission: FrameOmission = KEEP_BOTH,
 ): LiveRackingPart[] {
   const parts: LiveRackingPart[] = []
-  pushFrames(parts, node)
-  pushSideBracing(parts, node)
+  pushFrames(parts, node, omission)
+  pushSideBracing(parts, node, omission)
   pushHinges(parts, node)
   for (let level = 0; level < node.levels; level++) {
     pushLevelBeams(parts, node, level)

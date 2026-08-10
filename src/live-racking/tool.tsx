@@ -20,7 +20,7 @@ import {
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
-import { bayWidthM, channelDepthM, frameHeightM } from './metrics'
+import { channelDepthM, channelPitchM, frameHeightM } from './metrics'
 import LiveRackingPreview from './preview'
 import { LiveRackingNode } from './schema'
 
@@ -71,9 +71,12 @@ export default function LiveRackingTool() {
   const ghostRef = useRef(ghostNode)
   ghostRef.current = ghostNode
 
+  // Aralık, dış genişlik değil — `definition.ts`'in ayak izi notuyla aynı sayı
+  // ve aynı gerekçe: dış genişlikle iki komşu bir dikme kadar bindirilmiş
+  // sayılır, kutu kırmızıya döner ve kanal bloğun yanına hiç konamaz.
   const boxDimensions = useMemo(
     (): [number, number, number] => [
-      bayWidthM(ghostNode),
+      channelPitchM(ghostNode),
       frameHeightM(ghostNode),
       channelDepthM(ghostNode),
     ],
@@ -100,7 +103,7 @@ export default function LiveRackingTool() {
       const { valid: placeable } = spatialGridManager.canPlaceOnFloor(
         activeLevelId,
         position,
-        [bayWidthM(ghost), frameHeightM(ghost), channelDepthM(ghost)],
+        [channelPitchM(ghost), frameHeightM(ghost), channelDepthM(ghost)],
         [0, rotationRef.current, 0],
         [],
       )

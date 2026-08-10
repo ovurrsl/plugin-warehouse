@@ -169,7 +169,6 @@ export default function DriveInTool() {
       const committed = DriveInRackNode.parse({
         ...ghostRef.current,
         id: previewNode.id,
-        name: 'Drive-in Lane',
         position,
         rotation: [0, rotationRef.current, 0],
         parentId: activeLevelId,

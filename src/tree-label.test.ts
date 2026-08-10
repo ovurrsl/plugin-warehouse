@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import { CATALOG_ITEMS } from './catalog'
 import { warehousePlugin } from './index'
 
@@ -133,6 +134,36 @@ describe('hiçbir kind `defaults()` içinde sabit ad yazmıyor', () => {
   test.each(withDefaults.map((def) => [def.kind, def] as const))('%s', (_kind, def) => {
     const defaults = (def as unknown as { defaults: () => Record<string, unknown> }).defaults()
     expect('name' in defaults).toBe(false)
+  })
+})
+
+describe('hiçbir araç yerleştirdiği düğüme sabit ad yazmıyor', () => {
+  /**
+   * `defaults()` bekçisinin kaçırdığı ikinci kapı, ve daha çok kullanılan
+   * olan o: eklentinin araçları düğümü `defaults()` üzerinden değil, kendi
+   * `Node.parse({...})` çağrılarıyla kuruyor. Sekiz araç orada bir sabit ad
+   * yazıyordu — `name: 'Bench'`, `name: 'M3 Bay'`, `name: 'Mezzanine'` — ve
+   * `treeLabel` dolu bir `name`'i kullanıcının verdiği ad saydığı için
+   * türetme hiç çalışmıyordu. Altı tezgâh fişi ağaçta yine altı "Bench"
+   * satırı açıyordu; `defaults()` bekçisi yeşil yanarken.
+   *
+   * Bekçi kaynağa bakıyor çünkü kusur metinsel: aracı testten çalıştırmak
+   * R3F ağacı, host mağazaları ve bir tıklama olayı ister. Aranan şey dar
+   * tutuldu — yalnızca dizge sabiti. `name: item.label` gibi türetilmiş bir
+   * ad meşru ve bilerek serbest.
+   */
+  const toolSources = [...new Bun.Glob('src/*/tool.tsx').scanSync('.')].sort()
+
+  test('araç dosyaları bulunuyor', () => {
+    expect(toolSources.length).toBeGreaterThan(0)
+  })
+
+  test.each(toolSources)('%s', (path) => {
+    const source = readFileSync(path, 'utf8')
+    const literals = [...source.matchAll(/(^|[\s{,])name:\s*(['"`])[^'"`]*\2/g)].map((m) =>
+      m[0].trim(),
+    )
+    expect(literals).toEqual([])
   })
 })
 

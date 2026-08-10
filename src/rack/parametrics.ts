@@ -38,6 +38,24 @@ const PRESET_KEYS = Object.keys(PALLET_PRESETS) as (keyof typeof PALLET_PRESETS)
 const ASSUMED_UNIT_LOAD = 1.2
 
 /**
+ * Alçak raf dikmesinin panel tavanı, metre.
+ *
+ * SEÇİLMİŞ VARSAYILAN — bir katalogdan değil, kullanıcının şartından geliyor
+ * ("lower rack seçtiğimde en fazla 3 metre yapabildiğim ... rack gelmeli").
+ * Rakamı uyduran bir kaynak yazmıyorum; gerçek dünyada alçak toplama rafını
+ * sınırlayan şey ELLE ERİŞİM, ve o sınır dikme boyunda değil en üst gözün
+ * kotunda: operatör yerde durup toplar, dolayısıyla üst göz omuz-baş
+ * hizasını aşamaz. 3 m dikme o kullanımla tutarlı bir tavan, ama türetilmiş
+ * bir sayı değil — seçilmiş.
+ *
+ * Bu yüzden ŞEMADA değil PANELDE duruyor. Şemadaki `max` 20 kalıyor, yani
+ * MCP'den ya da elle düzenlenmiş bir sahneden gelen 3.5 m'lik alçak raf
+ * REDDEDİLMİYOR — açılıyor, çiziliyor ve panelde uyarı olarak görünüyor.
+ * Ailenin kuralı bu: sayı reddedilmez, uyarılır.
+ */
+const LOW_RACK_MAX_HEIGHT_M = 3
+
+/**
  * Auto-derived inspector fields rather than a `customPanel`, for the reason the
  * pallet's descriptor gives: the escape hatch short-circuits `groups`,
  * `actions` *and* `trailingSection`, so taking it means owning the
@@ -93,7 +111,35 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
         },
         { key: 'bayClearWidth', kind: 'number', unit: 'm', min: 0.6, max: 6, step: 0.05 },
         { key: 'depth', kind: 'number', unit: 'm', min: 0.4, max: 2.5, step: 0.05 },
-        { key: 'uprightHeight', kind: 'number', unit: 'm', min: 1, max: 20, step: 0.1 },
+        /**
+         * Aynı alanın iki kontrolü, tavanları farklı — `max` bir sayı,
+         * düğümün fonksiyonu değil, yani varyanta göre daralan tek bir
+         * slider host'un alan tipiyle ifade edilemiyor. `visibleIf` ikisini
+         * birbirini dışlar kılıyor; aynı anda ikisi birden asla görünmez.
+         *
+         * Alternatif, tek slider'ı 20'de bırakıp değeri sessizce kırpmaktı:
+         * kullanıcı 4 m'ye çeker, panel 3 yazar, ve neden olduğunu hiçbir yer
+         * söylemez. Tavanı slider'ın KENDİSİNE koymak sebebi de görünür
+         * kılıyor — hemen üstündeki varyant anahtarı.
+         */
+        {
+          key: 'uprightHeight',
+          kind: 'number',
+          unit: 'm',
+          min: 1,
+          max: 20,
+          step: 0.1,
+          visibleIf: (node) => node.variant !== 'low-rack',
+        },
+        {
+          key: 'uprightHeight',
+          kind: 'number',
+          unit: 'm',
+          min: 1,
+          max: LOW_RACK_MAX_HEIGHT_M,
+          step: 0.1,
+          visibleIf: (node) => node.variant === 'low-rack',
+        },
         { key: 'depthPositions', kind: 'number', min: 1, max: 2, step: 1 },
         {
           key: 'depthGap',
@@ -315,6 +361,23 @@ export const palletRackParametrics: ParametricDescriptor<PalletRackNode> = {
           field: 'levels',
           severity: 'warning',
           msg: `Only ${fitted} of ${node.levels} levels fit a ${lengthLabel(node.uprightHeight, unit)} upright. Raise the height or reduce the clear openings.`,
+        })
+      }
+
+      /**
+       * Panelin kırpamadığı yoldan gelmiş alçak raf.
+       *
+       * Slider 3 m'de duruyor, ama düğüme yazan tek şey slider değil: MCP,
+       * elle düzenlenmiş bir sahne, ya da 5 m'lik bir palet rafını alçak
+       * rafa çeviren varyant anahtarı aynı alanı 3'ün üstünde bırakabilir.
+       * Şema bunu reddetmiyor (bilerek — bkz. `LOW_RACK_MAX_HEIGHT_M`), o
+       * yüzden sessiz kalmasın diye burada söyleniyor.
+       */
+      if (node.variant === 'low-rack' && node.uprightHeight > LOW_RACK_MAX_HEIGHT_M) {
+        issues.push({
+          field: 'uprightHeight',
+          severity: 'warning',
+          msg: `A low rack is picked on foot, so its upright is capped at ${lengthLabel(LOW_RACK_MAX_HEIGHT_M, unit)} — this one is ${lengthLabel(node.uprightHeight, unit)}. Lower it, or switch the variant to Pallet rack.`,
         })
       }
 

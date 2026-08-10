@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { CATALOG_ITEMS, CATALOG_SECTIONS } from './catalog'
+import { CATALOG_ITEMS, CATALOG_SECTIONS, chipIsArmed } from './catalog'
 import { warehousePlugin } from './index'
 import { useWarehouseStore } from './store'
 
@@ -134,5 +134,48 @@ describe('her fırça kolunun bir uygulayıcısı var', () => {
 
   test.each(arms)('%s', (arm) => {
     expect(source).toContain(`item.brush?.kind === '${arm}'`)
+  })
+})
+
+describe('vurgulama — bir seferde TEK fiş yanar', () => {
+  /**
+   * Kullanıcının bildirdiği "lower rack seçtiğimde pallet rackı da seçiyor"
+   * şikâyetinin panel tarafı.
+   *
+   * Vurgulama JSX'in içinde altı elle yazılmış yüklemdi ve yüklemi yazılmamış
+   * her aile aynı anda birden çok fişi yakıyordu: raf, longspan, m3, drive-in,
+   * live-rack, mezzanine — çok fişli ailelerin yarısından fazlası. Yüklem
+   * listesine yedincisini eklemek yalnız bir sonraki ailenin unutulmasını
+   * geciktirirdi, o yüzden karşılaştırma fişin KİMLİĞİNE taşındı ve bekçi de
+   * aile başına değil, bütün aileleri süpürerek yazıldı.
+   */
+  const byKind = new Map<string, typeof CATALOG_ITEMS>()
+  for (const item of CATALOG_ITEMS) {
+    byKind.set(item.kind, [...(byKind.get(item.kind) ?? []), item])
+  }
+
+  test.each([...byKind])('%s', (kind, items) => {
+    for (const armed of items) {
+      const lit = items.filter((item) => chipIsArmed(item, kind, armed.id))
+      expect({ armed: armed.id, lit: lit.map((item) => item.id) }).toEqual({
+        armed: armed.id,
+        lit: [armed.id],
+      })
+    }
+  })
+
+  test('başka bir kindʼın aracı silahlıyken hiçbir fiş yanmıyor', () => {
+    const lit = CATALOG_ITEMS.filter((item) => chipIsArmed(item, 'wall', 'pallet-rack'))
+    expect(lit.map((item) => item.id)).toEqual([])
+  })
+
+  test('katalog dışından silahlanan araçta ailenin fişleri yanıyor', () => {
+    // Kasıtlı geri düşme: kısayolla ya da host paletinden silahlanan araç fiş
+    // kimliği yazmıyor. Kimlik yoksa hiçbir şey yanmasaydı panel silahlı
+    // aracı hiç göstermezdi — bugünkü davranış korunuyor.
+    const lit = CATALOG_ITEMS.filter((item) =>
+      chipIsArmed(item, 'warehouse:pallet-rack', null),
+    ).map((item) => item.id)
+    expect(lit).toEqual(['pallet-rack', 'pallet-rack-low'])
   })
 })

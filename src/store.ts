@@ -42,6 +42,23 @@ type WarehouseStore = {
   tab: PanelTab
   setTab: (tab: PanelTab) => void
 
+  /**
+   * Katalogda en son basılan fişin kimliği, ya da katalog dışından silahlanan
+   * bir araç için `null`.
+   *
+   * Vurgulamanın TEK doğru kaynağı bu. Önceki hâli `activeTool === item.kind`
+   * idi, artı fişleri ayırt etmek için elle yazılmış altı yüklem
+   * (`wantsLoad`, `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`,
+   * `wantsTilt`). Yüklemi yazılmamış her aile aynı anda birden çok fişi
+   * yakıyordu — raf, longspan, m3, drive-in, live-rack ve mezzanine, yani
+   * çok fişli ailelerin yarısından fazlası — ve yedincisi de unutulacaktı.
+   *
+   * Kimlik karşılaştırması aile başına bakım istemiyor: fiş eklenir, doğru
+   * yanar.
+   */
+  armedChipId: string | null
+  setArmedChipId: (id: string | null) => void
+
   scope: StatsScope
   setScope: (scope: StatsScope) => void
 
@@ -341,6 +358,9 @@ export type RackBrush = Pick<
 export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
   tab: 'catalog',
   setTab: (tab) => set({ tab }),
+
+  armedChipId: null,
+  setArmedChipId: (armedChipId) => set({ armedChipId }),
 
   scope: 'building',
   setScope: (scope) => set({ scope, slabFilter: null }),

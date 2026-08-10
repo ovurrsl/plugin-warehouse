@@ -861,3 +861,28 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
 export function itemsInSection(sectionId: string): CatalogItem[] {
   return CATALOG_ITEMS.filter((item) => item.sectionId === sectionId)
 }
+
+/**
+ * Bir fiş yanıyor mu — yani bir sonraki tıklama TAM OLARAK bunu mu koyar.
+ *
+ * Panelden ayrı bir saf fonksiyon, çünkü asıl değeri test edilebilir olması:
+ * önceki hâli JSX'in içinde altı elle yazılmış yüklemdi (`wantsLoad`,
+ * `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`, `wantsTilt`) ve
+ * yüklemi yazılmamış her aile aynı anda birden çok fişi yakıyordu — raf,
+ * longspan, m3, drive-in, live-rack, mezzanine. Hiçbir test bunu göremiyordu.
+ *
+ * Kimlik tek karşılaştırma ve aile başına bakım istemiyor.
+ *
+ * Katalog dışından silahlanan araç (kısayol, host paleti) kimlik yazmıyor;
+ * o hâlde kind eşleşmesine düşülüyor, yoksa araç açıkken hiçbir fiş yanmaz
+ * ve panel silahlı aracı hiç göstermez.
+ */
+export function chipIsArmed(
+  item: CatalogItem,
+  activeTool: string | null | undefined,
+  armedChipId: string | null,
+): boolean {
+  if (activeTool !== item.kind) return false
+  const armed = CATALOG_ITEMS.find((chip) => chip.id === armedChipId)
+  return armed?.kind === item.kind ? armed.id === item.id : true
+}

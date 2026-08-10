@@ -3,12 +3,11 @@ import { lengthLabel, unitOf } from '../units'
 import {
   BUMPER_FACE_M,
   BUMPER_PROJECTION_M,
-  BUMPER_SPREAD_RATIO,
-  BUMPER_Y_M,
+  BUMPER_SIDE_CLEAR_M,
   CONTROL_OFFSET_M,
   PALETTE,
 } from './catalog'
-import { isStored, lipReachM, platformLengthM, riseM, widthM } from './metrics'
+import { controlPostXZ, isStored, lipReachM, platformLengthM, riseM, widthM } from './metrics'
 import type { DockLevellerNode } from './schema'
 
 /**
@@ -91,7 +90,7 @@ export function buildDockLevellerFloorplan(
       children.push({
         kind: 'rect',
         x: halfLength,
-        y: side * width * BUMPER_SPREAD_RATIO - BUMPER_FACE_M[1] / 2,
+        y: side * (width / 2 + BUMPER_SIDE_CLEAR_M) + (side > 0 ? 0 : -BUMPER_FACE_M[1]),
         width: BUMPER_PROJECTION_M,
         height: BUMPER_FACE_M[1],
         fill: ink,
@@ -106,7 +105,7 @@ export function buildDockLevellerFloorplan(
     // kalması gereken nokta.
     children.push({
       kind: 'circle',
-      cx: halfLength - BUMPER_Y_M,
+      cx: controlPostXZ(node)[0],
       cy: halfWidth + CONTROL_OFFSET_M,
       r: 0.09,
       fill: 'none',

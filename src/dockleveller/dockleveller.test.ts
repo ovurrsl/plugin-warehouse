@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
 import { CATALOG_ITEMS, CATALOG_SECTIONS } from '../catalog'
 import { clearConveyorGeometryCache } from '../conveyor/geometry-builder'
 import { warehouseCatalogPanel, warehousePlugin } from '../index'
 import {
   EN1398_MAX_GRADIENT,
+  PIT_WALL_M,
   PLATFORM_LENGTHS,
   PLATFORM_PLATE_M,
   TELESCOPIC_LIP_MAX_M,
@@ -13,6 +15,7 @@ import {
   WORKING_RANGE_BANDS,
 } from './catalog'
 import { dockLevellerDefinition } from './definition'
+import { buildDockLevellerFloorplan } from './floorplan'
 import {
   dockLevellerDeckKey,
   dockLevellerFrameKey,
@@ -23,6 +26,7 @@ import {
 } from './geometry'
 import {
   aboveFloorHeightM,
+  controlPostXZ,
   deckAngleRad,
   footprintM,
   gradient,
@@ -348,12 +352,27 @@ describe('seçim kutusu zeminin üstündeki gövdeyi sarıyor', () => {
     ['ikisi de, tabla inik', { hasBumpers: true, hasControlPost: true, inclination: -1 }],
   ]
 
-  /** Zeminin ÜSTÜNDE kalan parçalar — çukurun astarı ve nervürler aşağıda ve
-   *  seçim kutusunun konusu değiller. */
-  const aboveFloor = (node: DockLevellerNode) =>
-    [...dockLevellerFrameParts(node, 'full'), ...dockLevellerFrameParts(node, 'simple')].filter(
-      (part) => part.center[1] + part.size[1] / 2 > 1e-9,
-    )
+  /**
+   * Dışarıdan GÖRÜNEN parçalar — kutunun kapsaması gerekenler.
+   *
+   * Ölçüt "zeminin üstünde" değil: tampon rıhtım yüzüne monte ve tamamı zemin
+   * kotunun altında duruyor, ama kazının dışında olduğu için ekranda görünüyor
+   * ve tıklanabilir olmak zorunda. Kazının İÇİNDE kalanlar (çukur astarı,
+   * taban, silindir, nervürler) döşemenin içinde ve gerçekten görünmüyorlar.
+   * Kazı = iz + her yanda bir astar duvarı kalınlığı.
+   */
+  const visible = (node: DockLevellerNode) => {
+    const [length, width] = footprintM(node)
+    return [
+      ...dockLevellerFrameParts(node, 'full'),
+      ...dockLevellerFrameParts(node, 'simple'),
+    ].filter((part) => {
+      if (part.center[1] + part.size[1] / 2 > 1e-9) return true
+      const outsideX = Math.abs(part.center[0]) + part.size[0] / 2 > length / 2 + PIT_WALL_M + 1e-9
+      const outsideZ = Math.abs(part.center[2]) + part.size[2] / 2 > width / 2 + PIT_WALL_M + 1e-9
+      return outsideX || outsideZ
+    })
+  }
 
   for (const [label, overrides] of FIXTURES) {
     test(`${label}: her parça kutunun içinde`, () => {
@@ -361,7 +380,7 @@ describe('seçim kutusu zeminin üstündeki gövdeyi sarıyor', () => {
       const box = selectionBoxM(node)
       const slack = 1e-6
 
-      for (const part of aboveFloor(node)) {
+      for (const part of visible(node)) {
         for (const axis of [0, 1, 2] as const) {
           const low = box.center[axis] - box.size[axis] / 2
           const high = box.center[axis] + box.size[axis] / 2
@@ -378,15 +397,19 @@ describe('seçim kutusu zeminin üstündeki gövdeyi sarıyor', () => {
     // ölçülüyor: orada tavanı belirleyen şey direk değil tablanın burnu.
     const node = leveller({ hasBumpers: true, hasControlPost: true })
     const box = selectionBoxM(node)
-    const parts = aboveFloor(node)
+    const parts = visible(node)
 
     const reach = (axis: 0 | 1 | 2, sign: 1 | -1) =>
       Math.max(...parts.map((part) => sign * (part.center[axis] + (sign * part.size[axis]) / 2)))
 
-    // +X tampon, +Z kumanda direği, +Y direğin kutusu.
+    // +X tampon, +Z kumanda direği, +Y direğin kutusu, −Y tamponun alt ucu.
     expect(reach(0, 1)).toBeCloseTo(box.center[0] + box.size[0] / 2, 9)
     expect(reach(2, 1)).toBeCloseTo(box.center[2] + box.size[2] / 2, 9)
-    expect(reach(1, 1)).toBeCloseTo(box.size[1], 9)
+    expect(reach(1, 1)).toBeCloseTo(box.center[1] + box.size[1] / 2, 9)
+    // Taban artık sıfır DEĞİL: tampon zeminin altına sarkıyor ve kutu onunla
+    // birlikte iniyor. `size[1]`'i tavanla kıyaslayan eski hâl bunu göremezdi
+    // — kutunun tabanı sıfırda kalsaydı yine geçerdi.
+    expect(reach(1, -1)).toBeCloseTo(-(box.center[1] - box.size[1] / 2), 9)
   })
 
   test('çıplak rampanın kutusu çarpışma zarfıyla AYNI', () => {
@@ -590,4 +613,102 @@ describe('katalog fırçasının her kolu mağazaya yazılıyor', () => {
       ).toBe(true)
     })
   }
+})
+
+// ── Tampon, menteşe borusu, kumanda direği ───────────────────────────────────
+
+describe('rıhtım donanımı doğru yerde duruyor', () => {
+  const CTX = {} as GeometryContext
+
+  const frameOf = (node: DockLevellerNode, detail: DockLevellerDetail) =>
+    dockLevellerFrameParts(node, detail)
+
+  test('tampon bitmiş zeminin ALTINDA — üstünden geçilen yüzeyde çıkıntı yok', () => {
+    /**
+     * Tampon rıhtım DUVARINA monte: dorsenin arkası ona çarpar, forklift
+     * onun üstünden geçmez. Önceki hâlde `BUMPER_Y_M` pozitifti ve tampon
+     * zeminin 275 mm üstünde HAVADA duruyordu — hem hiçbir şeye bağlı
+     * değildi hem de sürüş yüzeyinin ortasında bir engeldi. Hiçbir hata
+     * vermez: iki sarı blok, doğru renkte, yanlış kotta.
+     */
+    for (const part of frameOf(leveller({ hasBumpers: true }), 'full')) {
+      if (part.role !== 'bumper') continue
+      expect(part.center[1] + part.size[1] / 2).toBeLessThanOrEqual(1e-9)
+    }
+  })
+
+  test('tampon dudağın süpürdüğü genişliğin DIŞINDA', () => {
+    /**
+     * Dudak tabla genişliğinde ve menteşede dönüyor; yayımlanmış çalışma
+     * aralığının her yerinde |z| ≤ W/2 hacmini süpürüyor. Tampon o bandın
+     * içine girerse makine kendi kendini deler — ve bu çakışma yalnız
+     * kaydırıcı hareket ederken, yani ekran görüntüsünde değil, görünür.
+     */
+    const node = leveller({ hasBumpers: true })
+    const half = widthM(node) / 2
+    for (const part of frameOf(node, 'full')) {
+      if (part.role !== 'bumper') continue
+      const inner = Math.abs(part.center[2]) - part.size[2] / 2
+      expect(inner, 'tampon dudağın bandına giriyor').toBeGreaterThan(half)
+    }
+  })
+
+  test('menteşe borusu y = 0 düzlemini tabla sacıyla paylaşmıyor', () => {
+    /**
+     * İkisinin üst yüzü de tam sıfırdaysa aynı materyalde iki eş düzlemli
+     * yüz olur: tablanın arka kenarında tam genişlikte bir şeritte z-savaşı,
+     * hem de düğümlerin çoğunun içinde bulunduğu VARSAYILAN pozda. Kamera
+     * kımıldadıkça titrer, durunca kaybolur — bir kez düzeltilip bir daha
+     * fark edilmemesi gereken cinsten.
+     */
+    const node = leveller()
+    const deck = dockLevellerDeckParts(node, 'full').find((part) => part.role === 'deck')
+    if (!deck) throw new Error('tabla sacı bekleniyordu')
+    const deckBottom = deck.center[1] - deck.size[1] / 2
+    for (const detail of ['full', 'simple'] as const) {
+      const tube = frameOf(node, detail).find(
+        (part) => part.role === 'frame' && part.size[0] === part.size[1],
+      )
+      if (!tube) throw new Error('menteşe borusu bekleniyordu')
+      expect(tube.center[1] + tube.size[1] / 2, detail).toBeLessThanOrEqual(deckBottom + 1e-9)
+    }
+  })
+
+  test('kumanda direğinin yeri 3B ile PLANDA aynı', () => {
+    /**
+     * Plan `halfLength - BUMPER_Y_M` yazıyordu: tamponun KOTUNU bir X geri
+     * çekmesi olarak kullanıyordu. Varsayılan düğümde 260 mm kayma, ve bağ
+     * yanlış yerdeydi — tamponun yüksekliğini değiştiren biri planda direği
+     * yürütüyordu. İkisi artık `controlPostXZ`'den okuyor; bu test o tekliği
+     * tutuyor, iki sayının bugünkü değerini değil.
+     */
+    for (const overrides of [{}, { length: '2000' }, { width: '2250' }] as const) {
+      const node = leveller({ ...overrides, hasControlPost: true })
+      const [postX, postZ] = controlPostXZ(node)
+      const post = frameOf(node, 'full').find((part) => part.role === 'control')
+      if (!post) throw new Error('kumanda kutusu bekleniyordu')
+      expect(post.center[0]).toBeCloseTo(postX, 9)
+      expect(post.center[2]).toBeCloseTo(postZ, 9)
+
+      const plan = buildDockLevellerFloorplan(node, CTX)
+      const circle = (plan?.kind === 'group' ? plan.children : []).find(
+        (child): child is Extract<FloorplanGeometry, { kind: 'circle' }> => child.kind === 'circle',
+      )
+      if (!circle) throw new Error('plan sembolünde direk bekleniyordu')
+      expect(circle.cx).toBeCloseTo(postX, 9)
+      expect(circle.cy).toBeCloseTo(postZ, 9)
+    }
+  })
+
+  test('kumanda kutusu UZAK katmanda da var', () => {
+    // Düşerse geriye tepesi kesilmiş çıplak bir çubuk kalıyor: düzeneğin
+    // zeminin üstündeki en geniş parçası oydu, ve kaybolduğu mesafe tam da
+    // yerleşimin bütününe bakılan mesafe.
+    for (const detail of ['full', 'simple'] as const) {
+      const boxes = frameOf(leveller({ hasControlPost: true }), detail).filter(
+        (part) => part.role === 'control',
+      )
+      expect(boxes.length, detail).toBe(1)
+    }
+  })
 })

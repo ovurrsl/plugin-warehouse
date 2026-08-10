@@ -16,11 +16,10 @@
 import {
   BUMPER_FACE_M,
   BUMPER_PROJECTION_M,
-  BUMPER_SPREAD_RATIO,
+  BUMPER_SIDE_CLEAR_M,
   BUMPER_Y_M,
   CONTROL_BOX_M,
   CONTROL_HEIGHT_M,
-  CONTROL_OFFSET_M,
   CONTROL_POST_M,
   CYLINDER_M,
   HINGE_TUBE_M,
@@ -35,7 +34,7 @@ import {
   TOE_GUARD_HEIGHT_M,
   TOE_GUARD_THICKNESS_M,
 } from './catalog'
-import { frameHeightM, lipFullLengthM, platformLengthM, widthM } from './metrics'
+import { controlPostXZ, frameHeightM, lipFullLengthM, platformLengthM, widthM } from './metrics'
 import type { DockLevellerNode } from './schema'
 
 export type DockLevellerDetail = 'full' | 'simple'
@@ -99,22 +98,32 @@ export function dockLevellerFrameParts(
   // Arka menteşe borusu — hem dolu hem sade katmanda, çünkü tablanın döndüğü
   // hattı gösteren tek parça bu ve yerleşimi okuyan kişi rampanın hangi
   // ucundan kalktığını görmeli.
+  /**
+   * Menteşe borusu tabla sacının ALTINDAN asılı.
+   *
+   * Önceki hâlde borunun üst yüzü de tabla sacının üst yüzü de tam `y = 0`'a
+   * düşüyordu: iki ayrı mesh, tek materyal, aynı derinlik → tablanın arka
+   * kenarında 70 mm × tam genişlik bir şeritte z-savaşı, üstelik düğümlerin
+   * çoğunun içinde bulunduğu VARSAYILAN pozda. Artık `y = 0` düzlemini tabla
+   * sacından başka hiçbir gövde paylaşmıyor.
+   */
   parts.push({
     role: 'frame',
-    center: [-halfLength + HINGE_TUBE_M / 2, -HINGE_TUBE_M / 2, 0],
+    center: [-halfLength + HINGE_TUBE_M / 2, -PLATFORM_PLATE_M - HINGE_TUBE_M / 2, 0],
     size: [HINGE_TUBE_M, HINGE_TUBE_M, width],
   })
 
   if (node.hasBumpers) {
-    // Tamponlar kapı yüzünde, zeminin ÜSTÜNDE: dorseyi durduran ve çalışma
-    // aralığı tablosunun ölçüldüğü 100 mm'lik boşluğu veren parça.
+    // Tamponlar kapı yüzünde, zeminin ALTINA sarkıyor ve dudağın süpürdüğü
+    // genişliğin DIŞINDA duruyor — ikisi de makinenin çalışabilmesinin şartı,
+    // bkz. `BUMPER_Y_M` ve `BUMPER_SIDE_CLEAR_M`.
     for (const side of [-1, 1] as const) {
       parts.push({
         role: 'bumper',
         center: [
           halfLength + BUMPER_PROJECTION_M / 2,
           BUMPER_Y_M,
-          side * width * BUMPER_SPREAD_RATIO,
+          side * (halfWidth + BUMPER_SIDE_CLEAR_M + BUMPER_FACE_M[1] / 2),
         ],
         size: [BUMPER_PROJECTION_M, BUMPER_FACE_M[0], BUMPER_FACE_M[1]],
       })
@@ -124,19 +133,25 @@ export function dockLevellerFrameParts(
   if (node.hasControlPost) {
     // Kumanda direği yanda, kapı ağzının dışında: operatör rampanın üstünde
     // değil KENARINDA durarak çalıştırır (EN 1398, iki elle-tut kumanda).
-    const postZ = halfWidth + CONTROL_OFFSET_M
-    const postX = halfLength - CONTROL_BOX_M[0]
+    // Yer TEK kaynaktan: plan sembolü de aynı fonksiyonu okuyor. İki hesap
+    // sessizce ayrışmıştı — planda direk `halfLength - BUMPER_Y_M`'ye
+    // konuyordu, yani tamponun KOTU bir X geri çekmesi olarak kullanılmıştı.
+    const [postX, postZ] = controlPostXZ(node)
     parts.push({
       role: 'frame',
       center: [postX, CONTROL_HEIGHT_M / 2, postZ],
       size: [CONTROL_POST_M, CONTROL_HEIGHT_M, CONTROL_POST_M],
     })
+    // Kutu ve acil stop İKİ katmanda da: düzeneğin en geniş parçası bu, ve
+    // uzak katmanda düşünce geriye tepesi kesilmiş çıplak bir çubuk kalıyor —
+    // zeminin üstünde LOD anahtarında kaybolan tek parça oydu. Rampa kapı
+    // başına bir tane, iki kutu bedelsiz.
+    parts.push({
+      role: 'control',
+      center: [postX, CONTROL_HEIGHT_M, postZ],
+      size: CONTROL_BOX_M,
+    })
     if (detail === 'full') {
-      parts.push({
-        role: 'control',
-        center: [postX, CONTROL_HEIGHT_M, postZ],
-        size: CONTROL_BOX_M,
-      })
       parts.push({
         role: 'estop',
         center: [postX + CONTROL_BOX_M[0] / 2, CONTROL_HEIGHT_M + CONTROL_BOX_M[1] / 4, postZ],

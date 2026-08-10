@@ -170,16 +170,44 @@ export const CYLINDER_M: readonly [number, number, number] = [mm(520), mm(120), 
  * tamponla ölçülmüş. Yüzün 250 × 250 mm'si seçilmiş varsayılan.
  */
 export const BUMPER_FACE_M: readonly [number, number] = [mm(250), mm(250)]
-/** Tampon merkezinin zeminden kotu. SEÇİLMİŞ VARSAYILAN. */
-export const BUMPER_Y_M = mm(400)
-/** İki tamponun kapı ekseninden yana açıklığı. SEÇİLMİŞ VARSAYILAN. */
-export const BUMPER_SPREAD_RATIO = 0.34
+/**
+ * Tampon merkezinin zemin kotuna göre yeri — NEGATİF.
+ *
+ * Tampon rıhtım YÜZÜNE monte edilir ve bitmiş zeminin altına sarkar: dorsenin
+ * arka şasisi ona çarpar, ve çalışma aralığı tablosunun varsaydığı 100 mm'lik
+ * boşluk böyle doğar. Üst kenarı zemin hizasında, o yüzden merkez yüzün
+ * yarısı kadar aşağıda.
+ *
+ * Pozitifken (400 mm) tampon zeminin 275 mm ÜSTÜNDE, altında hiçbir şey
+ * olmadan asılı duruyordu — ve ikinci sonucu daha ağır: uzun tablada,
+ * yayımlanmış çalışma aralığının İÇİNDE kalan bir ayarda çelik dudak kauçuk
+ * tamponun içinden geçiyordu.
+ */
+export const BUMPER_Y_M = -BUMPER_FACE_M[0] / 2
+/**
+ * Tamponun tabla kenarından yana açıklığı — dudağın süpürdüğü genişliğin
+ * DIŞINDA. SEÇİLMİŞ VARSAYILAN (kesin açıklık kapı genişliğine bağlı), ama
+ * "dudağın dışında" kısmı bir tercih değil: rampa zeminin altına da iniyor ve
+ * dudak her inişinde tamponların arasından geçmek zorunda.
+ *
+ * Önceki hâl oranı TAM GENİŞLİKLE çarpıyordu (`0.34 × width`), yani her tabla
+ * genişliğinde tamponlar dudağın tam yolunda kalıyordu.
+ */
+export const BUMPER_SIDE_CLEAR_M = mm(60)
 /** Kumanda direği: iki elle-tut butonu taşıyan kutu. SEÇİLMİŞ VARSAYILAN. */
 export const CONTROL_POST_M = mm(80)
 export const CONTROL_HEIGHT_M = mm(1200)
 export const CONTROL_BOX_M: readonly [number, number, number] = [mm(140), mm(220), mm(180)]
 /** Direğin tabla kenarından yana açıklığı. */
 export const CONTROL_OFFSET_M = mm(350)
+/**
+ * Direğin kapı yüzünden GERİ çekilmesi. SEÇİLMİŞ VARSAYILAN.
+ *
+ * Ayrı bir sabit, çünkü eskiden `CONTROL_BOX_M[0]` — kutunun DERİNLİĞİ — bu
+ * iş için kullanılıyordu: anlamsız bir bağ, ve kutunun ölçüsünü değiştiren
+ * biri direği farkında olmadan yürütüyordu.
+ */
+export const CONTROL_SETBACK_M = mm(140)
 
 /** Aile paleti — parça rolü başına tek renk, vertex attribute'una yazılıyor. */
 export const PALETTE = {

@@ -10,10 +10,12 @@
 import {
   BUMPER_FACE_M,
   BUMPER_PROJECTION_M,
+  BUMPER_SIDE_CLEAR_M,
   BUMPER_Y_M,
   CONTROL_BOX_M,
   CONTROL_HEIGHT_M,
   CONTROL_OFFSET_M,
+  CONTROL_SETBACK_M,
   EN1398_MAX_GRADIENT,
   LIP_PLATE_M,
   PLATFORM_PLATE_M,
@@ -237,11 +239,22 @@ export function selectionBoxM(node: DockLevellerNode): {
 
   let xMax = length / 2
   let zMax = width / 2
+  // Tampon ÇİFT: kapı yüzünün iki yanında da bir tane var. `zMin`'i sabit
+  // −W/2'de bırakmak −Z tamponunu kutunun dışında bırakırdı — hem de tam
+  // olarak +Z'dekini içeri alan düzeltmenin yanında, yani yarısı görünmez.
+  let zMin = -width / 2
   let yMax = aboveFloorHeightM(node)
+  // Zeminin ALTI da kutuya girebiliyor: tampon rıhtım yüzüne monte ve zemin
+  // hizasından aşağı sarkıyor — çukur astarı gibi gömülü değil, dışarıdan
+  // görünen bir gövde. Görünen ama tıklanamayan parça bırakmamak bu kutunun
+  // varlık sebebi.
+  let yMin = 0
 
   if (node.hasBumpers) {
     xMax = Math.max(xMax, length / 2 + BUMPER_PROJECTION_M)
-    yMax = Math.max(yMax, BUMPER_Y_M + BUMPER_FACE_M[0] / 2)
+    zMax = Math.max(zMax, width / 2 + BUMPER_SIDE_CLEAR_M + BUMPER_FACE_M[1])
+    zMin = Math.min(zMin, -(width / 2 + BUMPER_SIDE_CLEAR_M + BUMPER_FACE_M[1]))
+    yMin = Math.min(yMin, BUMPER_Y_M - BUMPER_FACE_M[0] / 2)
   }
   if (node.hasControlPost) {
     // Direk yalnız +Z yanında: kutu bu yüzden simetrik değil ve merkezi de
@@ -251,11 +264,23 @@ export function selectionBoxM(node: DockLevellerNode): {
   }
 
   const xMin = -length / 2
-  const zMin = -width / 2
   return {
-    center: [(xMin + xMax) / 2, yMax / 2, (zMin + zMax) / 2],
-    size: [xMax - xMin, yMax, zMax - zMin],
+    center: [(xMin + xMax) / 2, (yMin + yMax) / 2, (zMin + zMax) / 2],
+    size: [xMax - xMin, yMax - yMin, zMax - zMin],
   }
+}
+
+/**
+ * Kumanda direğinin yeri, `[x, z]` — 3B ve plan sembolünün TEK kaynağı.
+ *
+ * İki hesap sessizce ayrışmıştı: plan `halfLength - BUMPER_Y_M` yazıyordu,
+ * yani tamponun zeminden KOTUNU bir X geri çekmesi olarak kullanıyordu.
+ * Varsayılan düğümde 260 mm kayma, ve bağ yanlış yerdeydi — tamponun
+ * yüksekliğini değiştiren biri planda direği yürütüyor, direği taşıyan biri
+ * planı kımıldatmıyordu.
+ */
+export function controlPostXZ(node: DockLevellerNode): readonly [number, number] {
+  return [platformLengthM(node) / 2 - CONTROL_SETBACK_M, widthM(node) / 2 + CONTROL_OFFSET_M]
 }
 
 /** Kapı yüzünün yerel X'i — tampon oraya oturuyor. */

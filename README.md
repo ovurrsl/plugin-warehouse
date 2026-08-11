@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`ed35f53`](https://github.com/ovurrsl/plugin-warehouse/commit/ed35f53075dbf3ceeeba08ff83febfce8e3fcefe))
 - Refresh generated README blocks [skip ci] ([`f61f677`](https://github.com/ovurrsl/plugin-warehouse/commit/f61f677abcd4d3a825b940b8641f87fdbf6b4966))
 - Refresh generated README blocks [skip ci] ([`0afebaa`](https://github.com/ovurrsl/plugin-warehouse/commit/0afebaa149ceb093aceff44e8251bbf78aec232b))
 - Refresh generated README blocks [skip ci] ([`1209ae0`](https://github.com/ovurrsl/plugin-warehouse/commit/1209ae09363899b2b62101f4962ce31835c89bc3))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`14053d7`](https://github.com/ovurrsl/plugin-warehouse/commit/14053d725f9d8128082b7d39b31fdcef8723ae08))
 - Hayalet stoğun seçime bağlılığını bekçiye bağla ([`bc3432f`](https://github.com/ovurrsl/plugin-warehouse/commit/bc3432f327eba632caf1f3a3d4a0e1e4ab02474d))
 - Refresh generated README blocks [skip ci] ([`349e388`](https://github.com/ovurrsl/plugin-warehouse/commit/349e38863098393870e4c5aa653a768a31537b07))
-- Refresh generated README blocks [skip ci] ([`01a0b87`](https://github.com/ovurrsl/plugin-warehouse/commit/01a0b87774eb048642dee61f0e3a0582c72a89f0))
 
 …
 

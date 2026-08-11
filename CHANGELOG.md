@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`ed35f53`](https://github.com/ovurrsl/plugin-warehouse/commit/ed35f53075dbf3ceeeba08ff83febfce8e3fcefe))
 - Refresh generated README blocks [skip ci] ([`f61f677`](https://github.com/ovurrsl/plugin-warehouse/commit/f61f677abcd4d3a825b940b8641f87fdbf6b4966))
 - Refresh generated README blocks [skip ci] ([`0afebaa`](https://github.com/ovurrsl/plugin-warehouse/commit/0afebaa149ceb093aceff44e8251bbf78aec232b))
 - Refresh generated README blocks [skip ci] ([`1209ae0`](https://github.com/ovurrsl/plugin-warehouse/commit/1209ae09363899b2b62101f4962ce31835c89bc3))
@@ -272,6 +273,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Yedi araç ızgara ayarını yok sayıyordu (#23) ([`3a08711`](https://github.com/ovurrsl/plugin-warehouse/commit/3a0871170d01782768d1a48e745be81dc0273849))
 - Sekiz araç yerleştirdiği düğüme sabit ad yazıyordu (#21) ([`551e0c8`](https://github.com/ovurrsl/plugin-warehouse/commit/551e0c828842c9ac193c0f0b111e05cec823634a))
 - Kafes paletin girdiği yüzleri kapatıyordu — uzun kenarlara taşındı ([`aca1fd4`](https://github.com/ovurrsl/plugin-warehouse/commit/aca1fd48325cbd223ecda116cc1d936a3b70b7e3))
 - Metre tutan dört alan birim bildirmiyordu — mm yazımı sessizce kırpılıyordu ([`104155e`](https://github.com/ovurrsl/plugin-warehouse/commit/104155e4d60b9f67beafad8a0d4d0a3cd41cd4e1))

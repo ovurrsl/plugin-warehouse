@@ -1,12 +1,20 @@
 'use client'
 
-import { type AnyNode, type AnyNodeId, spatialGridManager, useScene } from '@pascal-app/core'
+import {
+  type AlignmentAnchor,
+  type AnyNode,
+  type AnyNodeId,
+  collectAlignmentAnchors,
+  spatialGridManager,
+  useScene,
+} from '@pascal-app/core'
 import {
   EDITOR_LAYER,
   isGridSnapActive,
   movementSfxStepKey,
   PlacementBox,
   triggerSFX,
+  useAlignmentGuides,
   useEditor,
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
@@ -15,11 +23,13 @@ import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
   electSupportSlab,
+  resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from '../placement'
 import { useWarehouseStore } from '../store'
+import { snapToNeighbourSeam } from './magnet'
 import { channelDepthM, channelPitchM, frameHeightM } from './metrics'
 import LiveRackingPreview from './preview'
 import { LiveRackingNode } from './schema'
@@ -93,6 +103,22 @@ export default function LiveRackingTool() {
     validRef.current = true
     setCursorRotationY(0)
 
+    /**
+     * Hizalama çıpaları efekt başına BİR kez, `const` olarak.
+     *
+     * Yerleştirmeden sonra yeniden toplamak akla yakın ve YANLIŞ: bu araç
+     * `id: previewNode.id` ile taahhüt ediyor, yani `collectAlignmentAnchors`'ın
+     * dışladığı kimlik tam da az önce konan düğümün kimliği. Yeni toplama onu
+     * ekleyemez, yalnız her tıklamada bütün sahneyi bir kez daha gezer. Gerek
+     * de yok: taahhüt `placementSerial`'ı artırıyor → `previewNode` yenileniyor
+     * → bu efekt zaten baştan koşuyor.
+     */
+    const alignmentCandidates: AlignmentAnchor[] = collectAlignmentAnchors(
+      useScene.getState().nodes,
+      previewNode.id,
+      activeLevelId,
+    )
+
     const recomputeValidity = (position: [number, number, number]) => {
       if (altRef.current) {
         validRef.current = true
@@ -134,10 +160,49 @@ export default function LiveRackingTool() {
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
       setCursorVisible(true)
-      applyCursor([rawX, 0, rawZ])
+      /**
+       * Üç aşama, ve SIRASI önemli: ızgara → hizalama → komşu ek yeri.
+       *
+       * Önceki hâl `applyCursor([rawX, 0, rawZ])` yazıyordu; ızgara ayarı
+       * yerleştirmeye hiç ulaşmıyordu. Yanıltıcı olan, aracın
+       * `isGridSnapActive()`'i zaten OKUYOR olmasıydı — ama okuduğu yer
+       * aşağıdaki ses anahtarı.
+       *
+       * Yalnız `resolveAlignedPlacement` eklemek bu kindʼi BOZARDI. Host'un
+       * yapışma kipleri BİRBİRİNİ DIŞLIYOR: `grid` kipinde kuantalama var ve
+       * mıknatıslı çekiş YOK. Ek yeri aralığı hiçbir ızgara adımının katı
+       * olmadığı için, kuantalanmış imleç ek yerine hiç ulaşamaz; bitişik bay
+       * bir kaç santim bindiği için geçerlilik kırmızıya döner ve tıklama
+       * yutulur. Izgarayı yok saymak bir hataydı; onu ek yerini ULAŞILMAZ
+       * kılacak şekilde eklemek daha büyük bir hata olurdu — kindʼin etrafında
+       * kurulduğu hareket tümden kaybolurdu.
+       *
+       * Bu yüzden kindʼin kendi ek yeri mıknatısı en üste biniyor. Desen
+       * uydurma değil: yedi konveyör aracı `placementPose`'u tam bu şekilde
+       * `resolveAlignedPlacement`'ın çıktısının üstüne koyuyor. Mıknatıs
+       * ateşlerken hizalama kılavuzları susuyor — iki farklı hedefi aynı anda
+       * göstermek kullanıcıya hangisinin kazandığını sormak olurdu.
+       */
+      const aligned = resolveAlignedPlacement({
+        candidates: alignmentCandidates,
+        node: previewNode as unknown as AnyNode,
+        rawX,
+        rawZ,
+        rotationY: rotationRef.current,
+      })
+      const ghostNow = { ...ghostRef.current, rotation: [0, rotationRef.current, 0] }
+      const seam = snapToNeighbourSeam(
+        ghostNow as never,
+        aligned.position,
+        [previewNode.id],
+        useScene.getState().nodes as Readonly<Record<string, unknown>>,
+      )
+      const position = seam ?? aligned.position
+      useAlignmentGuides.getState().set(seam ? [] : aligned.guides)
+      applyCursor(position)
 
       const nextSnapKey = movementSfxStepKey({
-        coords: [rawX, rawZ],
+        coords: [position[0], position[2]],
         gridSnapActive: isGridSnapActive(),
         gridStep: useEditor.getState().gridSnapStep,
       })
@@ -222,6 +287,8 @@ export default function LiveRackingTool() {
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      // Araç bırakılınca kılavuzlar tuvalde asılı kalırdı.
+      useAlignmentGuides.getState().clear()
     }
   }, [activeLevelId, previewNode])
 

@@ -1,5 +1,6 @@
 import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import type { BenchNode } from './bench/schema'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import type { DockLevellerNode } from './dockleveller/schema'
@@ -24,7 +25,12 @@ import type { TruckNode } from './truck/schema'
  *
  * It holds view state and the placement "brush" — what the next placed item
  * looks like. The panel writes it, the tools read it. Node data lives on the
- * nodes; nothing here is persisted, and losing it on reload costs one click.
+ * nodes; almost nothing here is persisted, and losing it on reload costs one
+ * click. The two exceptions are `instancingEnabled` and `lodQuality`: those
+ * are per-machine render tuning, and an integrated-GPU user who turned detail
+ * down would get it silently turned back up on every reload — the one place
+ * where "one click" is really "one click after you notice the stutter came
+ * back". See the `partialize` at the store definition.
  *
  * It deliberately lives outside the panel component: the panel unmounts
  * whenever the user switches rail tabs, and a scope selection that reset every
@@ -355,264 +361,311 @@ export type RackBrush = Pick<
   | 'ghostFill'
 >
 
-export const useWarehouseStore = create<WarehouseStore>((set, get) => ({
-  tab: 'catalog',
-  setTab: (tab) => set({ tab }),
-
-  armedChipId: null,
-  setArmedChipId: (armedChipId) => set({ armedChipId }),
-
-  scope: 'building',
-  setScope: (scope) => set({ scope, slabFilter: null }),
-
-  // Slab ids belong to a level, so changing the level clears the filter for the
-  // same reason changing the scope does.
-  statsLevelId: null,
-  setStatsLevel: (statsLevelId) => set({ statsLevelId, slabFilter: null }),
-
-  slabFilter: null,
-  setSlabFilter: (slabFilter) => set({ slabFilter }),
-  toggleSlab: (id, allIds) => {
-    const current = get().slabFilter
-    const next = new Set(current ?? allIds)
-    if (next.has(id)) {
-      next.delete(id)
-    } else {
-      next.add(id)
-    }
-    // Collapse "everything selected" back to the null sentinel so newly drawn
-    // slabs are included by default instead of silently missing from the total.
-    set({ slabFilter: next.size === allIds.length ? null : next })
-  },
-
-  flowRunning: false,
-  setFlowRunning: (flowRunning) => set({ flowRunning }),
-
-  fleetRunning: false,
-  setFleetRunning: (fleetRunning) => set({ fleetRunning }),
-
-  instancingEnabled: true,
-  setInstancingEnabled: (instancingEnabled) => set({ instancingEnabled }),
-
-  lodQuality: 'balanced',
-  setLodQuality: (lodQuality) => set({ lodQuality }),
-
-  palletBrush: {
-    preset: 'epal-1',
-    cargo: 'none',
-    fillRange: [0.4, 1],
-    wrapped: true,
-    strapped: true,
-    labelled: true,
-    cargoColor: 'kraft',
-  },
-  setPalletBrush: (patch) =>
-    set((state) => {
-      const next = { ...state.palletBrush, ...patch }
-      // Choosing a cargo type brings that type's own practice with it: cartons
-      // are filmed and drums are not. The flags are still the user's to change
-      // afterwards — this only decides what they start as, which is the one
-      // reader `CargoType.defaults` was declared for.
-      if (patch.cargo && patch.cargo !== 'none' && patch.cargo !== state.palletBrush.cargo) {
-        const defaults = CARGO_TYPES[patch.cargo].defaults
-        next.wrapped = patch.wrapped ?? defaults.wrap
-        next.strapped = patch.strapped ?? defaults.strapping
-        next.labelled = patch.labelled ?? defaults.label
-      }
-      return { palletBrush: next }
-    }),
-
-  routeBrush: {
-    role: 'pedestrian',
-    traffic: 'two-way',
-    width: defaultWidthM('pedestrian', null),
-    lineWidth: 'standard',
-    requiredFor: null,
-    datum: 'load-face',
-  },
-  setRouteBrush: (patch) =>
-    set((state) => {
-      const next = { ...state.routeBrush, ...patch }
-      // The width follows the class unless the user is setting it directly.
-      if (
-        patch.width === undefined &&
-        (patch.role !== undefined || patch.requiredFor !== undefined)
-      ) {
-        next.width = defaultWidthM(next.role, next.requiredFor)
-      }
-      return { routeBrush: next }
-    }),
-
-  rackBrush: {
-    variant: 'pallet-rack',
-    bayClearWidth: 2.7,
-    depth: 1.1,
-    uprightHeight: 5,
-    levels: 3,
-    palletPreset: 'epal-1',
-    palletOrientation: 'short-side-out',
-    pickingLevels: 0,
-    ghostFill: 0,
-  },
+/**
+ * Named and exported rather than written inline, because the test cannot reach
+ * it any other way: zustand v5's `persist` silently degrades to a plain store
+ * when `localStorage` is missing — which it is under bun — and in that mode it
+ * never attaches the `store.persist` API the options could be read from.
+ */
+export const WAREHOUSE_PREFERENCE_PERSISTENCE = {
+  name: 'warehouse-preferences',
   /**
-   * Sığ birleştirme, ve YAPIŞKAN: yamanın yazmadığı alan bir öncekinden
-   * taşınır. Bilinçli — kullanıcı 1.2 m derinlik kurup art arda on raf
-   * koyduğunda derinliği her seferinde yeniden girmez.
-   *
-   * Bedeli, aynı kind'ı kuran iki fişten YALNIZ BİRİNİN bir alanı yazmasıdır:
-   * o alan artık hangi fişe basıldığına değil, en son hangisine basıldığına
-   * bağlanır. Alçak raf tam olarak böyle sızıyordu — "Pallet Rack" fişinin hiç
-   * fırçası yoktu, dolayısıyla alçak raftan sonra basılan palet rafı onun
-   * 2.5 m dikmesini ve toplama gözünü giyerek geliyordu, ve hiçbir şey bunu
-   * söylemiyordu.
-   *
-   * Sözleşme bu yüzden tek tek alanlar değil ANAHTAR KÜMESİ üzerine: **bir
-   * ailenin fişlerinden biri bir alanı yazıyorsa hepsi yazmalı.**
-   * `catalog.test.ts` bunu her aile için tutuyor, yani kural rafa özel değil
-   * ve bir sonraki ikinci fişte kendiliğinden geçerli.
+   * ONLY the two per-machine render knobs persist. The brushes stay out on
+   * purpose — a brush is "what the next placed item looks like", and a
+   * week-old persisted brush surprising the user mid-placement is worse than
+   * the one click it saves. Widening this list is a decision, not a
+   * convenience.
    */
-  setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
-
-  multiply: DEFAULT_MULTIPLY,
-  setMultiply: (patch) => set((state) => ({ multiply: { ...state.multiply, ...patch } })),
-
-  truckBrush: {
-    model: 'forklift-1300',
-    mastRowId: null,
-    referenceLoad: '1000x1200',
-    duty: 'parked',
-  },
-  setTruckBrush: (patch) =>
-    set((state) => {
-      const next = { ...state.truckBrush, ...patch }
-      if (patch.model !== undefined && patch.model !== state.truckBrush.model) {
-        next.mastRowId = patch.mastRowId ?? null
-      }
-      return { truckBrush: next }
-    }),
-
-  telescopicBrush: {
-    model: 'a4-6+12',
-    beltWidth: '800',
-    extension: 0,
-  },
-  setTelescopicBrush: (patch) =>
-    set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
-
-  activeDeck: null,
-  setActiveDeck: (activeDeck) => {
-    /**
-     * İlgili mezzanine'ler kirletiliyor ki 2D plan yeniden çizilsin: plan
-     * seçili katı gösteriyor (`buildMezzanineFloorplan` `activeDeck` okuyor)
-     * ama yalnız düğüm kirlenince yeniden kuruluyor — store değişimi tek
-     * başına onu tetiklemez. Eski VE yeni hedefin sahibi ayrı düğümlerse
-     * ikisi de tazelenmeli.
-     */
-    const previous = get().activeDeck
-    set({ activeDeck })
-    const scene = useScene.getState()
-    for (const id of new Set(
-      [previous?.mezzanineId, activeDeck?.mezzanineId].filter((v): v is string => !!v),
-    )) {
-      scene.markDirty(id as never)
+  partialize: (state: WarehouseStore) => ({
+    instancingEnabled: state.instancingEnabled,
+    lodQuality: state.lodQuality,
+  }),
+  /**
+   * Persisted values are user data read back from localStorage, so they can
+   * be anything. A corrupt `lodQuality` is the dangerous one: it does not
+   * throw — `lodScaleSq` looks it up in `LOD_QUALITY_SCALE`, gets
+   * `undefined`, and every LOD comparison turns NaN, which silently disables
+   * the distance tiers the setting exists to control.
+   */
+  merge: (persisted: unknown, current: WarehouseStore): WarehouseStore => {
+    const raw = (persisted ?? {}) as Partial<WarehouseStore>
+    return {
+      ...current,
+      instancingEnabled:
+        typeof raw.instancingEnabled === 'boolean'
+          ? raw.instancingEnabled
+          : current.instancingEnabled,
+      lodQuality:
+        raw.lodQuality === 'near' || raw.lodQuality === 'balanced' || raw.lodQuality === 'wide'
+          ? raw.lodQuality
+          : current.lodQuality,
     }
   },
+}
 
-  mezzanineBrush: {
-    constructiveSystem: 'SIGMA',
-    grid: { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 5 },
-    columnType: 'single',
-    tiers: [
-      {
-        index: 0,
-        elevationM: 'auto',
-        clearHeightM: 3,
-        loadClass: 500,
-        floorType: 'WOOD_CHIPBOARD_30',
-        accessories: emptyAccessories(),
+export const useWarehouseStore = create<WarehouseStore>()(
+  persist(
+    (set, get) => ({
+      tab: 'catalog',
+      setTab: (tab) => set({ tab }),
+
+      armedChipId: null,
+      setArmedChipId: (armedChipId) => set({ armedChipId }),
+
+      scope: 'building',
+      setScope: (scope) => set({ scope, slabFilter: null }),
+
+      // Slab ids belong to a level, so changing the level clears the filter for the
+      // same reason changing the scope does.
+      statsLevelId: null,
+      setStatsLevel: (statsLevelId) => set({ statsLevelId, slabFilter: null }),
+
+      slabFilter: null,
+      setSlabFilter: (slabFilter) => set({ slabFilter }),
+      toggleSlab: (id, allIds) => {
+        const current = get().slabFilter
+        const next = new Set(current ?? allIds)
+        if (next.has(id)) {
+          next.delete(id)
+        } else {
+          next.add(id)
+        }
+        // Collapse "everything selected" back to the null sentinel so newly drawn
+        // slabs are included by default instead of silently missing from the total.
+        set({ slabFilter: next.size === allIds.length ? null : next })
       },
-    ],
-  },
-  setMezzanineBrush: (patch) =>
-    set((state) => ({ mezzanineBrush: { ...state.mezzanineBrush, ...patch } })),
 
-  liveRackingBrush: {
-    variant: 'FIFO',
-    palletPreset: 'epal-1',
-    palletsDeep: 8,
-    levels: 4,
-    withRetainers: false,
-  },
-  setLiveRackingBrush: (patch) =>
-    set((state) => ({ liveRackingBrush: { ...state.liveRackingBrush, ...patch } })),
+      flowRunning: false,
+      setFlowRunning: (flowRunning) => set({ flowRunning }),
 
-  // Ölçüler BOŞ başlıyor: varyant seçmek zarfı da seçiyor demek. Buraya sayı
-  // yazmak, altı varyanttan beşini ilk yerleştirmede yanlış ölçüde koyardı.
-  benchBrush: { variant: 'processing' },
-  setBenchBrush: (patch) => set((state) => ({ benchBrush: { ...state.benchBrush, ...patch } })),
+      fleetRunning: false,
+      setFleetRunning: (fleetRunning) => set({ fleetRunning }),
 
-  // Kataloğun en yaygın satırı: 2500 × 2000 mm, menteşeli dudak (Armo,
-  // "ready in stock"). Yerleştirme her zaman DİNLENMEDE — kullanıcı çukuru
-  // koyuyor, rampayı çalıştırmıyor.
-  dockLevellerBrush: {
-    width: '2000',
-    length: '2500',
-    lip: 'hinged',
-    lipLength: '400',
-    capacity: '60',
-    frameHeight: '585',
-  },
-  setDockLevellerBrush: (patch) =>
-    set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
+      instancingEnabled: true,
+      setInstancingEnabled: (instancingEnabled) => set({ instancingEnabled }),
 
-  // Kullanıcının kendi spec'inin arabası: 5 kat x 220 mm kasa, ki toplam
-  // yükseklik onun yayımladigi 1,5 m'ye çıksın.
-  toteCartBrush: {
-    toteFootprint: '600x400',
-    toteHeight: '220',
-    tiers: 5,
-    castorDiameter: '100',
-    tilt: false,
-    hasHandle: true,
-  },
-  setToteCartBrush: (patch) =>
-    set((state) => ({ toteCartBrush: { ...state.toteCartBrush, ...patch } })),
+      lodQuality: 'balanced',
+      setLodQuality: (lodQuality) => set({ lodQuality }),
 
-  driveInBrush: {
-    laneClearWidth: 1.35,
-    palletsDeep: 4,
-    levels: 3,
-    railType: 'gp',
-    entryMode: 'drive-in',
-    palletPreset: 'epal-1',
-  },
-  setDriveInBrush: (patch) =>
-    set((state) => ({ driveInBrush: { ...state.driveInBrush, ...patch } })),
+      palletBrush: {
+        preset: 'epal-1',
+        cargo: 'none',
+        fillRange: [0.4, 1],
+        wrapped: true,
+        strapped: true,
+        labelled: true,
+        cargoColor: 'kraft',
+      },
+      setPalletBrush: (patch) =>
+        set((state) => {
+          const next = { ...state.palletBrush, ...patch }
+          // Choosing a cargo type brings that type's own practice with it: cartons
+          // are filmed and drums are not. The flags are still the user's to change
+          // afterwards — this only decides what they start as, which is the one
+          // reader `CargoType.defaults` was declared for.
+          if (patch.cargo && patch.cargo !== 'none' && patch.cargo !== state.palletBrush.cargo) {
+            const defaults = CARGO_TYPES[patch.cargo].defaults
+            next.wrapped = patch.wrapped ?? defaults.wrap
+            next.strapped = patch.strapped ?? defaults.strapping
+            next.labelled = patch.labelled ?? defaults.label
+          }
+          return { palletBrush: next }
+        }),
 
-  longspanBrush: {
-    bayLength: 1.9,
-    frameDepth: 0.6,
-    frameHeight: 2.5,
-    levelCount: 4,
-    structure: 'beam-shelf',
-    shelfKind: 'chipboard',
-  },
-  setLongspanBrush: (patch) =>
-    set((state) => ({ longspanBrush: { ...state.longspanBrush, ...patch } })),
+      routeBrush: {
+        role: 'pedestrian',
+        traffic: 'two-way',
+        width: defaultWidthM('pedestrian', null),
+        lineWidth: 'standard',
+        requiredFor: null,
+        datum: 'load-face',
+      },
+      setRouteBrush: (patch) =>
+        set((state) => {
+          const next = { ...state.routeBrush, ...patch }
+          // The width follows the class unless the user is setting it directly.
+          if (
+            patch.width === undefined &&
+            (patch.role !== undefined || patch.requiredFor !== undefined)
+          ) {
+            next.width = defaultWidthM(next.role, next.requiredFor)
+          }
+          return { routeBrush: next }
+        }),
 
-  m3Brush: {
-    shelfLength: 1,
-    shelfDepth: 0.4,
-    frameHeight: 2,
-    frameVariant: 'basic',
-    backPanel: 'none',
-    door: 'none',
-    levelCount: 4,
-    structure: 'shelf',
-    model: 'HL',
-  },
-  setM3Brush: (patch) => set((state) => ({ m3Brush: { ...state.m3Brush, ...patch } })),
-}))
+      rackBrush: {
+        variant: 'pallet-rack',
+        bayClearWidth: 2.7,
+        depth: 1.1,
+        uprightHeight: 5,
+        levels: 3,
+        palletPreset: 'epal-1',
+        palletOrientation: 'short-side-out',
+        pickingLevels: 0,
+        ghostFill: 0,
+      },
+      /**
+       * Sığ birleştirme, ve YAPIŞKAN: yamanın yazmadığı alan bir öncekinden
+       * taşınır. Bilinçli — kullanıcı 1.2 m derinlik kurup art arda on raf
+       * koyduğunda derinliği her seferinde yeniden girmez.
+       *
+       * Bedeli, aynı kind'ı kuran iki fişten YALNIZ BİRİNİN bir alanı yazmasıdır:
+       * o alan artık hangi fişe basıldığına değil, en son hangisine basıldığına
+       * bağlanır. Alçak raf tam olarak böyle sızıyordu — "Pallet Rack" fişinin hiç
+       * fırçası yoktu, dolayısıyla alçak raftan sonra basılan palet rafı onun
+       * 2.5 m dikmesini ve toplama gözünü giyerek geliyordu, ve hiçbir şey bunu
+       * söylemiyordu.
+       *
+       * Sözleşme bu yüzden tek tek alanlar değil ANAHTAR KÜMESİ üzerine: **bir
+       * ailenin fişlerinden biri bir alanı yazıyorsa hepsi yazmalı.**
+       * `catalog.test.ts` bunu her aile için tutuyor, yani kural rafa özel değil
+       * ve bir sonraki ikinci fişte kendiliğinden geçerli.
+       */
+      setRackBrush: (patch) => set((state) => ({ rackBrush: { ...state.rackBrush, ...patch } })),
+
+      multiply: DEFAULT_MULTIPLY,
+      setMultiply: (patch) => set((state) => ({ multiply: { ...state.multiply, ...patch } })),
+
+      truckBrush: {
+        model: 'forklift-1300',
+        mastRowId: null,
+        referenceLoad: '1000x1200',
+        duty: 'parked',
+      },
+      setTruckBrush: (patch) =>
+        set((state) => {
+          const next = { ...state.truckBrush, ...patch }
+          if (patch.model !== undefined && patch.model !== state.truckBrush.model) {
+            next.mastRowId = patch.mastRowId ?? null
+          }
+          return { truckBrush: next }
+        }),
+
+      telescopicBrush: {
+        model: 'a4-6+12',
+        beltWidth: '800',
+        extension: 0,
+      },
+      setTelescopicBrush: (patch) =>
+        set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
+
+      activeDeck: null,
+      setActiveDeck: (activeDeck) => {
+        /**
+         * İlgili mezzanine'ler kirletiliyor ki 2D plan yeniden çizilsin: plan
+         * seçili katı gösteriyor (`buildMezzanineFloorplan` `activeDeck` okuyor)
+         * ama yalnız düğüm kirlenince yeniden kuruluyor — store değişimi tek
+         * başına onu tetiklemez. Eski VE yeni hedefin sahibi ayrı düğümlerse
+         * ikisi de tazelenmeli.
+         */
+        const previous = get().activeDeck
+        set({ activeDeck })
+        const scene = useScene.getState()
+        for (const id of new Set(
+          [previous?.mezzanineId, activeDeck?.mezzanineId].filter((v): v is string => !!v),
+        )) {
+          scene.markDirty(id as never)
+        }
+      },
+
+      mezzanineBrush: {
+        constructiveSystem: 'SIGMA',
+        grid: { baysX: 4, baysY: 3, bayWidthM: 5, bayDepthM: 5 },
+        columnType: 'single',
+        tiers: [
+          {
+            index: 0,
+            elevationM: 'auto',
+            clearHeightM: 3,
+            loadClass: 500,
+            floorType: 'WOOD_CHIPBOARD_30',
+            accessories: emptyAccessories(),
+          },
+        ],
+      },
+      setMezzanineBrush: (patch) =>
+        set((state) => ({ mezzanineBrush: { ...state.mezzanineBrush, ...patch } })),
+
+      liveRackingBrush: {
+        variant: 'FIFO',
+        palletPreset: 'epal-1',
+        palletsDeep: 8,
+        levels: 4,
+        withRetainers: false,
+      },
+      setLiveRackingBrush: (patch) =>
+        set((state) => ({ liveRackingBrush: { ...state.liveRackingBrush, ...patch } })),
+
+      // Ölçüler BOŞ başlıyor: varyant seçmek zarfı da seçiyor demek. Buraya sayı
+      // yazmak, altı varyanttan beşini ilk yerleştirmede yanlış ölçüde koyardı.
+      benchBrush: { variant: 'processing' },
+      setBenchBrush: (patch) => set((state) => ({ benchBrush: { ...state.benchBrush, ...patch } })),
+
+      // Kataloğun en yaygın satırı: 2500 × 2000 mm, menteşeli dudak (Armo,
+      // "ready in stock"). Yerleştirme her zaman DİNLENMEDE — kullanıcı çukuru
+      // koyuyor, rampayı çalıştırmıyor.
+      dockLevellerBrush: {
+        width: '2000',
+        length: '2500',
+        lip: 'hinged',
+        lipLength: '400',
+        capacity: '60',
+        frameHeight: '585',
+      },
+      setDockLevellerBrush: (patch) =>
+        set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
+
+      // Kullanıcının kendi spec'inin arabası: 5 kat x 220 mm kasa, ki toplam
+      // yükseklik onun yayımladigi 1,5 m'ye çıksın.
+      toteCartBrush: {
+        toteFootprint: '600x400',
+        toteHeight: '220',
+        tiers: 5,
+        castorDiameter: '100',
+        tilt: false,
+        hasHandle: true,
+      },
+      setToteCartBrush: (patch) =>
+        set((state) => ({ toteCartBrush: { ...state.toteCartBrush, ...patch } })),
+
+      driveInBrush: {
+        laneClearWidth: 1.35,
+        palletsDeep: 4,
+        levels: 3,
+        railType: 'gp',
+        entryMode: 'drive-in',
+        palletPreset: 'epal-1',
+      },
+      setDriveInBrush: (patch) =>
+        set((state) => ({ driveInBrush: { ...state.driveInBrush, ...patch } })),
+
+      longspanBrush: {
+        bayLength: 1.9,
+        frameDepth: 0.6,
+        frameHeight: 2.5,
+        levelCount: 4,
+        structure: 'beam-shelf',
+        shelfKind: 'chipboard',
+      },
+      setLongspanBrush: (patch) =>
+        set((state) => ({ longspanBrush: { ...state.longspanBrush, ...patch } })),
+
+      m3Brush: {
+        shelfLength: 1,
+        shelfDepth: 0.4,
+        frameHeight: 2,
+        frameVariant: 'basic',
+        backPanel: 'none',
+        door: 'none',
+        levelCount: 4,
+        structure: 'shelf',
+        model: 'HL',
+      },
+      setM3Brush: (patch) => set((state) => ({ m3Brush: { ...state.m3Brush, ...patch } })),
+    }),
+    WAREHOUSE_PREFERENCE_PERSISTENCE,
+  ),
+)
 
 /** Detay mesafesi kolunun üç konumu. */
 export type LodQuality = 'near' | 'balanced' | 'wide'

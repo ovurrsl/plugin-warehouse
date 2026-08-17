@@ -194,6 +194,9 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
   'warehouse:conveyor-telescopic': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
   ],
+  'warehouse:conveyor-spiral': [
+    { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+  ],
   'warehouse:mezzanine': [
     {
       field: 'supportSlabId',

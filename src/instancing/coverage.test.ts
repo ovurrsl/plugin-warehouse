@@ -62,6 +62,10 @@ const NOT_INSTANCED: Array<{ file: string; why: string }> = [
     why: 'Bom her karede uzayıp kısalıyor: dört mesh, düğüm başına farklı poz. Kolektif havuz dünya matrislerini yeniden inşa anında donduruyor, yani her kare değişen bir şekli taşıyamaz.',
   },
   {
+    file: 'conveyor/spiral-renderer.tsx',
+    why: 'Slat grubu her karede vida hareketiyle dönüp yükseliyor: düğüm başına farklı poz. Kolektif havuz dünya matrislerini yeniden inşa anında donduruyor, yani her kare değişen bu pozu taşıyamaz — teleskopik girdisinin aynı gerekçesi.',
+  },
+  {
     file: 'truck/renderer.tsx',
     why: 'Mast kademeleri ve çatal kızağı filo sistemi tarafından düğüm başına ayrı sürülüyor; gövdeler tek bir matrise sığmıyor. Kendi LOD katmanı zaten var.',
   },

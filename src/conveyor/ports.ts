@@ -35,6 +35,14 @@ import {
 import type { ConveyorObliqueNode } from './oblique-schema'
 import type { ConveyorRollerNode } from './schema'
 import {
+  helixArcLengthM as spiralArcLengthM,
+  entryHeightM as spiralEntryHeightM,
+  exitHeightM as spiralExitHeightM,
+  frameWidthM as spiralFrameWidthM,
+  portSpanM as spiralPortSpanM,
+} from './spiral-metrics'
+import type { ConveyorSpiralNode } from './spiral-schema'
+import {
   currentLengthM as telescopicCurrentLengthM,
   frameWidthM as telescopicFrameWidthM,
   telescopicModelOf,
@@ -83,6 +91,7 @@ export type ConveyorModule =
   | ConveyorTransferNode
   | ConveyorObliqueNode
   | ConveyorTelescopicNode
+  | ConveyorSpiralNode
 
 /**
  * Ids are **geometric, never flow-named**.
@@ -127,6 +136,7 @@ const CONVEYOR_KINDS = new Set([
   // açıyordu: teleskopiğin ucu hat indeksine hiç görünmüyor, dolayısıyla ne
   // ona yapışılabiliyor ne o bir hatta yapışabiliyordu.
   'warehouse:conveyor-telescopic',
+  'warehouse:conveyor-spiral',
 ])
 
 export function isCurveModule(module: ConveyorModule): module is ConveyorCurveNode {
@@ -153,6 +163,10 @@ export function isTelescopicModule(module: ConveyorModule): module is ConveyorTe
   return module.type === 'warehouse:conveyor-telescopic'
 }
 
+export function isSpiralModule(module: ConveyorModule): module is ConveyorSpiralNode {
+  return module.type === 'warehouse:conveyor-spiral'
+}
+
 /** Narrow an unknown scene node to a module of this kind, any shape. */
 export function asConveyorModule(node: unknown): ConveyorModule | null {
   const record = node as { type?: unknown; id?: unknown } | null
@@ -175,11 +189,15 @@ export function inletPort(module: ConveyorModule): ConveyorPortId {
   // ikinci bir uç yaratmaz — `'b'` döndürmek olmayan bir portu adlandırmak
   // olurdu ve o adı okuyan her şey sessizce boşa düşerdi.
   if (isTelescopicModule(module)) return 'a'
+  // Sarmalın iki ucu ayrı KOTTA: `up` alttan (giriş 'a') üste, `down` üstten
+  // (giriş 'b'). Roller ailesinin `forward/reverse` mantığının kot karşılığı.
+  if (isSpiralModule(module)) return module.flow === 'up' ? 'a' : 'b'
   return module.flow === 'forward' ? 'a' : 'b'
 }
 
 export function outletPort(module: ConveyorModule): ConveyorPortId {
   if (isTelescopicModule(module)) return 'a'
+  if (isSpiralModule(module)) return module.flow === 'up' ? 'b' : 'a'
   return module.flow === 'forward' ? 'b' : 'a'
 }
 
@@ -190,7 +208,7 @@ export function outletPort(module: ConveyorModule): ConveyorPortId {
  * along is an incline whose two ends differ — and a magnet written against the
  * field would silently mate a 0.75 m end onto a 1.2 m one the day that lands.
  */
-export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId): number {
+export function transportHeightAt(module: ConveyorModule, port: ConveyorPortId): number {
   /**
    * Teleskopikte kot ALAN DEĞİL, modelin: katalog bu makineleri "Fixed Type"
    * diye tanımlıyor — bant kotu bölüm sayısının sonucu ve sahada ayarlanmıyor.
@@ -201,6 +219,13 @@ export function transportHeightAt(module: ConveyorModule, _port: ConveyorPortId)
    * takılacağı bir eklemi sahnede sorunsuz göstermek olurdu.
    */
   if (isTelescopicModule(module)) return telescopicTransportHeightM(module)
+  // Sarmal, bu paketin per-port Y taşıyan İLK kind'ı: giriş ('a') altta,
+  // çıkış ('b') üstte. `port` parametresi tam da bunun için okunuyor — bu
+  // olmadan `module.transportHeight` (`undefined`) yukarıdaki NaN sessizliğine
+  // düşerdi ve kot uyuşmayan iki uç sorunsuz birleşirdi.
+  if (isSpiralModule(module)) {
+    return port === 'b' ? spiralExitHeightM(module) : spiralEntryHeightM(module)
+  }
   return module.transportHeight
 }
 
@@ -219,6 +244,9 @@ export function moduleLaneMm(module: ConveyorModule): number {
   // toleranslı olduğu için varsayılanlar (800 ⨯ 600) asla eşleşmez ve panel
   // bunu açıkça söyler.
   if (isTelescopicModule(module)) return Number(module.beltWidth)
+  // Sarmalda da şerit sınıfı `beltWidth` (mm). Roller ailesiyle ancak ortak
+  // bir sınıfta (ör. 600) buluşur; R1 sıfır toleranslı.
+  if (isSpiralModule(module)) return Number(module.beltWidth)
   return usefulWidthMm(module)
 }
 
@@ -238,6 +266,8 @@ export function moduleRunLengthM(module: ConveyorModule): number {
   if (isObliqueModule(module)) return obliqueLengthM(module)
   // Anlık uzamış boy (A + B·e) — bom uzadıkça malın kat ettiği yol da uzuyor.
   if (isTelescopicModule(module)) return telescopicCurrentLengthM(module)
+  // Helis yay uzunluğu + iki tanjant güdüğü — malın gerçekten kat ettiği yol.
+  if (isSpiralModule(module)) return spiralArcLengthM(module) + 2 * spiralPortSpanM(module)
   return moduleLengthM(module)
 }
 
@@ -250,6 +280,7 @@ export function moduleFrameWidthM(module: ConveyorModule): number {
   if (isTransferModule(module)) return transferFrameWidthM(module)
   if (isObliqueModule(module)) return mainWidthM(module)
   if (isTelescopicModule(module)) return telescopicFrameWidthM(module)
+  if (isSpiralModule(module)) return spiralFrameWidthM(module)
   return frameWidthM(module)
 }
 
@@ -321,6 +352,46 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
         role: (module.flow === 'forward' ? 'in' : 'out') as PortRole,
         laneMm: Number(module.beltWidth),
         frameWidthM: telescopicFrameWidthM(module),
+      },
+    ]
+  }
+
+  /**
+   * Sarmal: İKİ port, ayrı KOTTA — bu paketin ilk per-port Y'si.
+   *
+   * Giriş 'a' −X'te, kotu `entryHeight`; çıkış 'b' +X'te, kotu `exitHeight`
+   * (= giriş + yükseklik). Tanjant güdükleri X boyunca (birleşme temiz olsun
+   * diye), uçlar `±portSpan`'de. Rol akıştan: `up` alttan besler (giriş 'in',
+   * çıkış 'out'), `down` tersi. `transportHeightAt` bu iki kotu port'a göre
+   * döndürüyor — mıknatıs kot kuralını (R2) her uçta doğru okuyor.
+   */
+  if (isSpiralModule(module)) {
+    const span = spiralPortSpanM(module)
+    const lane = Number(module.beltWidth)
+    const frame = spiralFrameWidthM(module)
+    const bottomIn = module.flow === 'up'
+    return [
+      {
+        id: 'a',
+        x: -span,
+        y: spiralEntryHeightM(module),
+        z: 0,
+        dx: -1,
+        dz: 0,
+        role: (bottomIn ? 'in' : 'out') as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
+      },
+      {
+        id: 'b',
+        x: span,
+        y: spiralExitHeightM(module),
+        z: 0,
+        dx: 1,
+        dz: 0,
+        role: (bottomIn ? 'out' : 'in') as PortRole,
+        laneMm: lane,
+        frameWidthM: frame,
       },
     ]
   }

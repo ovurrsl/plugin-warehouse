@@ -58,6 +58,17 @@ export type CatalogItem = {
         }
       }
     | { kind: 'telescopic'; model: string }
+    // Sarmalın iki fişi (karton / palet). İkisi de AYNI alan kümesini
+    // ({loadClass, outerDiameter, beltWidth}) yazmalı — fırça-yapışkanlık
+    // kuralı (`catalog.test.ts`). Literal tipler satır içi, şema import'u yok.
+    | {
+        kind: 'conveyor-spiral'
+        patch: {
+          loadClass: 'light' | 'pallet'
+          outerDiameter: '1200' | '1500' | '1800' | '2400'
+          beltWidth: '400' | '500' | '650' | '800'
+        }
+      }
     | {
         kind: 'totecart'
         patch: { tiers: number; toteHeight: '170' | '220' | '320'; tilt: boolean }
@@ -427,6 +438,32 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
       'Araç/konteyner yükleme bomu: sabit gövdesinden dorsenin içine uzayan bant. On katalog modeli, tam açıkken 14–25 m. [ ve ] ile bomu kısaltıp uzatın.',
     icon: 'lucide:move-horizontal',
     brush: { kind: 'telescopic', model: 'a4-6+12' },
+  },
+  {
+    id: 'conveyor-spiral-carton',
+    kind: 'warehouse:conveyor-spiral',
+    label: 'Spiral Conveyor (carton)',
+    sectionId: 'conveyance',
+    description:
+      'Merkezi kolon etrafında yükselen helis bant — karton/tote için (≤12,5° eğim). Dar bir taban izinde kot değiştirir. Giriş ve çıkış farklı yükseklikte.',
+    icon: 'lucide:tornado',
+    brush: {
+      kind: 'conveyor-spiral',
+      patch: { loadClass: 'light', outerDiameter: '1500', beltWidth: '500' },
+    },
+  },
+  {
+    id: 'conveyor-spiral-pallet',
+    kind: 'warehouse:conveyor-spiral',
+    label: 'Spiral Conveyor (pallet)',
+    sectionId: 'conveyance',
+    description:
+      'Palet sınıfı sarmal: min. 2.400 mm dış çap, ≤13° eğim, 5 m/dak (yayınlanmış). Tekil palet yükünü kat değiştirir.',
+    icon: 'lucide:tornado',
+    brush: {
+      kind: 'conveyor-spiral',
+      patch: { loadClass: 'pallet', outerDiameter: '2400', beltWidth: '500' },
+    },
   },
   {
     id: 'conveyor-oblique',

@@ -84,6 +84,9 @@ export const CLICK_TRIGGER_KINDS = [
   'warehouse:conveyor-transfer',
   'warehouse:conveyor-oblique',
   'warehouse:conveyor-telescopic',
+  // Sarmal da bir hat parçası: girişi bir hattın ucuna oturuyor, kendi
+  // kolideri imlecin üzerinde durduğu şey. Listede olmasa o tıklama yutulur.
+  'warehouse:conveyor-spiral',
   // A route is drawn across a hall that already has paint on it, and its own
   // hit target covers the whole corridor — so without this the second route
   // cannot be started anywhere the first one runs.

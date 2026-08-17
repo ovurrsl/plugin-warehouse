@@ -13,6 +13,7 @@ import {
   isCurveModule,
   isLauncherModule,
   isObliqueModule,
+  isSpiralModule,
   isTelescopicModule,
   isTransferModule,
   localPorts,
@@ -88,6 +89,8 @@ export function moduleSpeedMPerSec(module: ConveyorModule): number {
   // birleşim tipi onu içerdiği için dal burada da olmalı: 0, "bu makineyi
   // simüle etmiyoruz" demenin dürüst hâli.
   if (isTelescopicModule(module)) return 0
+  // Sarmal da ağa girmiyor (aşağıdaki gerekçe); dal yine de dürüst 0 döndürür.
+  if (isSpiralModule(module)) return 0
   return straightSpeed(module)
 }
 
@@ -131,6 +134,17 @@ export function buildNetwork(nodes: Readonly<Record<string, unknown>>): FlowNetw
      * onu genişletmenin yeri değil.)
      */
     if (isTelescopicModule(module)) continue
+    /**
+     * Sarmal da simülasyona GİRMEZ — ve bu, mıknatısa girmesiyle çelişmiyor
+     * (teleskopikle aynı ayrım). Mıknatıs "bu iki uç birleşir mi", simülasyon
+     * "kutu buradan nereye" sorusu. Helis 2D bir Route ile modellenemiyor:
+     * rota tek bir düzlemde örnekleniyor, oysa sarmal yükseklik boyunca dönüyor
+     * (Route.ys gerekli — adlandırılmış bir takip işi). Akış simülasyonu ayrıca
+     * kullanıcı tarafından beklemeye alındı; burası onu genişletmenin yeri değil.
+     * `spiral.test.ts` bir roller→sarmal→roller sahnesinde sarmal rotası
+     * ÜRETİLMEDİĞİNİ kilitliyor.
+     */
+    if (isSpiralModule(module)) continue
     modules.set(module.id, module)
     const list = routesOf(module)
     routes.set(module.id, list)

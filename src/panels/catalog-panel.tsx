@@ -441,6 +441,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'telescopic') {
       useWarehouseStore.getState().setTelescopicBrush({ model: item.brush.model as never })
     }
+    if (item.brush?.kind === 'conveyor-spiral') {
+      useWarehouseStore.getState().setSpiralBrush(item.brush.patch)
+    }
     if (item.brush?.kind === 'mezzanine') {
       useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
     }

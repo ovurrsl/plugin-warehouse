@@ -532,6 +532,7 @@ describe('yerleştirme araçlarının hepsi mıknatısı okuyor', () => {
     'transfer-tool.tsx',
     'oblique-tool.tsx',
     'telescopic-tool.tsx',
+    'spiral-tool.tsx',
   ]
 
   for (const file of TOOLS) {

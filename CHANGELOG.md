@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`606da00`](https://github.com/ovurrsl/plugin-warehouse/commit/606da00664627cb6a373753e277a4c917967aaf9))
 - Refresh generated README blocks [skip ci] ([`2aa497a`](https://github.com/ovurrsl/plugin-warehouse/commit/2aa497a501783b406488298acac0c481d229e8aa))
 - Refresh generated README blocks [skip ci] ([`ed35f53`](https://github.com/ovurrsl/plugin-warehouse/commit/ed35f53075dbf3ceeeba08ff83febfce8e3fcefe))
 - Refresh generated README blocks [skip ci] ([`f61f677`](https://github.com/ovurrsl/plugin-warehouse/commit/f61f677abcd4d3a825b940b8641f87fdbf6b4966))
@@ -162,6 +163,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Warehouse:conveyor-spiral (#25) ([`aed5d4e`](https://github.com/ovurrsl/plugin-warehouse/commit/aed5d4e097e7969887f42f5c4339b277c7bb48cc))
 - Toplu çizim ve LOD tercihi yenilemede korunuyor (#24) ([`ea1a653`](https://github.com/ovurrsl/plugin-warehouse/commit/ea1a653dd0baf01a39ee2739158618160a22426f))
 - Komşu mıknatısı + paylaşılan dikme hattı (#22) ([`2db6dac`](https://github.com/ovurrsl/plugin-warehouse/commit/2db6dac90581e4c5bf9a10cdff10fa28464839ce))
 - Sahne ağacı satırı ürünün adını söylesin ([`43e1e5c`](https://github.com/ovurrsl/plugin-warehouse/commit/43e1e5c38da63287ffd8a2874a84f474f3f30fdf))

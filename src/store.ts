@@ -2,6 +2,7 @@ import { useScene } from '@pascal-app/core'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { BenchNode } from './bench/schema'
+import type { ConveyorSpiralNode } from './conveyor/spiral-schema'
 import type { ConveyorTelescopicNode } from './conveyor/telescopic-schema'
 import type { DockLevellerNode } from './dockleveller/schema'
 import type { DriveInRackNode } from './drivein/schema'
@@ -196,6 +197,14 @@ type WarehouseStore = {
   setTelescopicBrush: (patch: Partial<TelescopicBrush>) => void
 
   /**
+   * Shape of the next placed spiral conveyor. Katalogun iki fişi (karton /
+   * palet) de {loadClass, outerDiameter, beltWidth} yazıyor (fırça-yapışkanlık
+   * kuralı). Persist edilmez.
+   */
+  spiralBrush: SpiralBrush
+  setSpiralBrush: (patch: Partial<SpiralBrush>) => void
+
+  /**
    * Shape of the next placed mezzanine. `grid`/`tiers` fırçada duruyor —
    * katalog fişleri (1 katlı SIGMA / 2 katlı GL2000) farklı `tiers.length`
    * taşır, `rackBrush`'ın kendi ölçülerini taşıması gibi.
@@ -257,6 +266,8 @@ export type RouteBrush = Pick<
 export type TruckBrush = Pick<TruckNode, 'model' | 'mastRowId' | 'referenceLoad' | 'duty'>
 
 export type TelescopicBrush = Pick<ConveyorTelescopicNode, 'model' | 'beltWidth' | 'extension'>
+
+export type SpiralBrush = Pick<ConveyorSpiralNode, 'loadClass' | 'outerDiameter' | 'beltWidth'>
 
 /**
  * Tezgâh yerleştirme fırçası.
@@ -548,6 +559,28 @@ export const useWarehouseStore = create<WarehouseStore>()(
       },
       setTelescopicBrush: (patch) =>
         set((state) => ({ telescopicBrush: { ...state.telescopicBrush, ...patch } })),
+
+      spiralBrush: {
+        loadClass: 'light',
+        outerDiameter: '1500',
+        beltWidth: '500',
+      },
+      setSpiralBrush: (patch) =>
+        set((state) => {
+          const next = { ...state.spiralBrush, ...patch }
+          // Sınıf çapı takip eder: palet sınıfının asgari dış çapı 2.400 mm
+          // (spec §4, YAYINLANMIŞ). Palete geçilirken daha küçük bir çap
+          // kalırsa sessizce 2.400'e çekilir — `setRouteBrush`'ın "genişlik
+          // sınıfı takip eder" kuplajının aynısı.
+          if (
+            patch.loadClass === 'pallet' &&
+            patch.outerDiameter === undefined &&
+            Number(next.outerDiameter) < 2400
+          ) {
+            next.outerDiameter = '2400'
+          }
+          return { spiralBrush: next }
+        }),
 
       activeDeck: null,
       setActiveDeck: (activeDeck) => {

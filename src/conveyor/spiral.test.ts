@@ -453,6 +453,23 @@ describe('tanım ve manifest', () => {
     })
   })
 
+  test('sarmal ve tüm konveyör ailesi host paletinden GİZLİ', () => {
+    // Konveyörler eklentinin kendi katalog panelinden yerleştirilir; host'un
+    // genel furnish paletinde de görünürlerse tek tık İKİ düğüm oluşturur
+    // (host varsayılanı + eklenti aracı). Sarmal bunu bir kez yaşadı — bu
+    // bekçi aileden herhangi birinin `hidden`'ı unutmasını yakalar.
+    const conveyorDefs = (warehousePlugin.nodes ?? []).filter((def) =>
+      def.kind.startsWith('warehouse:conveyor-'),
+    )
+    expect(conveyorDefs.length).toBeGreaterThanOrEqual(8)
+    for (const def of conveyorDefs) {
+      expect(
+        (def as { presentation?: { hidden?: boolean } }).presentation?.hidden,
+        `${def.kind} host paletinden gizli olmalı`,
+      ).toBe(true)
+    }
+  })
+
   test('dönüş adımı 45° — sekiz açı', () => {
     const angles = conveyorSpiralDefinition.capabilities.rotatable.snapAngles
     expect(angles.length).toBe(8)

@@ -116,6 +116,11 @@ export const conveyorSpiralDefinition = {
     description:
       'A helical belt climbing around a central drive column. Two load classes — cartons (≤12.5°) and pallets (≥2400 mm diameter, ≤13°). Entry and exit sit at different heights.',
     icon: { kind: 'iconify', name: 'lucide:tornado' },
+    // Ailenin geri kalanı gibi GİZLİ: konveyörler host'un genel furnish
+    // paletinden DEĞİL, eklentinin kendi katalog panelinden yerleştirilir.
+    // Eksik olması sarmalı iki yoldan birden yerleştirilebilir yapıyordu ve
+    // tek tık İKİ düğüm oluşturuyordu (host varsayılanı + eklenti aracı).
+    hidden: true,
     paletteSection: 'furnish',
   },
 

@@ -62,7 +62,8 @@ const RAIL_HEIGHT_M = 1.0
 const RAIL_SECTION_M = 0.04
 /** Korkuluk segment adımı — slat'tan seyrek, üçgen bütçesi için. */
 const HANDRAIL_STEP_RAD = TWO_PI / 12
-const SLAT_THICKNESS_M = 0.03
+/** Slat kalınlığı — koli, üst yüzeyine (helis + bunun yarısı) oturur. */
+export const SLAT_THICKNESS_M = 0.03
 
 /**
  * Statik iskelet.

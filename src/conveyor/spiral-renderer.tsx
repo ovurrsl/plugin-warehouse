@@ -16,6 +16,8 @@ import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { lodScaleSq, useWarehouseStore } from '../store'
+import { FLOW_BOX_M } from './flow-simulation'
+import { getFlowBoxMaterial } from './materials'
 import type { ConveyorDetail } from './parts'
 import {
   getSpiralSlatGeometry,
@@ -27,17 +29,20 @@ import {
 } from './spiral-geometry'
 import { getSpiralCageMaterial, getSpiralMaterial } from './spiral-materials'
 import {
-  beltSpeedMS,
   cageRadiusM,
   columnRadiusM,
   entryHeightM,
   footprintM,
   handednessSign,
-  helixRadiusM,
+  helixPoint,
   overallHeightM,
-  pitchM,
-  slatStepRad,
+  SPIRAL_MAX_BOXES,
+  spiralBoxCount,
+  spiralBoxRateRadPerSec,
+  spiralBoxStepRad,
+  totalAngleRad,
 } from './spiral-metrics'
+import { SLAT_THICKNESS_M } from './spiral-parts'
 import type { ConveyorSpiralNode } from './spiral-schema'
 
 const NO_RAYCAST = () => {}
@@ -45,9 +50,16 @@ const NO_RAYCAST = () => {}
 const LOD_FAR_SQ = 55 * 55
 const LOD_NEAR_SQ = 42 * 42
 const LOD_INTERVAL = 8
-const TWO_PI = Math.PI * 2
 
 const worldPosition = new THREE.Vector3()
+
+/** Taşınan koli — ailenin kraft kutusu, paylaşılan tekil geometri. */
+const BOX_GEOMETRY = new THREE.BoxGeometry(...FLOW_BOX_M)
+const boxMatrix = new THREE.Matrix4()
+const boxQuaternion = new THREE.Quaternion()
+const boxPosition = new THREE.Vector3()
+const boxScale = new THREE.Vector3(1, 1, 1)
+const yAxis = new THREE.Vector3(0, 1, 0)
 
 function hashPhase(id: string): number {
   let hash = 0x811c9dc5
@@ -64,11 +76,13 @@ const COLUMN_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 24, 1)
 const CAGE_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 32, 1, true)
 
 /**
- * Sarmal konveyör. Statik iskelet + vida hareketiyle dönen slat grubu; merkez
- * kolon ve kafes düğüm başına ölçekli birim silindir.
+ * Sarmal konveyör. TAMAMEN statik iskelet + slat yüzeyi; hareket eden şey
+ * helis yolunu takip eden ayrı koli instance'ları (kullanıcı kararı: band
+ * değil koliler hareket eder — spec §5'in "yük nesneleri ayrı instance'lar"
+ * satırı). Merkez kolon ve kafes düğüm başına ölçekli birim silindir.
  *
- * Kolektif havuza GİRMEZ (`instancing/coverage.test.ts`): slat grubu her karede
- * kendi vida pozunu taşıyor, donmuş kolektif matris bunu tutamaz.
+ * Kolektif havuza GİRMEZ (`instancing/coverage.test.ts`): koli havuzu her karede
+ * matrisini yazıyor, donmuş kolektif matris bunu tutamaz.
  */
 export default function SpiralRenderer({ node }: { node: ConveyorSpiralNode }) {
   const admitted = useAdmitted(node.id)
@@ -110,6 +124,7 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
   const appearance = useAppearance()
   const material = getSpiralMaterial(appearance)
   const cageMaterial = getSpiralCageMaterial(appearance)
+  const boxMaterial = getFlowBoxMaterial(appearance)
 
   // İki katman da ekranda sayılır: tahliye çizileni boşaltamaz.
   useEffect(() => {
@@ -126,11 +141,11 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
 
   const staticRef = useRef<THREE.Mesh>(null)
   const slatMeshRef = useRef<THREE.Mesh>(null)
-  const slatGroupRef = useRef<THREE.Group>(null)
   const cageRef = useRef<THREE.Mesh>(null)
+  const boxesRef = useRef<THREE.InstancedMesh>(null)
   const detailRef = useRef<ConveyorDetail>('full')
   const frameRef = useRef(0)
-  const phaseRef = useRef(0)
+  const travelRef = useRef(0)
   const phase = useMemo(() => hashPhase(node.id), [node.id])
 
   const entry = entryHeightM(node)
@@ -139,6 +154,8 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
   const colR = columnRadiusM(node)
   const cageR = cageRadiusM(node)
   const travel = node.travelHeight
+  /** Kolinin bindiği kot: slat üst yüzeyi (helisY + slat/2) + koli yarısı. */
+  const boxRideY = SLAT_THICKNESS_M / 2 + FLOW_BOX_M[1] / 2
 
   useFrame(({ camera }, delta) => {
     const root = registeredRef.current
@@ -172,24 +189,33 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
       }
     }
 
-    // ── Vida hareketi ──
-    const group = slatGroupRef.current
-    if (!group) return
-    if (!flowRunning || isExporting) return // donmuş: slat grubu son pozunda kalır
-    const r = helixRadiusM(node)
-    const pitch = pitchM(node)
+    // ── Koli akışı ──
+    const boxes = boxesRef.current
+    if (!boxes) return
+    if (!flowRunning || isExporting) {
+      // `count = 0` çizim çağrısını tamamen kaldırır (band + iskelet zaten statik).
+      boxes.count = 0
+      return
+    }
     const s = handednessSign(node)
-    // Açısal hız = çizgisel hız / R; işaret akış × kiralite.
-    const rate = (beltSpeedMS(node) / Math.max(r, 1e-3)) * (node.flow === 'up' ? 1 : -1) * s
-    const step = slatStepRad('full')
-    let theta = phaseRef.current + rate * Math.min(delta, 0.1)
-    // Adımda sarılır: tam bir slat adımı helisi kendi üstüne oturtur (marj
-    // slat dikişi gizliyor), yani sıçrama görünmez.
-    theta = ((theta % step) + step) % step
-    phaseRef.current = theta
-    // Vida: grup −s·θ döner ve (pitch/2π)·θ yükselir; taban `entryHeight`.
-    group.rotation.y = -s * theta
-    group.position.y = entry + (pitch / TWO_PI) * theta
+    const total = totalAngleRad(node)
+    const step = spiralBoxStepRad(node)
+    const count = spiralBoxCount(node)
+    // İlerleme: akış `up` → `t` artar (tırmanır), `down` → azalır.
+    travelRef.current += spiralBoxRateRadPerSec(node) * (node.flow === 'up' ? 1 : -1) * delta
+    for (let i = 0; i < count; i++) {
+      // `t` daima [0, total] içinde: koli tepeye varınca tabana sarar.
+      const t = (((travelRef.current + i * step) % total) + total) % total
+      const [x, y, z] = helixPoint(node, t)
+      boxPosition.set(x, entry + y + boxRideY, z)
+      // Koli, slat'la aynı radyal çerçeveye döner. `emitPart`'ın rotationY=φ'si
+      // three'nin −φ'sine denk (emitPart x'=ox·cosφ−z·sinφ), o yüzden −s·t.
+      boxQuaternion.setFromAxisAngle(yAxis, -s * t)
+      boxMatrix.compose(boxPosition, boxQuaternion, boxScale)
+      boxes.setMatrixAt(i, boxMatrix)
+    }
+    boxes.count = count
+    boxes.instanceMatrix.needsUpdate = true
   })
 
   return (
@@ -217,16 +243,26 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
           receiveShadow
           scale={[colR, overall, colR]}
         />
-        {/* Slat grubu — vida hareketiyle döner/yükselir; taban kotu entryHeight. */}
-        <group position={[0, entry, 0]} ref={slatGroupRef}>
-          <mesh
-            dispose={null}
-            geometry={getSpiralSlatGeometry(node, isExporting ? 'full' : detailRef.current)}
-            material={material}
-            raycast={NO_RAYCAST}
-            ref={slatMeshRef}
-          />
-        </group>
+        {/* Slat yüzeyi — SABİT (hareket eden koliler); taban kotu entryHeight. */}
+        <mesh
+          dispose={null}
+          geometry={getSpiralSlatGeometry(node, isExporting ? 'full' : detailRef.current)}
+          material={material}
+          position={[0, entry, 0]}
+          raycast={NO_RAYCAST}
+          ref={slatMeshRef}
+        />
+        {/* Taşınan koliler — tek InstancedMesh, matrisleri kare döngüsü yazar.
+            `frustumCulled={false}`: matrisler her kare değişir, sınır küresi ilk
+            testteki hâline saplanır (`flow-system.tsx`'in kuralı). */}
+        <instancedMesh
+          args={[BOX_GEOMETRY, boxMaterial, SPIRAL_MAX_BOXES]}
+          count={0}
+          dispose={null}
+          frustumCulled={false}
+          raycast={NO_RAYCAST}
+          ref={boxesRef}
+        />
         {/* Güvenlik kafesi — açık uçlu silindir, yarı saydam sarı materyal. */}
         {node.hasCage && (
           <mesh

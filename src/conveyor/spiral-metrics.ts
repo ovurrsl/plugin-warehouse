@@ -193,3 +193,51 @@ export function frameWidthM(node: ConveyorSpiralNode): number {
 export function beltSpeedMS(node: ConveyorSpiralNode): number {
   return SPIRAL_BELT_SPEED_MS[node.loadClass]
 }
+
+// ── Taşınan koliler ──────────────────────────────────────────────────────────
+//
+// Bant SABİT çizilir; hareket eden koliler helis yolunu takip eden ayrı
+// instance'lardır (spec §5: "yük nesneleri aynı helis yolunu takip eden ayrı
+// instance'lar"). Aşağısı o yolun saf matematiği — renderer yalnız matrisleri
+// yazar.
+
+/** İki koli arası yay uzaklığı, metre — SEÇİLMİŞ VARSAYILAN (görselleştirme). */
+export const SPIRAL_BOX_GAP_M = 1.4
+/** Aynı anda çizilen en fazla koli — üçgen/matris bütçesi. */
+export const SPIRAL_MAX_BOXES = 24
+
+/**
+ * Helis yayının `t` parametresi başına uzunluğu: √(R² + (pitch/2π)²).
+ *
+ * Bir malın kat ettiği yol düz değil eğik: her radyanlık `t` artışı hem yatay
+ * R·dt hem dikey (pitch/2π)·dt gider. Koli aralığı ve hızı bu orana bölünerek
+ * `t`'ye çevriliyor, yani koliler yayda eşit aralıklı ve gerçek hızda akar.
+ */
+export function helixArcPerRad(node: ConveyorSpiralNode): number {
+  const r = helixRadiusM(node)
+  const c = pitchM(node) / TWO_PI
+  return Math.hypot(r, c)
+}
+
+/** İki koli arası `t` adımı: yay aralığı / (yay/radyan). */
+export function spiralBoxStepRad(node: ConveyorSpiralNode): number {
+  return SPIRAL_BOX_GAP_M / Math.max(helixArcPerRad(node), 1e-3)
+}
+
+/** Aynı anda helis üzerinde görünen koli sayısı, 1…SPIRAL_MAX_BOXES. */
+export function spiralBoxCount(node: ConveyorSpiralNode): number {
+  const span = totalAngleRad(node)
+  const step = spiralBoxStepRad(node)
+  return Math.max(1, Math.min(SPIRAL_MAX_BOXES, Math.floor(span / step)))
+}
+
+/**
+ * Kolinin `t` ilerleme hızı, radyan/saniye: bant hızı / (yay/radyan).
+ *
+ * Böylece kolinin yay üzerindeki çizgisel hızı tam `beltSpeedMS` olur. İşaret
+ * renderer'da akış yönünden (`up`/`down`) veriliyor; kiralite `t`'nin y'sini
+ * değiştirmediği için tırmanış yönünü etkilemez.
+ */
+export function spiralBoxRateRadPerSec(node: ConveyorSpiralNode): number {
+  return beltSpeedMS(node) / Math.max(helixArcPerRad(node), 1e-3)
+}

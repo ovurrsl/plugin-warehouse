@@ -482,27 +482,19 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: 'lucide:split',
   },
   // Palet asansörü birim yükü DİKEY taşır (EN 619 sürekli-taşıma komşuluğu);
-  // tek kind'lık ayrı bir bölüm bir tek tile için raf başlığı ekler, o yüzden
-  // conveyance'a giriyor. İki fiş de {capacityClass, mastCount} yazar.
+  // TEK fiş: kapasite kademesi (1000/1500/4500 kg) ve mast sayısı (2/4)
+  // müfettiş panelinden seçilir — iki neredeyse-aynı fiş yerine bir nesne.
+  // Ağır sınıf 4 mastı zorunlu kılıyor (parametrics + store bağı).
+  // conveyance'a giriyor: tek kind'lık ayrı bölüm bir tile için raf başlığı ekler.
   {
-    id: 'pallet-lift-standard',
+    id: 'pallet-lift',
     kind: 'warehouse:pallet-lift',
-    label: 'Pallet Lift (standard)',
+    label: 'Pallet Lift',
     sectionId: 'conveyance',
     description:
-      'Mast-guided vertical pallet lift with a roller-conveyor platform. Serves the building’s floors (derived, not set). Standard ≤1000 kg, two masts, 80 m/min (Mecalux/PFlow).',
+      'Mast-guided vertical pallet lift with a roller-conveyor platform. Serves the building’s floors (derived, not set). Capacity (≤1000/1500/4500 kg) and mast count set in the inspector; 80 m/min at 1000 kg (Mecalux/PFlow).',
     icon: 'lucide:arrow-up-down',
     brush: { kind: 'pallet-lift', patch: { capacityClass: '1000', mastCount: '2' } },
-  },
-  {
-    id: 'pallet-lift-heavy',
-    kind: 'warehouse:pallet-lift',
-    label: 'Pallet Lift (heavy)',
-    sectionId: 'conveyance',
-    description:
-      'Heavy-duty vertical pallet lift, ≤4500 kg, four masts. Speed is an assumption — no published m/min for this class. Floors derive from the building.',
-    icon: 'lucide:arrow-up-down',
-    brush: { kind: 'pallet-lift', patch: { capacityClass: '4500', mastCount: '4' } },
   },
   {
     id: 'longspan-picking',

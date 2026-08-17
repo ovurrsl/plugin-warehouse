@@ -36,9 +36,14 @@ import {
   overallHeightM,
   pitchM,
   portSpanM,
+  SPIRAL_MAX_BOXES,
   screwYawPerStep,
   screwYPerStep,
   slatOuterRadiusM,
+  spiralBoxCount,
+  spiralBoxRateRadPerSec,
+  spiralBoxStepRad,
+  totalAngleRad,
 } from './spiral-metrics'
 import { conveyorSpiralParametrics } from './spiral-parametrics'
 import { SLAT_MARGIN_COUNT, screwCenter, spiralSlatParts } from './spiral-parts'
@@ -151,13 +156,14 @@ describe('geometri anahtarı kapsaması — iki yönlü', () => {
 
 // ── 2. Vida invaryansı ───────────────────────────────────────────────────────
 
-describe('vida invaryansı — slat animasyon numarası TAM', () => {
+describe('vida invaryansı — slat aralığı helis boyunca DÜZGÜN', () => {
   /**
-   * Slat'lar dinlenme helisinde yazılıyor; renderer bütün grubu bir vida
-   * hareketiyle (Y dönüşü + Y ötelemesi) sürüyor. Bu test o hareketin slat_k'yı
-   * TAM olarak slat_{k+1}'e taşıdığını kanıtlıyor — yani düzgün Y dönüşü DEĞİL
-   * (helis dönme değil vida simetrisine sahip), ve slat aralığının t'de düzgün
-   * olması bu yüzden şart. Marj slat (kaynak) hariç, ardışık her çift.
+   * Band SABİT (koliler hareket ediyor), ama slat'ların helis boyunca EŞİT
+   * aralıklı olması hâlâ şart: aksi hâlde yüzey sürekli bir band gibi
+   * okunmaz, deliklenir. Bu test her slat'ın bir vida hareketiyle (Y dönüşü +
+   * Y ötelemesi) TAM olarak bir sonrakine oturduğunu kanıtlıyor — helisin
+   * vida simetrisi, yani aralığın t'de düzgünlüğü. Marj slat (kaynak) hariç,
+   * ardışık her çift.
    */
   for (const combo of [
     {},
@@ -474,5 +480,38 @@ describe('tanım ve manifest', () => {
   test('yayınlanmamışlar notu hem tahmini hem sınırını söyler', () => {
     expect(SPIRAL_UNPUBLISHED_NOTE.toLowerCase()).toContain('ölçüm değildir')
     expect(SPIRAL_UNPUBLISHED_NOTE).toContain('5 m/dak')
+  })
+
+  // ── Taşınan koliler (band değil koliler hareket eder) ────────────────────
+  describe('koli akışı', () => {
+    test('koli sayısı en az 1 ve tavanı aşmıyor', () => {
+      for (const th of [1, 4, 8, 15]) {
+        const count = spiralBoxCount(spiral({ travelHeight: th }) as never)
+        expect(count).toBeGreaterThanOrEqual(1)
+        expect(count).toBeLessThanOrEqual(SPIRAL_MAX_BOXES)
+      }
+    })
+
+    test('daha yüksek kule daha çok koli taşır (sabit çap/eğim)', () => {
+      const few = spiralBoxCount(spiral({ travelHeight: 2 }) as never)
+      const many = spiralBoxCount(spiral({ travelHeight: 10 }) as never)
+      expect(many).toBeGreaterThan(few)
+    })
+
+    test('koli adımı × sayısı toplam açıyı aşmıyor (kuyruk taşmaz)', () => {
+      const node = spiral({ travelHeight: 6 }) as never
+      expect(spiralBoxStepRad(node) * spiralBoxCount(node)).toBeLessThanOrEqual(
+        totalAngleRad(node) + 1e-9,
+      )
+    })
+
+    test('ilerleme hızı çizgisel bant hızını yay üzerinde koruyor', () => {
+      // rate (rad/s) × yay/radyan = çizgisel hız (m/s). Palet sınıfı 5 m/dak.
+      const node = spiral({ loadClass: 'pallet', outerDiameter: '2400' }) as never
+      const r = helixRadiusM(node)
+      const c = pitchM(node) / (Math.PI * 2)
+      const arcPerRad = Math.hypot(r, c)
+      expect(spiralBoxRateRadPerSec(node) * arcPerRad).toBeCloseTo(5 / 60, 6)
+    })
   })
 })

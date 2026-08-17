@@ -15,7 +15,8 @@ import { useAppearance } from '../appearance'
 import { Collider } from '../collider'
 import { useFrozenMatrix } from '../frozen-matrix'
 import { useAdmitted } from '../instancing/admission'
-import { specOf } from '../pallet/presets'
+import { getPalletGeometry } from '../pallet/geometry-builder'
+import { getPalletMaterial } from '../pallet/materials'
 import { useStaticTransform } from '../static-transform'
 import { lodScaleSq, useWarehouseStore } from '../store'
 import { ROLLER_DIAMETER_M, SPEED_MPM } from './catalog'
@@ -48,9 +49,8 @@ const LOD_INTERVAL = 8
 
 const worldPosition = new THREE.Vector3()
 
-/** Muhafaza ve palet stand-in birim kutuları — düğüm başına ölçekli. */
+/** Muhafaza birim kutusu — düğüm başına ölçekli. */
 const ENCLOSURE_BOX = new THREE.BoxGeometry(1, 1, 1)
-const STANDIN_BOX = new THREE.BoxGeometry(1, 1, 1)
 
 function hashPhase(id: string): number {
   let hash = 0x811c9dc5
@@ -128,6 +128,9 @@ function PalletLiftBody({ node }: { node: PalletLiftNode }) {
   const appearance = useAppearance()
   const material = getPalletLiftMaterial(appearance)
   const enclosureMaterial = getPalletLiftEnclosureMaterial(appearance)
+  // Taşınan yük GERÇEK palet düğümünün geometrisi (stand-in kutu değil):
+  // eklentinin `warehouse:pallet` kind'ının paylaşılan, önbellekli buffer'ı.
+  const palletMaterial = getPalletMaterial(appearance, node.palletPreset)
 
   /**
    * Kotlar bir STRING PARMAK İZİ seçicisiyle: bir kat yüksekliği/kotu değişince
@@ -157,12 +160,11 @@ function PalletLiftBody({ node }: { node: PalletLiftNode }) {
   const footprint = footprintM(node)
   const enclosure = enclosureXZ(node)
   const faceZ = doorFaceZ(node)
-  const pallet = specOf(node.palletPreset)
 
   const staticMeshRef = useRef<THREE.Mesh>(null)
   const platformMeshRef = useRef<THREE.Mesh>(null)
   const platformGroupRef = useRef<THREE.Group>(null)
-  const standInRef = useRef<THREE.Mesh>(null)
+  const palletRef = useRef<THREE.Mesh>(null)
   const enclosureRef = useRef<THREE.Mesh>(null)
   const doorGroupRefs = useRef<Array<THREE.Group | null>>([])
   const detailRef = useRef<'full' | 'simple'>('full')
@@ -241,7 +243,7 @@ function PalletLiftBody({ node }: { node: PalletLiftNode }) {
         const g = doorGroupRefs.current[i]
         if (g) g.position.y = stops[i]?.baseY ?? 0
       }
-      if (standInRef.current) standInRef.current.visible = false
+      if (palletRef.current) palletRef.current.visible = false
       return
     }
 
@@ -273,8 +275,8 @@ function PalletLiftBody({ node }: { node: PalletLiftNode }) {
       g.position.y = base + (step.doorStopIndex === i ? doorFrac : 0) * lift
     }
 
-    // Stand-in palet: çevrim boyunca platformda taşınıyor (stand-in kutu).
-    if (standInRef.current) standInRef.current.visible = true
+    // Gerçek palet: çevrim boyunca platformda taşınıyor.
+    if (palletRef.current) palletRef.current.visible = true
   })
 
   return (
@@ -312,16 +314,16 @@ function PalletLiftBody({ node }: { node: PalletLiftNode }) {
             receiveShadow
             ref={platformMeshRef}
           />
-          {/* Palet STAND-IN — gerçek palet düğümü değil, çevrim boyunca taşınan
-              yer tutucu bir kutu. */}
+          {/* Taşınan yük — GERÇEK palet: `warehouse:pallet` kind'ının
+              paylaşılan geometrisi. Tabanı y=0'da, rulo üstüne oturur. Çevrim
+              boyunca görünür; duran/donmuş asansörde gizli. */}
           <mesh
             dispose={null}
-            geometry={STANDIN_BOX}
-            material={material}
-            position={[0, ROLLER_DIAMETER_M + pallet.height / 2, 0]}
+            geometry={getPalletGeometry(node.palletPreset)}
+            material={palletMaterial}
+            position={[0, ROLLER_DIAMETER_M, 0]}
             raycast={NO_RAYCAST}
-            ref={standInRef}
-            scale={[pallet.length, pallet.height, pallet.width]}
+            ref={palletRef}
             visible={false}
           />
         </group>

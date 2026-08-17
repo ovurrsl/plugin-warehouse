@@ -318,13 +318,14 @@ describe('tanım ve manifest', () => {
     expect(warehouseCatalogPanel.kinds).toContain('warehouse:pallet-lift')
   })
 
-  test('katalog fişleri var ve bölümleri gerçek', () => {
+  test('katalog fişi tek ve bölümü gerçek', () => {
+    // TEK fiş — kapasite/mast panelden seçilir (kullanıcı kararı: iki
+    // neredeyse-aynı fiş yerine bir nesne).
     const tiles = CATALOG_ITEMS.filter((item) => item.kind === 'warehouse:pallet-lift')
-    expect(tiles.length).toBe(2)
+    expect(tiles.length).toBe(1)
     const sections = new Set(CATALOG_SECTIONS.map((section) => section.id))
-    for (const tile of tiles) expect(sections.has(tile.sectionId)).toBe(true)
-    // İki fiş de AYNI alan kümesini yazıyor (fırça-yapışkanlık).
     for (const tile of tiles) {
+      expect(sections.has(tile.sectionId)).toBe(true)
       expect(tile.brush?.kind).toBe('pallet-lift')
       const patch = (tile.brush as { patch: Record<string, unknown> }).patch
       expect(Object.keys(patch).sort()).toEqual(['capacityClass', 'mastCount'])

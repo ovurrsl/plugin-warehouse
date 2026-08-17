@@ -16,6 +16,7 @@ import { longspanDefinition } from './longspan/definition'
 import { m3ShelvingDefinition } from './m3/definition'
 import { mezzanineDefinition } from './mezzanine/definition'
 import { palletDefinition } from './pallet/definition'
+import { palletLiftDefinition } from './palletlift/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
@@ -65,6 +66,7 @@ export const warehousePlugin: Plugin = {
     benchDefinition as unknown as AnyNodeDefinition,
     dockLevellerDefinition as unknown as AnyNodeDefinition,
     toteCartDefinition as unknown as AnyNodeDefinition,
+    palletLiftDefinition as unknown as AnyNodeDefinition,
   ],
 }
 
@@ -107,6 +109,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:bench',
     'warehouse:dock-leveller',
     'warehouse:tote-cart',
+    'warehouse:pallet-lift',
   ],
   // A stable module-level thunk: the host caches the wrapped component in a
   // WeakMap keyed on this function's identity, so an inline arrow would rebuild

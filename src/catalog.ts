@@ -77,6 +77,13 @@ export type CatalogItem = {
         kind: 'dockleveller'
         patch: { length: '2500' | '3000' | '3500'; lip: 'hinged' | 'telescopic' }
       }
+    // Palet asansörünün iki fişi (standart / ağır). İkisi de AYNI alan
+    // kümesini ({capacityClass, mastCount}) yazar — fırça-yapışkanlık kuralı
+    // (`catalog.test.ts`). Literal tipler satır içi, şema import'u yok.
+    | {
+        kind: 'pallet-lift'
+        patch: { capacityClass: '1000' | '1500' | '4500'; mastCount: '2' | '4' }
+      }
     | {
         kind: 'bench'
         patch: {
@@ -473,6 +480,29 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
     icon: 'lucide:split',
+  },
+  // Palet asansörü birim yükü DİKEY taşır (EN 619 sürekli-taşıma komşuluğu);
+  // tek kind'lık ayrı bir bölüm bir tek tile için raf başlığı ekler, o yüzden
+  // conveyance'a giriyor. İki fiş de {capacityClass, mastCount} yazar.
+  {
+    id: 'pallet-lift-standard',
+    kind: 'warehouse:pallet-lift',
+    label: 'Pallet Lift (standard)',
+    sectionId: 'conveyance',
+    description:
+      'Mast-guided vertical pallet lift with a roller-conveyor platform. Serves the building’s floors (derived, not set). Standard ≤1000 kg, two masts, 80 m/min (Mecalux/PFlow).',
+    icon: 'lucide:arrow-up-down',
+    brush: { kind: 'pallet-lift', patch: { capacityClass: '1000', mastCount: '2' } },
+  },
+  {
+    id: 'pallet-lift-heavy',
+    kind: 'warehouse:pallet-lift',
+    label: 'Pallet Lift (heavy)',
+    sectionId: 'conveyance',
+    description:
+      'Heavy-duty vertical pallet lift, ≤4500 kg, four masts. Speed is an assumption — no published m/min for this class. Floors derive from the building.',
+    icon: 'lucide:arrow-up-down',
+    brush: { kind: 'pallet-lift', patch: { capacityClass: '4500', mastCount: '4' } },
   },
   {
     id: 'longspan-picking',

@@ -12,6 +12,7 @@ import type { M3Level, M3ShelvingNode } from './m3/schema'
 import { emptyAccessories, type MezzanineNode } from './mezzanine/schema'
 import { CARGO_TYPES } from './pallet/cargo-types'
 import type { PalletNode } from './pallet/schema'
+import type { PalletLiftNode } from './palletlift/schema'
 import { DEFAULT_MULTIPLY, type MultiplySpec } from './rack/multiply'
 import type { PalletRackNode } from './rack/schema'
 import { defaultWidthM } from './route/metrics'
@@ -240,6 +241,15 @@ type WarehouseStore = {
   dockLevellerBrush: DockLevellerBrush
   setDockLevellerBrush: (patch: Partial<DockLevellerBrush>) => void
 
+  /**
+   * Shape of the next placed pallet lift. Katalogun iki fişi (standart / ağır)
+   * de {capacityClass, mastCount} yazar (fırça-yapışkanlık kuralı). `capacityClass`
+   * `4500` seçilince `mastCount` `4`'e çekilir — 4500 kg iki kolonla yayınlanmıyor
+   * (`spiralBrush`'ın çap kuplajıyla aynı desen). Persist edilmez.
+   */
+  palletLiftBrush: PalletLiftBrush
+  setPalletLiftBrush: (patch: Partial<PalletLiftBrush>) => void
+
   toteCartBrush: ToteCartBrush
   setToteCartBrush: (patch: Partial<ToteCartBrush>) => void
 
@@ -297,6 +307,8 @@ export type DockLevellerBrush = Pick<
   DockLevellerNode,
   'width' | 'length' | 'lip' | 'lipLength' | 'capacity' | 'frameHeight'
 >
+
+export type PalletLiftBrush = Pick<PalletLiftNode, 'capacityClass' | 'mastCount'>
 
 export type LiveRackingBrush = Pick<
   LiveRackingNode,
@@ -647,6 +659,18 @@ export const useWarehouseStore = create<WarehouseStore>()(
       },
       setDockLevellerBrush: (patch) =>
         set((state) => ({ dockLevellerBrush: { ...state.dockLevellerBrush, ...patch } })),
+
+      palletLiftBrush: { capacityClass: '1000', mastCount: '2' },
+      setPalletLiftBrush: (patch) =>
+        set((state) => {
+          const next = { ...state.palletLiftBrush, ...patch }
+          // 4500 kg ağır hizmet iki kolonla yayınlanmıyor: kapasite ona
+          // çekilince mast sayısı 4'e yükseltilir (kullanıcı elle mast yazmadıysa).
+          if (patch.capacityClass === '4500' && patch.mastCount === undefined) {
+            next.mastCount = '4'
+          }
+          return { palletLiftBrush: next }
+        }),
 
       // Kullanıcının kendi spec'inin arabası: 5 kat x 220 mm kasa, ki toplam
       // yükseklik onun yayımladigi 1,5 m'ye çıksın.

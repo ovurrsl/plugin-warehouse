@@ -73,6 +73,10 @@ const NOT_INSTANCED: Array<{ file: string; why: string }> = [
     file: 'route/renderer.tsx',
     why: 'Her rota KENDİ poligonu — iki rotanın geometri anahtarı hiçbir zaman eşleşmiyor. Instancing yalnız şekil tekrarladığında kazandırır; burada havuz başına tek örnek düşer ve InstancedMesh ek yükü net kayıp olurdu.',
   },
+  {
+    file: 'palletlift/renderer.tsx',
+    why: 'Platform ve kapı grupları her karede düğüm başına ayrı poz taşıyor (her düğüm kendi çevrim saatinden sürülüyor); donmuş bir kolektif matris bu pozları taşıyamaz — teleskopik/sarmal girdisinin aynı gerekçesi.',
+  },
 ]
 
 describe('kolektif instancing kapsamı', () => {

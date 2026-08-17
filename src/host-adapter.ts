@@ -47,6 +47,16 @@ export type LevelLike = {
   level: number
   name: string | undefined
   height: number | undefined
+  /**
+   * Additive Y offset the host applies to this level and every level above it
+   * in the same stack, metres, or `undefined` when the host does not offer one.
+   *
+   * Deliberately NOT part of the guard (same pattern as `SlabLike.elevation`):
+   * a host that renames this field should cost the pallet-lift its stop
+   * elevations degrading to the plain stack, not throw. Read only by
+   * `levelElevationsOfBuilding` — see `services/storey.ts getLevelElevations`.
+   */
+  baseElevation: number | undefined
 }
 
 /** The subset of a host `building` this plugin reads. */
@@ -146,6 +156,12 @@ export function asLevel(node: unknown): LevelLike | null {
     level: typeof record.level === 'number' ? record.level : 0,
     name: stringOrUndefined(record.name),
     height: typeof record.height === 'number' ? record.height : undefined,
+    // Not part of the guard: a host rename should degrade the stop elevations,
+    // not throw. Same reasoning as `SlabLike.elevation`.
+    baseElevation:
+      typeof record.baseElevation === 'number' && Number.isFinite(record.baseElevation)
+        ? record.baseElevation
+        : undefined,
   }
 }
 
@@ -229,6 +245,89 @@ export function slabsOfLevel(
     if (slab) slabs.push(slab)
   }
   return slabs
+}
+
+// ─── Level stacking ──────────────────────────────────────────────────────
+//
+// A local reimplementation of the host's storey stacking, restricted to one
+// building. The plugin must NOT import `@pascal-app/core`'s
+// `services/storey.ts` (a deep, non-contract host path outside the barrel's
+// `exports`), so the arithmetic is owned here and kept findable by citation.
+
+/**
+ * Fallback storey height when a level carries no `height`, metres.
+ *
+ * SEÇİLMİŞ VARSAYILAN, ~3.0 m. The host's own default is 2.5 m
+ * (`@pascal-app/core` `services/level-height` `DEFAULT_LEVEL_HEIGHT`, not
+ * re-exported from the barrel), so a height-less legacy level stacks a touch
+ * taller here than in the host — acceptable because a real level almost always
+ * carries its own `height`, and this only backs the gap.
+ */
+export const DEFAULT_LEVEL_HEIGHT = 3.0
+
+/**
+ * The id of the level this node sits on.
+ *
+ * `parentId` naming a level wins; otherwise the node is found by membership in
+ * some level's `children`. Guard-safe: a host that stops exposing either drops
+ * the pallet-lift to its fallback two-stop run rather than throwing.
+ */
+export function parentLevelIdOf(
+  nodes: Readonly<Record<string, unknown>>,
+  node: unknown,
+): string | null {
+  const record = asRecord(node)
+  if (!record) return null
+  const parentId = typeof record.parentId === 'string' ? record.parentId : null
+  if (parentId && asLevel(nodes[parentId])) return parentId
+  const selfId = typeof record.id === 'string' ? record.id : null
+  if (!selfId) return null
+  for (const candidate of Object.values(nodes)) {
+    const level = asLevel(candidate)
+    if (level?.children.includes(selfId)) return level.id
+  }
+  return null
+}
+
+/** The building that owns a level, by `children` membership. `null` when the
+ *  level stands under no building. */
+export function buildingOfLevel(
+  nodes: Readonly<Record<string, unknown>>,
+  levelId: string | null,
+): string | null {
+  if (!levelId) return null
+  for (const candidate of Object.values(nodes)) {
+    const building = asBuilding(candidate)
+    if (building?.children.includes(levelId)) return building.id
+  }
+  return null
+}
+
+/**
+ * Stacked floor elevations for one building, bottom to top.
+ *
+ * A local reimplementation of `services/storey.ts getLevelElevations`
+ * (lines 65-101) restricted to a single building: levels are ordered by their
+ * `level` ordinal (via `levelsOfBuilding`), and a running cumulative Y
+ * accumulates each level's stored height. Each level's `baseElevation` shifts
+ * its own floor AND — because the cumulative carries it forward — every level
+ * stacked above it, matching the host exactly. `height` falls back to
+ * {@link DEFAULT_LEVEL_HEIGHT}.
+ */
+export function levelElevationsOfBuilding(
+  nodes: Readonly<Record<string, unknown>>,
+  buildingId: string | null,
+): Array<{ id: string; baseY: number; height: number }> {
+  const levels = levelsOfBuilding(nodes, buildingId)
+  const out: Array<{ id: string; baseY: number; height: number }> = []
+  let cumulative = 0
+  for (const level of levels) {
+    const baseY = cumulative + (level.baseElevation ?? 0)
+    const height = level.height ?? DEFAULT_LEVEL_HEIGHT
+    out.push({ id: level.id, baseY, height })
+    cumulative = baseY + height
+  }
+  return out
 }
 
 // ─── Geometry ────────────────────────────────────────────────────────────

@@ -69,6 +69,10 @@ export const CLICK_TRIGGER_KINDS = [
   // Toplama arabaları sıra hâlinde park ediliyor ve sıradaki araba,
   // hizalandığı arabanın koliderinin üstünde yerleştiriliyor.
   'warehouse:tote-cart',
+  // Asansör tam mast zarfı büyüklüğünde bir koliderı taşıyor; ikinci bir
+  // asansör çoğu zaman ilkinin zarfına değen bir imleçle konuyor. Listede
+  // olmasa o tıklama yutulur.
+  'warehouse:pallet-lift',
   // A placed rack's picking collider swallows the click that lands on it, so
   // without this a second rack cannot be placed against the first — the cursor
   // is over the run you are aligning to, and nothing commits.

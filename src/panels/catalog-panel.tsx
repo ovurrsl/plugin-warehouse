@@ -477,6 +477,9 @@ function CatalogTile({ item }: { item: CatalogItem }) {
     if (item.brush?.kind === 'dockleveller') {
       useWarehouseStore.getState().setDockLevellerBrush(item.brush.patch)
     }
+    if (item.brush?.kind === 'pallet-lift') {
+      useWarehouseStore.getState().setPalletLiftBrush(item.brush.patch)
+    }
     if (item.brush?.kind === 'totecart') {
       useWarehouseStore.getState().setToteCartBrush(item.brush.patch)
     }

@@ -62,6 +62,10 @@ const SINGLETONS = [
   'bench',
   'dock-leveller',
   'tote-cart',
+  // Kural 3 — tekil şey, eksiz. Bir dikey transfer makinesi: paletin bir
+  // varyantı değil, konveyör hattının bir parçası değil, ve bir "lift"
+  // ailesi de yok (tek üye). `elevator` gibi eksiz.
+  'pallet-lift',
 ] as const
 
 describe('kind isimlendirme standardı', () => {

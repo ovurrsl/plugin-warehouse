@@ -213,12 +213,15 @@ describe('tek tıklama tek yerleştirme', () => {
     // 1) Paletin üst yüzeyine çarpan tıklama — `pointerup` ile sentezlenir.
     // Kind adı host'un olay birleşiminde yok — eklenti kind'leri registry'ye
     // çalışma zamanında giriyor, tip tarafına değil. Yayın yolu aynı.
-    emitter.emit('warehouse:pallet:click' as never, {
-      node: { id: 'pallet_1', type: 'warehouse:pallet' },
-      position: [10, 1.2, 5],
-      localPosition: [10, 1.2, 5],
-      nativeEvent: {} as never,
-    } as never)
+    emitter.emit(
+      'warehouse:pallet:click' as never,
+      {
+        node: { id: 'pallet_1', type: 'warehouse:pallet' },
+        position: [10, 1.2, 5],
+        localPosition: [10, 1.2, 5],
+        nativeEvent: {} as never,
+      } as never,
+    )
 
     // 2) Aynı fiziksel tıklamanın tarayıcı `click`'i — zemin düzlemini
     //    kestiği için XZ'de kaymış bir konum bildiriyor.

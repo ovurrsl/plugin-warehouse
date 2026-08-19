@@ -1,11 +1,12 @@
 'use client'
 
 import { EDITOR_LAYER } from '@pascal-app/editor'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type { Group } from 'three'
 import { useAppearance } from '../appearance'
-import { getBoosterGeometry } from './booster-geometry'
+import { getBoosterGeometry, retainBoosterGeometry } from './booster-geometry'
 import type { ConveyorBoosterNode } from './booster-schema'
+import { releaseGeometry } from './geometry-builder'
 import { getConveyorPreviewMaterial } from './materials'
 
 const NO_RAYCAST = () => {}
@@ -34,6 +35,18 @@ export default function ConveyorBoosterPreview({ node }: { node: ConveyorBooster
   useLayoutEffect(() => {
     ref.current?.traverse((object) => object.layers.set(EDITOR_LAYER))
   }, [])
+
+  /**
+   * Hayalet de ekranda sayılır: bu bileşen şeklini PAYLAŞILAN havuzdan
+   * çekiyor. Tutmazsa, aynı şekli çizen yerleştirilmiş bir modül silinince
+   * sayaç sıfıra düşüyor ve süpürme buffer'ı ekrandayken serbest bırakıyor —
+   * `position` bağlanamayan bir çizim o karenin TÜM command buffer'ını
+   * düşürür, yani ekran kararır.
+   */
+  useEffect(() => {
+    const key = retainBoosterGeometry(node, 'full', false)
+    return () => releaseGeometry(key)
+  }, [node])
 
   return (
     <group ref={ref}>

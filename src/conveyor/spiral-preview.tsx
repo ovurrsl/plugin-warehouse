@@ -1,10 +1,17 @@
 'use client'
 
 import { EDITOR_LAYER } from '@pascal-app/editor'
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useAppearance } from '../appearance'
-import { getSpiralSlatGeometry, getSpiralStaticGeometry } from './spiral-geometry'
+import {
+  getSpiralSlatGeometry,
+  getSpiralStaticGeometry,
+  releaseGeometry,
+  retainGeometry,
+  spiralSlatKey,
+  spiralStaticKey,
+} from './spiral-geometry'
 import { getSpiralCageMaterial, getSpiralPreviewMaterial } from './spiral-materials'
 import { cageRadiusM, columnRadiusM, entryHeightM, overallHeightM } from './spiral-metrics'
 import type { ConveyorSpiralNode } from './spiral-schema'
@@ -27,6 +34,27 @@ export default function SpiralPreview({ node }: { node: ConveyorSpiralNode }) {
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))
   }, [])
+
+  /**
+   * Hayalet de ekranda sayılır.
+   *
+   * Bu bileşen şekillerini PAYLAŞILAN havuzdan çekiyor ama tutmuyordu. Aynı
+   * şekli çizen yerleştirilmiş bir sarmal silinince tutma sayacı sıfıra
+   * düşüyor, `sweepConveyorGeometry` bekleme penceresi dolunca buffer'ı
+   * serbest bırakıyor — ve hayalet o buffer'ı çizmeye devam ediyordu.
+   * `position` bağlanamayan bir çizim WebGPU'da yalnız kendi mesh'ini değil,
+   * o karenin TÜM command buffer'ını düşürüyor: ekran kararıyor ve nesne
+   * sahnede durdukça her karede yeniden kararıyor.
+   */
+  useEffect(() => {
+    const keys = [
+      retainGeometry(spiralStaticKey(node, 'full')),
+      retainGeometry(spiralSlatKey(node, 'full')),
+    ]
+    return () => {
+      for (const key of keys) releaseGeometry(key)
+    }
+  }, [node])
 
   const entry = entryHeightM(node)
   const overall = overallHeightM(node)

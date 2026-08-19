@@ -1,11 +1,17 @@
 'use client'
 
 import { EDITOR_LAYER } from '@pascal-app/editor'
-import { useLayoutEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import type * as THREE from 'three'
 import { useAppearance } from '../appearance'
+import { releaseGeometry, retainGeometry } from './geometry-builder'
 import { getTelescopicPreviewMaterial } from './materials'
-import { getTelescopicBaseGeometry, getTelescopicSectionGeometry } from './telescopic-geometry'
+import {
+  getTelescopicBaseGeometry,
+  getTelescopicSectionGeometry,
+  telescopicBaseKey,
+  telescopicSectionKey,
+} from './telescopic-geometry'
 import { boomSections } from './telescopic-metrics'
 import type { ConveyorTelescopicNode } from './telescopic-schema'
 
@@ -25,6 +31,24 @@ export default function TelescopicPreview({ node }: { node: ConveyorTelescopicNo
   useLayoutEffect(() => {
     ref.current?.traverse((obj) => obj.layers.set(EDITOR_LAYER))
   }, [])
+
+  /**
+   * Hayalet de ekranda sayılır: taban ve HER bölüm ayrı bir paylaşılan
+   * buffer. Tutulmazsa, aynı şekli çizen yerleştirilmiş bir bom silinince
+   * süpürme buffer'ı ekrandayken serbest bırakıyor — `position` bağlanamayan
+   * bir çizim o karenin TÜM command buffer'ını düşürür, ekran kararır.
+   */
+  useEffect(() => {
+    const keys = [
+      retainGeometry(telescopicBaseKey(node, 'full')),
+      ...boomSections(node).map((section) =>
+        retainGeometry(telescopicSectionKey(node, section.index, 'full')),
+      ),
+    ]
+    return () => {
+      for (const key of keys) releaseGeometry(key)
+    }
+  }, [node])
 
   return (
     <group ref={ref}>

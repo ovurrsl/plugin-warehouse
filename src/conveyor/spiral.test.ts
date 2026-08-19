@@ -17,6 +17,7 @@ import {
 import { conveyorSpiralDefinition } from './spiral-definition'
 import { buildSpiralFloorplan } from './spiral-floorplan'
 import {
+  getSpiralColumnGeometry,
   getSpiralSlatGeometry,
   getSpiralStaticGeometry,
   spiralSlatKey,
@@ -530,5 +531,63 @@ describe('tanım ve manifest', () => {
       const arcPerRad = Math.hypot(r, c)
       expect(spiralBoxRateRadPerSec(node) * arcPerRad).toBeCloseTo(5 / 60, 6)
     })
+  })
+})
+
+/**
+ * BEKÇİ: `vertexColors` isteyen bir materyalle çizilen HER geometri `color`
+ * attribute'u taşımalı.
+ *
+ * ## Belirtisi neden bu kadar yanıltıcı
+ *
+ * Eksik bir attribute three'de hata vermiyor, SESSİZCE atlanıyor
+ * (`RenderObject.js`: `if (attribute === undefined) continue`). Atlanınca
+ * kalan attribute'ların `shaderLocation`'ları bir aşağı kayıyor, çünkü konum
+ * filtrelenmiş dizinin sıra numarası (`WebGPUAttributeUtils.js`). Shader'ın en
+ * yüksek girdisi bağsız kalıyor ve WebGPU o çizimi reddediyor.
+ *
+ * Reddedilen tek çizim KARENİN TAMAMINI düşürüyor — host bunu kendi kodunda
+ * yazıyor (`viewer/lib/drawable-geometry.ts`): "poisons the entire command
+ * encoder … the whole canvas flickering/garbling, not just the offending
+ * mesh". Yani hata, kusurlu nesnede DEĞİL, sahnedeki her şeyde görünüyor:
+ * sarmalın kolonu yüzünden hiç dokunulmamış kavisli konveyör de bozuluyordu.
+ *
+ * Hiçbir kind testi bunu yakalayamaz — bozulma kind'ın kendi çıktısında değil.
+ * O yüzden invaryant burada, çizilen çift üzerinden kilitleniyor.
+ */
+describe('vertex renk sözleşmesi', () => {
+  const node = ConveyorSpiralNode.parse({ type: 'warehouse:conveyor-spiral' })
+
+  test('merkez kolon color attribute taşıyor — materyali vertexColors istiyor', () => {
+    const column = getSpiralColumnGeometry(node.legColor)
+    const color = column.getAttribute('color')
+    expect(
+      color,
+      'kolonda color attribute yok: shader location kayar, WebGPU çizimi reddeder ve KARENİN TAMAMI düşer',
+    ).toBeDefined()
+    expect(color?.itemSize, 'birleştirilmiş konveyör geometrisiyle aynı olmalı').toBe(3)
+    expect(color?.count).toBe(column.getAttribute('position').count)
+  })
+
+  test('kolon rengi düğümün legColor’ından geliyor ve renk başına paylaşılıyor', () => {
+    const a = getSpiralColumnGeometry('#ff0000')
+    const b = getSpiralColumnGeometry('#ff0000')
+    const c = getSpiralColumnGeometry('#00ff00')
+    expect(a, 'aynı renk aynı buffer’ı paylaşmalı').toBe(b)
+    expect(c, 'farklı renk ayrı buffer olmalı').not.toBe(a)
+    expect(a.getAttribute('color').getX(0)).not.toBe(c.getAttribute('color').getX(0))
+  })
+
+  test('birleştirilmiş gövde ve slat geometrileri de color taşıyor', () => {
+    for (const [label, geometry] of [
+      ['static', getSpiralStaticGeometry(node, 'full')],
+      ['slat', getSpiralSlatGeometry(node, 'full')],
+    ] as const) {
+      const color = geometry.getAttribute('color')
+      expect(color, `${label} geometrisinde color attribute yok`).toBeDefined()
+      expect(color?.count, `${label}: color sayacı position ile eşleşmiyor`).toBe(
+        geometry.getAttribute('position').count,
+      )
+    }
   })
 })

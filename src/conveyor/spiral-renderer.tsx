@@ -20,6 +20,7 @@ import { FLOW_BOX_M } from './flow-simulation'
 import { getFlowBoxMaterial } from './materials'
 import type { ConveyorDetail } from './parts'
 import {
+  getSpiralColumnGeometry,
   getSpiralSlatGeometry,
   getSpiralStaticGeometry,
   releaseGeometry,
@@ -72,7 +73,6 @@ function hashPhase(id: string): number {
 
 /** Merkez kolon ve kafes birim silindir — birleştirilmiş kutu üreticisi
  *  silindir emitleyemiyor, o yüzden düğüm başına ölçekleniyorlar. */
-const COLUMN_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 24, 1)
 const CAGE_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 32, 1, true)
 
 /**
@@ -236,7 +236,7 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
         {/* Merkez kolon — birim silindir, düğüm başına ölçekli. */}
         <mesh
           dispose={null}
-          geometry={COLUMN_GEOMETRY}
+          geometry={getSpiralColumnGeometry(node.legColor)}
           material={material}
           position={[0, overall / 2, 0]}
           raycast={NO_RAYCAST}

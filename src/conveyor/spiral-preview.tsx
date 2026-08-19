@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { useAppearance } from '../appearance'
 import {
+  getSpiralColumnGeometry,
   getSpiralSlatGeometry,
   getSpiralStaticGeometry,
   releaseGeometry,
@@ -18,7 +19,6 @@ import type { ConveyorSpiralNode } from './spiral-schema'
 
 const NO_RAYCAST = () => {}
 
-const COLUMN_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 24, 1)
 const CAGE_GEOMETRY = new THREE.CylinderGeometry(1, 1, 1, 32, 1, true)
 
 /**
@@ -72,7 +72,7 @@ export default function SpiralPreview({ node }: { node: ConveyorSpiralNode }) {
       />
       <mesh
         dispose={null}
-        geometry={COLUMN_GEOMETRY}
+        geometry={getSpiralColumnGeometry(node.legColor)}
         material={material}
         position={[0, overall / 2, 0]}
         raycast={NO_RAYCAST}

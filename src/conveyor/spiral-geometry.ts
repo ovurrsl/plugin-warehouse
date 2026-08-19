@@ -22,7 +22,7 @@
  * `spiral.test.ts` iki yönü de (eksik ve aşırı rapor) ölçüyor.
  */
 
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import { memoiseGeometryKey } from '../geometry-key-memo'
 import { PALETTE } from './constants'
 import {
@@ -141,3 +141,41 @@ export { releaseGeometry, retainGeometry }
 /** Düğüm-nesnesine memoize — bkz. `geometry-key-memo.ts`. */
 export const spiralStaticKey = memoiseGeometryKey(buildStaticKey, (detail) => `s:${detail}`)
 export const spiralSlatKey = memoiseGeometryKey(buildSlatKey, (detail) => `l:${detail}`)
+
+/**
+ * Merkez kolon — birim silindir, ama renk attribute'u İLE.
+ *
+ * `getSpiralMaterial` `vertexColors: true` taşıyor (materyalin kendi yorumu
+ * kolonu da o listeye yazıyor). Çıplak bir `CylinderGeometry`'de `color`
+ * attribute'u yok, ve eksik bir attribute three'de sessizce atlanıyor
+ * (`RenderObject.js`: `if (attribute === undefined) continue`). Atlanınca
+ * kalan attribute'ların `shaderLocation`'ları bir aşağı kayıyor
+ * (`WebGPUAttributeUtils.js`: konum, filtrelenmiş dizinin sıra numarası) ve
+ * shader'ın en yüksek girdisi bağsız kalıyor. WebGPU o çizimi reddediyor —
+ * ve reddedilen tek çizim KARENİN TAMAMINI düşürüyor, yalnız bu mesh'i değil.
+ * Belirtisi, hiç dokunulmamış komşu nesnelerin de bozuk görünmesiydi.
+ *
+ * Renk düğümün `legColor`'ından geliyor: kolon yapısal, ayaklarla aynı boya.
+ * Renk başına bir silindir; kolon sayısı değil, palet boyutu kadar girdi olur.
+ * Paylaşılan konveyör havuzuna KOYULMUYOR: burada ömür modül düzeyi ve
+ * süpürme yok, yani ekrandaki bir buffer'ın altından çekilmesi mümkün değil.
+ */
+const columnGeometries = new Map<string, THREE.BufferGeometry>()
+
+export function getSpiralColumnGeometry(legColor: string): THREE.BufferGeometry {
+  const cached = columnGeometries.get(legColor)
+  if (cached) return cached
+
+  const geometry = new THREE.CylinderGeometry(1, 1, 1, 24, 1)
+  const count = geometry.getAttribute('position').count
+  const [r, g, b] = toLinear(legColor)
+  const colors = new Float32Array(count * 3)
+  for (let index = 0; index < count; index++) {
+    colors[index * 3] = r
+    colors[index * 3 + 1] = g
+    colors[index * 3 + 2] = b
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  columnGeometries.set(legColor, geometry)
+  return geometry
+}

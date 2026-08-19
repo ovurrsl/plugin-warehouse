@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import { emitter } from '@pascal-app/core'
+import { emitter, sceneRegistry } from '@pascal-app/core'
+import { Group } from 'three'
 import { warehousePlugin } from './index'
 import {
   CLICK_TRIGGER_KINDS,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  toToolFrame,
 } from './placement'
 
 /**
@@ -298,5 +300,42 @@ describe('aynı noktayı iki kez bildirmemek', () => {
     expect(samePlacementPoint([1, 0, 2], [1.00001, 0, 2])).toBe(true)
     expect(samePlacementPoint([1, 0, 2], [1.001, 0, 2])).toBe(false)
     expect(samePlacementPoint([1, 0, 2], [1, 0.001, 2])).toBe(false)
+  })
+})
+
+describe('hayalet, çizildiği çerçeveye taşınıyor', () => {
+  /**
+   * BEKÇİ: hayalet, aktif katın kotunda çizilmeli.
+   *
+   * ## Yanlış cevap neye benziyor
+   *
+   * `0`. Yani araçların ürettiği kat-yerel Y'nin ta kendisi — host'un araç
+   * grubu yalnız bina dönüşümünü uyguladığı için ekranda binanın tabanına
+   * denk düşüyor. Aktif kat sıfır kotundaysa doğru cevapla birebir aynı;
+   * altında bir bodrum olan sahnede (raporu açan projede zemin kat 12,93 m)
+   * hayalet imlecin tam o kadar altında.
+   *
+   * ## Neden kimse fark etmedi
+   *
+   * Tıklama DOĞRU yere yerleştiriyor: commit edilen düğüm katın altına
+   * parent'lanıyor ve kotu oradan geri alıyor. Yani belirti "nesne yanlış yere
+   * gidiyor" değil, "hayalet imlecin altında" — ve tek katlı bir sahnede hiç
+   * yok. Testin ölçtüğü şey, iki çerçevenin karıştırılmadığı.
+   */
+  test('kat kotu ekleniyor, kat-yerel Y olduğu gibi bırakılmıyor', () => {
+    const level = new Group()
+    level.position.y = 12.93
+    sceneRegistry.nodes.set('level_ground', level)
+
+    expect(toToolFrame([3, 0, -4], 'level_ground')).toEqual([3, 12.93, -4])
+    // Raf gözü gibi kat içinde yükseklik taşıyan bir konum, kotu ÜSTÜNE alır.
+    expect(toToolFrame([0, 1.8, 0], 'level_ground')).toEqual([0, 14.73, 0])
+
+    sceneRegistry.nodes.delete('level_ground')
+  })
+
+  test('kaydı olmayan kat hayaleti düşürmüyor', () => {
+    expect(toToolFrame([1, 0, 2], 'level_yok')).toEqual([1, 0, 2])
+    expect(toToolFrame([1, 0, 2], null)).toEqual([1, 0, 2])
   })
 })

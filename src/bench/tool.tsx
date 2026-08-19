@@ -30,6 +30,7 @@ import {
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  toToolFrame,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { BENCH_VARIANT_IDS } from './catalog'
@@ -144,7 +145,7 @@ export default function BenchTool() {
     }
 
     const applyCursor = (position: [number, number, number]) => {
-      cursorRef.current?.position.set(...position)
+      cursorRef.current?.position.set(...toToolFrame(position, activeLevelId))
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
       // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
       // kendi gölgesi yalnız bu store'dan besleniyor.

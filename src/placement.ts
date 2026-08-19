@@ -576,3 +576,36 @@ export function publishPlacementPreview(
 export function clearPlacementPreview(): void {
   usePlacementPreview.getState().clear()
 }
+
+/**
+ * Kat-yerel bir konumu, 3B hayaletin ÇİZİLDİĞİ çerçeveye taşır.
+ *
+ * Araçların ürettiği her konum kat-yereldir: commit edilen `position` katın
+ * altına parent'lanır ve kotu oradan gelir. Hayalet ise host'un `ToolManager`
+ * grubunda çiziliyor ve o grup yalnız BİNA dönüşümünü uyguluyor — aradaki fark
+ * aktif katın kotu. Aktif kat sıfırdaysa görünmez; altında bir bodrum varsa
+ * (raporu açan sahnede zemin kat 12,93 m) hayalet imlecin tam o kadar altında
+ * duruyor, ama tıklayınca nesne DOĞRU yere oturuyor: yalan söyleyen yerleştirme
+ * değil, önizleme.
+ *
+ * Kot, kat nesnesinin kendisinden okunuyor — sahneden yeniden hesaplanmıyor.
+ * O Y'yi host'un `LevelSystem`'i yazıyor (kat tabanı + patlatılmış görünüm
+ * aralığı, kare kare lerp'lenerek) ve ızgaranın ışın düzlemi de aynı yerden
+ * besleniyor; yani imleç ile hayalet tanım gereği aynı kotta buluşuyor.
+ * Yeniden hesaplamak, patlatılmış görünümde hayaletin animasyonu atlayıp son
+ * karesine sıçraması demek olurdu.
+ *
+ * `getFloorStackPreviewPosition` kullanan araçlar bu kotu zaten host'tan
+ * alıyor; bu yardımcı, o zinciri atlayan yolları (raf gözüne yapışan palet ve
+ * yalın `position` yazan sekiz araç) aynı çerçeveye getiriyor.
+ *
+ * Yalnız GÖRSEL için: commit yolundaki konum kat-yerel kalmalı.
+ */
+export function toToolFrame(
+  position: readonly [number, number, number],
+  levelId: string | null | undefined,
+): [number, number, number] {
+  const object = levelId ? sceneRegistry.nodes.get(levelId) : null
+  const lift = typeof object?.position?.y === 'number' ? object.position.y : 0
+  return [position[0], position[1] + lift, position[2]]
+}

@@ -31,6 +31,7 @@ import {
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  toToolFrame,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { unitLoadHeightOf } from './cargo-types'
@@ -244,7 +245,10 @@ export default function PalletTool() {
 
       const rotationY = target ? target.rotationY : rotationRef.current
       const visual = target
-        ? target.position
+        ? // Slot positions come off the rack in the storey's frame, same as a
+          // floor placement — the ghost still has to be lifted into the frame
+          // it is drawn in.
+          toToolFrame(target.position, activeLevelId)
         : getFloorStackPreviewPosition({
             node: ghostNodeRef.current as unknown as AnyNode,
             position,

@@ -16,6 +16,7 @@ import {
   isGridSnapActive,
   isMagneticSnapActive,
   useEditor,
+  usePlacementPreview,
 } from '@pascal-app/editor'
 import { Vector3 } from 'three'
 import { asSlab, type SlabLike, slabAt } from './host-adapter'
@@ -534,4 +535,44 @@ export function subscribeGridMove(handler: GridMoveHandler): () => void {
     // bir aracın state'ine yazardı.
     pending = null
   }
+}
+
+// ── 2B plan hayaleti ────────────────────────────────────────────────────────
+
+/**
+ * 2B plandaki yerleştirme hayaletini yayınlar.
+ *
+ * 3B'de hayalet, aracın kendi `cursorRef` grubudur — imleçle birlikte gezen
+ * yarı saydam bir mesh. 2B planda o mesh GÖRÜNEMEZ: plana geçildiğinde 3B
+ * tuval `display:none` ile gizleniyor. Planın kendi hayaleti tek bir yerden
+ * besleniyor: `usePlacementPreview`. Katman oraya konan geçici düğümü alıp
+ * `def.floorplan` ayak izini soluk bir gölge olarak çiziyor.
+ *
+ * Host'un kendi araçları (column, cabinet, door, dormer) buraya yazıyor; bu
+ * paketin araçlarının hiçbiri yazmıyordu, yani 2B'de HİÇ hayalet yoktu —
+ * kullanıcı nereye koyduğunu göremeden tıklıyordu. Eksik olan bir mekanizma
+ * değil, ona yapılan çağrıydı.
+ *
+ * Konum ve rotasyon, 3B hayaletin o an durduğu yerin AYNISI olmalı; iki
+ * görünümün farklı yer göstermesi, tek yer göstermemekten beterdir.
+ */
+export function publishPlacementPreview(
+  node: unknown,
+  position: readonly [number, number, number],
+  rotationY: number,
+): void {
+  usePlacementPreview.getState().set({
+    ...(node as object),
+    position: [position[0], position[1], position[2]],
+    rotation: [0, rotationY, 0],
+  } as AnyNode)
+}
+
+/**
+ * Hayaleti kaldırır. Araçların temizlik bloğundan çağrılıyor, yani taahhüt,
+ * Esc, kind değişimi ve unmount'u tek elden karşılıyor — sahipsiz kalan bir
+ * hayalet planın üstünde asılı kalırdı.
+ */
+export function clearPlacementPreview(): void {
+  usePlacementPreview.getState().clear()
 }

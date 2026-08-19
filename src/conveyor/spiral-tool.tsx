@@ -23,7 +23,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
@@ -144,6 +146,9 @@ export default function SpiralTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, poseRotationRef.current, 0)
+      // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
+      // kendi gölgesi yalnız bu store'dan besleniyor.
+      publishPlacementPreview(previewNode, visual, poseRotationRef.current)
       if (!samePlacementPoint(cursorPositionRef.current, visual)) {
         cursorPositionRef.current = visual
         setCursorPosition(visual)
@@ -254,6 +259,7 @@ export default function SpiralTool() {
 
     return () => {
       unsubscribeMove()
+      clearPlacementPreview()
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

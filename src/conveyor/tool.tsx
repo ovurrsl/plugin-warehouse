@@ -22,7 +22,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { areClearAt } from '../clash'
 import {
+  clearPlacementPreview,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
@@ -202,6 +204,9 @@ export default function ConveyorRollerTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationY, 0)
+      // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
+      // kendi gölgesi yalnız bu store'dan besleniyor.
+      publishPlacementPreview(previewNode, visual, rotationY)
       // Rafın aynı gerekçesi: taze dizi kimliği her harekette kaçınılmaz bir
       // render ettiriyordu, ızgaraya oturmuş imleç için çoğu aynı kareyi üretmek
       // üzere.
@@ -352,6 +357,7 @@ export default function ConveyorRollerTool() {
 
     return () => {
       unsubscribeMove()
+      clearPlacementPreview()
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

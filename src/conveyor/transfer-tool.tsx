@@ -23,7 +23,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
@@ -139,6 +141,9 @@ export default function ConveyorTransferTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationY, 0)
+      // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
+      // kendi gölgesi yalnız bu store'dan besleniyor.
+      publishPlacementPreview(previewNode, visual, rotationY)
       // A transfer's body is square and centred on its node, so the box and the
       // ghost share a position.
       // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
@@ -277,6 +282,7 @@ export default function ConveyorTransferTool() {
 
     return () => {
       unsubscribeMove()
+      clearPlacementPreview()
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

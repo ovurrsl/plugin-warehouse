@@ -23,7 +23,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
@@ -142,6 +144,9 @@ export default function ConveyorLauncherTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationY, 0)
+      // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
+      // kendi gölgesi yalnız bu store'dan besleniyor.
+      publishPlacementPreview(previewNode, visual, rotationY)
       // The steel is not centred on the node — the arm sticks out one side — so
       // the measuring box sits off the ghost by however far the two differ,
       // carried into world space by the module's own rotation.
@@ -287,6 +292,7 @@ export default function ConveyorLauncherTool() {
 
     return () => {
       unsubscribeMove()
+      clearPlacementPreview()
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

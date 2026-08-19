@@ -24,7 +24,9 @@ import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import { displayNameOf } from '../handling/models'
 import {
+  clearPlacementPreview,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
@@ -135,6 +137,9 @@ export default function TruckTool() {
       })
       cursorRef.current?.position.set(...visual)
       cursorRef.current?.rotation.set(0, rotationRef.current, 0)
+      // 2B plan hayaleti: 3B mesh'i plana geçince gizleniyor, planın
+      // kendi gölgesi yalnız bu store'dan besleniyor.
+      publishPlacementPreview(previewNode, visual, rotationRef.current)
       // Kutunun merkezi gerçekten kımıldadıysa yaz. Taze dizi kimliği React'e
       // her fare hareketinde kaçamayacağı bir render ettiriyor; ızgaraya
       // oturmuş imleç için o render'ların çoğu birebir aynı kareyi üretiyor.
@@ -240,6 +245,7 @@ export default function TruckTool() {
 
     return () => {
       unsubscribeMove()
+      clearPlacementPreview()
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)

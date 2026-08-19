@@ -138,39 +138,68 @@ export type PlacementClickEvent = { stopPropagation?: () => void }
  * follow-up with a window-capture listener. That helper is not published, so
  * the guard lives here instead.
  *
- * Collapsed on time AND position rather than on time alone: two genuine
- * placements a tenth of a second apart at the *same* point are a double-click,
- * which no tool in this package wants to treat as two.
+ * Collapsing on position as well as time looked safer and was the bug: the two
+ * events of ONE physical click do not report the same point. A node-surface
+ * click carries where the ray hit the *mesh*; `grid:click` carries where the
+ * same ray crosses the *ground plane*. Those diverge by roughly the hit's
+ * height above the floor — 14 cm over a pallet, metres over a rack upright,
+ * against a 1 mm threshold. So `samePlace` was false for exactly the pair the
+ * guard existed to collapse, and both events committed. It only ever held on
+ * bare floor, where the two points coincide, which is why the double placement
+ * looked intermittent.
+ *
+ * Collapsing on a time window instead would trade one wrong answer for another:
+ * two deliberate placements a few tens of milliseconds apart are legitimate and
+ * would be silently dropped. The honest unit is the **press**, not the clock —
+ * so the gate is armed by `pointerdown` and spent by the first commit. Both
+ * events of one press share it; two placements need two presses.
+ *
+ * The primary defence is still the host's: eat the follow-up browser click so
+ * `grid:click` is never emitted at all. The per-press gate is the backstop for
+ * the paths that reach the emitter some other way.
  */
-const DUPLICATE_WINDOW_MS = 200
-const SAME_POINT_M = 0.001
 
-let lastFiredAt = 0
-let lastPoint: readonly [number, number] | null = null
+/**
+ * A node-surface click is synthesized on `pointerup`; the browser's own `click`
+ * fires a moment later and reaches the canvas listener that emits `grid:click`
+ * — a path R3F's `stopPropagation` cannot reach. Eating that one follow-up at
+ * the window's capture phase stops it before the canvas ever sees it.
+ *
+ * Copied rather than imported: the host keeps this in
+ * `nodes/shared/floor-placement.ts`, which is not part of any published barrel.
+ */
+function swallowFollowUpBrowserClick(): void {
+  if (typeof window === 'undefined') return
+  const swallow = (event: Event) => {
+    event.stopPropagation()
+    event.preventDefault()
+  }
+  window.addEventListener('click', swallow, { capture: true, once: true })
+  setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 300)
+}
 
-function isFollowUpOfSameClick(event: PlacementClickEvent): boolean {
-  const now = Date.now()
-  const position = (event as { position?: [number, number, number] }).position
-  const here: readonly [number, number] | null = position ? [position[0], position[2]] : null
-
-  const withinWindow = now - lastFiredAt < DUPLICATE_WINDOW_MS
-  const samePlace =
-    here === null ||
-    lastPoint === null ||
-    (Math.abs(here[0] - lastPoint[0]) < SAME_POINT_M &&
-      Math.abs(here[1] - lastPoint[1]) < SAME_POINT_M)
-
-  if (withinWindow && samePlace) return true
-  lastFiredAt = now
-  lastPoint = here
-  return false
+/** Grid events carry no `node`; every kind-surface event does. */
+function isNodeSurfaceClick(event: PlacementClickEvent): boolean {
+  return typeof event === 'object' && event !== null && 'node' in event
 }
 
 export function subscribePlacementClicks(
   handler: (event: PlacementClickEvent) => void,
 ): () => void {
+  // Per-subscription, not module-global: two tools are never armed at once, and
+  // keeping it local means one tool's commit can never gate another's.
+  let spentThisPress = false
+  const rearm = () => {
+    spentThisPress = false
+  }
+
   const guarded = (event: PlacementClickEvent) => {
-    if (isFollowUpOfSameClick(event)) return
+    if (spentThisPress) return
+    spentThisPress = true
+    // Bir nesnenin üzerine yapılan tıklamada, tarayıcının hemen ardından
+    // gelen `click`'i yut — yoksa aynı jest `grid:click` olarak ikinci kez
+    // döner ve aynı koordinata ikinci bir düğüm koyar.
+    if (isNodeSurfaceClick(event)) swallowFollowUpBrowserClick()
     // Bekleyen hareket ÖNCE işlenir: tıklama, son hareketin bıraktığı konuma
     // yerleştiriyor ve o hareket bu karenin rAF'ını beklemiş olabilir.
     // Boşaltmadan çağırmak, imlecin bir kare geride kalan yerine koyardı.
@@ -179,8 +208,14 @@ export function subscribePlacementClicks(
   }
   const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
   for (const name of events) emitter.on(name as never, guarded as never)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('pointerdown', rearm, { capture: true })
+  }
   return () => {
     for (const name of events) emitter.off(name as never, guarded as never)
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('pointerdown', rearm, { capture: true })
+    }
   }
 }
 

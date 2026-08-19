@@ -101,6 +101,10 @@ export const toteCartDefinition = {
       'Order-picking trolley: a wheeled steel frame carrying one Euro tote per tier. Tier count, tote size and castors are set from the inspector; the overall height follows from them.',
     icon: { kind: 'iconify', name: 'lucide:shopping-cart' },
     paletteSection: 'furnish',
+    // Out of the host's auto-derived Build palette, reachable from this
+    // plugin's catalog alone. With both surfaces armed, one click commits
+    // twice — the host default and this plugin's tool.
+    hidden: true,
   },
 
   mcp: {

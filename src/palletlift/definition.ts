@@ -103,6 +103,10 @@ export const palletLiftDefinition = {
       'A mast-guided, chain-driven vertical pallet lift with an integrated roller conveyor on the platform. Serves the building’s levels (floors are derived, not a field); capacity, mast count, enclosure and doors are set from the inspector.',
     icon: { kind: 'iconify', name: 'lucide:arrow-up-down' },
     paletteSection: 'furnish',
+    // Out of the host's auto-derived Build palette, reachable from this
+    // plugin's catalog alone. With both surfaces armed, one click commits
+    // twice — the host default and this plugin's tool.
+    hidden: true,
   },
 
   mcp: {

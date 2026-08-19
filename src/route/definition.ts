@@ -114,6 +114,10 @@ export const routeDefinition = {
     label: 'Route',
     description: 'Yaya veya araç yolu — zemine boyanmış iki şerit.',
     icon: { kind: 'iconify', name: 'lucide:route' },
+    // Out of the host's auto-derived Build palette, reachable from this
+    // plugin's catalog alone. With both surfaces armed, one click commits
+    // twice — the host default and this plugin's tool.
+    hidden: true,
   },
 
   mcp: {

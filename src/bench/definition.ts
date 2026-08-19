@@ -102,6 +102,10 @@ export const benchDefinition = {
       'Packing and processing benches: dispatch and mail-order packing tables, a processing bench, a weighing-scale station, a mobile workbench and a plain eco table. Width, worktop height and depth are all adjustable.',
     icon: { kind: 'iconify', name: 'lucide:table' },
     paletteSection: 'furnish',
+    // Out of the host's auto-derived Build palette, reachable from this
+    // plugin's catalog alone. With both surfaces armed, one click commits
+    // twice — the host default and this plugin's tool.
+    hidden: true,
   },
 
   mcp: {

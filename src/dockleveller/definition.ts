@@ -104,6 +104,10 @@ export const dockLevellerDefinition = {
       'Pit-mounted hydraulic dock leveller: flush with the floor at rest, hinged or telescopic lip onto the trailer bed. Platform, lip, capacity and incline are all set from the inspector.',
     icon: { kind: 'iconify', name: 'lucide:import' },
     paletteSection: 'furnish',
+    // Out of the host's auto-derived Build palette, reachable from this
+    // plugin's catalog alone. With both surfaces armed, one click commits
+    // twice — the host default and this plugin's tool.
+    hidden: true,
   },
 
   mcp: {

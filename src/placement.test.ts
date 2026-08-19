@@ -189,6 +189,103 @@ describe('ızgara hareketi kareye kilitlenir', () => {
   })
 })
 
+/**
+ * BEKÇİ: TEK fiziksel tıklama TEK düğüm koyar.
+ *
+ * Bu, guard'ın kendisinin ilk testi — ve guard aylarca delikti çünkü hiçbir şey
+ * onu ölçmüyordu. Deliğin şekli şu: bir fiziksel tıklama emitter'a iki kez
+ * ulaşıyor (nesne yüzeyinden `pointerup` ile sentezlenen `<kind>:click`, sonra
+ * tarayıcının kendi `click`'inden gelen `grid:click`) ve eski guard ikisini
+ * KONUM karşılaştırarak eşleştirmeye çalışıyordu. Oysa ikisi tanım gereği farklı
+ * nokta bildiriyor: biri ışının mesh'e çarptığı yeri, diğeri aynı ışının zemini
+ * kestiği yeri. Aradaki fark çarpma noktasının yerden yüksekliği kadar — bir
+ * paletin üstünde ~14 cm, 1 mm'lik eşiğin 140 katı. Guard "aynı yer değil" deyip
+ * ikinci olayı geçiriyordu.
+ *
+ * Aşağıdaki test tam olarak o çifti kuruyor: yüksekte bir çarpma, ardından
+ * zeminde bir kesişim. Eski guard bu testte düşer.
+ */
+describe('tek tıklama tek yerleştirme', () => {
+  test('nesnenin üzerine yapılan tıklama, ardından gelen grid:click ile ikinci kez commit etmez', () => {
+    const commits: string[] = []
+    const unsubscribe = subscribePlacementClicks(() => commits.push('commit'))
+
+    // 1) Paletin üst yüzeyine çarpan tıklama — `pointerup` ile sentezlenir.
+    // Kind adı host'un olay birleşiminde yok — eklenti kind'leri registry'ye
+    // çalışma zamanında giriyor, tip tarafına değil. Yayın yolu aynı.
+    emitter.emit('warehouse:pallet:click' as never, {
+      node: { id: 'pallet_1', type: 'warehouse:pallet' },
+      position: [10, 1.2, 5],
+      localPosition: [10, 1.2, 5],
+      nativeEvent: {} as never,
+    } as never)
+
+    // 2) Aynı fiziksel tıklamanın tarayıcı `click`'i — zemin düzlemini
+    //    kestiği için XZ'de kaymış bir konum bildiriyor.
+    emitter.emit('grid:click', {
+      position: [10.9, 0, 5],
+      localPosition: [10.9, 0, 5],
+      nativeEvent: {} as never,
+    } as never)
+
+    expect(
+      commits.length,
+      'tek fiziksel tıklama iki düğüm koydu: guard çiftin ikinci bacağını geçirdi',
+    ).toBe(1)
+
+    unsubscribe()
+  })
+
+  test('boş zeminde de tek commit — tek bacaklı tıklama hâlâ çalışıyor', () => {
+    // Guard'ı sıkarken asıl işi bozmamak: zemine yapılan tıklamanın tek bacağı
+    // var ve yerleştirmeyi o yapıyor.
+    const commits: string[] = []
+    const unsubscribe = subscribePlacementClicks(() => commits.push('commit'))
+
+    emitter.emit('grid:click', {
+      position: [4, 0, 4],
+      localPosition: [4, 0, 4],
+      nativeEvent: {} as never,
+    } as never)
+
+    expect(commits.length).toBe(1)
+    unsubscribe()
+  })
+})
+
+/**
+ * BEKÇİ: kaydedilen her kind host'un otomatik türettiği paletten GİZLİ olmalı.
+ *
+ * Gizli değilse kind iki yerden birden yerleştirilebilir hâle geliyor: host'un
+ * Build/Furnish paleti ve bu eklentinin kendi kataloğu. İkisi de aynı anda
+ * kurulu olduğunda tek tık İKİ düğüm koyuyor — ve ikisi birebir aynı koordinatta
+ * olduğu için kimse fark etmiyor.
+ *
+ * Bu tam olarak `warehouse:conveyor-spiral`'da yaşandı ve düzeltildi; sonra aynı
+ * atlama beş kind'da daha tekrarlandı (bench, dock-leveller, pallet-lift,
+ * tote-cart, route). Aile bazlı testler yakalayamadı çünkü her biri yalnız kendi
+ * ailesine bakıyordu. Bu yüzden kural burada, İSTİSNASIZ ve aile-üstü.
+ */
+describe('host paletinden gizlilik', () => {
+  const nodes = (warehousePlugin.nodes ?? []) as ReadonlyArray<{
+    kind: string
+    presentation?: { hidden?: boolean }
+  }>
+
+  test('kind listesi boş değil — yoksa döngü sıfır iddiayla yeşil kalır', () => {
+    expect(nodes.length).toBeGreaterThan(10)
+  })
+
+  for (const node of nodes) {
+    test(`${node.kind} host paletinde görünmüyor`, () => {
+      expect(
+        node.presentation?.hidden,
+        `${node.kind} için presentation.hidden yok: kind hem host paletinden hem eklenti kataloğundan yerleştirilebilir ve tek tık iki düğüm koyar`,
+      ).toBe(true)
+    })
+  }
+})
+
 describe('aynı noktayı iki kez bildirmemek', () => {
   test('ızgaraya oturmuş imleç "değişmedi" der, gerçekten kımıldayan demez', () => {
     // Tek amacı bir React render'ını atlatmak; eşiği görünür bir mesafeye

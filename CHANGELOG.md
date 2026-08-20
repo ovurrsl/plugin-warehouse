@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`0e09cca`](https://github.com/ovurrsl/plugin-warehouse/commit/0e09cca610c1439146db57478adec244a1b3b736))
 - Refresh generated README blocks [skip ci] ([`58fd80e`](https://github.com/ovurrsl/plugin-warehouse/commit/58fd80e2a9c41153d1c57769d11d67e5eb22c936))
 - Refresh generated README blocks [skip ci] ([`c55d384`](https://github.com/ovurrsl/plugin-warehouse/commit/c55d38495e3369ace0f717aa429d90119b5d733f))
 - Refresh generated README blocks [skip ci] ([`165b463`](https://github.com/ovurrsl/plugin-warehouse/commit/165b4638d423ea47a7c19b0329b5b6efc1ff7cab))
@@ -281,6 +282,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Resolve Bug #50-D3 ambient preview and disarming ([`fc39034`](https://github.com/ovurrsl/plugin-warehouse/commit/fc390346c1709298714147bd41b20ee019353327))
 - Sarmal host paletinden gizli — cift yerlestirme giderildi (#28) ([`cb989d7`](https://github.com/ovurrsl/plugin-warehouse/commit/cb989d7d447f9b7dae8b4d499b7685cd02c540fa))
 - Sarmalda koliler aksin, asansore gercek palet, tek fis (#27) ([`042c45a`](https://github.com/ovurrsl/plugin-warehouse/commit/042c45a1ea4b848fb129757cebeda80a9d2dd89f))
 - Yedi araç ızgara ayarını yok sayıyordu (#23) ([`3a08711`](https://github.com/ovurrsl/plugin-warehouse/commit/3a0871170d01782768d1a48e745be81dc0273849))

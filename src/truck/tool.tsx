@@ -24,11 +24,16 @@ import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import { displayNameOf } from '../handling/models'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { mastRowOf, modelOf, overallHeightM, planLengthM, planWidthM } from './metrics'
@@ -49,7 +54,8 @@ const ROTATION_STEP = Math.PI / 4
  * "Truck" yerine "Electric forklift · 1.3 t".
  */
 export default function TruckTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.truckBrush)
 
@@ -145,6 +151,17 @@ export default function TruckTool() {
       setCursorRotationY(rotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(visual)
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewNode as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -199,12 +216,14 @@ export default function TruckTool() {
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
-      setPlacementSerial((serial) => serial + 1)
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -244,6 +263,7 @@ export default function TruckTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       useAlignmentGuides.getState().clear()
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode, boxDimensions, model])
 

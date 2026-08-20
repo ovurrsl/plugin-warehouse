@@ -22,11 +22,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { areClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { frameWidthM, moduleLengthM } from './metrics'
 import { extendConveyorRun, moduleOffsets } from './multiply'
@@ -57,7 +62,8 @@ const GHOST_LIMIT = 60
  * is left to hit is the legs.
  */
 export default function ConveyorRollerTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
 
   const cursorRef = useRef<Group>(null)
@@ -218,6 +224,17 @@ export default function ConveyorRollerTool() {
         rotationY,
         depth: frameWidthM(previewNode),
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewNode as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationY, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -288,11 +305,14 @@ export default function ConveyorRollerTool() {
 
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
+
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+      })
       event.stopPropagation?.()
     })
 
@@ -359,6 +379,7 @@ export default function ConveyorRollerTool() {
       // facing triangle left behind lingers over the canvas with no owner.
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
+      clearPlacementPreview()
     }
     // Deliberately not `extent` or `modules`: both are read through refs, so
     // growing the run does not tear the tool down and reset the rotation.

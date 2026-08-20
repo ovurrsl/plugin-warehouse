@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { footprintM } from './curve-metrics'
 import ConveyorCurvePreview from './curve-preview'
@@ -59,7 +64,8 @@ const ANGLES = ['45', '90', '180'] as const
  * goes.
  */
 export default function ConveyorCurveTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
 
   const cursorRef = useRef<Group>(null)
@@ -164,6 +170,17 @@ export default function ConveyorCurveTool() {
         rotationY: rotationY,
         depth: footprintM(previewRef.current)[1],
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewRef.current as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationY, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -234,11 +251,14 @@ export default function ConveyorCurveTool() {
 
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewRef.current.id,
-        activeLevelId,
-      )
+
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewRef.current.id,
+          activeLevelId,
+        )
+      })
       event.stopPropagation?.()
     })
 
@@ -302,6 +322,7 @@ export default function ConveyorCurveTool() {
       // facing triangle left behind lingers over the canvas with no owner.
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
+      clearPlacementPreview()
     }
     // Deliberately not `previewNode`: the angle and the hand are read through a
     // ref, so cycling either does not tear the tool down and reset the rotation.

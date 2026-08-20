@@ -22,11 +22,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { resolveLift } from './levels'
@@ -38,7 +43,8 @@ import { PalletLiftNode } from './schema'
 const ROTATION_STEP = Math.PI / 2
 
 export default function PalletLiftTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.palletLiftBrush)
 
@@ -125,6 +131,17 @@ export default function PalletLiftTool() {
       setCursorRotationY(rotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(position)
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(ghostRef.current as unknown as AnyNode),
+          position,
+          rotation: [0, rotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -171,7 +188,10 @@ export default function PalletLiftTool() {
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
       useViewer.getState().setSelection({ selectedIds: [committed.id as AnyNodeId] })
       triggerSFX('sfx:item-place')
-      setPlacementSerial((serial) => serial + 1)
+
+      disarmPlacementToolOnCommit(() => {
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -212,6 +232,7 @@ export default function PalletLiftTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       useAlignmentGuides.getState().clear()
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode, boxDimensions])
 

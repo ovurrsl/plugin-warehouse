@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { BENCH_VARIANT_IDS } from './catalog'
@@ -51,7 +56,8 @@ const ROTATION_STEP = Math.PI / 4
  * büyütülüp yeşil kutuyla taahhüt edilebilir.
  */
 export default function BenchTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.benchBrush)
   const setBrush = useWarehouseStore((s) => s.setBenchBrush)
@@ -163,6 +169,17 @@ export default function BenchTool() {
         rotationY: rotationRef.current,
         depth: depthM(ghostRef.current),
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(ghostRef.current as unknown as AnyNode),
+          position,
+          rotation: [0, rotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -217,7 +234,10 @@ export default function BenchTool() {
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
       useViewer.getState().setSelection({ selectedIds: [committed.id as AnyNodeId] })
       triggerSFX('sfx:item-place')
-      setPlacementSerial((serial) => serial + 1)
+
+      disarmPlacementToolOnCommit(() => {
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -276,6 +296,7 @@ export default function BenchTool() {
       // hizalama kılavuzları için: araç bırakılınca tuvalde asılı kalırlardı.
       useFacingPose.getState().clear()
       useAlignmentGuides.getState().clear()
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode, setBrush])
 

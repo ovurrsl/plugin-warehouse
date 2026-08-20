@@ -19,10 +19,14 @@ import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef, useState } from 'react'
 import { slabAt } from '../host-adapter'
 import {
+  clearPlacementPreview,
   collectSlabs,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
   subscribeGridClicks,
   subscribeGridMove,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { MAX_VERTICES } from './constants'
@@ -57,7 +61,8 @@ const NO_RAYCAST = () => {}
  */
 
 export default function RouteTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const gridStep = useEditor((s) => s.gridSnapStep)
   const brush = useWarehouseStore((s) => s.routeBrush)
 
@@ -160,7 +165,10 @@ export default function RouteTool() {
       useScene.getState().createNode(node as unknown as AnyNode, activeLevelId as AnyNodeId)
       useViewer.getState().setSelection({ selectedIds: [node.id as AnyNodeId] })
       triggerSFX('sfx:item-place')
-      clearDraft()
+
+      disarmPlacementToolOnCommit(() => {
+        clearDraft()
+      })
     }
 
     const unsubscribeClicks = subscribeGridClicks((_event, detail) => {
@@ -228,6 +236,7 @@ export default function RouteTool() {
       clearDraft()
       cursorRef.current = null
       setCursor(null)
+      clearPlacementPreview()
     }
   }, [activeLevelId])
 

@@ -10,18 +10,152 @@ import {
   resolveAlignment,
   sceneRegistry,
   snapPointToGrid,
+  useScene,
 } from '@pascal-app/core'
 import {
   isAlignmentGuideActive,
   isGridSnapActive,
   isMagneticSnapActive,
   useEditor,
+  useFacingPose,
+  usePlacementPreview,
 } from '@pascal-app/editor'
+import { useViewer } from '@pascal-app/viewer'
+import { useMemo } from 'react'
 import { Vector3 } from 'three'
 import { asSlab, type SlabLike, slabAt } from './host-adapter'
 import { deckSlabId, mezzanineContains } from './mezzanine/deck-slabs'
 import type { MezzanineNode } from './mezzanine/schema'
 import { useWarehouseStore } from './store'
+
+/**
+ * Resolves the active level ID for placement.
+ *
+ * If `selection.levelId` is valid in the scene nodes, returns it.
+ * Otherwise, falls back to the ambient level (Level 0 or lowest indexed level)
+ * of the currently selected building, the first building in the scene, or
+ * any Level 0 in the scene.
+ */
+export function resolveActiveLevelId(
+  nodes: Readonly<Record<string, unknown>>,
+  selection: { levelId?: string | null; buildingId?: string | null },
+): string | null {
+  if (selection.levelId && nodes[selection.levelId]) {
+    return selection.levelId
+  }
+
+  const findBestLevelInBuilding = (buildingId: string): string | null => {
+    const building = nodes[buildingId] as { type?: string; children?: unknown[] } | undefined
+    if (building?.type !== 'building' || !Array.isArray(building.children)) return null
+    let zeroId: string | null = null
+    let lowestId: string | null = null
+    let lowestIdx = Number.POSITIVE_INFINITY
+    for (const childId of building.children) {
+      if (typeof childId !== 'string') continue
+      const child = nodes[childId] as { type?: string; level?: number; id?: string } | undefined
+      if (child?.type !== 'level') continue
+      if (child.level === 0) {
+        zeroId = childId
+        break
+      }
+      if (typeof child.level === 'number' && child.level < lowestIdx) {
+        lowestIdx = child.level
+        lowestId = childId
+      } else if (!lowestId) {
+        lowestId = childId
+      }
+    }
+    return zeroId ?? lowestId
+  }
+
+  if (selection.buildingId) {
+    const fromBuilding = findBestLevelInBuilding(selection.buildingId)
+    if (fromBuilding) return fromBuilding
+  }
+
+  // Fallback across the whole scene
+  let firstBuildingLevel: string | null = null
+  let fallbackLevelZero: string | null = null
+  let fallbackLowestLevel: string | null = null
+  let fallbackLowestIdx = Number.POSITIVE_INFINITY
+
+  for (const node of Object.values(nodes)) {
+    const candidate = node as { id?: string; type?: string; level?: number } | undefined
+    if (!candidate || typeof candidate.id !== 'string') continue
+    if (candidate.type === 'building' && !firstBuildingLevel) {
+      firstBuildingLevel = findBestLevelInBuilding(candidate.id)
+    }
+    if (candidate.type === 'level') {
+      if (candidate.level === 0) {
+        fallbackLevelZero = candidate.id
+      } else if (typeof candidate.level === 'number' && candidate.level < fallbackLowestIdx) {
+        fallbackLowestIdx = candidate.level
+        fallbackLowestLevel = candidate.id
+      } else if (!fallbackLowestLevel) {
+        fallbackLowestLevel = candidate.id
+      }
+    }
+  }
+
+  return firstBuildingLevel ?? fallbackLevelZero ?? fallbackLowestLevel
+}
+
+/**
+ * Hook to retrieve the active level ID for placement tools with ambient building fallback.
+ */
+export function useActiveLevelId(): string | null {
+  const selectedLevelId = useViewer((s) => s.selection.levelId)
+  const selectedBuildingId = useViewer((s) => s.selection.buildingId)
+  const nodes = useScene((s) => s.nodes)
+
+  return useMemo(
+    () =>
+      resolveActiveLevelId(nodes as Readonly<Record<string, unknown>>, {
+        levelId: selectedLevelId,
+        buildingId: selectedBuildingId,
+      }),
+    [selectedLevelId, selectedBuildingId, nodes],
+  )
+}
+
+/**
+ * Hook to retrieve the active level node object (or null).
+ */
+export function useActiveLevel(): AnyNode | null {
+  const activeLevelId = useActiveLevelId()
+  const nodes = useScene((s) => s.nodes) as Readonly<Record<string, AnyNode>>
+  return activeLevelId ? nodes[activeLevelId] ?? null : null
+}
+
+/**
+ * Publishes the 2D placement preview ghost to `usePlacementPreview`.
+ */
+export function publishPlacementPreview(ghostNode: unknown, activeLevelNode?: unknown): void {
+  usePlacementPreview.getState().set((ghostNode as AnyNode) ?? null, (activeLevelNode as AnyNode) ?? null)
+}
+
+/**
+ * Clears the 2D placement preview ghost in `usePlacementPreview`.
+ */
+export function clearPlacementPreview(): void {
+  usePlacementPreview.getState().clear()
+}
+
+/**
+ * Disarms the placement tool if continuation mode is 'single' (default).
+ * In 'repeat' mode, keeps the tool armed for subsequent placements.
+ */
+export function disarmPlacementToolOnCommit(onRepeat?: () => void): void {
+  const continuation = useEditor.getState().getContinuation?.('point') ?? 'single'
+  if (continuation === 'repeat') {
+    onRepeat?.()
+  } else {
+    clearPlacementPreview()
+    useFacingPose.getState().clear()
+    useEditor.getState().setTool(null)
+    useEditor.getState().setMode('select')
+  }
+}
 
 /**
  * Placement plumbing, re-derived rather than imported.

@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { placementPose } from './placement-pose'
@@ -53,7 +58,8 @@ const EXTENSION_STEP = 0.1
  * ister — koyduktan sonra panelde bulmak değil.
  */
 export default function TelescopicTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.telescopicBrush)
 
@@ -179,6 +185,17 @@ export default function TelescopicTool() {
       setCursorRotationY(poseRotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(visual)
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(ghostNodeRef.current as unknown as AnyNode),
+          position: visual,
+          rotation: [0, poseRotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -243,12 +260,14 @@ export default function TelescopicTool() {
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
-      setPlacementSerial((serial) => serial + 1)
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -309,6 +328,7 @@ export default function TelescopicTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       useAlignmentGuides.getState().clear()
+      clearPlacementPreview()
     }
     // `boxDimensions` KASTEN bağımlılık değil: uzamayla her basışta değişir
     // ve efekti yeniden kurmak hayaleti kaybettirirdi. Geçerlilik hesabı onu

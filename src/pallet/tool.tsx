@@ -24,11 +24,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { unitLoadHeightOf } from './cargo-types'
@@ -70,7 +75,8 @@ const ROTATION_STEP = Math.PI / 4
  *     `grid:click`.
  */
 export default function PalletTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.palletBrush)
 
@@ -279,6 +285,17 @@ export default function PalletTool() {
         rotationY,
         depth: boxDimensions[2],
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(ghostNodeRef.current as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationY, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -345,22 +362,15 @@ export default function PalletTool() {
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
-      // The pallet just placed is a valid alignment target for the next one.
-      //
-      // The tool stays armed rather than reading `getContinuation('point')`
-      // like the built-in point tools: `continuationContextOf` matches a
-      // hardcoded kind set that a plugin kind can never join, so the
-      // once/repeat chip is not rendered while this tool is active. Honouring a
-      // setting the user cannot see or change would disarm the tool after one
-      // pallet with nothing on screen explaining why.
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
-      // The id just spent belongs to a real pallet now; the next ghost needs its
-      // own, or two pallets placed in a row would resolve to the same load.
-      setPlacementSerial((serial) => serial + 1)
+      disarmPlacementToolOnCommit(() => {
+        // In repeat mode, refresh alignment anchors and mint fresh id
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -405,6 +415,7 @@ export default function PalletTool() {
       // facing triangle left behind lingers over the canvas with no owner.
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode, boxDimensions])
 

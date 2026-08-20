@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { areClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { multiplyPlacements, runExtent } from './multiply'
@@ -61,7 +66,8 @@ const GHOST_LIMIT = 200
  * user reaching for one behaviour and silently getting the other as well.
  */
 export default function PalletRackTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.rackBrush)
 
@@ -260,6 +266,17 @@ export default function PalletRackTool() {
         rotationY: rotationRef.current,
         depth: totalDepth(previewNode),
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewNode as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -318,12 +335,14 @@ export default function PalletRackTool() {
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
-      // The racks just placed are alignment targets for the next one.
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
+      disarmPlacementToolOnCommit(() => {
+        // The racks just placed are alignment targets for the next one.
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+      })
       event.stopPropagation?.()
     })
 
@@ -377,6 +396,7 @@ export default function PalletRackTool() {
       // facing triangle left behind lingers over the canvas with no owner.
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
+      clearPlacementPreview()
     }
     // Deliberately not `extent` or `boxDimensions`: both are read through refs
     // above, so growing the run with `[` / `]` adjusts the box in place instead

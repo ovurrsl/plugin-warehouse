@@ -1,8 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { emitter } from '@pascal-app/core'
+import { type AnyNode, emitter } from '@pascal-app/core'
+import { useEditor, usePlacementPreview } from '@pascal-app/editor'
 import { warehousePlugin } from './index'
+import { PalletNode } from './pallet/schema'
 import {
+  clearPlacementPreview,
   CLICK_TRIGGER_KINDS,
+  disarmPlacementToolOnCommit,
+  publishPlacementPreview,
+  resolveActiveLevelId,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
@@ -200,3 +206,229 @@ describe('aynı noktayı iki kez bildirmemek', () => {
     expect(samePlacementPoint([1, 0, 2], [1, 0.001, 2])).toBe(false)
   })
 })
+
+describe('resolveActiveLevelId — ambient kat çözümü', () => {
+  const sampleNodes: Record<string, unknown> = {
+    'bldg-1': {
+      id: 'bldg-1',
+      type: 'building',
+      children: ['lvl-1', 'lvl-0', 'lvl-2'],
+    },
+    'lvl-0': {
+      id: 'lvl-0',
+      type: 'level',
+      level: 0,
+      parentId: 'bldg-1',
+    },
+    'lvl-1': {
+      id: 'lvl-1',
+      type: 'level',
+      level: 1,
+      parentId: 'bldg-1',
+    },
+    'lvl-2': {
+      id: 'lvl-2',
+      type: 'level',
+      level: 2,
+      parentId: 'bldg-1',
+    },
+  }
+
+  test('açıkça seçilmiş levelId doğrudan kazanır', () => {
+    const levelId = resolveActiveLevelId(sampleNodes, {
+      levelId: 'lvl-2',
+      buildingId: 'bldg-1',
+    })
+    expect(levelId).toBe('lvl-2')
+  })
+
+  test('levelId null ve buildingId seçiliyken binanın Level 0 katına düşer', () => {
+    const levelId = resolveActiveLevelId(sampleNodes, {
+      levelId: null,
+      buildingId: 'bldg-1',
+    })
+    expect(levelId).toBe('lvl-0')
+  })
+
+  test('levelId geçersiz / sahnede yoksa ambient Level 0 katına düşer', () => {
+    const levelId = resolveActiveLevelId(sampleNodes, {
+      levelId: 'non-existent',
+      buildingId: 'bldg-1',
+    })
+    expect(levelId).toBe('lvl-0')
+  })
+
+  test('hiçbir şey seçili değilken sahnedeki ilk binanın Level 0 katına düşer', () => {
+    const levelId = resolveActiveLevelId(sampleNodes, {
+      levelId: null,
+      buildingId: null,
+    })
+    expect(levelId).toBe('lvl-0')
+  })
+
+  test('Level 0 olmayan binada en düşük indeksli kata düşer', () => {
+    const customNodes: Record<string, unknown> = {
+      'bldg-x': {
+        id: 'bldg-x',
+        type: 'building',
+        children: ['lvl-5', 'lvl-3'],
+      },
+      'lvl-5': { id: 'lvl-5', type: 'level', level: 5 },
+      'lvl-3': { id: 'lvl-3', type: 'level', level: 3 },
+    }
+    const levelId = resolveActiveLevelId(customNodes, {
+      buildingId: 'bldg-x',
+    })
+    expect(levelId).toBe('lvl-3')
+  })
+
+  test('bina olmayan ama kat bulunan sahnede Level 0 katına düşer', () => {
+    const standaloneNodes: Record<string, unknown> = {
+      'lvl-standalone-0': { id: 'lvl-standalone-0', type: 'level', level: 0 },
+    }
+    const levelId = resolveActiveLevelId(standaloneNodes, {})
+    expect(levelId).toBe('lvl-standalone-0')
+  })
+
+  test('boş sahnede null döner', () => {
+    const levelId = resolveActiveLevelId({}, {})
+    expect(levelId).toBeNull()
+  })
+})
+
+describe('2D placement preview — usePlacementPreview entegrasyonu', () => {
+  test('publishPlacementPreview ephemeral store’a ghost düğümü ve aktif katı yazar', () => {
+    const ghost = { id: 'pallet_ghost', type: 'warehouse:pallet', position: [1, 0, 2] } as never
+    const level = { id: 'level_0', type: 'level' } as never
+
+    publishPlacementPreview(ghost, level)
+
+    const state = usePlacementPreview.getState()
+    expect(state.node).toEqual(ghost)
+    expect(state.parentNode).toEqual(level)
+  })
+
+  test('clearPlacementPreview ephemeral store’u sıfırlar', () => {
+    const ghost = { id: 'pallet_ghost', type: 'warehouse:pallet', position: [1, 0, 2] } as never
+    publishPlacementPreview(ghost)
+    expect(usePlacementPreview.getState().node).not.toBeNull()
+
+    clearPlacementPreview()
+    const state = usePlacementPreview.getState()
+    expect(state.node).toBeNull()
+    expect(state.parentNode).toBeNull()
+  })
+})
+
+describe('disarmPlacementToolOnCommit — araç bırakma mantığı', () => {
+  test('single modunda (varsayılan) aracı ve modu select yapar, preview’ı temizler', () => {
+    useEditor.getState().setMode('build')
+    useEditor.getState().setTool('pallet' as never)
+    useEditor.getState().setContinuation('point', 'single')
+    publishPlacementPreview({ id: 'ghost', type: 'warehouse:pallet' } as never)
+
+    let repeatCalled = false
+    disarmPlacementToolOnCommit(() => {
+      repeatCalled = true
+    })
+
+    expect(repeatCalled).toBe(false)
+    expect(useEditor.getState().mode).toBe('select')
+    expect(useEditor.getState().tool).toBeNull()
+    expect(usePlacementPreview.getState().node).toBeNull()
+  })
+
+  test('repeat modunda aracı silahsızlandırmaz, onRepeat geri çağrısını çalıştırır', () => {
+    useEditor.getState().setMode('build')
+    useEditor.getState().setTool('pallet' as never)
+    useEditor.getState().setContinuation('point', 'repeat')
+
+    let repeatCalled = false
+    disarmPlacementToolOnCommit(() => {
+      repeatCalled = true
+    })
+
+    expect(repeatCalled).toBe(true)
+    expect(useEditor.getState().mode).toBe('build')
+    expect(useEditor.getState().tool).toBe('pallet' as never)
+  })
+})
+
+describe('ambient kat çözümleme & 2D Floorplan görünürlük entegrasyonu', () => {
+  test('ambient bina görünümünde yerleştirilen düğüm Level 0 parentId alır ve 2D DFS ile anında taranır', () => {
+    // 1. Sahne: 1 bina ve Level 0 katı
+    const level0 = {
+      id: 'level_bldg1_0',
+      type: 'level',
+      object: 'node',
+      level: 0,
+      parentId: 'building_1',
+      children: [],
+      visible: true,
+      metadata: {},
+    } as unknown as AnyNode
+
+    const building = {
+      id: 'building_1',
+      type: 'building',
+      object: 'node',
+      parentId: null,
+      children: [level0.id],
+      visible: true,
+      metadata: {},
+    } as unknown as AnyNode
+
+    const initialNodes: Record<string, AnyNode> = {
+      [building.id]: building,
+      [level0.id]: level0,
+    }
+
+    // 2. Kullanıcı 2D ambient bina modunda (level seçimi yok, bina seçili veya sahne genelinde)
+    const selection = { levelId: null, buildingId: 'building_1' }
+    const resolvedLevelId = resolveActiveLevelId(initialNodes, selection)
+    expect(resolvedLevelId).toBe('level_bldg1_0')
+
+    // 3. Yerleştirilen warehouse düğümü resolvedLevelId'yi parentId olarak alır
+    const palletNode = PalletNode.parse({
+      id: 'pallet_placed_1',
+      position: [2, 0, 3],
+      rotation: [0, 0, 0],
+      parentId: resolvedLevelId,
+    })
+
+    expect(palletNode.parentId).toBe('level_bldg1_0')
+
+    // 4. Sahneye düğüm eklendiğinde katın çocuklarına girer
+    const existingChildren = (level0 as unknown as { children?: string[] }).children ?? []
+    const updatedLevel0 = {
+      ...level0,
+      children: [...existingChildren, palletNode.id],
+    } as unknown as AnyNode
+
+    const updatedNodes: Record<string, AnyNode> = {
+      ...initialNodes,
+      [level0.id]: updatedLevel0,
+      [palletNode.id]: palletNode as unknown as AnyNode,
+    }
+
+    // 5. 2D FloorplanRegistryLayer DFS algoritmasını simüle et:
+    // FloorplanRegistryLayer aktif kat (Level 0) üzerinden DFS traversal yapar
+    const visitedIds: string[] = []
+    const visit = (id: string) => {
+      const node = updatedNodes[id]
+      if (!node) return
+      visitedIds.push(id)
+      const childIds = (node as { children?: string[] }).children
+      if (Array.isArray(childIds)) {
+        for (const cid of childIds) visit(cid)
+      }
+    }
+
+    visit(resolvedLevelId!)
+
+    // Yerleştirilen düğüm doğrudan 2D kat DFS'i içinde yer alır — 2D/3D toggle gerektirmez
+    expect(visitedIds).toContain('pallet_placed_1')
+    expect(visitedIds).toEqual(['level_bldg1_0', 'pallet_placed_1'])
+  })
+})
+

@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { footprintCentreZM, footprintM } from './oblique-metrics'
 import ConveyorObliquePreview from './oblique-preview'
@@ -54,7 +59,8 @@ const ROTATION_STEP = Math.PI / 4
  * the wedge between them, which is where the line the branch feeds runs.
  */
 export default function ConveyorObliqueTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
 
   const cursorRef = useRef<Group>(null)
@@ -165,6 +171,17 @@ export default function ConveyorObliqueTool() {
         rotationY: rotationY,
         depth: footprintM(previewRef.current)[1],
       })
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewRef.current as unknown as AnyNode),
+          position: visual,
+          rotation: [0, rotationY, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -235,11 +252,14 @@ export default function ConveyorObliqueTool() {
 
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewRef.current.id,
-        activeLevelId,
-      )
+
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewRef.current.id,
+          activeLevelId,
+        )
+      })
       event.stopPropagation?.()
     })
 
@@ -293,6 +313,7 @@ export default function ConveyorObliqueTool() {
       // facing triangle left behind lingers over the canvas with no owner.
       useAlignmentGuides.getState().clear()
       useFacingPose.getState().clear()
+      clearPlacementPreview()
     }
     // Deliberately not `previewNode`: the branch side is read through a ref, so
     // flipping it does not tear the tool down and reset the rotation.

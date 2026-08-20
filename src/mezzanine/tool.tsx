@@ -10,7 +10,15 @@ import {
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { electSupportSlab, subscribeGridMove, subscribePlacementClicks } from '../placement'
+import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
+  electSupportSlab,
+  subscribeGridMove,
+  subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
+} from '../placement'
 import { useWarehouseStore } from '../store'
 import { GROUND_SUPPORT_ID } from './deck-slabs'
 import { closeEnough, finishOutline, outlineBounds, type Point2, rectangleFrom } from './draw-shape'
@@ -43,7 +51,8 @@ import { MezzanineNode } from './schema'
  * İki kapanış yolu — ilk köşeye dönmek ve Enter — bu yüzden yeterli sayıldı.
  */
 export default function MezzanineTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const brush = useWarehouseStore((s) => s.mezzanineBrush)
 
   const [cursor, setCursor] = useState<Point2>([0, 0])
@@ -120,10 +129,12 @@ export default function MezzanineTool() {
       useViewer.getState().setSelection({ selectedIds: [committed.id as AnyNodeId] })
       triggerSFX('sfx:item-place')
 
-      draftRef.current = []
-      setDraft([])
-      setBlocked(false)
-      setPlacementSerial((serial) => serial + 1)
+      disarmPlacementToolOnCommit(() => {
+        draftRef.current = []
+        setDraft([])
+        setBlocked(false)
+        setPlacementSerial((serial) => serial + 1)
+      })
       return true
     }
 
@@ -213,6 +224,7 @@ export default function MezzanineTool() {
       unsubscribeClicks()
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode])
 

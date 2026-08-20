@@ -23,11 +23,16 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Group } from 'three'
 import { isClearAt } from '../clash'
 import {
+  clearPlacementPreview,
+  disarmPlacementToolOnCommit,
   electSupportSlab,
+  publishPlacementPreview,
   resolveAlignedPlacement,
   samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
+  useActiveLevel,
+  useActiveLevelId,
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { placementPose } from './placement-pose'
@@ -45,7 +50,8 @@ const ROTATION_STEP = Math.PI / 4
  * tuşu yok (helis sabit), gerisi teleskopikle aynı plumbing.
  */
 export default function SpiralTool() {
-  const activeLevelId = useViewer((s) => s.selection.levelId)
+  const activeLevelId = useActiveLevelId()
+  const activeLevelNode = useActiveLevel()
   const unit = useViewer((s) => s.unit)
   const brush = useWarehouseStore((s) => s.spiralBrush)
 
@@ -151,6 +157,17 @@ export default function SpiralTool() {
       setCursorRotationY(poseRotationRef.current)
       lastPositionRef.current = position
       recomputeValidity(visual)
+
+      // Publish 2D floorplan placement preview
+      publishPlacementPreview(
+        {
+          ...(previewNodeRef.current as unknown as AnyNode),
+          position: visual,
+          rotation: [0, poseRotationRef.current, 0],
+          parentId: activeLevelId,
+        },
+        activeLevelNode,
+      )
     }
 
     const unsubscribeMove = subscribeGridMove(([rawX, , rawZ]) => {
@@ -210,12 +227,14 @@ export default function SpiralTool() {
       triggerSFX('sfx:item-place')
       useAlignmentGuides.getState().clear()
 
-      alignmentCandidates = collectAlignmentAnchors(
-        useScene.getState().nodes,
-        previewNode.id,
-        activeLevelId,
-      )
-      setPlacementSerial((serial) => serial + 1)
+      disarmPlacementToolOnCommit(() => {
+        alignmentCandidates = collectAlignmentAnchors(
+          useScene.getState().nodes,
+          previewNode.id,
+          activeLevelId,
+        )
+        setPlacementSerial((serial) => serial + 1)
+      })
       event.stopPropagation?.()
     })
 
@@ -258,6 +277,7 @@ export default function SpiralTool() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
       useAlignmentGuides.getState().clear()
+      clearPlacementPreview()
     }
   }, [activeLevelId, previewNode])
 

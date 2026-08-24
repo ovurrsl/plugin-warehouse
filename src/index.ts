@@ -75,8 +75,12 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   // Must string-match `warehousePlugin.id` — this is the key the host stores in
   // the scene graph's `installedPlugins`, and the one the rail filters on.
   pluginId: PLUGIN_ID,
-  label: 'Warehouse',
-  description: 'Pallet racking, pallets, and warehouse layout tools.',
+  // Display name only. `PLUGIN_ID` and `KIND_PREFIX` stay `warehouse` — the
+  // host writes the id into the scene graph's `installedPlugins` and every
+  // placed node carries a `warehouse:` kind, so renaming either would
+  // uninstall the plugin from existing projects and orphan their nodes.
+  label: 'Asset',
+  description: 'Pallets, racking, conveyors, and warehouse layout tools.',
   icon: { kind: 'iconify', name: 'lucide:warehouse' },
   // Fills the host's plugin detail card — `plugins-panel.tsx` renders Creator
   // and a "View plugin" link from these, and omits each row when its field is

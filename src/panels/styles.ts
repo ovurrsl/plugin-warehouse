@@ -123,17 +123,18 @@ export const tokens = {
     color: fade(40),
   },
   /**
-   * Five tiles to a row.
+   * Four tiles to a row.
    *
    * A fixed count rather than `auto-fill, minmax(…)`: the rail has one width,
    * so an intrinsic track size only reintroduces the question of how many fit
    * and answers it differently as the label lengths change. `minmax(0, 1fr)`
    * is what lets a long label ellipsize instead of forcing the track wider —
-   * `1fr` alone floors at min-content and would push the row to four.
+   * `1fr` alone floors at min-content and a long label would push the row to
+   * three.
    */
   tileGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
     gap: '0.25rem',
   },
   tileIcon: {

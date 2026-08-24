@@ -58,7 +58,7 @@ export default function WarehousePanel() {
     <div style={tokens.root}>
       <header style={tokens.header}>
         <div style={tokens.titleRow}>
-          <h2 style={tokens.title}>Warehouse</h2>
+          <h2 style={tokens.title}>Asset</h2>
           <span style={tokens.countChip}>{placed} placed</span>
         </div>
         <SegmentedControl

@@ -272,49 +272,84 @@ export type PlacementClickEvent = { stopPropagation?: () => void }
  * follow-up with a window-capture listener. That helper is not published, so
  * the guard lives here instead.
  *
- * Collapsed on time AND position rather than on time alone: two genuine
- * placements a tenth of a second apart at the *same* point are a double-click,
- * which no tool in this package wants to treat as two.
+ * Two separate tests, because the pair this exists to collapse and a genuine
+ * double-click are told apart by different things.
+ *
+ * **The pair.** It is always a node-surface click followed by `grid:click`, and
+ * the two carry DIFFERENT positions: the first is raycast against the node's
+ * own collider, the second against the ground plane, so a conveyor module
+ * standing 0.8 m tall puts them the better part of a metre apart in XZ. Testing
+ * position here is therefore not a tightening, it is the hole — it was the
+ * reason one click placed two stacked conveyors. What identifies the pair is
+ * its SHAPE (node click, then grid click, within a frame or two), so that is
+ * what is matched.
+ *
+ * **A double-click.** Two placements a tenth of a second apart at the same
+ * point, which no tool in this package wants to treat as two. That one really
+ * is a time-and-position question, and it keeps the original test.
  */
 const DUPLICATE_WINDOW_MS = 200
 const SAME_POINT_M = 0.001
 
+/**
+ * How long after a node-surface click the browser's own click can still arrive.
+ *
+ * `pointerup` and `click` are the same gesture and land within a frame of each
+ * other; the allowance is generous against a stalled main thread but still far
+ * below the ~100 ms floor of a deliberate second click.
+ */
+const SAME_GESTURE_MS = 60
+
 let lastFiredAt = 0
 let lastPoint: readonly [number, number] | null = null
+let lastWasNodeSurface = false
 
-function isFollowUpOfSameClick(event: PlacementClickEvent): boolean {
+function isFollowUpOfSameClick(event: PlacementClickEvent, fromGrid: boolean): boolean {
   const now = Date.now()
   const position = (event as { position?: [number, number, number] }).position
   const here: readonly [number, number] | null = position ? [position[0], position[2]] : null
 
-  const withinWindow = now - lastFiredAt < DUPLICATE_WINDOW_MS
+  const sinceLast = now - lastFiredAt
+
+  // The documented pair: a node-surface click, then the canvas's own click.
+  // Position is deliberately not consulted — the two never agree on it.
+  if (fromGrid && lastWasNodeSurface && sinceLast < SAME_GESTURE_MS) return true
+
   const samePlace =
     here === null ||
     lastPoint === null ||
     (Math.abs(here[0] - lastPoint[0]) < SAME_POINT_M &&
       Math.abs(here[1] - lastPoint[1]) < SAME_POINT_M)
 
-  if (withinWindow && samePlace) return true
+  if (sinceLast < DUPLICATE_WINDOW_MS && samePlace) return true
+
   lastFiredAt = now
   lastPoint = here
+  lastWasNodeSurface = !fromGrid
   return false
 }
 
 export function subscribePlacementClicks(
   handler: (event: PlacementClickEvent) => void,
 ): () => void {
-  const guarded = (event: PlacementClickEvent) => {
-    if (isFollowUpOfSameClick(event)) return
-    // Bekleyen hareket ÖNCE işlenir: tıklama, son hareketin bıraktığı konuma
-    // yerleştiriyor ve o hareket bu karenin rAF'ını beklemiş olabilir.
-    // Boşaltmadan çağırmak, imlecin bir kare geride kalan yerine koyardı.
-    flushPendingGridMoves()
-    handler(event)
-  }
-  const events = CLICK_TRIGGER_KINDS.map((kind) => `${kind}:click`)
-  for (const name of events) emitter.on(name as never, guarded as never)
+  // Bound per kind rather than through one shared listener, because the guard
+  // has to know whether an event came from the canvas or from a node's own
+  // surface — that is what tells the double-fire pair from two real clicks.
+  const bound = CLICK_TRIGGER_KINDS.map((kind) => {
+    const fromGrid = kind === 'grid'
+    const guarded = (event: PlacementClickEvent) => {
+      if (isFollowUpOfSameClick(event, fromGrid)) return
+      // Bekleyen hareket ÖNCE işlenir: tıklama, son hareketin bıraktığı konuma
+      // yerleştiriyor ve o hareket bu karenin rAF'ını beklemiş olabilir.
+      // Boşaltmadan çağırmak, imlecin bir kare geride kalan yerine koyardı.
+      flushPendingGridMoves()
+      handler(event)
+    }
+    return { name: `${kind}:click`, guarded }
+  })
+  for (const { name, guarded } of bound) emitter.on(name as never, guarded as never)
   return () => {
-    for (const name of events) emitter.off(name as never, guarded as never)
+    for (const { name, guarded } of bound) emitter.off(name as never, guarded as never)
   }
 }
 

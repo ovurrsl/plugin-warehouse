@@ -472,6 +472,120 @@ describe('Adversarial Challenge 4: Rapid multiple placements in repeat vs single
     unsubscribeMove()
     unsubscribeClicks()
   })
+
+  /**
+   * The shape that actually shipped: one click over a conveyor placed two
+   * stacked conveyors.
+   *
+   * The test above emits the pair as two `grid:click`s at the SAME point, which
+   * is the double-click case — and the position test in the guard already
+   * caught that. The real pair never agrees on position: the node click is
+   * raycast against the module's own collider and the grid click against the
+   * ground plane, so a module standing 0.8 m tall reports XZ the better part of
+   * a metre away. That is why a guard keyed on position let the second commit
+   * through, and why this case needs its own test.
+   */
+  test('a node-surface click and the browser click that follows it commit once, though their positions differ', async () => {
+    // The duplicate guard keeps module-level state across tests. Let its
+    // window lapse first, or this test's opening click is collapsed as the
+    // previous test's double-click and the assertion passes for a false reason.
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    const commits: Array<[number, number, number]> = []
+    let lastPosition: [number, number, number] = [5, 0, 5]
+
+    const unsubscribeMove = subscribeGridMove((pos) => {
+      lastPosition = pos
+    })
+    const unsubscribeClicks = subscribePlacementClicks(() => {
+      commits.push([...lastPosition])
+    })
+
+    try {
+      emitter.emit('grid:move', {
+        position: [5, 0, 5],
+        localPosition: [5, 0, 5],
+        nativeEvent: {} as never,
+      } as never)
+
+      // 1. The node synthesizes its own click on pointerup, hit against the
+      //    module's collider — a different surface, so a different point.
+      emitter.emit('warehouse:conveyor-roller:click' as never, {
+        position: [5.62, 0.82, 5.41],
+        localPosition: [5.62, 0.82, 5.41],
+        nativeEvent: {} as never,
+      } as never)
+
+      // 2. The browser's real click reaches the canvas listener a frame later,
+      //    hit against the ground plane.
+      emitter.emit('grid:click', {
+        position: [5, 0, 5],
+        localPosition: [5, 0, 5],
+        nativeEvent: {} as never,
+      } as never)
+
+      expect(commits.length).toBe(1)
+    } finally {
+      // In a `finally` because the guard's state is module-level: a throw that
+      // skipped these would leave this handler subscribed, and the next test's
+      // events would then pass through the shared guard twice and be collapsed.
+      unsubscribeMove()
+      unsubscribeClicks()
+    }
+  })
+
+  /**
+   * The guard must not become a blanket "swallow every grid click that follows
+   * a node click" — a real second placement has to survive.
+   */
+  test('a grid click well after a node click is a second placement, not a follow-up', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    const commits: Array<[number, number, number]> = []
+    let lastPosition: [number, number, number] = [40, 0, 40]
+
+    const unsubscribeMove = subscribeGridMove((pos) => {
+      lastPosition = pos
+    })
+    const unsubscribeClicks = subscribePlacementClicks(() => {
+      commits.push([...lastPosition])
+    })
+
+    // Coordinates deliberately far from the test above: the duplicate guard
+    // keeps module-level state, so reusing a point within its 200 ms window
+    // would collapse this test's opening click as that test's double-click.
+    try {
+      emitter.emit('grid:move', {
+        position: [40, 0, 40],
+        localPosition: [40, 0, 40],
+        nativeEvent: {} as never,
+      } as never)
+      emitter.emit('warehouse:conveyor-roller:click' as never, {
+        position: [40.62, 0.82, 40.41],
+        localPosition: [40.62, 0.82, 40.41],
+        nativeEvent: {} as never,
+      } as never)
+
+      // Past the same-gesture allowance, and somewhere else entirely.
+      await new Promise((resolve) => setTimeout(resolve, 90))
+
+      emitter.emit('grid:move', {
+        position: [12, 0, 3],
+        localPosition: [12, 0, 3],
+        nativeEvent: {} as never,
+      } as never)
+      emitter.emit('grid:click', {
+        position: [12, 0, 3],
+        localPosition: [12, 0, 3],
+        nativeEvent: {} as never,
+      } as never)
+
+      expect(commits.length).toBe(2)
+    } finally {
+      unsubscribeMove()
+      unsubscribeClicks()
+    }
+  })
 })
 
 describe('Adversarial Challenge 5: Immediate 2D FloorplanRegistry Rendering without Unmounting/View Switching', () => {

@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { buildPalletRackFloorplan } from './floorplan'
 import { snapToNeighbourSeam } from './magnet'
@@ -92,6 +93,7 @@ export const palletRackDefinition = {
           movingIds as readonly string[],
           nodes as Readonly<Record<string, unknown>>,
         ),
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

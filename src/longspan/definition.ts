@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { buildLongspanFloorplan } from './floorplan'
 import { bayPitch, totalDepth, totalWidth } from './levels'
@@ -75,6 +76,7 @@ export const longspanDefinition = {
           movingIds as readonly string[],
           nodes as Readonly<Record<string, unknown>>,
         ),
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
 

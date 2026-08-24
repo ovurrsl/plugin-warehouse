@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { buildObliqueFloorplan } from './oblique-floorplan'
 import { localBoundsM, mainWidthM, moduleLengthM } from './oblique-metrics'
 import { conveyorObliqueParametrics } from './oblique-parametrics'
@@ -57,6 +58,7 @@ export const conveyorObliqueDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

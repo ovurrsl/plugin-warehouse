@@ -10,6 +10,7 @@ import {
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { isClearAt } from '../clash'
 import {
   clearPlacementPreview,
   disarmPlacementToolOnCommit,
@@ -90,23 +91,6 @@ export default function MezzanineTool() {
       const finished = finishOutline(points)
       if (!finished) return false
 
-      // Çizilen alan gerçekten boş mu. Alt bunu atlatır — rafın/M3'ün
-      // "zorla yerleştir" davranışının aynısı, aynı tuşla.
-      if (!altRef.current) {
-        const bounds = outlineBounds(finished.polygon)
-        const { valid } = spatialGridManager.canPlaceOnFloor(
-          activeLevelId,
-          finished.position,
-          [bounds.widthM, totalHeightM(previewNode), bounds.depthM],
-          [0, 0, 0],
-          [],
-        )
-        if (!valid) {
-          setBlocked(true)
-          return false
-        }
-      }
-
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const committed = MezzanineNode.parse({
         ...previewNode,
@@ -124,6 +108,45 @@ export default function MezzanineTool() {
           electSupportSlab(nodes, activeLevelId, finished.position[0], finished.position[2]) ??
           GROUND_SUPPORT_ID,
       })
+
+      /**
+       * Çizilen alan gerçekten boş mu. Alt bunu atlatır — rafın/M3'ün "zorla
+       * yerleştir" davranışının aynısı, aynı tuşla.
+       *
+       * İKİ TEST, ÇÜNKÜ İKİ AYRI SORU. Host'un `canPlaceOnFloor`'u plan
+       * dikdörtgenidir ve Y GÖRMEZ: bir asma katın sınırlayıcı dikdörtgeni
+       * kapladığı alanın tamamıdır, oysa bir asma katın varlık sebebi ALTININ
+       * boş kalması. Yalnız onunla yetinilse üstünde durduğu her şeyi
+       * reddederdi; yalnız o kaldırılsa kolonlar bir rafın dikmesinin içinden
+       * geçebilirdi ve hiçbir şey itiraz etmezdi.
+       *
+       * Bu yüzden 3B test önce: `occupiedVolumes` asma katı KOLONLARI VE
+       * GÜVERTESİ olarak tanımlıyor, aradaki hava değil. 2,5 m'lik bir güverte
+       * 2 m'lik rafın üstünden geçer; 6 m'lik rafın içinden geçemez. Sıralama
+       * önemli değil ama maliyeti önemli: 3B test aday düğümün poligonunu
+       * ister, o yüzden `committed` kurulduktan SONRA çalışır.
+       */
+      if (!altRef.current) {
+        const bounds = outlineBounds(finished.polygon)
+        const { valid } = spatialGridManager.canPlaceOnFloor(
+          activeLevelId,
+          finished.position,
+          [bounds.widthM, totalHeightM(previewNode), bounds.depthM],
+          [0, 0, 0],
+          [],
+        )
+        const clear = isClearAt({
+          node: committed,
+          position: finished.position,
+          rotationY: 0,
+          nodes,
+          ignore: [committed.id],
+        })
+        if (!(valid && clear)) {
+          setBlocked(true)
+          return false
+        }
+      }
 
       useScene.getState().createNode(committed as unknown as AnyNode, activeLevelId as AnyNodeId)
       useViewer.getState().setSelection({ selectedIds: [committed.id as AnyNodeId] })

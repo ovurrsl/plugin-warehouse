@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { crossesSurface, rectOpening, verticalOpening } from '../vertical-opening'
 import { buildPalletLiftFloorplan } from './floorplan'
@@ -67,7 +68,7 @@ export const palletLiftDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: { axes: ['x', 'z'], gridSnap: true, ...clashGuardedMove() },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},
 

@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { buildBoosterFloorplan } from './booster-floorplan'
 import { frameWidthM, localBoundsM, moduleLengthM } from './booster-metrics'
 import { conveyorBoosterParametrics } from './booster-parametrics'
@@ -52,6 +53,7 @@ export const conveyorBoosterDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

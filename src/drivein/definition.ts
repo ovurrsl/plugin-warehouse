@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { buildDriveInFloorplan } from './floorplan'
 import { frameTopY, lanePitch, totalDepth, totalWidth } from './lanes'
@@ -63,6 +64,7 @@ export const driveInRackDefinition = {
           movingIds as readonly string[],
           nodes as Readonly<Record<string, unknown>>,
         ),
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
 

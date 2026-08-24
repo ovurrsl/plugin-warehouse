@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { circleOpening, crossesSurface, verticalOpening } from '../vertical-opening'
 import { snapToLineEnd } from './port-magnet'
@@ -80,6 +81,7 @@ export const conveyorSpiralDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
 

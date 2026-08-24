@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { buildLauncherFloorplan } from './launcher-floorplan'
 import { frameWidthM, localBoundsM, moduleLengthM } from './launcher-metrics'
 import { conveyorLauncherParametrics } from './launcher-parametrics'
@@ -57,6 +58,7 @@ export const conveyorLauncherDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

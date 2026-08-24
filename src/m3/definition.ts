@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { bayPitch, totalDepth, totalWidth } from './bays'
 import { buildM3Floorplan } from './floorplan'
@@ -59,6 +60,7 @@ export const m3ShelvingDefinition = {
           movingIds as readonly string[],
           nodes as Readonly<Record<string, unknown>>,
         ),
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
 

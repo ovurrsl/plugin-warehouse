@@ -2,10 +2,16 @@
 
 import { Icon } from '@iconify/react'
 import { useScene } from '@pascal-app/core'
-import { SegmentedControl, useEditor } from '@pascal-app/editor'
+import {
+  ItemCatalog,
+  type ItemCatalogItem,
+  SegmentedControl,
+  cn,
+  useEditor,
+} from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useState } from 'react'
-import { CATALOG_SECTIONS, type CatalogItem, chipIsArmed, itemsInSection } from '../catalog'
+import { CATALOG_ITEMS, CATALOG_SECTIONS, type CatalogItem, chipIsArmed } from '../catalog'
 import { reportHostCompatibility } from '../compat'
 import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
@@ -19,7 +25,7 @@ import {
 import { type PanelTab, useWarehouseStore } from '../store'
 import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
 import { areaLabel, type LinearUnit, lengthLabel } from '../units'
-import { checkbox, listRow, tile, tokens } from './styles'
+import { checkbox, listRow, tokens } from './styles'
 
 /**
  * The plugin's left-rail panel. Two tabs share one rail slot: browse-and-place,
@@ -71,32 +77,158 @@ export default function WarehousePanel() {
 }
 
 function CatalogTab() {
+  const [activeSectionId, setActiveSectionId] = useState<string>(
+    CATALOG_SECTIONS[0]?.id ?? 'unit-loads',
+  )
+  const [search, setSearch] = useState<string>('')
+  const activeTool = useEditor((s) => s.tool)
+  const armedChipId = useWarehouseStore((s) => s.armedChipId)
+  const setBrush = useWarehouseStore((s) => s.setPalletBrush)
+  const setRouteBrush = useWarehouseStore((s) => s.setRouteBrush)
+
+  const activeSection = useMemo(
+    () => CATALOG_SECTIONS.find((s) => s.id === activeSectionId) ?? CATALOG_SECTIONS[0],
+    [activeSectionId],
+  )
+
+  const arm = (item: CatalogItem) => {
+    useWarehouseStore.getState().setArmedChipId(item.id)
+    if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
+    if (item.brush?.kind === 'route') {
+      setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
+    }
+    // Beş makine tile'ı beş ayrı model — fırçaya yazılmazsa hepsi
+    // varsayılan forklift'i yerleştirir ve katalog yalan söyler.
+    if (item.brush?.kind === 'truck') {
+      useWarehouseStore.getState().setTruckBrush({ model: item.brush.model as never })
+    }
+    if (item.brush?.kind === 'rack') {
+      useWarehouseStore.getState().setRackBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'telescopic') {
+      useWarehouseStore.getState().setTelescopicBrush({ model: item.brush.model as never })
+    }
+    if (item.brush?.kind === 'conveyor-spiral') {
+      useWarehouseStore.getState().setSpiralBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'mezzanine') {
+      useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
+    }
+    if (item.brush?.kind === 'longspan') {
+      useWarehouseStore.getState().setLongspanBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'm3') {
+      useWarehouseStore.getState().setM3Brush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'drive-in') {
+      useWarehouseStore.getState().setDriveInBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'live-racking') {
+      useWarehouseStore.getState().setLiveRackingBrush(item.brush.patch)
+    }
+    // Tezgâhın altı fişi de varyantını buradan yazıyor. YAZILMADIĞI sürece
+    // altısı da fırçadaki varsayılanı (`processing`) koyuyordu: katalog altı
+    // farklı masa gösterip tek masa yerleştiriyordu, ve fark yalnız gözle
+    // görülüyordu. `catalog.test.ts` artık her fırça kolunun bir uygulayıcısı
+    // olduğunu kilitliyor.
+    if (item.brush?.kind === 'bench') {
+      useWarehouseStore.getState().setBenchBrush({
+        ...item.brush.patch,
+        // Varyantla birlikte elle girilmiş ölçüler de temizleniyor —
+        // aracın `[`/`]` davranışının aynısı, aynı gerekçeyle.
+        width: undefined,
+        height: undefined,
+        depth: undefined,
+      })
+    }
+    if (item.brush?.kind === 'dockleveller') {
+      useWarehouseStore.getState().setDockLevellerBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'pallet-lift') {
+      useWarehouseStore.getState().setPalletLiftBrush(item.brush.patch)
+    }
+    if (item.brush?.kind === 'totecart') {
+      useWarehouseStore.getState().setToteCartBrush(item.brush.patch)
+    }
+    // The host types `tool` as its own built-in union, which by construction
+    // cannot know about plugin-contributed kinds. Arming by kind string is the
+    // path a catalog panel is expected to use.
+    const editor = useEditor.getState() as unknown as {
+      setTool: (value: string) => void
+      setMode: (value: string) => void
+    }
+    editor.setTool(item.kind)
+    editor.setMode('build')
+  }
+
   return (
     <div style={tokens.sections}>
-      {CATALOG_SECTIONS.map((section) => {
-        const items = itemsInSection(section.id)
-        return (
-          <section key={section.id} style={tokens.section}>
-            <div style={tokens.sectionHeader}>
-              <Icon height={14} icon={section.icon} style={tokens.sectionIcon} width={14} />
-              <h3 style={tokens.sectionTitle}>{section.label}</h3>
-            </div>
-            <p style={tokens.blurb}>{section.blurb}</p>
-            {section.id === 'unit-loads' && <LoadBrush />}
-            {section.id === 'conveyance' && <FlowSwitch />}
-            {section.id === 'handling' && <FleetSwitch />}
-            {items.length > 0 ? (
-              <div style={tokens.tileGrid}>
-                {items.map((item) => (
-                  <CatalogTile item={item} key={item.id} />
-                ))}
-              </div>
-            ) : (
-              <div style={tokens.empty}>Nothing here yet.</div>
-            )}
-          </section>
-        )
-      })}
+      {/* Category tabs */}
+      <div className="flex shrink-0 flex-wrap gap-1 border-border/70 border-b pb-2">
+        {CATALOG_SECTIONS.map((section) => {
+          const isActive = activeSectionId === section.id
+          return (
+            <button
+              className={cn(
+                'flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition-colors cursor-pointer',
+                isActive
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
+              )}
+              key={section.id}
+              onClick={() => {
+                setActiveSectionId(section.id)
+                setSearch('')
+              }}
+              type="button"
+            >
+              <Icon
+                className={cn('size-6', !isActive && 'opacity-60')}
+                height={24}
+                icon={section.icon}
+                width={24}
+              />
+              <span className="text-[10px] leading-none">{section.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Search row */}
+      <div className="flex items-center gap-1.5">
+        <input
+          className="min-w-0 w-full rounded-lg bg-muted px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none"
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search..."
+          type="text"
+          value={search}
+        />
+      </div>
+
+      {/* Category description and contextual controls */}
+      {!search && activeSection && (
+        <div style={tokens.section}>
+          <p style={tokens.blurb}>{activeSection.blurb}</p>
+          {activeSection.id === 'unit-loads' && <LoadBrush />}
+          {activeSection.id === 'conveyance' && <FlowSwitch />}
+          {activeSection.id === 'handling' && <FleetSwitch />}
+        </div>
+      )}
+
+      {/* Items Grid */}
+      <ItemCatalog
+        category={search ? undefined : activeSectionId}
+        emptyState={
+          <div style={tokens.empty}>
+            {search ? `No items matching "${search}"` : 'Nothing here yet.'}
+          </div>
+        }
+        isItemActive={(item) => chipIsArmed(item as CatalogItem, activeTool, armedChipId)}
+        items={CATALOG_ITEMS as unknown as ItemCatalogItem[]}
+        onItemClick={(item) => arm(item as CatalogItem)}
+        search={search}
+      />
+
       <InstancingSwitch />
       <DetailRangeSwitch />
     </div>
@@ -397,108 +529,6 @@ function LoadBrush() {
         ))}
       </div>
     </div>
-  )
-}
-
-function CatalogTile({ item }: { item: CatalogItem }) {
-  const activeTool = useEditor((s) => s.tool)
-  const setBrush = useWarehouseStore((s) => s.setPalletBrush)
-  const setRouteBrush = useWarehouseStore((s) => s.setRouteBrush)
-
-  /**
-   * Yanan fiş, en son BASILAN fiş.
-   *
-   * Buraya kadar vurgulama `activeTool === item.kind`'a, artı fişleri ayırt
-   * etmek için elle yazılmış altı yükleme dayanıyordu (`wantsLoad`,
-   * `wantsRole`, `wantsModel`, `wantsVariant`, `wantsLip`, `wantsTilt`).
-   * Yüklemi yazılmamış her aile aynı anda birden çok fişi yakıyordu — raf,
-   * longspan, m3, drive-in, live-rack ve mezzanine — ve listeye yedincisini
-   * eklemek yalnız bir sonraki ailenin unutulmasını geciktirirdi.
-   *
-   * Fişin KİMLİĞİ tek karşılaştırma, ve aile başına bakım istemiyor.
-   *
-   * Katalog dışından (kısayol, host paleti) silahlanmış bir araçta kimlik
-   * ya boş ya başka bir kind'a ait kalır; o hâlde eski davranışa —
-   * kind eşleşmesine — düşülüyor, yoksa araç açıkken hiçbir fiş yanmazdı.
-   */
-  const armedChipId = useWarehouseStore((s) => s.armedChipId)
-  const arming = chipIsArmed(item, activeTool, armedChipId)
-
-  const arm = () => {
-    useWarehouseStore.getState().setArmedChipId(item.id)
-    if (item.brush?.kind === 'pallet') setBrush({ cargo: item.brush.cargo })
-    if (item.brush?.kind === 'route') {
-      setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
-    }
-    // Beş makine tile'ı beş ayrı model — fırçaya yazılmazsa hepsi
-    // varsayılan forklift'i yerleştirir ve katalog yalan söyler.
-    if (item.brush?.kind === 'truck') {
-      useWarehouseStore.getState().setTruckBrush({ model: item.brush.model as never })
-    }
-    if (item.brush?.kind === 'rack') {
-      useWarehouseStore.getState().setRackBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'telescopic') {
-      useWarehouseStore.getState().setTelescopicBrush({ model: item.brush.model as never })
-    }
-    if (item.brush?.kind === 'conveyor-spiral') {
-      useWarehouseStore.getState().setSpiralBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'mezzanine') {
-      useWarehouseStore.getState().setMezzanineBrush(item.brush.patch as never)
-    }
-    if (item.brush?.kind === 'longspan') {
-      useWarehouseStore.getState().setLongspanBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'm3') {
-      useWarehouseStore.getState().setM3Brush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'drive-in') {
-      useWarehouseStore.getState().setDriveInBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'live-racking') {
-      useWarehouseStore.getState().setLiveRackingBrush(item.brush.patch)
-    }
-    // Tezgâhın altı fişi de varyantını buradan yazıyor. YAZILMADIĞI sürece
-    // altısı da fırçadaki varsayılanı (`processing`) koyuyordu: katalog altı
-    // farklı masa gösterip tek masa yerleştiriyordu, ve fark yalnız gözle
-    // görülüyordu. `catalog.test.ts` artık her fırça kolunun bir uygulayıcısı
-    // olduğunu kilitliyor.
-    if (item.brush?.kind === 'bench') {
-      useWarehouseStore.getState().setBenchBrush({
-        ...item.brush.patch,
-        // Varyantla birlikte elle girilmiş ölçüler de temizleniyor —
-        // aracın `[`/`]` davranışının aynısı, aynı gerekçeyle.
-        width: undefined,
-        height: undefined,
-        depth: undefined,
-      })
-    }
-    if (item.brush?.kind === 'dockleveller') {
-      useWarehouseStore.getState().setDockLevellerBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'pallet-lift') {
-      useWarehouseStore.getState().setPalletLiftBrush(item.brush.patch)
-    }
-    if (item.brush?.kind === 'totecart') {
-      useWarehouseStore.getState().setToteCartBrush(item.brush.patch)
-    }
-    // The host types `tool` as its own built-in union, which by construction
-    // cannot know about plugin-contributed kinds. Arming by kind string is the
-    // path a catalog panel is expected to use.
-    const editor = useEditor.getState() as unknown as {
-      setTool: (value: string) => void
-      setMode: (value: string) => void
-    }
-    editor.setTool(item.kind)
-    editor.setMode('build')
-  }
-
-  return (
-    <button onClick={arm} style={tile(arming)} title={item.description} type="button">
-      <Icon height={20} icon={item.icon} style={tokens.tileIcon} width={20} />
-      <span style={tokens.tileLabel}>{item.label}</span>
-    </button>
   )
 }
 

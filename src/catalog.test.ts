@@ -223,3 +223,65 @@ describe('vurgulama — bir seferde TEK fiş yanar', () => {
     expect(lit).toEqual(['pallet-rack', 'pallet-rack-low'])
   })
 })
+
+describe('modernize edilmiş ItemCatalog entegrasyonu ve panel yapısı', () => {
+  const source = readFileSync(`${import.meta.dir}/panels/catalog-panel.tsx`, 'utf8')
+
+  test('ItemCatalog ve @pascal-app/editor importları mevcut', () => {
+    expect(source).toContain("import {\n  ItemCatalog,")
+    expect(source).toContain("} from '@pascal-app/editor'")
+  })
+
+  test('Kategori sekmeleri CATALOG_SECTIONS üzerinden çiziliyor', () => {
+    expect(source).toContain('CATALOG_SECTIONS.map((section)')
+    expect(source).toContain('activeSectionId === section.id')
+  })
+
+  test('Arama girişi mevcut ve ItemCatalog ile bağlı', () => {
+    expect(source).toContain('placeholder="Search..."')
+    expect(source).toContain('search={search}')
+    expect(source).toContain('category={search ? undefined : activeSectionId}')
+  })
+
+  test('Bağlamsal anahtarlar ve alt kontroller mevcut', () => {
+    expect(source).toContain("<LoadBrush />")
+    expect(source).toContain("<FlowSwitch />")
+    expect(source).toContain("<FleetSwitch />")
+    expect(source).toContain("<InstancingSwitch />")
+    expect(source).toContain("<DetailRangeSwitch />")
+  })
+})
+
+describe('katalog arama ve filtreleme mantığı', () => {
+  test('her bölümün en az 1 öğesi var', () => {
+    for (const section of CATALOG_SECTIONS) {
+      const sectionItems = CATALOG_ITEMS.filter((item) => item.sectionId === section.id)
+      expect(sectionItems.length).toBeGreaterThan(0)
+    }
+  })
+
+  test('arama adı veya etiketi eşleştiriyor', () => {
+    const query = 'forklift'
+    const matches = CATALOG_ITEMS.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.id.toLowerCase().includes(query),
+    )
+    expect(matches.length).toBeGreaterThan(0)
+    expect(matches.map((m) => m.id)).toContain('truck-forklift')
+  })
+
+  test('açıklama veya ad üzerinden arama eşleşiyor', () => {
+    const query = 'spiral'
+    const matches = CATALOG_ITEMS.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.description.toLowerCase().includes(query) ||
+        item.id.toLowerCase().includes(query),
+    )
+    expect(matches.map((m) => m.id)).toContain('conveyor-spiral-carton')
+    expect(matches.map((m) => m.id)).toContain('conveyor-spiral-pallet')
+  })
+})
+

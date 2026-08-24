@@ -4,8 +4,8 @@ import { useEditor, usePlacementPreview } from '@pascal-app/editor'
 import { warehousePlugin } from './index'
 import { PalletNode } from './pallet/schema'
 import {
-  clearPlacementPreview,
   CLICK_TRIGGER_KINDS,
+  clearPlacementPreview,
   disarmPlacementToolOnCommit,
   publishPlacementPreview,
   resolveActiveLevelId,
@@ -431,4 +431,3 @@ describe('ambient kat çözümleme & 2D Floorplan görünürlük entegrasyonu', 
     expect(visitedIds).toEqual(['level_bldg1_0', 'pallet_placed_1'])
   })
 })
-

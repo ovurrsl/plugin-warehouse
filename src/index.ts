@@ -124,10 +124,10 @@ export const warehouseCatalogPanel: EditorHostPanel = {
 export { palletDefinition } from './pallet/definition'
 export { PALLET_PRESETS, type PalletPreset } from './pallet/presets'
 export { PalletNode } from './pallet/schema'
+export { StatsTab as WarehouseStatsTab } from './panels/catalog-panel'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
 export { palletRackDefinition } from './rack/definition'
 export { PalletRackNode } from './rack/schema'
 export { truckDefinition } from './truck/definition'
 export { TruckNode } from './truck/schema'
-export { StatsTab as WarehouseStatsTab } from './panels/catalog-panel'
 export default warehousePlugin

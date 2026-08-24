@@ -124,14 +124,16 @@ export function useActiveLevelId(): string | null {
 export function useActiveLevel(): AnyNode | null {
   const activeLevelId = useActiveLevelId()
   const nodes = useScene((s) => s.nodes) as Readonly<Record<string, AnyNode>>
-  return activeLevelId ? nodes[activeLevelId] ?? null : null
+  return activeLevelId ? (nodes[activeLevelId] ?? null) : null
 }
 
 /**
  * Publishes the 2D placement preview ghost to `usePlacementPreview`.
  */
 export function publishPlacementPreview(ghostNode: unknown, activeLevelNode?: unknown): void {
-  usePlacementPreview.getState().set((ghostNode as AnyNode) ?? null, (activeLevelNode as AnyNode) ?? null)
+  usePlacementPreview
+    .getState()
+    .set((ghostNode as AnyNode) ?? null, (activeLevelNode as AnyNode) ?? null)
 }
 
 /**

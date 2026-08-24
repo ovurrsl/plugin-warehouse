@@ -55,7 +55,9 @@ const EXEMPT: Record<string, string> = {
     'kafese yapışırdı. İkisi #27 ile birlikte tek elden düzeltilecek; şimdi yamamak iki kez iş demek.',
 }
 
-const toolFiles = [...new Bun.Glob(TOOL_GLOB).scanSync('.')].map((p) => p.replace(/\\/g, '/')).sort()
+const toolFiles = [...new Bun.Glob(TOOL_GLOB).scanSync('.')]
+  .map((p) => p.replace(/\\/g, '/'))
+  .sort()
 const sourceOf = new Map(toolFiles.map((path) => [path, readFileSync(path, 'utf8')]))
 
 /** Yerleştirme imlecini dinleyen araçlar — bekçinin kapsamı bu. */

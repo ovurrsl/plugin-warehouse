@@ -510,11 +510,14 @@ describe('Adversarial Challenge 4: Rapid multiple placements in repeat vs single
 
       // 1. The node synthesizes its own click on pointerup, hit against the
       //    module's collider — a different surface, so a different point.
-      emitter.emit('warehouse:conveyor-roller:click' as never, {
-        position: [5.62, 0.82, 5.41],
-        localPosition: [5.62, 0.82, 5.41],
-        nativeEvent: {} as never,
-      } as never)
+      emitter.emit(
+        'warehouse:conveyor-roller:click' as never,
+        {
+          position: [5.62, 0.82, 5.41],
+          localPosition: [5.62, 0.82, 5.41],
+          nativeEvent: {} as never,
+        } as never,
+      )
 
       // 2. The browser's real click reaches the canvas listener a frame later,
       //    hit against the ground plane.
@@ -560,11 +563,14 @@ describe('Adversarial Challenge 4: Rapid multiple placements in repeat vs single
         localPosition: [40, 0, 40],
         nativeEvent: {} as never,
       } as never)
-      emitter.emit('warehouse:conveyor-roller:click' as never, {
-        position: [40.62, 0.82, 40.41],
-        localPosition: [40.62, 0.82, 40.41],
-        nativeEvent: {} as never,
-      } as never)
+      emitter.emit(
+        'warehouse:conveyor-roller:click' as never,
+        {
+          position: [40.62, 0.82, 40.41],
+          localPosition: [40.62, 0.82, 40.41],
+          nativeEvent: {} as never,
+        } as never,
+      )
 
       // Past the same-gesture allowance, and somewhere else entirely.
       await new Promise((resolve) => setTimeout(resolve, 90))

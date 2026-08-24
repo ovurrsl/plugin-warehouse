@@ -1,9 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
-import { CATALOG_ITEMS, CATALOG_SECTIONS, type CatalogItem, chipIsArmed, itemsInSection } from './catalog'
+import { useEditor } from '@pascal-app/editor'
+import {
+  CATALOG_ITEMS,
+  CATALOG_SECTIONS,
+  type CatalogItem,
+  chipIsArmed,
+  itemsInSection,
+} from './catalog'
 import { warehousePlugin } from './index'
 import { useWarehouseStore } from './store'
-import { useEditor } from '@pascal-app/editor'
 
 /**
  * Challenger Adversarial Test Suite for Item Arming, Brush Verification,
@@ -61,7 +67,9 @@ describe('Challenger Adversarial: 15 Brush Branches Verification in arm(item)', 
       useWarehouseStore.getState().setPalletBrush({ cargo: item.brush.cargo })
     }
     if (item.brush?.kind === 'route') {
-      useWarehouseStore.getState().setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
+      useWarehouseStore
+        .getState()
+        .setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
     }
     if (item.brush?.kind === 'truck') {
       useWarehouseStore.getState().setTruckBrush({ model: item.brush.model as never })
@@ -149,7 +157,12 @@ describe('Challenger Adversarial: 15 Brush Branches Verification in arm(item)', 
       arm(item)
       expect(useWarehouseStore.getState().armedChipId).toBe(item.id)
       if (item.brush?.kind === 'truck') {
-        expect(useWarehouseStore.getState().truckBrush.model).toBe(item.brush.model)
+        // The catalog types `model` as a plain string while the brush types it
+        // as the five-model union, so the two sides of this assertion do not
+        // meet without widening one. Widening the received value keeps the
+        // check as what it is meant to be — the store holds the model the
+        // catalog named — rather than asserting a cast.
+        expect(useWarehouseStore.getState().truckBrush.model as string).toBe(item.brush.model)
       }
     }
   })
@@ -355,13 +368,20 @@ describe('Challenger Adversarial: AST & Code Invariant Checks', () => {
     }
   })
 
-  test('AST verification: ItemCatalog integration and state bindings are intact', () => {
-    expect(panelSource).toContain('import {\n  ItemCatalog,')
-    expect(panelSource).toContain('<ItemCatalog')
-    expect(panelSource).toContain('category={search ? undefined : activeSectionId}')
-    expect(panelSource).toContain('isItemActive={(item) => chipIsArmed(item as CatalogItem, activeTool, armedChipId)}')
-    expect(panelSource).toContain('onItemClick={(item) => arm(item as CatalogItem)}')
-    expect(panelSource).toContain('search={search}')
+  /**
+   * Bu test host'un `ItemCatalog`'una bağlanmayı doğruluyordu. O bağımlılık
+   * kaldırıldı — yayınlanmış hiçbir `@pascal-app/editor` sürümü o sembolü
+   * export etmiyor, dolayısıyla paket kendi CI'ında tip denetimi geçemiyordu.
+   * Korunan şey artık ızgaranın kendi çizilmesi ve silahlandırma bağlantıları.
+   */
+  test('AST verification: the grid is drawn locally and the arming bindings are intact', () => {
+    expect(panelSource).not.toContain('<ItemCatalog')
+    expect(panelSource).not.toMatch(/import\s*\{[^}]*\bItemCatalog\b[^}]*\}\s*from/)
+    expect(panelSource).toContain('<CatalogTile')
+    expect(panelSource).toContain('tokens.tileGrid')
+    expect(panelSource).toContain('chipIsArmed(item, activeTool, armedChipId)')
+    expect(panelSource).toContain('onArm={arm}')
+    expect(panelSource).toContain('value={search}')
   })
 
   test('AST verification: contextual switches and controls are rendered in catalog-panel.tsx', () => {

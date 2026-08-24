@@ -252,7 +252,7 @@ function CatalogTab() {
         Verified against the newest published build, 1.0.0-beta.5: the barrel
         exports `FloatingLevelSelector` and not `ItemCatalog`.
 
-        Drawing it here also gets the layout this panel wants — five to a row
+        Drawing it here also gets the layout this panel wants — four to a row
         against the host grid's `auto-fill, minmax(90px, …)`, which yields two
         in a 256 px rail.
       */}

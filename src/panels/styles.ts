@@ -122,18 +122,57 @@ export const tokens = {
     lineHeight: 1.5,
     color: fade(40),
   },
+  /**
+   * Five tiles to a row.
+   *
+   * A fixed count rather than `auto-fill, minmax(…)`: the rail has one width,
+   * so an intrinsic track size only reintroduces the question of how many fit
+   * and answers it differently as the label lengths change. `minmax(0, 1fr)`
+   * is what lets a long label ellipsize instead of forcing the track wider —
+   * `1fr` alone floors at min-content and would push the row to four.
+   */
   tileGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: '0.5rem',
+    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    gap: '0.25rem',
   },
   tileIcon: {
     color: fade(70),
   },
   tileLabel: {
-    fontSize: '0.75rem',
+    fontSize: '0.5625rem',
+    lineHeight: 1.2,
     fontWeight: 500,
     color: FG,
+    // The tile is a fifth of a 256 px rail; without this a two-word label
+    // widens its track and drops the row to four.
+    width: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    textAlign: 'center',
+  },
+
+  /** Category names wrap across as many lines as they need. */
+  chipRow: {
+    display: 'flex',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+    gap: '0.25rem',
+    borderBottom: `1px solid ${BORDER}`,
+    paddingBottom: '0.5rem',
+  },
+
+  searchInput: {
+    width: '100%',
+    minWidth: 0,
+    borderRadius: '0.5rem',
+    border: `1px solid ${BORDER}`,
+    backgroundColor: 'transparent',
+    padding: '0.375rem 0.625rem',
+    fontSize: '0.75rem',
+    color: FG,
+    outline: 'none',
   },
 
   // ── The statistics readout ───────────────────────────────────────────────
@@ -250,17 +289,35 @@ export function checkbox(checked: boolean): CSSProperties {
   }
 }
 
+/** A category filter chip — a name, not a picture. See the note in the panel. */
+export function categoryChip(selected: boolean): CSSProperties {
+  return {
+    flexShrink: 0,
+    borderRadius: '0.5rem',
+    border: `1px solid ${selected ? RING : 'transparent'}`,
+    backgroundColor: selected ? ACCENT : 'transparent',
+    padding: '0.1875rem 0.5rem',
+    fontSize: '0.6875rem',
+    fontWeight: selected ? 600 : 400,
+    color: selected ? FG : fade(65),
+    cursor: 'pointer',
+    transition: 'border-color 150ms, background-color 150ms, color 150ms',
+  }
+}
+
 export function tile(selected: boolean): CSSProperties {
   return {
     display: 'flex',
     flexDirection: 'column',
-    gap: '0.5rem',
-    alignItems: 'flex-start',
-    borderRadius: '0.75rem',
+    gap: '0.25rem',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
+    borderRadius: '0.5rem',
     border: `1px solid ${selected ? RING : BORDER}`,
     backgroundColor: selected ? ACCENT : 'transparent',
-    padding: '0.625rem',
-    textAlign: 'left',
+    padding: '0.375rem 0.125rem',
+    textAlign: 'center',
     cursor: 'pointer',
     transition: 'border-color 150ms, background-color 150ms',
   }

@@ -224,12 +224,30 @@ describe('vurgulama — bir seferde TEK fiş yanar', () => {
   })
 })
 
-describe('modernize edilmiş ItemCatalog entegrasyonu ve panel yapısı', () => {
+describe('katalog ızgarası ve panel yapısı', () => {
   const source = readFileSync(`${import.meta.dir}/panels/catalog-panel.tsx`, 'utf8')
 
-  test('ItemCatalog ve @pascal-app/editor importları mevcut', () => {
-    expect(source).toContain("import {\n  ItemCatalog,")
-    expect(source).toContain("} from '@pascal-app/editor'")
+  /**
+   * Bu blok, panelin host'un `ItemCatalog`'unu kullandığını iddia ediyordu.
+   * O bağımlılık geri alındı ve asıl korunması gereken şey artık bunun
+   * TERSİ: `ItemCatalog` yalnızca fork'un `integration` dalında var, npm'e
+   * hiç çıkmadı (en yeni yayın 1.0.0-beta.5'te barrel `FloatingLevelSelector`
+   * export ediyor, `ItemCatalog` etmiyor). İçeri alındığı sürece bu paket
+   * yayınlanmış hiçbir sürüme karşı tip denetimi geçemiyordu ve CI kırmızıydı.
+   */
+  test('panel host un yayınlanmamış ItemCatalog una bağlanmıyor', () => {
+    // Sembolün ADI üzerinden değil, KULLANIMI üzerinden: bu dosyanın yorumu
+    // kararı anlatmak için adı geçiriyor, ve bir yorum bağımlılık değildir.
+    expect(source).not.toContain('<ItemCatalog')
+    expect(source).not.toMatch(/import\s*\{[^}]*\bItemCatalog\b[^}]*\}\s*from/)
+    // Host'tan yalnızca gerçekten yayınlanmış olanlar alınıyor.
+    expect(source).toContain("import { SegmentedControl, useEditor } from '@pascal-app/editor'")
+  })
+
+  test('ızgarayı panelin kendisi çiziyor', () => {
+    expect(source).toContain('tokens.tileGrid')
+    expect(source).toContain('<CatalogTile')
+    expect(source).toContain('visibleItems.map')
   })
 
   test('Kategori sekmeleri CATALOG_SECTIONS üzerinden çiziliyor', () => {
@@ -237,18 +255,29 @@ describe('modernize edilmiş ItemCatalog entegrasyonu ve panel yapısı', () => 
     expect(source).toContain('activeSectionId === section.id')
   })
 
-  test('Arama girişi mevcut ve ItemCatalog ile bağlı', () => {
+  /** Kategori görselle değil isimle: sekme yalnız `section.label` çiziyor. */
+  test('kategoriler isimle gösteriliyor, ikonla değil', () => {
+    expect(source).toContain('{section.label}')
+    expect(source).not.toContain('icon={section.icon}')
+  })
+
+  /** Panel açılışta filtresiz: hiçbir kategori seçili değil, hepsi görünür. */
+  test('varsayılanda kategori seçili değil', () => {
+    expect(source).toContain('useState<string | null>(null)')
+  })
+
+  test('Arama girişi mevcut ve duruma bağlı', () => {
     expect(source).toContain('placeholder="Search..."')
-    expect(source).toContain('search={search}')
-    expect(source).toContain('category={search ? undefined : activeSectionId}')
+    expect(source).toContain('value={search}')
+    expect(source).toContain('setSearch(e.target.value)')
   })
 
   test('Bağlamsal anahtarlar ve alt kontroller mevcut', () => {
-    expect(source).toContain("<LoadBrush />")
-    expect(source).toContain("<FlowSwitch />")
-    expect(source).toContain("<FleetSwitch />")
-    expect(source).toContain("<InstancingSwitch />")
-    expect(source).toContain("<DetailRangeSwitch />")
+    expect(source).toContain('<LoadBrush />')
+    expect(source).toContain('<FlowSwitch />')
+    expect(source).toContain('<FleetSwitch />')
+    expect(source).toContain('<InstancingSwitch />')
+    expect(source).toContain('<DetailRangeSwitch />')
   })
 })
 
@@ -284,4 +313,3 @@ describe('katalog arama ve filtreleme mantığı', () => {
     expect(matches.map((m) => m.id)).toContain('conveyor-spiral-pallet')
   })
 })
-

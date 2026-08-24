@@ -2,16 +2,16 @@
 
 import { Icon } from '@iconify/react'
 import { useScene } from '@pascal-app/core'
-import {
-  ItemCatalog,
-  type ItemCatalogItem,
-  SegmentedControl,
-  cn,
-  useEditor,
-} from '@pascal-app/editor'
+import { SegmentedControl, useEditor } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useState } from 'react'
-import { CATALOG_ITEMS, CATALOG_SECTIONS, type CatalogItem, chipIsArmed } from '../catalog'
+import {
+  CATALOG_ITEMS,
+  CATALOG_SECTIONS,
+  type CatalogItem,
+  chipIsArmed,
+  itemsInSection,
+} from '../catalog'
 import { reportHostCompatibility } from '../compat'
 import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
@@ -25,7 +25,7 @@ import {
 import { type PanelTab, useWarehouseStore } from '../store'
 import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
 import { areaLabel, type LinearUnit, lengthLabel } from '../units'
-import { checkbox, listRow, tokens } from './styles'
+import { categoryChip, checkbox, listRow, tile, tokens } from './styles'
 
 /**
  * The plugin's left-rail panel. Two tabs share one rail slot: browse-and-place,
@@ -77,9 +77,14 @@ export default function WarehousePanel() {
 }
 
 function CatalogTab() {
-  const [activeSectionId, setActiveSectionId] = useState<string>(
-    CATALOG_SECTIONS[0]?.id ?? 'unit-loads',
-  )
+  /**
+   * `null` means no category filter — every item shows.
+   *
+   * That is the default on purpose: opening the panel to a pre-selected first
+   * category hides most of the catalog behind a tab the user did not choose,
+   * and "what can I place?" is the question the panel opens on.
+   */
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [search, setSearch] = useState<string>('')
   const activeTool = useEditor((s) => s.tool)
   const armedChipId = useWarehouseStore((s) => s.armedChipId)
@@ -87,9 +92,25 @@ function CatalogTab() {
   const setRouteBrush = useWarehouseStore((s) => s.setRouteBrush)
 
   const activeSection = useMemo(
-    () => CATALOG_SECTIONS.find((s) => s.id === activeSectionId) ?? CATALOG_SECTIONS[0],
+    () => (activeSectionId ? CATALOG_SECTIONS.find((s) => s.id === activeSectionId) : undefined),
     [activeSectionId],
   )
+
+  /**
+   * The grid's contents: category filter first, then the search text.
+   *
+   * Search deliberately ignores the category — someone typing a name wants it
+   * found wherever it lives, not "no results" because the wrong tab is open.
+   */
+  const visibleItems = useMemo(() => {
+    const base = activeSectionId ? itemsInSection(activeSectionId) : [...CATALOG_ITEMS]
+    const query = search.trim().toLowerCase()
+    if (!query) return base
+    const pool = search ? [...CATALOG_ITEMS] : base
+    return pool.filter((item) =>
+      `${item.label} ${item.description} ${item.kind}`.toLowerCase().includes(query),
+    )
+  }, [activeSectionId, search])
 
   const arm = (item: CatalogItem) => {
     useWarehouseStore.getState().setArmedChipId(item.id)
@@ -163,47 +184,51 @@ function CatalogTab() {
 
   return (
     <div style={tokens.sections}>
-      {/* Category tabs */}
-      <div className="flex shrink-0 flex-wrap gap-1 border-border/70 border-b pb-2">
-        {CATALOG_SECTIONS.map((section) => {
-          const isActive = activeSectionId === section.id
-          return (
-            <button
-              className={cn(
-                'flex shrink-0 flex-col items-center gap-1 rounded-xl px-2.5 py-1.5 transition-colors cursor-pointer',
-                isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground',
-              )}
-              key={section.id}
-              onClick={() => {
-                setActiveSectionId(section.id)
-                setSearch('')
-              }}
-              type="button"
-            >
-              <Icon
-                className={cn('size-6', !isActive && 'opacity-60')}
-                height={24}
-                icon={section.icon}
-                width={24}
-              />
-              <span className="text-[10px] leading-none">{section.label}</span>
-            </button>
-          )
-        })}
+      {/*
+        Categories read as names, not pictures. A warehouse catalog splits on
+        words a user already knows ("Racking", "Conveyance"); an icon per
+        category asks them to learn a second vocabulary to reach the same
+        shelf. The tiles below still carry icons — there the picture IS the
+        distinguishing information.
+
+        Inline styles rather than utility classes throughout this file: this
+        package is installed from a git URL, so it lands as a symlink, and
+        Tailwind v4's scanner does not follow symlinks. A class written here is
+        never compiled and the failure is silent. See `styles.ts`.
+      */}
+      <div style={tokens.chipRow}>
+        <button
+          onClick={() => {
+            setActiveSectionId(null)
+            setSearch('')
+          }}
+          style={categoryChip(activeSectionId === null)}
+          type="button"
+        >
+          All
+        </button>
+        {CATALOG_SECTIONS.map((section) => (
+          <button
+            key={section.id}
+            onClick={() => {
+              setActiveSectionId(section.id)
+              setSearch('')
+            }}
+            style={categoryChip(activeSectionId === section.id)}
+            type="button"
+          >
+            {section.label}
+          </button>
+        ))}
       </div>
 
-      {/* Search row */}
-      <div className="flex items-center gap-1.5">
-        <input
-          className="min-w-0 w-full rounded-lg bg-muted px-2.5 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none"
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search..."
-          type="text"
-          value={search}
-        />
-      </div>
+      <input
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search..."
+        style={tokens.searchInput}
+        type="text"
+        value={search}
+      />
 
       {/* Category description and contextual controls */}
       {!search && activeSection && (
@@ -215,19 +240,38 @@ function CatalogTab() {
         </div>
       )}
 
-      {/* Items Grid */}
-      <ItemCatalog
-        category={search ? undefined : activeSectionId}
-        emptyState={
-          <div style={tokens.empty}>
-            {search ? `No items matching "${search}"` : 'Nothing here yet.'}
-          </div>
-        }
-        isItemActive={(item) => chipIsArmed(item as CatalogItem, activeTool, armedChipId)}
-        items={CATALOG_ITEMS as unknown as ItemCatalogItem[]}
-        onItemClick={(item) => arm(item as CatalogItem)}
-        search={search}
-      />
+      {/*
+        The plugin draws its own grid rather than composing the host's
+        `ItemCatalog`.
+
+        Not a style preference: `ItemCatalog` is exported only from the fork's
+        `integration` branch and has never been published, so importing it made
+        this package impossible to type-check against any release of
+        `@pascal-app/editor` — `bun run check-types` failed on `main` with
+        "has no exported member 'ItemCatalog'", and CI has been red on it.
+        Verified against the newest published build, 1.0.0-beta.5: the barrel
+        exports `FloatingLevelSelector` and not `ItemCatalog`.
+
+        Drawing it here also gets the layout this panel wants — five to a row
+        against the host grid's `auto-fill, minmax(90px, …)`, which yields two
+        in a 256 px rail.
+      */}
+      {visibleItems.length > 0 ? (
+        <div style={tokens.tileGrid}>
+          {visibleItems.map((item) => (
+            <CatalogTile
+              armed={chipIsArmed(item, activeTool, armedChipId)}
+              item={item}
+              key={item.id}
+              onArm={arm}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={tokens.empty}>
+          {search ? `No items matching "${search}"` : 'Nothing here yet.'}
+        </div>
+      )}
 
       <InstancingSwitch />
       <DetailRangeSwitch />
@@ -243,6 +287,30 @@ function CatalogTab() {
  * erken düşerek çizim maliyetini kısar; "Geniş" güçlü makinede tam detayı
  * uzağa taşır. Değerler seçilmiş varsayılanlar — bkz. `store.ts`.
  */
+/**
+ * One catalog tile: icon over label, five to a row.
+ *
+ * Stateless by design — arming lives in `CatalogTab.arm`, which is the only
+ * place that knows the brush-per-family rules. A tile that armed itself would
+ * put that switch behind every kind added later.
+ */
+function CatalogTile({
+  item,
+  armed,
+  onArm,
+}: {
+  item: CatalogItem
+  armed: boolean
+  onArm: (item: CatalogItem) => void
+}) {
+  return (
+    <button onClick={() => onArm(item)} style={tile(armed)} title={item.description} type="button">
+      <Icon height={18} icon={item.icon} style={tokens.tileIcon} width={18} />
+      <span style={tokens.tileLabel}>{item.label}</span>
+    </button>
+  )
+}
+
 function DetailRangeSwitch() {
   const quality = useWarehouseStore((s) => s.lodQuality)
   const setQuality = useWarehouseStore((s) => s.setLodQuality)

@@ -205,7 +205,9 @@ describe('Adversarial Challenge: Item Click Arming & Editor Mode Switching', () 
       useWarehouseStore.getState().setPalletBrush({ cargo: item.brush.cargo })
     }
     if (item.brush?.kind === 'route') {
-      useWarehouseStore.getState().setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
+      useWarehouseStore
+        .getState()
+        .setRouteBrush({ role: item.brush.role, traffic: item.brush.traffic })
     }
     if (item.brush?.kind === 'truck') {
       useWarehouseStore.getState().setTruckBrush({ model: item.brush.model as never })
@@ -280,7 +282,9 @@ describe('Adversarial Challenge: Item Click Arming & Editor Mode Switching', () 
       expect(chipIsArmed(item, activeTool, armedChipId)).toBe(true)
 
       // All other items with same kind must NOT be armed
-      const sameKindOthers = CATALOG_ITEMS.filter((other) => other.kind === item.kind && other.id !== item.id)
+      const sameKindOthers = CATALOG_ITEMS.filter(
+        (other) => other.kind === item.kind && other.id !== item.id,
+      )
       for (const other of sameKindOthers) {
         expect(chipIsArmed(other, activeTool, armedChipId)).toBe(false)
       }

@@ -43,16 +43,24 @@ import type { PalletNode } from './schema'
 const NO_RAYCAST = () => {}
 
 /**
- * Where the load drops to its far tier, and where it comes back.
+ * Paletin uzak katmanı KAPALI — eşikler bilerek sonsuz.
  *
- * Two thresholds rather than one, because a single one at the exact distance a
- * pallet is hovering makes it flicker between tiers on every camera breath. The
- * near figure is set from the acceptance requirement rather than from taste:
- * carton seams have to stay countable at ten to fifteen metres, so the detailed
- * tier has to survive well past that.
+ * Eşikler `25*25 / 18*18` idi: yirmi beş metreden sonra hem güverte hem yük
+ * basitleştirilmiş geometriye ve ayrı bir materyale düşüyordu, ve uzaklaşan
+ * kullanıcının gördüğü şey paletin kutuya dönüşmesiydi. İstenen görüntü bu
+ * değil, o yüzden katman `'full'`de sabitleniyor: `distSq > Infinity` hiçbir
+ * zaman doğru olmaz.
+ *
+ * Bu, asma kattaki sonsuz eşiklerden FARKLI bir karar. Orada iki katman aynı
+ * geometriyi ve aynı anahtarı veriyordu, yani sonsuz yapmak saf kazançtı.
+ * Burada uzak katman gerçekten daha ucuzdu — `getPalletFarGeometry` ve
+ * `getPalletFarMaterial` ayrı ve daha basit. Yani bu bir görüntü tercihi ve
+ * bedeli var: uzaktaki her palet artık tam geometrisiyle çiziliyor.
+ *
+ * Geri almak tek satır: aşağıdaki iki sabiti `25 * 25` ve `18 * 18` yap.
  */
-const LOD_FAR_SQ = 25 * 25
-const LOD_NEAR_SQ = 18 * 18
+const LOD_FAR_SQ = Number.POSITIVE_INFINITY
+const LOD_NEAR_SQ = Number.POSITIVE_INFINITY
 
 /**
  * Where the film stops being drawn at all.

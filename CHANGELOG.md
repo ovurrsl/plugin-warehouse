@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`dadaeb6`](https://github.com/ovurrsl/plugin-warehouse/commit/dadaeb6ffaf3bcebf771e2497bdd39e72f431a0c))
 - Refresh generated README blocks [skip ci] ([`4f056e7`](https://github.com/ovurrsl/plugin-warehouse/commit/4f056e7e39bf3d8862365a0b6f3c9784bd64da80))
 - Refresh generated README blocks [skip ci] ([`d188ad4`](https://github.com/ovurrsl/plugin-warehouse/commit/d188ad4ea265c290af34576755e19000ab9aa69e))
 - Refresh generated README blocks [skip ci] ([`0e09cca`](https://github.com/ovurrsl/plugin-warehouse/commit/0e09cca610c1439146db57478adec244a1b3b736))
@@ -350,6 +351,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Tek tıkta iki nesne, euro palet LOD'u, ve katalog panelinin yeniden düzeni (#31) ([`83bdc14`](https://github.com/ovurrsl/plugin-warehouse/commit/83bdc1473c4cd8ff7425d938c2a724f8a78852f0))
 - Merge pull request #20 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`a8d47e3`](https://github.com/ovurrsl/plugin-warehouse/commit/a8d47e31e837d7ea01656b209aae3bf0b988142f))
 - Merge pull request #19 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`9da5fbc`](https://github.com/ovurrsl/plugin-warehouse/commit/9da5fbca81025562830293632f017d2ca312623b))
 - Merge pull request #18 from ovurrsl/claude/camera-stutter-measurements-5tfsm2 ([`6211ce2`](https://github.com/ovurrsl/plugin-warehouse/commit/6211ce2bf7d5198e6254706336654fd064a772cc))

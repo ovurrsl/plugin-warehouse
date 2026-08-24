@@ -510,7 +510,7 @@ function CatalogTile({ item }: { item: CatalogItem }) {
  * returns a scalar or the store's own object so the tab does not re-render on
  * unrelated scene writes.
  */
-function StatsTab() {
+export function StatsTab() {
   const stats = useScene((s) => sceneStats(s.nodes as Record<string, unknown>))
   const unit = useViewer((s) => s.unit)
   const viewerBuildingId = useViewer((s) => s.selection.buildingId)

@@ -129,4 +129,5 @@ export { palletRackDefinition } from './rack/definition'
 export { PalletRackNode } from './rack/schema'
 export { truckDefinition } from './truck/definition'
 export { TruckNode } from './truck/schema'
+export { StatsTab as WarehouseStatsTab } from './panels/catalog-panel'
 export default warehousePlugin

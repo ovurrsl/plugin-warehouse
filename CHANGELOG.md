@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4f056e7`](https://github.com/ovurrsl/plugin-warehouse/commit/4f056e7e39bf3d8862365a0b6f3c9784bd64da80))
 - Refresh generated README blocks [skip ci] ([`d188ad4`](https://github.com/ovurrsl/plugin-warehouse/commit/d188ad4ea265c290af34576755e19000ab9aa69e))
 - Refresh generated README blocks [skip ci] ([`0e09cca`](https://github.com/ovurrsl/plugin-warehouse/commit/0e09cca610c1439146db57478adec244a1b3b736))
 - Refresh generated README blocks [skip ci] ([`58fd80e`](https://github.com/ovurrsl/plugin-warehouse/commit/58fd80e2a9c41153d1c57769d11d67e5eb22c936))
@@ -168,6 +169,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Migrate to native ItemCatalog with filters and vector icons ([`f17977d`](https://github.com/ovurrsl/plugin-warehouse/commit/f17977d0f5e2d704c8c5ccf18f56b961ca26074f))
 - Export WarehouseStatsTab ([`32848f1`](https://github.com/ovurrsl/plugin-warehouse/commit/32848f1c2e02c2ca40a10e407b439dad1c857b0a))
 - Warehouse:pallet-lift (#26) ([`07ad080`](https://github.com/ovurrsl/plugin-warehouse/commit/07ad080c676a8fd4f503da88e9a014e1ac74175c))
 - Warehouse:conveyor-spiral (#25) ([`aed5d4e`](https://github.com/ovurrsl/plugin-warehouse/commit/aed5d4e097e7969887f42f5c4339b277c7bb48cc))

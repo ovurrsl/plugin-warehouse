@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`d188ad4`](https://github.com/ovurrsl/plugin-warehouse/commit/d188ad4ea265c290af34576755e19000ab9aa69e))
 - Refresh generated README blocks [skip ci] ([`0e09cca`](https://github.com/ovurrsl/plugin-warehouse/commit/0e09cca610c1439146db57478adec244a1b3b736))
 - Refresh generated README blocks [skip ci] ([`58fd80e`](https://github.com/ovurrsl/plugin-warehouse/commit/58fd80e2a9c41153d1c57769d11d67e5eb22c936))
 - Refresh generated README blocks [skip ci] ([`c55d384`](https://github.com/ovurrsl/plugin-warehouse/commit/c55d38495e3369ace0f717aa429d90119b5d733f))
@@ -167,6 +168,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Export WarehouseStatsTab ([`32848f1`](https://github.com/ovurrsl/plugin-warehouse/commit/32848f1c2e02c2ca40a10e407b439dad1c857b0a))
 - Warehouse:pallet-lift (#26) ([`07ad080`](https://github.com/ovurrsl/plugin-warehouse/commit/07ad080c676a8fd4f503da88e9a014e1ac74175c))
 - Warehouse:conveyor-spiral (#25) ([`aed5d4e`](https://github.com/ovurrsl/plugin-warehouse/commit/aed5d4e097e7969887f42f5c4339b277c7bb48cc))
 - Toplu çizim ve LOD tercihi yenilemede korunuyor (#24) ([`ea1a653`](https://github.com/ovurrsl/plugin-warehouse/commit/ea1a653dd0baf01a39ee2739158618160a22426f))

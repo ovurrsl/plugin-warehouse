@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f93b4f8`](https://github.com/ovurrsl/plugin-warehouse/commit/f93b4f8837408889750162c4b4a6567ba546158f))
 - Refresh generated README blocks [skip ci] ([`96e7762`](https://github.com/ovurrsl/plugin-warehouse/commit/96e7762804307a0d628c5153d87f2af440042b6a))
 - Refresh generated README blocks [skip ci] ([`021b9ec`](https://github.com/ovurrsl/plugin-warehouse/commit/021b9ecafbaa6addc5d0107be8d20c5b40d84383))
 - Refresh generated README blocks [skip ci] ([`dadaeb6`](https://github.com/ovurrsl/plugin-warehouse/commit/dadaeb6ffaf3bcebf771e2497bdd39e72f431a0c))
@@ -353,6 +354,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Palet asansörü ve spiral konveyör kat döşemelerini delsin, sürükleme de denetlensin (#34) ([`d3c6700`](https://github.com/ovurrsl/plugin-warehouse/commit/d3c6700f213ecb59930212202a14b5ad12461547))
 - Izgara 4'lü olsun (#33) ([`f9e1467`](https://github.com/ovurrsl/plugin-warehouse/commit/f9e14670b8035447e92ddef629dea64fb6e58ac2))
 - Eklentinin görünen adı "Asset" olsun (#32) ([`c299551`](https://github.com/ovurrsl/plugin-warehouse/commit/c299551973c5386519f2521114c1bc7b17775335))
 - Tek tıkta iki nesne, euro palet LOD'u, ve katalog panelinin yeniden düzeni (#31) ([`83bdc14`](https://github.com/ovurrsl/plugin-warehouse/commit/83bdc1473c4cd8ff7425d938c2a724f8a78852f0))

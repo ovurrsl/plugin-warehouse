@@ -38,6 +38,18 @@ export type SlabLike = {
    * cannot.
    */
   elevation: number | undefined
+  /**
+   * The `source` of each entry in `holeMetadata`, positionally aligned with
+   * `holes`, or `undefined` when the host does not publish it.
+   *
+   * Also deliberately outside the guard (same reasoning as `elevation`). Read
+   * for one purpose: `compat.ts` asking whether the host honoured a
+   * `verticalOpening` this plugin declared. That capability is newer than the
+   * published `@pascal-app/core`, so on an older host the two multi-level
+   * machines simply do not cut their floors — and a hole that was never cut is
+   * invisible. The probe turns that into a console line.
+   */
+  holeSources: string[] | undefined
 }
 
 /** The subset of a host `level` this plugin reads. */
@@ -143,7 +155,17 @@ export function asSlab(node: unknown): SlabLike | null {
       typeof record.elevation === 'number' && Number.isFinite(record.elevation)
         ? record.elevation
         : undefined,
+    holeSources: toHoleSources(record.holeMetadata),
   }
+}
+
+/** The `source` strings of a host `holeMetadata` array, or `undefined`. */
+function toHoleSources(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.map((entry) => {
+    const record = asRecord(entry)
+    return typeof record?.source === 'string' ? record.source : ''
+  })
 }
 
 export function asLevel(node: unknown): LevelLike | null {

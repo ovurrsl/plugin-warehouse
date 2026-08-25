@@ -13,6 +13,7 @@
 
 import { nodeRegistry, useScene } from '@pascal-app/core'
 import { asLevel, asSlab } from './host-adapter'
+import { liftOpeningSpan } from './palletlift/levels'
 import { PLUGIN_ID } from './plugin-id'
 
 export type ProbeStatus = 'ok' | 'degraded' | 'missing'
@@ -110,13 +111,64 @@ function shapeProbe(key: string, ok: number, total: number): Probe {
   return { key, status: 'degraded', detail: `${ok}/${total} readable` }
 }
 
+/**
+ * Did the host honour a `verticalOpening` this plugin declared?
+ *
+ * The capability is newer than the published `@pascal-app/core`, and the
+ * plugin declares it through a spread precisely so an older host ignores the
+ * key instead of erroring. That fails soft in the worst way: a pallet lift
+ * runs through a sealed floor and nothing anywhere says so — the hole that was
+ * never cut leaves no trace. This counts the lifts that *should* have pierced
+ * something against the slabs that actually carry a `verticalOpening` hole.
+ *
+ * Only the pallet lift is counted, not the spiral: the lift's span comes from
+ * the building's own levels, so "should have pierced" is decidable here without
+ * duplicating the spiral's rise arithmetic. One machine is enough to tell a
+ * host that cuts from one that does not.
+ */
+function probeVerticalOpening(nodes: Readonly<Record<string, unknown>>): Probe {
+  const key = 'vertical openings'
+  let expecting = 0
+  try {
+    for (const node of Object.values(nodes)) {
+      const record = node as { type?: unknown } | null
+      if (record?.type !== 'warehouse:pallet-lift') continue
+      if (liftOpeningSpan(nodes, node as never)) expecting++
+    }
+  } catch (error) {
+    return { key, status: 'missing', detail: describe(error) }
+  }
+
+  if (expecting === 0) return { key, status: 'ok', detail: 'no multi-level machine placed' }
+
+  let cut = 0
+  for (const node of Object.values(nodes)) {
+    const slab = asSlab(node)
+    if (slab?.holeSources?.includes('verticalOpening')) cut++
+  }
+
+  if (cut === 0) {
+    return {
+      key,
+      status: 'missing',
+      detail: `${expecting} lift(s) span a floor but no slab is cut — host predates the capability?`,
+    }
+  }
+  return { key, status: 'ok', detail: `${cut} slab(s) cut for ${expecting} lift(s)` }
+}
+
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
 export function runHostProbes(): Probe[] {
   const scene = probeScene()
-  return [probeRegistry(), scene.probe, ...probeHostShapes(scene.nodes)]
+  return [
+    probeRegistry(),
+    scene.probe,
+    ...probeHostShapes(scene.nodes),
+    probeVerticalOpening(scene.nodes),
+  ]
 }
 
 const GLYPH: Record<ProbeStatus, string> = { ok: '✅', degraded: '⚠️', missing: '❌' }

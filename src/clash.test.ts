@@ -3,6 +3,9 @@ import { registerNode } from '@pascal-app/core'
 import { areClearAt, clashesWith, isClearAt, occupiedVolumes } from './clash'
 import { conveyorRollerDefinition } from './conveyor/definition'
 import { ConveyorRollerNode } from './conveyor/schema'
+import { mezzanineDefinition } from './mezzanine/definition'
+import { gridColumnPositions } from './mezzanine/metrics'
+import { MezzanineNode } from './mezzanine/schema'
 import { palletDefinition } from './pallet/definition'
 import { PalletNode } from './pallet/schema'
 import { palletRackDefinition } from './rack/definition'
@@ -28,6 +31,7 @@ beforeAll(() => {
   registerNode(palletDefinition as never)
   registerNode(palletRackDefinition as never)
   registerNode(conveyorRollerDefinition as never)
+  registerNode(mezzanineDefinition as never)
 })
 
 const rack = (overrides: Record<string, unknown> = {}) =>
@@ -36,6 +40,18 @@ const pallet = (overrides: Record<string, unknown> = {}) =>
   PalletNode.parse({ id: 'pallet_a', ...overrides })
 const conveyor = (overrides: Record<string, unknown> = {}) =>
   ConveyorRollerNode.parse({ id: 'conveyor_roller_a', rollers: 40, ...overrides })
+/** 20 × 20 m deck, drawn around the origin. */
+const mezzanine = (overrides: Record<string, unknown> = {}) =>
+  MezzanineNode.parse({
+    id: 'mezzanine_a',
+    polygon: [
+      [-10, -10],
+      [10, -10],
+      [10, 10],
+      [-10, 10],
+    ],
+    ...overrides,
+  })
 
 const scene = (...nodes: Array<{ id: string }>) =>
   Object.fromEntries(nodes.map((node) => [node.id, node])) as Record<string, unknown>
@@ -351,5 +367,52 @@ describe('bir koşu, tek betimlemeden ötelenir', () => {
     const far = conveyor({ id: 'conveyor_roller_far', position: [19 * pitch, 0, 0] })
     expect(areClearAt({ node: moving, positions, rotationY: 0, nodes: scene(far) })).toBe(false)
     expect(areClearAt({ node: moving, positions, rotationY: 0, nodes: scene() })).toBe(true)
+  })
+})
+
+/**
+ * The asymmetry this closes: a mezzanine was an obstacle to everything else and
+ * an obstacle to nothing itself. `occupiedVolumes` has described one since it
+ * was written — so a rack could not be put into a mezzanine — but the mezzanine
+ * tool only ever ran the host's plan-rectangle test, which sees no Y at all. A
+ * deck could be drawn straight down through a six-metre run of racking and
+ * nothing objected.
+ *
+ * Both halves matter equally. The *point* of a mezzanine is that the space
+ * under it stays usable, so a test that refuses a deck over short racking has
+ * broken the feature it was added to protect.
+ */
+describe('a mezzanine is an obstacle to itself, not only to everything else', () => {
+  test('a deck below the top of a rack is refused', () => {
+    // Rack: 3 levels on a 6 m upright. Deck at 2.5 m walks through it.
+    const tall = rack({ uprightHeight: 6, levels: 3, position: [0, 0, 0] })
+    const deck = mezzanine({ clearHeightM: 2.5 })
+    expect(isClearAt({ node: deck, position: [0, 0, 0], rotationY: 0, nodes: scene(tall) })).toBe(
+      false,
+    )
+  })
+
+  test('a deck clearing a short rack is allowed — the space under one is the point', () => {
+    const deck = mezzanine({ clearHeightM: 3 })
+    /**
+     * Mid-bay, asked of the grid rather than guessed: a column IS solid down to
+     * the floor, so a rack sitting on one is a real clash and would make this
+     * test pass for the wrong reason — or fail if the pitch ever changes.
+     */
+    const columns = gridColumnPositions(deck)
+    const first = columns[0]!
+    const nextX = columns.find((point) => point.x > first.x)!
+    const midBay: [number, number, number] = [(first.x + nextX.x) / 2, 0, first.z]
+
+    const short = rack({ uprightHeight: 2, levels: 1, position: midBay })
+    expect(isClearAt({ node: deck, position: [0, 0, 0], rotationY: 0, nodes: scene(short) })).toBe(
+      true,
+    )
+  })
+
+  test('the mezzanine still obstructs, as it always did', () => {
+    const deck = mezzanine({ clearHeightM: 2.5 })
+    const tall = rack({ uprightHeight: 6, levels: 3 })
+    expect(hits(tall, [0, 0, 0], 0, scene(deck))).toContain(deck.id)
   })
 })

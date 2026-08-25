@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { snapToLineEnd } from './port-magnet'
 import { conveyorPorts } from './ports'
@@ -85,6 +86,7 @@ export const conveyorTelescopicDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
 

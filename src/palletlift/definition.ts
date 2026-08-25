@@ -1,12 +1,22 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
+import { crossesSurface, rectOpening, verticalOpening } from '../vertical-opening'
 import { buildPalletLiftFloorplan } from './floorplan'
-import { fallbackEnvelopeHeightM, footprintM } from './metrics'
+import { liftOpeningSpan } from './levels'
+import { enclosureXZ, fallbackEnvelopeHeightM, footprintM } from './metrics'
 import { palletLiftParametrics } from './parametrics'
 import { PalletLiftNode } from './schema'
 
 /** Asansör bir duvara/hatta yaslanıyor: dört açı, ara adım yok. */
 const SNAP_ANGLES = Array.from({ length: 4 }, (_, i) => (i * Math.PI) / 2)
+
+/**
+ * Kat deliğinin muhafaza zarfından dışarı payı, metre — host asansörünün
+ * `ELEVATOR_OPENING_PADDING` değeriyle aynı, iki mekanizma yan yana durunca
+ * delikler aynı cömertlikte olsun diye.
+ */
+const OPENING_CLEARANCE_M = 0.08
 
 /**
  * Palet asansörü — mastlı, zincir tahrikli, platformunda entegre rulo konveyör
@@ -26,6 +36,14 @@ const SNAP_ANGLES = Array.from({ length: 4 }, (_, i) => (i * Math.PI) / 2)
  * bir tahmin (`fallbackEnvelopeHeightM`) kullanılıyor; renderer koliderı
  * gerçek çözülmüş yüksekliği taşır. `collides: false` — host'un testi plan
  * dikdörtgeni ve Y görmüyor, 3B doğruluk `clash.ts`'te.
+ *
+ * ## Kuyu, host asansörünün açtığı deliğin aynısını açar
+ *
+ * `verticalOpening` bildirildiği için host, asansörün geçtiği her kat döşemesini
+ * ve tavanını kesiyor — OTURDUĞU döşemeyi değil, VARDIĞI döşemeyi (bkz.
+ * `vertical-opening.ts crossesSurface`). Delik muhafaza zarfı + boşluk payı;
+ * `footprintM` DEĞİL, çünkü o kontrol panosunun taşmasını da sarıyor ve pano
+ * tek katta kafesin dışında duruyor — kuyudan geçmiyor.
  */
 export const palletLiftDefinition = {
   kind: 'warehouse:pallet-lift',
@@ -50,7 +68,7 @@ export const palletLiftDefinition = {
     duplicable: true,
     deletable: true,
     groupable: true,
-    movable: { axes: ['x', 'z'], gridSnap: true },
+    movable: { axes: ['x', 'z'], gridSnap: true, ...clashGuardedMove() },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},
 
@@ -76,6 +94,24 @@ export const palletLiftDefinition = {
         center: [0, height / 2, 0],
       }
     },
+
+    ...verticalOpening({
+      polygon: (node) => {
+        const lift = node as PalletLiftNode
+        const [width, depth] = enclosureXZ(lift)
+        return rectOpening(
+          lift.position,
+          lift.rotation?.[1] ?? 0,
+          width / 2 + OPENING_CLEARANCE_M,
+          depth / 2 + OPENING_CLEARANCE_M,
+        )
+      },
+      servesLevel: (node, levelId, nodes, surface) => {
+        const lift = node as PalletLiftNode
+        const span = liftOpeningSpan(nodes, lift)
+        return span !== null && crossesSurface(nodes, lift, levelId, surface, span)
+      },
+    }),
   },
 
   parametrics: palletLiftParametrics,
@@ -107,6 +143,6 @@ export const palletLiftDefinition = {
 
   mcp: {
     description:
-      'Pallet lift — a mast-guided (2 or 4 columns), chain-driven vertical pallet transport with an integrated roller conveyor on its carrying platform (EN 1570-1/-2). **Floors are NOT a field: the served levels are derived from the building the lift sits in (its `level` children, stacked by ordinal), exactly as the host elevator does.** `fromLevelId` / `toLevelId` (level ids, nullable) clamp the service range; both null serves the whole stack. `fallbackTravelM` (metres, 1.5–12) is only used when fewer than two levels resolve (placed outside a building / single-level). `capacityClass` is `1000` / `1500` / `4500` kg — it sets the published vertical speed (80 / 60 m/min; 4500 is an assumption) and the mast section (150 / 200 / 250 mm). `mastCount` is `2` or `4`; the 4500 kg class requires 4. `palletPreset` picks the pallet family preset and sizes the platform (pallet + 2×0.15 m clearance). `hasEnclosure` (a translucent safety guard), `hasDoors` (single up-sliding floor doors), `hasControlPanel` toggle those parts. `mastColor` / `platformColor` / `doorColor` are the finishes. The platform, doors and cycle animate only while the flow simulation runs. All dimensions are metres.',
+      'Pallet lift — a mast-guided (2 or 4 columns), chain-driven vertical pallet transport with an integrated roller conveyor on its carrying platform (EN 1570-1/-2). **Floors are NOT a field: the served levels are derived from the building the lift sits in (its `level` children, stacked by ordinal), exactly as the host elevator does.** `fromLevelId` / `toLevelId` (level ids, nullable) clamp the service range; both null serves the whole stack. The shaft declares a vertical opening, so the host cuts the enclosure footprint through every served floor slab and ceiling exactly as it does for its own elevator — the floor the lift stands on excluded, the top served floor included. A lift outside a building, or clamped to a single level, cuts nothing. `fallbackTravelM` (metres, 1.5–12) is only used when fewer than two levels resolve (placed outside a building / single-level). `capacityClass` is `1000` / `1500` / `4500` kg — it sets the published vertical speed (80 / 60 m/min; 4500 is an assumption) and the mast section (150 / 200 / 250 mm). `mastCount` is `2` or `4`; the 4500 kg class requires 4. `palletPreset` picks the pallet family preset and sizes the platform (pallet + 2×0.15 m clearance). `hasEnclosure` (a translucent safety guard), `hasDoors` (single up-sliding floor doors), `hasControlPanel` toggle those parts. `mastColor` / `platformColor` / `doorColor` are the finishes. The platform, doors and cycle animate only while the flow simulation runs. All dimensions are metres.',
   },
 } satisfies NodeDefinition<typeof PalletLiftNode>

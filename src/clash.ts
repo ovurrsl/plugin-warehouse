@@ -800,3 +800,40 @@ export function areClearAt(query: RunClashQuery): boolean {
 }
 
 const ORIGIN: readonly [number, number, number] = [0, 0, 0]
+
+// ── The same question, asked during a drag ──────────────────────────────────
+
+/**
+ * `movable.canMoveTo` — host sözleşmesinde var, YAYINLANMIŞ `@pascal-app/core`
+ * tiplerinde henüz yok (`vertical-opening.ts`'teki aynı durum, aynı çözüm:
+ * yayılım fazla-özellik denetimini atlar, host yeteneği çalışma zamanında
+ * dinamik okur, eski host'ta hiçbir şey olmaz).
+ */
+export type HostCanMoveTo = (args: {
+  node: unknown
+  position: [number, number, number]
+  rotationY: number
+  nodes: Readonly<Record<string, unknown>>
+}) => boolean
+
+/**
+ * Sürükleme için bu modülün cevabı — yerleştirme kapısının aynısı.
+ *
+ * **Kapatılan boşluk:** bu paketin araçları yerleştirmeyi üç boyutta
+ * denetliyordu, ama yerleşen nesne sonradan SÜRÜKLENEBİLİYORDU ve orada hiçbir
+ * denetim yoktu. Host'un kendi sürükleme kapısı `floorPlaced.collides`'a bakar;
+ * bu paketin her kind'ı onu KAPALI tutmak zorunda (host'un testi plan
+ * dikdörtgenidir ve Y görmez — tünelli bir gözün altındaki yürüme yolunu
+ * dikmelerinin içinden geçmekten ayıramaz), yani sürükleme kapısı da kapalıydı.
+ * Doğru yerleştirilen bir konveyör, ertesi saniye rafın içine çekilebiliyordu.
+ *
+ * Rota HARİÇ her kind bunu bildirir, ve kural şu: **yerleştirme neyi
+ * denetliyorsa sürükleme de onu denetler.** Rota zemine çizilen boyadır,
+ * `occupiedVolumes` ona hacim vermez, dolayısıyla soru ona sorulmaz.
+ */
+export function clashGuardedMove(): { readonly canMoveTo: HostCanMoveTo } {
+  return {
+    canMoveTo: ({ node, position, rotationY, nodes }) =>
+      isClearAt({ node, position, rotationY, nodes }),
+  }
+}

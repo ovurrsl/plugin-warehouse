@@ -18,6 +18,7 @@
  */
 
 import {
+  asLevel,
   buildingOfLevel,
   levelElevationsOfBuilding,
   levelsOfBuilding,
@@ -103,6 +104,29 @@ export function resolveLift(
   const mastHeight = rise + OVERTRAVEL_M
   const fingerprint = `${stops.map((s) => Math.round(s.baseY * 1000)).join(',')}|${Math.round(mastHeight * 1000)}`
   return { stops, mastHeight, fingerprint }
+}
+
+/**
+ * Kuyunun dikey aralığı — kat döşemelerini delmek için, asansörün kendi katına
+ * göre. Gerçek kat çözülemediğinde `null`.
+ *
+ * `resolveLiftLevels` iki kattan azı çözülünce SENTETİK bir yedek duraklar
+ * çifti döner (`fallbackTravelM` kadar bir kuyu). O yedek çizimi ayakta tutmak
+ * içindir; DELİK açmak için değil. Bina dışına konmuş ya da tek kata
+ * kelepçelenmiş bir asansör, altından geçmediği döşemeleri kesmemeli — sentetik
+ * duraklar gerçek bir kata karşılık gelmediği için burada `null` dönüyor.
+ */
+export function liftOpeningSpan(
+  nodes: Readonly<Record<string, unknown>>,
+  lift: PalletLiftNode,
+): { bottom: number; top: number } | null {
+  const stops = resolveLiftLevels(nodes, lift)
+  if (stops.length < 2) return null
+  const bottom = stops[0]!
+  const top = stops[stops.length - 1]!
+  // Sentetik yedek: kimlikler hiçbir gerçek kata çözülmez.
+  if (!asLevel(nodes[bottom.id]) || !asLevel(nodes[top.id])) return null
+  return { bottom: bottom.baseY, top: top.baseY }
 }
 
 /** En üst ile en alt servis durağı arası kot farkı, metre. */

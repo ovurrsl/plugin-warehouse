@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { buildCurveFloorplan } from './curve-floorplan'
 import { footprintM, localBoundsM } from './curve-metrics'
 import { conveyorCurveParametrics } from './curve-parametrics'
@@ -57,6 +58,7 @@ export const conveyorCurveDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

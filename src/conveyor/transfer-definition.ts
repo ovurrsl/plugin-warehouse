@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { snapToLineEnd } from './port-magnet'
 import { conveyorPorts } from './ports'
 import { buildTransferFloorplan } from './transfer-floorplan'
@@ -56,6 +57,7 @@ export const conveyorTransferDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

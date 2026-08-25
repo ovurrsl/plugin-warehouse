@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { buildConveyorFloorplan } from './floorplan'
 import { frameWidthM, moduleLengthM } from './metrics'
 import { conveyorRollerParametrics } from './parametrics'
@@ -70,6 +71,7 @@ export const conveyorRollerDefinition = {
           nodes as Readonly<Record<string, unknown>>,
         )
       },
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

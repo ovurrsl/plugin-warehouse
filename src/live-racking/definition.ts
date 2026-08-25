@@ -1,4 +1,5 @@
 import type { NodeDefinition } from '@pascal-app/core'
+import { clashGuardedMove } from '../clash'
 import { treeLabel } from '../tree-label'
 import { buildLiveRackingFloorplan } from './floorplan'
 import { snapToNeighbourSeam } from './magnet'
@@ -65,6 +66,7 @@ export const liveRackingDefinition = {
           movingIds as readonly string[],
           nodes as Readonly<Record<string, unknown>>,
         ),
+      ...clashGuardedMove(),
     },
     rotatable: { axes: ['y'], snapAngles: SNAP_ANGLES },
     snappable: {},

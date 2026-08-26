@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`fe2798e`](https://github.com/ovurrsl/plugin-warehouse/commit/fe2798e246b7f81121bfa0502d3c97f898f72a87))
 - Refresh generated README blocks [skip ci] ([`119716b`](https://github.com/ovurrsl/plugin-warehouse/commit/119716b748326eb05d4096a6c8828663b0dc4116))
 - Refresh generated README blocks [skip ci] ([`f93b4f8`](https://github.com/ovurrsl/plugin-warehouse/commit/f93b4f8837408889750162c4b4a6567ba546158f))
 - Refresh generated README blocks [skip ci] ([`96e7762`](https://github.com/ovurrsl/plugin-warehouse/commit/96e7762804307a0d628c5153d87f2af440042b6a))
@@ -174,6 +175,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Multi-level conveyor schema, pallet lift parity, PDF BOM export, and catalog UI fixes ([`392e22b`](https://github.com/ovurrsl/plugin-warehouse/commit/392e22b2ca7d74e1340b238823fc9e1524825e40))
 - Implement detailed capacity calculations and add 3D webp logos ([`5aa3415`](https://github.com/ovurrsl/plugin-warehouse/commit/5aa3415b4908327180b36f812b78361d6cec01b2))
 - Migrate to native ItemCatalog with filters and vector icons ([`f17977d`](https://github.com/ovurrsl/plugin-warehouse/commit/f17977d0f5e2d704c8c5ccf18f56b961ca26074f))
 - Export WarehouseStatsTab ([`32848f1`](https://github.com/ovurrsl/plugin-warehouse/commit/32848f1c2e02c2ca40a10e407b439dad1c857b0a))

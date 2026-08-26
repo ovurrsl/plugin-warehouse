@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { CATALOG_ITEMS, CATALOG_SECTIONS, chipIsArmed } from './catalog'
 import { warehousePlugin } from './index'
 import { PalletRackNode } from './rack/schema'
@@ -313,3 +314,50 @@ describe('katalog arama ve filtreleme mantığı', () => {
     expect(matches.map((m) => m.id)).toContain('conveyor-spiral-pallet')
   })
 })
+
+describe('3D webp katalog logoları ve görsel varlıklar (R2)', () => {
+  test('katalogda tam 43 fiş var', () => {
+    expect(CATALOG_ITEMS.length).toBe(43)
+  })
+
+  test('tüm 43 fiş /icons/warehouse/<id>.webp formatında ikon taşır', () => {
+    for (const item of CATALOG_ITEMS) {
+      expect(item.icon).toBe(`/icons/warehouse/${item.id}.webp`)
+      expect(item.icon.startsWith('/icons/warehouse/')).toBe(true)
+      expect(item.icon.endsWith('.webp')).toBe(true)
+    }
+  })
+
+  test('hiçbir katalog fişi artık eski vektör (lucide:*) ikon kullanmaz', () => {
+    for (const item of CATALOG_ITEMS) {
+      expect(item.icon.startsWith('lucide:')).toBe(false)
+      expect(item.icon.includes(':')).toBe(false)
+    }
+  })
+
+  test('referans verilen tüm .webp dosyaları editor/apps/editor/public ve Digitaltwin/public disk dizinlerinde mevcuttur', () => {
+    const editorPublic = resolve(import.meta.dir, '../../editor/apps/editor/public')
+    const digitalTwinPublic = resolve(import.meta.dir, '../../Digitaltwin/public')
+
+    for (const item of CATALOG_ITEMS) {
+      const relPath = item.icon.replace(/^\//, '')
+      const editorFile = join(editorPublic, relPath)
+      const dtFile = join(digitalTwinPublic, relPath)
+
+      const existsInEditor = existsSync(editorFile)
+      const existsInDt = existsSync(dtFile)
+
+      expect(existsInEditor).toBe(true)
+      expect(existsInDt).toBe(true)
+    }
+  })
+
+  test('katalog paneli CatalogTile raster img etiketi ve stilini içerir', () => {
+    const source = readFileSync(`${import.meta.dir}/panels/catalog-panel.tsx`, 'utf8')
+    expect(source).toContain('isRaster')
+    expect(source).toContain('<img')
+    expect(source).toContain('item.icon')
+    expect(source).toContain('objectFit')
+  })
+})
+

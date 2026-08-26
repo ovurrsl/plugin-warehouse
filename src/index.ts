@@ -20,6 +20,10 @@ import { palletLiftDefinition } from './palletlift/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
+import {
+  calculateWarehouseZoneTakeoff,
+  warehouseZoneTakeoffExtension,
+} from './takeoff'
 import { toteCartDefinition } from './totecart/definition'
 import { truckDefinition } from './truck/definition'
 
@@ -68,6 +72,7 @@ export const warehousePlugin: Plugin = {
     toteCartDefinition as unknown as AnyNodeDefinition,
     palletLiftDefinition as unknown as AnyNodeDefinition,
   ],
+  zoneTakeoffExtensions: [warehouseZoneTakeoffExtension],
 }
 
 export const warehouseCatalogPanel: EditorHostPanel = {
@@ -132,6 +137,11 @@ export { StatsTab as WarehouseStatsTab } from './panels/catalog-panel'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
 export { palletRackDefinition } from './rack/definition'
 export { PalletRackNode } from './rack/schema'
+export {
+  calculateWarehouseZoneTakeoff,
+  type WarehouseZoneTakeoffInput,
+  warehouseZoneTakeoffExtension,
+} from './takeoff'
 export { truckDefinition } from './truck/definition'
 export { TruckNode } from './truck/schema'
 export default warehousePlugin

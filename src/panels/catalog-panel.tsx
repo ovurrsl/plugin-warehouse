@@ -303,9 +303,19 @@ function CatalogTile({
   armed: boolean
   onArm: (item: CatalogItem) => void
 }) {
+  const isRaster =
+    item.icon.startsWith('/') || item.icon.endsWith('.webp') || item.icon.endsWith('.png')
   return (
     <button onClick={() => onArm(item)} style={tile(armed)} title={item.description} type="button">
-      <Icon height={18} icon={item.icon} style={tokens.tileIcon} width={18} />
+      {isRaster ? (
+        <img
+          alt={item.label}
+          src={item.icon}
+          style={{ width: 18, height: 18, objectFit: 'contain' }}
+        />
+      ) : (
+        <Icon height={18} icon={item.icon} style={tokens.tileIcon} width={18} />
+      )}
       <span style={tokens.tileLabel}>{item.label}</span>
     </button>
   )

@@ -41,8 +41,23 @@ export const ConveyorSpiralNode = BaseNode.extend({
   beltWidth: z.enum(SPIRAL_BELT_WIDTHS).default('500'),
 
   /**
+   * Hizmet aralığının alt/üst kat kimliği — host merdiven ve asansör deseni
+   * (`stair.ts` / `elevator.ts`). Belirtildiğinde seyahat yüksekliği bina katları
+   * arasındaki farktan dinamik olarak hesaplanır. null ise `travelHeight` kullanılır.
+   */
+  fromLevelId: z.string().nullable().default(null),
+  toLevelId: z.string().nullable().default(null),
+
+  /**
+   * `fromLevelId` ve `toLevelId` alanlarının alternatif/eşanlamlı takma adları
+   * (StairNode / ElevatorNode paritesi).
+   */
+  baseLevelId: z.string().nullable().default(null),
+  topLevelId: z.string().nullable().default(null),
+
+  /**
    * Toplam dikey yükseliş, metre. Sınırlar SEÇİLMİŞ VARSAYILAN — katalog bir
-   * ayar aralığı yayınlamıyor.
+   * ayar aralığı yayınlamıyor. Kat kimlikleri seçilmediğinde yedek olarak kullanılır.
    */
   travelHeight: z.number().min(1).max(15).default(4),
 

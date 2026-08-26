@@ -3,6 +3,7 @@ import { lengthLabel, unitOf } from '../units'
 import {
   cageRadiusM,
   columnRadiusM,
+  exitAngleRad,
   frameWidthM,
   helixRadiusM,
   outerDiameterM,
@@ -38,6 +39,11 @@ export function buildSpiralFloorplan(
   const fill = selected ? (view?.palette.selectedFill ?? '#fce8cc') : '#e6e8ea'
   const detail = selected ? stroke : '#64748b'
 
+  const thetaExit = exitAngleRad(node)
+  const cosExit = Math.cos(thetaExit)
+  const sinExit = Math.sin(thetaExit)
+  const halfFrame = frame / 2
+
   const children: FloorplanGeometry[] = [
     // Kafes izi — makinenin tuttuğu zemin.
     { kind: 'circle', cx: 0, cy: 0, r: cage, fill, stroke, strokeWidth: 0.03 },
@@ -64,13 +70,15 @@ export function buildSpiralFloorplan(
       stroke,
       strokeWidth: 0.02,
     },
-    // Çıkış tanjant güdüğü (+X, üst kot).
+    // Çıkış tanjant güdüğü (θexit açısında, üst kot).
     {
-      kind: 'rect',
-      x: cage,
-      y: -frame / 2,
-      width: span - cage,
-      height: frame,
+      kind: 'polygon',
+      points: [
+        [cage * cosExit + halfFrame * sinExit, cage * sinExit - halfFrame * cosExit],
+        [span * cosExit + halfFrame * sinExit, span * sinExit - halfFrame * cosExit],
+        [span * cosExit - halfFrame * sinExit, span * sinExit + halfFrame * cosExit],
+        [cage * cosExit - halfFrame * sinExit, cage * sinExit + halfFrame * cosExit],
+      ],
       fill,
       stroke,
       strokeWidth: 0.02,
@@ -103,5 +111,14 @@ export function buildSpiralFloorplan(
     })
   }
 
-  return { kind: 'group', children }
+  const rotation = Array.isArray(node.rotation) ? (node.rotation[1] ?? 0) : 0
+
+  return {
+    kind: 'group',
+    children,
+    transform: {
+      translate: [node.position?.[0] ?? 0, node.position?.[2] ?? 0],
+      rotate: -rotation,
+    },
+  }
 }

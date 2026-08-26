@@ -5,6 +5,7 @@ import { circleOpening, crossesSurface, verticalOpening } from '../vertical-open
 import { snapToLineEnd } from './port-magnet'
 import { conveyorPorts } from './ports'
 import { buildSpiralFloorplan } from './spiral-floorplan'
+import { resolveSpiralRise } from './spiral-levels'
 import { cageRadiusM, footprintM, overallHeightM } from './spiral-metrics'
 import { conveyorSpiralParametrics } from './spiral-parametrics'
 import { ConveyorSpiralNode } from './spiral-schema'
@@ -35,12 +36,9 @@ const OPENING_SEGMENTS = 16
  * döşemesinin İÇİNDEN geçmek. `verticalOpening` bildirdiği için host, merdiven
  * ve asansörde olduğu gibi geçtiği her kat döşemesini ve tavanını kesiyor.
  *
- * Hangi katlarda çıkışı olacağı ayrı bir ALAN değil, `travelHeight`'ten
- * çıkıyor: makine oturduğu döşemeden `overallHeightM` kadar yükselir ve
- * arasında kalan her döşeme delinir (oturduğu döşeme HARİÇ — `crossesSurface`
- * alt ucu dışlar). Kat kimliğiyle seçilen bir "varış katı" alanı kotu sahneden
- * okumayı gerektirirdi ve `travelHeight` zaten ölçünün kendisi:
- * `pitchM`/`turnCount`/geometri anahtarı onun üstünde duruyor.
+ * `fromLevelId`/`toLevelId` (veya `baseLevelId`/`topLevelId`) seçilmişse
+ * toplam yükseliş bina katlarından dinamik türetilir. Seçilmemişse `travelHeight`
+ * değerinden okunur.
  */
 export const conveyorSpiralDefinition = {
   kind: 'warehouse:conveyor-spiral',
@@ -123,14 +121,24 @@ export const conveyorSpiralDefinition = {
       },
       servesLevel: (node, levelId, nodes, surface) => {
         const spiral = node as ConveyorSpiralNode
+        const height = resolveSpiralRise(nodes as Readonly<Record<string, unknown>>, spiral)
         // Taban 0: makine kendi döşemesinin üstünde duruyor, o döşeme
         // delinmiyor. Tepe, kafes/korkuluk payını da içeren toplam boy.
         return crossesSurface(nodes, spiral, levelId, surface, {
           bottom: 0,
-          top: overallHeightM(spiral),
+          top: overallHeightM(spiral, height),
         })
       },
     }),
+  },
+
+  extensions: {
+    'pascal:editor/floorplan': {
+      linkedLevelIds: (node: ConveyorSpiralNode) => {
+        const targetId = node.toLevelId ?? node.topLevelId
+        return targetId && targetId !== node.parentId ? [targetId] : []
+      },
+    },
   },
 
   parametrics: conveyorSpiralParametrics,

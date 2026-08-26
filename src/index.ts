@@ -20,10 +20,7 @@ import { palletLiftDefinition } from './palletlift/definition'
 import { CATALOG_PANEL_ID, PLUGIN_ID } from './plugin-id'
 import { palletRackDefinition } from './rack/definition'
 import { routeDefinition } from './route/definition'
-import {
-  calculateWarehouseZoneTakeoff,
-  warehouseZoneTakeoffExtension,
-} from './takeoff'
+import { warehouseZoneTakeoffExtension } from './takeoff'
 import { toteCartDefinition } from './totecart/definition'
 import { truckDefinition } from './truck/definition'
 
@@ -127,12 +124,40 @@ export const warehouseCatalogPanel: EditorHostPanel = {
   defaultInstalled: true,
 }
 
+export {
+  calculateWarehouseBOM,
+  downloadBlob,
+  exportWarehouseBomHtml,
+  exportWarehouseBomPdf,
+  generateWarehouseBomHtml,
+  generateWarehouseBomPdf,
+  generateWarehouseBomSheets,
+} from './bom'
+export * from './bom/types'
+export { conveyorSpiralDefinition } from './conveyor/spiral-definition'
+export { default as SpiralPanel } from './conveyor/spiral-panel'
+export {
+  resolveSpiralBuildingLevels,
+  resolveSpiralHeight,
+  resolveSpiralRise,
+  spiralLevelFingerprint,
+} from './conveyor/spiral-levels'
+export { ConveyorSpiralNode } from './conveyor/spiral-schema'
 // No re-export of `./pallet/geometry-builder` or `./pallet/epal-textures`:
 // the atlas touches `document`, and this barrel is imported eagerly during
 // server prerender. The lazy renderer/tool modules import them directly.
 export { palletDefinition } from './pallet/definition'
 export { PALLET_PRESETS, type PalletPreset } from './pallet/presets'
 export { PalletNode } from './pallet/schema'
+export { palletLiftDefinition } from './palletlift/definition'
+export { default as PalletLiftPanel } from './palletlift/panel'
+export {
+  liftLevelFingerprint,
+  resolveLift,
+  resolveLiftLevels,
+  resolvePalletLiftLevels,
+} from './palletlift/levels'
+export { PalletLiftNode } from './palletlift/schema'
 export { StatsTab as WarehouseStatsTab } from './panels/catalog-panel'
 export { CATALOG_PANEL_ID, KIND_PREFIX, PLUGIN_ID } from './plugin-id'
 export { palletRackDefinition } from './rack/definition'

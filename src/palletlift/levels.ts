@@ -51,9 +51,10 @@ export function resolveLiftLevels(
   const buildingId = buildingOfLevel(nodes, parentLevelId)
   const entries = levelElevationsOfBuilding(nodes, buildingId)
 
+  const fallbackTravel = lift.travelHeight ?? lift.fallbackTravelM ?? 3
   const fallback = (): LiftStop[] => [
     { id: '__base', baseY: 0, label: '0' },
-    { id: '__top', baseY: lift.fallbackTravelM, label: '1' },
+    { id: '__top', baseY: fallbackTravel, label: '1' },
   ]
 
   if (entries.length < 2) return fallback()
@@ -62,10 +63,12 @@ export function resolveLiftLevels(
   const ordinalOf = new Map(levelsOfBuilding(nodes, buildingId).map((l) => [l.id, l.level]))
 
   // Servis aralığı kelepçesi — host asansör deseni, min/max takasıyla.
+  const fromLevelId = lift.fromLevelId ?? lift.baseLevelId ?? null
+  const toLevelId = lift.toLevelId ?? lift.topLevelId ?? null
   let slice = entries
-  if (lift.fromLevelId !== null || lift.toLevelId !== null) {
-    const fromIndex = entries.findIndex((e) => e.id === lift.fromLevelId)
-    const toIndex = entries.findIndex((e) => e.id === lift.toLevelId)
+  if (fromLevelId !== null || toLevelId !== null) {
+    const fromIndex = entries.findIndex((e) => e.id === fromLevelId)
+    const toIndex = entries.findIndex((e) => e.id === toLevelId)
     const from = fromIndex >= 0 ? fromIndex : 0
     const to = toIndex >= 0 ? toIndex : entries.length - 1
     slice = entries.slice(Math.min(from, to), Math.max(from, to) + 1)
@@ -104,6 +107,45 @@ export function resolveLift(
   const mastHeight = rise + OVERTRAVEL_M
   const fingerprint = `${stops.map((s) => Math.round(s.baseY * 1000)).join(',')}|${Math.round(mastHeight * 1000)}`
   return { stops, mastHeight, fingerprint }
+}
+
+/**
+ * PROJECT.md sözleşmesi arayüzü:
+ * Asansör duraklarını, kuyu tabanı/tepesini, toplam mast yüksekliğini ve
+ * servis edilen katları çözer.
+ */
+export function resolvePalletLiftLevels(
+  node: PalletLiftNode,
+  nodes: Readonly<Record<string, unknown>>,
+): {
+  baseY: number
+  topY: number
+  totalHeight: number
+  servedLevels: Array<{ id: string; name: string; elevation: number }>
+} {
+  const resolved = resolveLift(nodes, node)
+  const stops = resolved.stops
+  const firstStop = stops[0]
+  const lastStop = stops[stops.length - 1]
+  const baseY = firstStop?.baseY ?? 0
+  const topY = lastStop?.baseY ?? node.travelHeight ?? node.fallbackTravelM ?? 3
+  const totalHeight = resolved.mastHeight
+
+  const servedLevels = stops.map((stop) => {
+    const levelNode = asLevel(nodes[stop.id])
+    return {
+      id: stop.id,
+      name: levelNode?.name ?? `Level ${stop.label}`,
+      elevation: stop.baseY,
+    }
+  })
+
+  return {
+    baseY,
+    topY,
+    totalHeight,
+    servedLevels,
+  }
 }
 
 /**
@@ -164,9 +206,12 @@ export function liftLevelFingerprint(
   return [
     buildingId ?? '-',
     parentLevelId ?? '-',
-    lift.fromLevelId ?? '-',
-    lift.toLevelId ?? '-',
-    lift.fallbackTravelM,
+    lift.fromLevelId ?? lift.baseLevelId ?? '-',
+    lift.toLevelId ?? lift.topLevelId ?? '-',
+    lift.travelHeight ?? lift.fallbackTravelM ?? 3,
+    lift.defaultLevelId ?? '-',
+    (lift.disabledLevelIds ?? []).join(','),
+    (lift.serviceOnlyLevelIds ?? []).join(','),
     ...parts,
   ].join('|')
 }

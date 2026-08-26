@@ -38,6 +38,13 @@ export const conveyorSpiralParametrics: ParametricDescriptor<ConveyorSpiralNode>
       ],
     },
     {
+      label: 'Service',
+      fields: [
+        { key: 'fromLevelId', kind: 'ref', refKind: 'level' },
+        { key: 'toLevelId', kind: 'ref', refKind: 'level' },
+      ],
+    },
+    {
       label: 'Geometry',
       fields: [
         { key: 'travelHeight', kind: 'number', unit: 'm', min: 1, max: 15, step: 0.1 },
@@ -68,6 +75,8 @@ export const conveyorSpiralParametrics: ParametricDescriptor<ConveyorSpiralNode>
       ],
     },
   ],
+
+  customPanel: () => import('./spiral-panel'),
 
   invariants: [
     (node): Issue[] => {

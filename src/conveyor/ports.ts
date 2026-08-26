@@ -35,6 +35,7 @@ import {
 import type { ConveyorObliqueNode } from './oblique-schema'
 import type { ConveyorRollerNode } from './schema'
 import {
+  exitAngleRad as spiralExitAngleRad,
   helixArcLengthM as spiralArcLengthM,
   entryHeightM as spiralEntryHeightM,
   exitHeightM as spiralExitHeightM,
@@ -370,6 +371,9 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
     const lane = Number(module.beltWidth)
     const frame = spiralFrameWidthM(module)
     const bottomIn = module.flow === 'up'
+    const thetaExit = spiralExitAngleRad(module)
+    const cosExit = Math.cos(thetaExit)
+    const sinExit = Math.sin(thetaExit)
     return [
       {
         id: 'a',
@@ -384,11 +388,11 @@ export function localPorts(module: ConveyorModule): LocalPort[] {
       },
       {
         id: 'b',
-        x: span,
+        x: span * cosExit,
         y: spiralExitHeightM(module),
-        z: 0,
-        dx: 1,
-        dz: 0,
+        z: span * sinExit,
+        dx: cosExit,
+        dz: sinExit,
         role: (bottomIn ? 'out' : 'in') as PortRole,
         laneMm: lane,
         frameWidthM: frame,

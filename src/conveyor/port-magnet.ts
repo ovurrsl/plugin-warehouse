@@ -413,12 +413,14 @@ export function mateBlockers(
           if (other.nodeId === module.id) continue
           const distance = (other.x - end.x) ** 2 + (other.z - end.z) ** 2
           if (distance >= MAGNET_RADIUS_SQ) continue
+          const mineHeight = transportHeightAt(module, end.id)
+          // 0.5m dikey toleransın ötesindeki portlar (ör. üst kat çıkışı) aynı planda olsa bile birleşme adayı değildir
+          if (Math.abs(other.height - mineHeight) > 0.5) continue
           const rule = blockingRule(module, end, other)
           // Yönü tutmayan bir uç yalnızca "henüz döndürmedin" demek olabilir;
           // kullanıcı zaten döndürerek çözer, uyarı gürültü olurdu.
           if (rule === null || rule === 'facing' || seen.has(rule)) continue
           seen.add(rule)
-          const mineHeight = transportHeightAt(module, end.id)
           if (rule === 'lane') {
             messages.push(
               `Yakındaki uç ${other.lane} mm şeritli, bu makine ${end.lane} mm — ` +

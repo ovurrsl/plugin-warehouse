@@ -67,6 +67,8 @@ export const palletLiftParametrics: ParametricDescriptor<PalletLiftNode> = {
     },
   ],
 
+  customPanel: () => import('./panel'),
+
   invariants: [
     (node): Issue[] => {
       const issues: Issue[] = []

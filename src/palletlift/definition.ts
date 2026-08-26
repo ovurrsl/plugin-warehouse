@@ -114,6 +114,20 @@ export const palletLiftDefinition = {
     }),
   },
 
+  extensions: {
+    'pascal:editor/floorplan': {
+      floorplanScope: 'building',
+      linkedLevelIds: (node: PalletLiftNode) => {
+        const from = node.fromLevelId ?? node.baseLevelId
+        const to = node.toLevelId ?? node.topLevelId
+        const ids: string[] = []
+        if (from && from !== node.parentId) ids.push(from)
+        if (to && to !== node.parentId) ids.push(to)
+        return ids
+      },
+    },
+  },
+
   parametrics: palletLiftParametrics,
 
   renderer: {

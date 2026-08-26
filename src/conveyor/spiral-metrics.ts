@@ -12,6 +12,7 @@
 
 import type { ConveyorDetail } from './parts'
 import { SPIRAL_BELT_SPEED_MS } from './spiral-catalog'
+import { resolveSpiralRise } from './spiral-levels'
 import type { ConveyorSpiralNode } from './spiral-schema'
 
 const TWO_PI = Math.PI * 2
@@ -46,24 +47,46 @@ export function pitchM(node: ConveyorSpiralNode): number {
   return TWO_PI * helixRadiusM(node) * Math.tan(inclineRad(node))
 }
 
+/** Dikey seyahat yükselişi, metre — düğümden veya sahne katlarından dinamik çözülür. */
+export function travelHeightM(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  if (typeof heightOrNodes === 'number') return heightOrNodes
+  if (heightOrNodes) return resolveSpiralRise(heightOrNodes, node)
+  return node.travelHeight
+}
+
 /** Tam tur sayısı: yükseklik / pitch. */
-export function turnCount(node: ConveyorSpiralNode): number {
-  return node.travelHeight / pitchM(node)
+export function turnCount(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return travelHeightM(node, heightOrNodes) / pitchM(node)
 }
 
 /** Toplam açı parametresi: tur × 2π. */
-export function totalAngleRad(node: ConveyorSpiralNode): number {
-  return turnCount(node) * TWO_PI
+export function totalAngleRad(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return turnCount(node, heightOrNodes) * TWO_PI
 }
 
 /** Helis yayının gerçek uzunluğu: yükseklik / sin(eğim) (bir malın kat ettiği yol). */
-export function helixArcLengthM(node: ConveyorSpiralNode): number {
-  return node.travelHeight / Math.sin(inclineRad(node))
+export function helixArcLengthM(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return travelHeightM(node, heightOrNodes) / Math.sin(inclineRad(node))
 }
 
 /**
- * Helis noktası, DİNLENME çerçevesinde (y tabanı 0): [R·cos(s·t),
- * (pitch/2π)·t, R·sin(s·t)]. `entryHeight` ofseti buraya GİRMEZ — slat'lar bu
+ * Helis noktası, DİNLENME çerçevesinde (y tabanı 0): [R·cos(π + s·t),
+ * (pitch/2π)·t, R·sin(π + s·t)].
+ * t=0 başlangıç noktası −X'tedir (açı π), böylece −X'teki giriş güdüğü ve Port 'a'
+ * ile 180° faz ayrıklığı olmadan kusursuz hizalanır.
+ * `entryHeight` ofseti buraya GİRMEZ — slat'lar bu
  * saf helis üzerinde inşa edilip renderer'da grup olarak `entryHeight` kadar
  * kaldırılıyor, yani kot geometri anahtarına girmiyor (teleskopik uzamanın
  * grup ötelemesi olmasının aynısı).
@@ -71,7 +94,34 @@ export function helixArcLengthM(node: ConveyorSpiralNode): number {
 export function helixPoint(node: ConveyorSpiralNode, t: number): [number, number, number] {
   const r = helixRadiusM(node)
   const s = handednessSign(node)
-  return [r * Math.cos(s * t), (pitchM(node) / TWO_PI) * t, r * Math.sin(s * t)]
+  const angle = Math.PI + s * t
+  return [r * Math.cos(angle), (pitchM(node) / TWO_PI) * t, r * Math.sin(angle)]
+}
+
+/**
+ * Helis çıkışının terminal açısı, radyan: θ_exit = π + s · totalAngleRad.
+ * Herhangi bir tamsayı veya kesirli tur sayısı için çıkış güdüğü ve Port 'b' yönünü belirler.
+ */
+export function exitAngleRad(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return Math.PI + handednessSign(node) * totalAngleRad(node, heightOrNodes)
+}
+
+/**
+ * Çıkış tanjant güdüğünün merkez koordinatı [x, y, z].
+ */
+export function exitStubCenter(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): [number, number, number] {
+  const theta = exitAngleRad(node, heightOrNodes)
+  const cage = cageRadiusM(node)
+  const span = portSpanM(node)
+  const rStub = (cage + span) / 2
+  const top = exitHeightM(node, heightOrNodes)
+  return [rStub * Math.cos(theta), top - 0.03, rStub * Math.sin(theta)]
 }
 
 /** Tur başına slat sayısı: tam 30, sade 10. */
@@ -112,16 +162,22 @@ export function entryHeightM(node: ConveyorSpiralNode): number {
 }
 
 /** Çıkış (üst) tanjant kotu: giriş + yükseklik. */
-export function exitHeightM(node: ConveyorSpiralNode): number {
-  return node.entryHeight + node.travelHeight
+export function exitHeightM(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return node.entryHeight + travelHeightM(node, heightOrNodes)
 }
 
 /** Korkuluk/kafes üstü için toplam boy payı. */
 export const OVERHEAD_MARGIN_M = 0.3
 
 /** Kolider ve footprint'in okuduğu toplam boy: çıkış kotu + pay. */
-export function overallHeightM(node: ConveyorSpiralNode): number {
-  return exitHeightM(node) + OVERHEAD_MARGIN_M
+export function overallHeightM(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  return exitHeightM(node, heightOrNodes) + OVERHEAD_MARGIN_M
 }
 
 /**
@@ -225,8 +281,11 @@ export function spiralBoxStepRad(node: ConveyorSpiralNode): number {
 }
 
 /** Aynı anda helis üzerinde görünen koli sayısı, 1…SPIRAL_MAX_BOXES. */
-export function spiralBoxCount(node: ConveyorSpiralNode): number {
-  const span = totalAngleRad(node)
+export function spiralBoxCount(
+  node: ConveyorSpiralNode,
+  heightOrNodes?: number | Readonly<Record<string, unknown>>,
+): number {
+  const span = totalAngleRad(node, heightOrNodes)
   const step = spiralBoxStepRad(node)
   return Math.max(1, Math.min(SPIRAL_MAX_BOXES, Math.floor(span / step)))
 }

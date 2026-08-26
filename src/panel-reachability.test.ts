@@ -196,9 +196,17 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
   ],
   'warehouse:conveyor-spiral': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    { field: 'baseLevelId', kind: 'SYSTEM', where: 'fromLevelId alias' },
+    { field: 'topLevelId', kind: 'SYSTEM', where: 'toLevelId alias' },
   ],
   'warehouse:pallet-lift': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    { field: 'baseLevelId', kind: 'SYSTEM', where: 'fromLevelId alias' },
+    { field: 'topLevelId', kind: 'SYSTEM', where: 'toLevelId alias' },
+    { field: 'defaultLevelId', kind: 'SYSTEM', where: 'level adapter / elevator parity' },
+    { field: 'disabledLevelIds', kind: 'SYSTEM', where: 'level adapter / elevator parity' },
+    { field: 'serviceOnlyLevelIds', kind: 'SYSTEM', where: 'level adapter / elevator parity' },
+    { field: 'travelHeight', kind: 'SYSTEM', where: 'fallbackTravelM alias' },
   ],
   'warehouse:mezzanine': [
     {

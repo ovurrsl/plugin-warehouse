@@ -5,6 +5,7 @@ import {
   useLiveNodeOverrides,
   useLiveTransforms,
   useRegistry,
+  useScene,
 } from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useFrame } from '@react-three/fiber'
@@ -27,6 +28,7 @@ import {
   spiralSlatKey,
   spiralStaticKey,
 } from './spiral-geometry'
+import { resolveSpiralRise, spiralLevelFingerprint } from './spiral-levels'
 import { getSpiralCageMaterial, getSpiralMaterial } from './spiral-materials'
 import {
   cageRadiusM,
@@ -41,6 +43,7 @@ import {
   spiralBoxRateRadPerSec,
   spiralBoxStepRad,
   totalAngleRad,
+  travelHeightM,
 } from './spiral-metrics'
 import { SLAT_THICKNESS_M } from './spiral-parts'
 import type { ConveyorSpiralNode } from './spiral-schema'
@@ -126,18 +129,26 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
   const cageMaterial = getSpiralCageMaterial(appearance)
   const boxMaterial = getFlowBoxMaterial(appearance)
 
+  const levelFingerprint = useScene((s) =>
+    spiralLevelFingerprint(s.nodes as Record<string, unknown>, node),
+  )
+  const resolvedRise = useMemo(
+    () => resolveSpiralRise(useScene.getState().nodes as Record<string, unknown>, node),
+    [levelFingerprint, node],
+  )
+
   // İki katman da ekranda sayılır: tahliye çizileni boşaltamaz.
   useEffect(() => {
     const keys = [
-      retainGeometry(spiralStaticKey(node, 'full')),
-      retainGeometry(spiralStaticKey(node, 'simple')),
-      retainGeometry(spiralSlatKey(node, 'full')),
-      retainGeometry(spiralSlatKey(node, 'simple')),
+      retainGeometry(spiralStaticKey(node, 'full', resolvedRise)),
+      retainGeometry(spiralStaticKey(node, 'simple', resolvedRise)),
+      retainGeometry(spiralSlatKey(node, 'full', resolvedRise)),
+      retainGeometry(spiralSlatKey(node, 'simple', resolvedRise)),
     ]
     return () => {
       for (const key of keys) releaseGeometry(key)
     }
-  }, [node])
+  }, [node, resolvedRise])
 
   const staticRef = useRef<THREE.Mesh>(null)
   const slatMeshRef = useRef<THREE.Mesh>(null)
@@ -149,11 +160,11 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
   const phase = useMemo(() => hashPhase(node.id), [node.id])
 
   const entry = entryHeightM(node)
-  const overall = overallHeightM(node)
+  const overall = overallHeightM(node, resolvedRise)
   const footprint = footprintM(node)
   const colR = columnRadiusM(node)
   const cageR = cageRadiusM(node)
-  const travel = node.travelHeight
+  const travel = travelHeightM(node, resolvedRise)
   /** Kolinin bindiği kot: slat üst yüzeyi (helisY + slat/2) + koli yarısı. */
   const boxRideY = SLAT_THICKNESS_M / 2 + FLOW_BOX_M[1] / 2
 
@@ -181,8 +192,10 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
               : 'simple'
         if (next !== current) {
           detailRef.current = next
-          if (staticRef.current) staticRef.current.geometry = getSpiralStaticGeometry(node, next)
-          if (slatMeshRef.current) slatMeshRef.current.geometry = getSpiralSlatGeometry(node, next)
+          if (staticRef.current)
+            staticRef.current.geometry = getSpiralStaticGeometry(node, next, resolvedRise)
+          if (slatMeshRef.current)
+            slatMeshRef.current.geometry = getSpiralSlatGeometry(node, next, resolvedRise)
           // Kafes yalnız yakın katmanda: uzakta zaten birkaç piksel.
           if (cageRef.current) cageRef.current.visible = node.hasCage && next !== 'simple'
         }
@@ -198,9 +211,9 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
       return
     }
     const s = handednessSign(node)
-    const total = totalAngleRad(node)
+    const total = totalAngleRad(node, resolvedRise)
     const step = spiralBoxStepRad(node)
-    const count = spiralBoxCount(node)
+    const count = spiralBoxCount(node, resolvedRise)
     // İlerleme: akış `up` → `t` artar (tırmanır), `down` → azalır.
     travelRef.current += spiralBoxRateRadPerSec(node) * (node.flow === 'up' ? 1 : -1) * delta
     for (let i = 0; i < count; i++) {
@@ -208,9 +221,8 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
       const t = (((travelRef.current + i * step) % total) + total) % total
       const [x, y, z] = helixPoint(node, t)
       boxPosition.set(x, entry + y + boxRideY, z)
-      // Koli, slat'la aynı radyal çerçeveye döner. `emitPart`'ın rotationY=φ'si
-      // three'nin −φ'sine denk (emitPart x'=ox·cosφ−z·sinφ), o yüzden −s·t.
-      boxQuaternion.setFromAxisAngle(yAxis, -s * t)
+      // Koli, slat'la aynı radyal çerçeveye döner.
+      boxQuaternion.setFromAxisAngle(yAxis, -(Math.PI + s * t))
       boxMatrix.compose(boxPosition, boxQuaternion, boxScale)
       boxes.setMatrixAt(i, boxMatrix)
     }
@@ -227,7 +239,11 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
         {/* Statik iskelet. */}
         <mesh
           dispose={null}
-          geometry={getSpiralStaticGeometry(node, isExporting ? 'full' : detailRef.current)}
+          geometry={getSpiralStaticGeometry(
+            node,
+            isExporting ? 'full' : detailRef.current,
+            resolvedRise,
+          )}
           material={material}
           raycast={NO_RAYCAST}
           receiveShadow
@@ -246,7 +262,11 @@ function SpiralBody({ node }: { node: ConveyorSpiralNode }) {
         {/* Slat yüzeyi — SABİT (hareket eden koliler); taban kotu entryHeight. */}
         <mesh
           dispose={null}
-          geometry={getSpiralSlatGeometry(node, isExporting ? 'full' : detailRef.current)}
+          geometry={getSpiralSlatGeometry(
+            node,
+            isExporting ? 'full' : detailRef.current,
+            resolvedRise,
+          )}
           material={material}
           position={[0, entry, 0]}
           raycast={NO_RAYCAST}

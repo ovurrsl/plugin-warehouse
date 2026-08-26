@@ -90,7 +90,16 @@ export function buildPalletLiftFloorplan(
     })
   }
 
-  return { kind: 'group', children }
+  const rotation = Array.isArray(node.rotation) ? (node.rotation[1] ?? 0) : 0
+
+  return {
+    kind: 'group',
+    children,
+    transform: {
+      translate: [node.position?.[0] ?? 0, node.position?.[2] ?? 0],
+      rotate: -rotation,
+    },
+  }
 }
 
 /**

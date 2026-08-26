@@ -56,11 +56,30 @@ export const PalletLiftNode = BaseNode.extend({
   toLevelId: z.string().nullable().default(null),
 
   /**
+   * `fromLevelId` ve `toLevelId` alanlarının alternatif/eşanlamlı takma adları
+   * (StairNode / ElevatorNode / ConveyorSpiralNode paritesi).
+   */
+  baseLevelId: z.string().nullable().default(null),
+  topLevelId: z.string().nullable().default(null),
+
+  /**
+   * Çok katlı erişim ve varsayılan durak metadatası (host ElevatorNode paritesi).
+   */
+  defaultLevelId: z.string().nullable().default(null),
+  disabledLevelIds: z.array(z.string()).default([]),
+  serviceOnlyLevelIds: z.array(z.string()).default([]),
+
+  /**
    * İki kattan azı çözüldüğünde (bina dışına konmuş / tek katlı sahne) kullanılan
    * yedek seyahat yüksekliği, metre — SEÇİLMİŞ VARSAYILAN. Bina katları
    * çözülürse OKUNMAZ.
    */
   fallbackTravelM: z.number().min(1.5).max(12).default(3),
+
+  /**
+   * `fallbackTravelM` için alternatif/yedek alan.
+   */
+  travelHeight: z.number().optional(),
 
   /** Yarı saydam güvenlik muhafazası (spec §2 satır 7). */
   hasEnclosure: z.boolean().default(true),

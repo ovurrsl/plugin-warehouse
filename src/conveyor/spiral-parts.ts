@@ -19,6 +19,7 @@ import {
   beltWidthM,
   cageRadiusM,
   entryHeightM,
+  exitAngleRad,
   exitHeightM,
   frameWidthM,
   handednessSign,
@@ -70,18 +71,24 @@ export const SLAT_THICKNESS_M = 0.03
  *
  * Ayaklar tam boy dikey direkler (çevre kulesi), slat halkasının DIŞINDA
  * (`legRadius > R + bant/2`). Tanjant güdükleri −X (giriş, `entryHeight`) ve
- * +X (çıkış, `exitHeight`) — ikisi ayrı kotta, portların per-port Y'sinin
+ * θexit (çıkış, `exitHeight`) — ikisi ayrı kotta, portların per-port Y'sinin
  * geometrik karşılığı. Korkuluk yalnız tam katmanda.
  */
-export function spiralStaticParts(node: ConveyorSpiralNode, detail: ConveyorDetail): SpiralPart[] {
+export function spiralStaticParts(
+  node: ConveyorSpiralNode,
+  detail: ConveyorDetail,
+  resolvedRise?: number,
+): SpiralPart[] {
   const parts: SpiralPart[] = []
   const legR = legRadiusM(node)
   const legs = legCount(node)
-  const top = exitHeightM(node)
+  const top = exitHeightM(node, resolvedRise)
   const entry = entryHeightM(node)
   const cage = cageRadiusM(node)
   const span = portSpanM(node)
   const frame = frameWidthM(node)
+  const thetaExit = exitAngleRad(node, resolvedRise)
+  const rStub = (cage + span) / 2
 
   // Çevre destek ayakları — tam boy direkler + taban plakaları (full).
   for (let i = 0; i < legs; i++) {
@@ -94,31 +101,34 @@ export function spiralStaticParts(node: ConveyorSpiralNode, detail: ConveyorDeta
     }
   }
 
-  // Giriş tanjant güdüğü: −X, bant kotu `entryHeight`.
+  // Giriş tanjant güdüğü: −X (açı π), bant kotu `entryHeight`.
   parts.push({
     role: 'stub',
     center: [-(cage + span) / 2, entry - 0.03, 0],
     size: [span - cage, STUB_DEPTH_M, frame],
   })
-  // Çıkış tanjant güdüğü: +X, bant kotu `exitHeight`.
+  // Çıkış tanjant güdüğü: θexit açısında, bant kotu `exitHeight`.
   parts.push({
     role: 'stub',
-    center: [(cage + span) / 2, top - 0.03, 0],
+    center: [rStub * Math.cos(thetaExit), top - 0.03, rStub * Math.sin(thetaExit)],
     size: [span - cage, STUB_DEPTH_M, frame],
+    rotationY: thetaExit,
   })
 
   if (detail === 'full') {
-    // Güdükleri taşıyan uç ayaklar.
-    for (const [sx, sy] of [
-      [-span + 0.1, entry],
-      [span - 0.1, top],
-    ] as const) {
-      parts.push({
-        role: 'leg',
-        center: [sx, sy / 2, 0],
-        size: [LEG_SECTION_M, sy, LEG_SECTION_M],
-      })
-    }
+    // Giriş güdüğünü taşıyan uç ayak.
+    parts.push({
+      role: 'leg',
+      center: [-span + 0.1, entry / 2, 0],
+      size: [LEG_SECTION_M, entry, LEG_SECTION_M],
+    })
+    // Çıkış güdüğünü taşıyan uç ayak (θexit açısında).
+    const rLeg = span - 0.1
+    parts.push({
+      role: 'leg',
+      center: [rLeg * Math.cos(thetaExit), top / 2, rLeg * Math.sin(thetaExit)],
+      size: [LEG_SECTION_M, top, LEG_SECTION_M],
+    })
     // Tahrik motoru — tabanda, kolonun yanında (RAL 7016 = gövde boyası).
     parts.push({
       role: 'motor',
@@ -134,16 +144,16 @@ export function spiralStaticParts(node: ConveyorSpiralNode, detail: ConveyorDeta
     const r = helixRadiusM(node)
     const s = handednessSign(node)
     const scale = railR / r
-    const total = totalAngleRad(node)
+    const total = totalAngleRad(node, resolvedRise)
     const chord = railR * HANDRAIL_STEP_RAD
-    const tilt = inclineRad(node) * s
+    const tilt = -s * inclineRad(node)
     for (let t = 0; t <= total + 1e-9; t += HANDRAIL_STEP_RAD) {
       const [hx, hy, hz] = helixPoint(node, t)
       parts.push({
         role: 'handrail',
         center: [hx * scale, entry + hy + RAIL_HEIGHT_M, hz * scale],
         size: [RAIL_SECTION_M, RAIL_SECTION_M, chord],
-        rotationY: s * t,
+        rotationY: Math.PI + s * t,
         tiltX: tilt,
       })
     }
@@ -156,29 +166,33 @@ export function spiralStaticParts(node: ConveyorSpiralNode, detail: ConveyorDeta
  * Slat dizisi — DİNLENME helisi (y tabanı 0), `entryHeight` YOK.
  *
  * Her slat R yarıçapında, radyal uzunluğu bant genişliği (local X → radyal),
- * teğetsel genişliği bir slat adımının yayı. `rotationY = s·t` local X'i o
- * parametredeki radyal yöne çeviriyor; `tiltX = eğim·s` slat'ı tırmanış
- * boyunca yatırıyor.
+ * teğetsel genişliği bir slat adımının yayı. `rotationY = π + s·t` local X'i o
+ * parametredeki radyal yöne çeviriyor; `tiltX = -s·eğim` slat'ı tırmanış
+ * yönü boyunca yukarı yatırıyor.
  *
  * Aralık `t ∈ [−adım, toplamAçı]`: girişin bir adım ALTINDA fazladan bir slat,
  * vida sarma dikişini gizleyen pay (invaryans testi bu marj slat'ı hariç
  * tutuyor).
  */
-export function spiralSlatParts(node: ConveyorSpiralNode, detail: ConveyorDetail): SpiralSlat[] {
+export function spiralSlatParts(
+  node: ConveyorSpiralNode,
+  detail: ConveyorDetail,
+  resolvedRise?: number,
+): SpiralSlat[] {
   const belt = beltWidthM(node)
   const r = helixRadiusM(node)
   const s = handednessSign(node)
   const step = slatStepRad(detail)
-  const total = totalAngleRad(node)
+  const total = totalAngleRad(node, resolvedRise)
   const tangential = Math.max(0.02, r * step * 0.85)
-  const tilt = inclineRad(node) * s
+  const tilt = -s * inclineRad(node)
   const slats: SpiralSlat[] = []
   for (let t = -step; t <= total + 1e-9; t += step) {
     const [x, y, z] = helixPoint(node, t)
     slats.push({
       center: [x, y, z],
       size: [belt, SLAT_THICKNESS_M, tangential],
-      rotationY: s * t,
+      rotationY: Math.PI + s * t,
       tiltX: tilt,
     })
   }

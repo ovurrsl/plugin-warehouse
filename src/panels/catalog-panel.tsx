@@ -12,6 +12,7 @@ import {
   chipIsArmed,
   itemsInSection,
 } from '../catalog'
+import { calculateWarehouseBOM, exportWarehouseBomPdf } from '../bom'
 import { reportHostCompatibility } from '../compat'
 import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
@@ -235,8 +236,6 @@ function CatalogTab() {
         <div style={tokens.section}>
           <p style={tokens.blurb}>{activeSection.blurb}</p>
           {activeSection.id === 'unit-loads' && <LoadBrush />}
-          {activeSection.id === 'conveyance' && <FlowSwitch />}
-          {activeSection.id === 'handling' && <FleetSwitch />}
         </div>
       )}
 
@@ -273,6 +272,8 @@ function CatalogTab() {
         </div>
       )}
 
+      <FlowSwitch />
+      <FleetSwitch />
       <InstancingSwitch />
       <DetailRangeSwitch />
     </div>
@@ -620,9 +621,26 @@ function LoadBrush() {
  */
 export function StatsTab() {
   const stats = useScene((s) => sceneStats(s.nodes as Record<string, unknown>))
+  const nodes = useScene((s) => s.nodes as Record<string, unknown>)
   const unit = useViewer((s) => s.unit)
   const viewerBuildingId = useViewer((s) => s.selection.buildingId)
   const viewerLevelId = useViewer((s) => s.selection.levelId)
+  const [exporting, setExporting] = useState(false)
+
+  const handleExportGlobalBom = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const bom = calculateWarehouseBOM(nodes as never, {
+        scopeLabel: 'Total Warehouse',
+      })
+      await exportWarehouseBomPdf(bom)
+    } catch (error) {
+      console.error('Failed to export Warehouse BOM PDF:', error)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const scope = useWarehouseStore((s) => s.scope)
   const setScope = useWarehouseStore((s) => s.setScope)
@@ -697,6 +715,33 @@ export function StatsTab() {
             outline is the wall centreline, which is also what the host's own
             slab inspector prints -- the comparison a user actually makes. */}
         <p style={tokens.blurb}>Gross to wall centrelines, holes deducted.</p>
+
+        <button
+          disabled={exporting}
+          onClick={handleExportGlobalBom}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.375rem',
+            width: '100%',
+            marginTop: '0.5rem',
+            borderRadius: '0.375rem',
+            border: '1px solid color-mix(in oklab, var(--sidebar-ring) 50%, var(--sidebar-border))',
+            background: 'color-mix(in oklab, var(--sidebar-accent) 85%, transparent)',
+            padding: '0.5rem 0.75rem',
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            color: 'var(--sidebar-foreground)',
+            cursor: exporting ? 'default' : 'pointer',
+            opacity: exporting ? 0.7 : 1,
+            transition: 'background-color 150ms, border-color 150ms',
+          }}
+          type="button"
+        >
+          <Icon height={14} icon="lucide:file-down" width={14} />
+          <span>{exporting ? 'Generating BOM PDF...' : 'Export Warehouse BOM (PDF)'}</span>
+        </button>
       </section>
 
       <section style={tokens.section}>

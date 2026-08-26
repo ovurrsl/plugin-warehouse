@@ -352,6 +352,29 @@ export function levelElevationsOfBuilding(
   return out
 }
 
+/**
+ * Resolves the floor-to-floor height between this level and the level directly
+ * above it in the building stack (accounting for baseElevation offsets). If this
+ * is the topmost level or has no building, falls back to stored height or DEFAULT_LEVEL_HEIGHT.
+ *
+ * Local reimplementation of `services/storey.ts getLevelFloorToFloorHeight`.
+ */
+export function getLevelFloorToFloorHeight(
+  nodes: Readonly<Record<string, unknown>>,
+  levelId: string,
+): number {
+  const buildingId = buildingOfLevel(nodes, levelId)
+  const entries = levelElevationsOfBuilding(nodes, buildingId)
+  const index = entries.findIndex((e) => e.id === levelId)
+  if (index < 0) {
+    const level = asLevel(nodes[levelId])
+    return level?.height ?? DEFAULT_LEVEL_HEIGHT
+  }
+  const next = entries[index + 1]
+  if (next) return next.baseY - entries[index]!.baseY
+  return entries[index]!.height
+}
+
 // ─── Geometry ────────────────────────────────────────────────────────────
 //
 // Implemented locally rather than imported from `@pascal-app/core`. Both

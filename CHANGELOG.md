@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`119716b`](https://github.com/ovurrsl/plugin-warehouse/commit/119716b748326eb05d4096a6c8828663b0dc4116))
 - Refresh generated README blocks [skip ci] ([`f93b4f8`](https://github.com/ovurrsl/plugin-warehouse/commit/f93b4f8837408889750162c4b4a6567ba546158f))
 - Refresh generated README blocks [skip ci] ([`96e7762`](https://github.com/ovurrsl/plugin-warehouse/commit/96e7762804307a0d628c5153d87f2af440042b6a))
 - Refresh generated README blocks [skip ci] ([`021b9ec`](https://github.com/ovurrsl/plugin-warehouse/commit/021b9ecafbaa6addc5d0107be8d20c5b40d84383))
@@ -173,6 +174,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Implement detailed capacity calculations and add 3D webp logos ([`5aa3415`](https://github.com/ovurrsl/plugin-warehouse/commit/5aa3415b4908327180b36f812b78361d6cec01b2))
 - Migrate to native ItemCatalog with filters and vector icons ([`f17977d`](https://github.com/ovurrsl/plugin-warehouse/commit/f17977d0f5e2d704c8c5ccf18f56b961ca26074f))
 - Export WarehouseStatsTab ([`32848f1`](https://github.com/ovurrsl/plugin-warehouse/commit/32848f1c2e02c2ca40a10e407b439dad1c857b0a))
 - Warehouse:pallet-lift (#26) ([`07ad080`](https://github.com/ovurrsl/plugin-warehouse/commit/07ad080c676a8fd4f503da88e9a014e1ac74175c))

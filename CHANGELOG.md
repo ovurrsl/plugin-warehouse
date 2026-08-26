@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`a0ccfb7`](https://github.com/ovurrsl/plugin-warehouse/commit/a0ccfb710ae64d75af9366298da77cdc6acc89e2))
 - Refresh generated README blocks [skip ci] ([`fe2798e`](https://github.com/ovurrsl/plugin-warehouse/commit/fe2798e246b7f81121bfa0502d3c97f898f72a87))
 - Refresh generated README blocks [skip ci] ([`119716b`](https://github.com/ovurrsl/plugin-warehouse/commit/119716b748326eb05d4096a6c8828663b0dc4116))
 - Refresh generated README blocks [skip ci] ([`f93b4f8`](https://github.com/ovurrsl/plugin-warehouse/commit/f93b4f8837408889750162c4b4a6567ba546158f))
@@ -358,6 +359,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Use transparent png icons instead of webp ([`b5f7999`](https://github.com/ovurrsl/plugin-warehouse/commit/b5f7999015be4e2b6999ab02b0c3502cb002ceee))
 - Palet asansörü ve spiral konveyör kat döşemelerini delsin, sürükleme de denetlensin (#34) ([`d3c6700`](https://github.com/ovurrsl/plugin-warehouse/commit/d3c6700f213ecb59930212202a14b5ad12461547))
 - Izgara 4'lü olsun (#33) ([`f9e1467`](https://github.com/ovurrsl/plugin-warehouse/commit/f9e14670b8035447e92ddef629dea64fb6e58ac2))
 - Eklentinin görünen adı "Asset" olsun (#32) ([`c299551`](https://github.com/ovurrsl/plugin-warehouse/commit/c299551973c5386519f2521114c1bc7b17775335))

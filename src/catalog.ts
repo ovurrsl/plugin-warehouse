@@ -271,7 +271,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Empty Pallet',
     sectionId: 'unit-loads',
     description: 'A bare deck. EPAL, GMA and plastic standards.',
-    icon: '/icons/warehouse/pallet-empty.webp',
+    icon: '/icons/warehouse/pallet-empty.png',
     brush: { kind: 'pallet', cargo: 'none' },
   },
   {
@@ -291,7 +291,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'One bay of adjustable racking. Multiply it into a run from the panel; bays standing together share a post.',
-    icon: '/icons/warehouse/pallet-rack.webp',
+    icon: '/icons/warehouse/pallet-rack.png',
     brush: {
       kind: 'rack',
       patch: { variant: 'pallet-rack', uprightHeight: 5, levels: 3, pickingLevels: 0 },
@@ -304,7 +304,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Alçak raf şablonu: 2.5 m dikme, iki kat, ikisi de kutu raflı toplama gözü. Aynı kind, hazır ölçüler — yerleştirdikten sonra her alanı değiştirilebilir.',
-    icon: '/icons/warehouse/pallet-rack-low.webp',
+    icon: '/icons/warehouse/pallet-rack-low.png',
     /**
      * `pickingLevels` DEPOLAMA konumlarını sayıyor ve sayım ZEMİNDEN başlıyor:
      * `levelTypeOf` `level < pickingLevels` diyor, zemin de 0. `levels: 2` +
@@ -329,7 +329,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'layout',
     description:
       'A marked pedestrian way. Two continuous stripes; the width is the clear floor between them.',
-    icon: '/icons/warehouse/route-pedestrian.webp',
+    icon: '/icons/warehouse/route-pedestrian.png',
     brush: { kind: 'route', role: 'pedestrian', traffic: 'two-way' },
   },
   {
@@ -339,7 +339,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'layout',
     description:
       'A marked vehicle aisle, sized from the published band for the truck class it names.',
-    icon: '/icons/warehouse/route-vehicle.webp',
+    icon: '/icons/warehouse/route-vehicle.png',
     brush: { kind: 'route', role: 'vehicle', traffic: 'one-way' },
   },
   // Aile başına bir tile — kullanıcının seçtiği beş makine, İngilizce
@@ -351,7 +351,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Hand pallet truck',
     sectionId: 'handling',
     description: 'Manual pallet truck, 680×1150 forks, 1.5 t. Carries at floor level.',
-    icon: '/icons/warehouse/truck-hand-pallet.webp',
+    icon: '/icons/warehouse/truck-hand-pallet.png',
     brush: { kind: 'truck', model: 'mpt-680x1150' },
   },
   {
@@ -360,7 +360,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Electric pallet truck',
     sectionId: 'handling',
     description: 'Ride-on electric pallet truck, 2.5 t. Published VDI aisle: 2.35 m.',
-    icon: '/icons/warehouse/truck-powered-pallet.webp',
+    icon: '/icons/warehouse/truck-powered-pallet.png',
     brush: { kind: 'truck', model: 'ept-2500' },
   },
   {
@@ -369,7 +369,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Electric forklift',
     sectionId: 'handling',
     description: 'Three-wheel counterbalanced, 1.3 t. Published VDI aisle: 3.11 m.',
-    icon: '/icons/warehouse/truck-forklift.webp',
+    icon: '/icons/warehouse/truck-forklift.png',
     brush: { kind: 'truck', model: 'forklift-1300' },
   },
   {
@@ -378,7 +378,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Reach truck',
     sectionId: 'handling',
     description: 'Straddle-leg reach truck, 1.8 t. Published VDI aisle: 2.74 m.',
-    icon: '/icons/warehouse/truck-reach.webp',
+    icon: '/icons/warehouse/truck-reach.png',
     brush: { kind: 'truck', model: 'rt-1800' },
   },
   {
@@ -388,7 +388,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'handling',
     description:
       'Man-up VNA truck, 1.6 t. Ast unpublished — the class band (EN 15620, 1.7–1.9 m) governs.',
-    icon: '/icons/warehouse/truck-turret.webp',
+    icon: '/icons/warehouse/truck-turret.png',
     brush: { kind: 'truck', model: 'tt-1600' },
   },
   {
@@ -398,7 +398,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'One module of continuously driven roller conveyor. Lay a run with [ and ]; each module is its own object.',
-    icon: '/icons/warehouse/conveyor-roller.webp',
+    icon: '/icons/warehouse/conveyor-roller.png',
   },
   {
     id: 'conveyor-curve',
@@ -407,7 +407,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Turns a line through 45, 90 or 180°, keeping every box facing the way it entered. [ and ] set the angle, H flips the hand.',
-    icon: '/icons/warehouse/conveyor-curve.webp',
+    icon: '/icons/warehouse/conveyor-curve.png',
   },
   {
     id: 'conveyor-launcher',
@@ -416,7 +416,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Branches a line at ninety degrees without a curve: the main bed runs through and a short arm throws the box off it. H flips the launch side.',
-    icon: '/icons/warehouse/conveyor-launcher.webp',
+    icon: '/icons/warehouse/conveyor-launcher.png',
   },
   {
     id: 'conveyor-booster',
@@ -425,7 +425,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'A short driven section that regulates a load’s passage and tightens the cycle. Its drive sits under the bed, which makes it the tightest frame in the family.',
-    icon: '/icons/warehouse/conveyor-booster.webp',
+    icon: '/icons/warehouse/conveyor-booster.png',
   },
   {
     id: 'conveyor-transfer',
@@ -434,7 +434,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Crosses a line through ninety degrees without turning the box: belt strips rise between the rollers and carry it off sideways. H flips the discharge side.',
-    icon: '/icons/warehouse/conveyor-transfer.webp',
+    icon: '/icons/warehouse/conveyor-transfer.png',
   },
   {
     id: 'conveyor-telescopic',
@@ -443,7 +443,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Araç/konteyner yükleme bomu: sabit gövdesinden dorsenin içine uzayan bant. On katalog modeli, tam açıkken 14–25 m. [ ve ] ile bomu kısaltıp uzatın.',
-    icon: '/icons/warehouse/conveyor-telescopic.webp',
+    icon: '/icons/warehouse/conveyor-telescopic.png',
     brush: { kind: 'telescopic', model: 'a4-6+12' },
   },
   {
@@ -453,7 +453,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Merkezi kolon etrafında yükselen helis bant — karton/tote için (≤12,5° eğim). Dar bir taban izinde kot değiştirir. Giriş ve çıkış farklı yükseklikte.',
-    icon: '/icons/warehouse/conveyor-spiral-carton.webp',
+    icon: '/icons/warehouse/conveyor-spiral-carton.png',
     brush: {
       kind: 'conveyor-spiral',
       patch: { loadClass: 'light', outerDiameter: '1500', beltWidth: '500' },
@@ -466,7 +466,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Palet sınıfı sarmal: min. 2.400 mm dış çap, ≤13° eğim, 5 m/dak (yayınlanmış). Tekil palet yükünü kat değiştirir.',
-    icon: '/icons/warehouse/conveyor-spiral-pallet.webp',
+    icon: '/icons/warehouse/conveyor-spiral-pallet.png',
     brush: {
       kind: 'conveyor-spiral',
       patch: { loadClass: 'pallet', outerDiameter: '2400', beltWidth: '500' },
@@ -479,7 +479,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Branches a line at an angle without stopping it. The branch is a narrower lane than the main bed, so a box that takes it has to fit the branch. H flips the side.',
-    icon: '/icons/warehouse/conveyor-oblique.webp',
+    icon: '/icons/warehouse/conveyor-oblique.png',
   },
   // Palet asansörü birim yükü DİKEY taşır (EN 619 sürekli-taşıma komşuluğu);
   // TEK fiş: kapasite kademesi (1000/1500/4500 kg) ve mast sayısı (2/4)
@@ -493,7 +493,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'conveyance',
     description:
       'Mast-guided vertical pallet lift with a roller-conveyor platform. Serves the building’s floors (derived, not set). Capacity (≤1000/1500/4500 kg) and mast count set in the inspector; 80 m/min at 1000 kg (Mecalux/PFlow).',
-    icon: '/icons/warehouse/pallet-lift.webp',
+    icon: '/icons/warehouse/pallet-lift.png',
     brush: { kind: 'pallet-lift', patch: { capacityClass: '1000', mastCount: '2' } },
   },
   {
@@ -503,7 +503,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Elle toplama gozu: kirisli sunta raflar, 1.9 m goz. Katlar serbestce karisir - kirisli raf, kirissiz HM, yalniz kiris ya da aski. Kose parantezlerle kat sayisini ayarlayin.',
-    icon: '/icons/warehouse/longspan-picking.webp',
+    icon: '/icons/warehouse/longspan-picking.png',
     brush: {
       kind: 'longspan',
       patch: {
@@ -523,7 +523,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Hacimli mal gozu: 2.7 m aciklik, 1.0 m derinlik, tel raf. Uzun mal icin katlari yalniz kiris yapabilirsiniz.',
-    icon: '/icons/warehouse/longspan-bulk.webp',
+    icon: '/icons/warehouse/longspan-bulk.png',
     brush: {
       kind: 'longspan',
       patch: {
@@ -543,7 +543,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Elle toplama rafı: kirişsiz, raflar dikmenin yan yuvalarına 25 mm adımla asılır. HL paneli kat başına 150 kg, HM 275 kg — bu paketin YAYIMLANMIŞ tek kapasitesi. [ ve ] ile kat sayısı.',
-    icon: '/icons/warehouse/m3-picking.webp',
+    icon: '/icons/warehouse/m3-picking.png',
     brush: {
       kind: 'm3',
       patch: {
@@ -566,7 +566,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Küçük parça toplama: her kat polipropilen çekmece taşır. Çekmece sayısı elle girilmez — göz boyu ÷ çekmece genişliği, katalogun 1.000 mm için 4/8 ve 1.250 mm için 5/10 satırlarını birebir veren bölme.',
-    icon: '/icons/warehouse/m3-drawers.webp',
+    icon: '/icons/warehouse/m3-drawers.png',
     brush: {
       kind: 'm3',
       patch: {
@@ -589,7 +589,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Yoğun sevkiyat istasyonu: 2000 × 900 mm tabla, makaralı yüzey, üst raf ve alt raf. Zarf eski uygulamanın spec dosyasından; iç ölçüler seçilmiş varsayılan. Genişlik, kot ve derinlik panelden ayarlanır.',
-    icon: '/icons/warehouse/bench-dispatch.webp',
+    icon: '/icons/warehouse/bench-dispatch.png',
     brush: { kind: 'bench', patch: { variant: 'dispatch-packing' } },
   },
   {
@@ -599,7 +599,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Posta siparişi paketleme: 1830 × 915 mm tabla, ahşap yüzey, sarf malzemesi için üst raf. [ ve ] ile tezgâh tipleri arasında dolaşın.',
-    icon: '/icons/warehouse/bench-mail-order.webp',
+    icon: '/icons/warehouse/bench-mail-order.png',
     brush: { kind: 'bench', patch: { variant: 'mail-order-packing' } },
   },
   {
@@ -609,7 +609,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Ayırma ve kontrol tezgâhı: 1600 × 750 mm tabla, çekmece bloğu ve alet panosu. Çekmeceler masanın yarısında, öteki yarısı diz boşluğu.',
-    icon: '/icons/warehouse/bench-processing.webp',
+    icon: '/icons/warehouse/bench-processing.png',
     brush: { kind: 'bench', patch: { variant: 'processing' } },
   },
   {
@@ -619,7 +619,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Tartılı istasyon: 1400 × 750 mm tabla, gömme platform terazi ve okuma ekranı standı. Platform tablaya sığmazsa panel HATA verir.',
-    icon: '/icons/warehouse/bench-weighing.webp',
+    icon: '/icons/warehouse/bench-weighing.png',
     brush: { kind: 'bench', patch: { variant: 'weighing-scale' } },
   },
   {
@@ -629,7 +629,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Tekerlekli tezgâh: 1220 × 910 mm tabla, çekmeceli. Tekerler tabla kotunu YÜKSELTMEZ — ayaklar kısalır, böylece sabit tezgâhla yan yana hizalanır.',
-    icon: '/icons/warehouse/bench-mobile.webp',
+    icon: '/icons/warehouse/bench-mobile.png',
     brush: { kind: 'bench', patch: { variant: 'mobile-workbench' } },
   },
   {
@@ -639,7 +639,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'stations',
     description:
       'Sade paketleme masası: 1200 × 600 mm tabla, metal çerçeve, donanımsız. Ölçüye yaptırılacak bir masanın başlangıç noktası.',
-    icon: '/icons/warehouse/bench-eco.webp',
+    icon: '/icons/warehouse/bench-eco.png',
     brush: { kind: 'bench', patch: { variant: 'eco' } },
   },
   {
@@ -649,7 +649,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'handling',
     description:
       'Sipariş toplama arabası: kat başına bir Euro kasa, 600 × 400 mm taban. Beş kat × 220 mm kasa, toplam boy 1,40 m. Yükseklik ALAN DEĞİL — katlardan hesaplanıyor, yani kasalar birbirinin içine giremiyor. [ ve ] ile kat sayısı.',
-    icon: '/icons/warehouse/tote-cart.webp',
+    icon: '/icons/warehouse/tote-cart.png',
     brush: { kind: 'totecart', patch: { tiers: 5, toteHeight: '220', tilt: false } },
   },
   {
@@ -659,7 +659,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'handling',
     description:
       'Eğimli tepsili toplama arabası: kasalar operatöre dönük, elle almak kolay. Üç kat × 320 mm kasa. Eğim açısı 15° — gerçek eğimli araba var ama açıyı hiçbir üretici yayımlamıyor, bu değer kullanıcının kendi eski uygulamasından.',
-    icon: '/icons/warehouse/tote-cart-tilted.webp',
+    icon: '/icons/warehouse/tote-cart-tilted.png',
     brush: { kind: 'totecart', patch: { tiers: 3, toteHeight: '320', tilt: true } },
   },
   {
@@ -669,7 +669,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'docks',
     description:
       'Kapı çukuruna gömülü hidrolik köprü: dinlenmede tablası zeminle aynı kotta, üstünden forklift geçer. 2500 × 2000 mm tabla, 400 mm menteşeli dudak, 60 kN. Ölçüler Stertil S serisinden; eğim sınırı EN 1398 (%12,5).',
-    icon: '/icons/warehouse/dock-leveller-hinged.webp',
+    icon: '/icons/warehouse/dock-leveller-hinged.png',
     brush: { kind: 'dockleveller', patch: { length: '2500', lip: 'hinged' } },
   },
   {
@@ -679,7 +679,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'docks',
     description:
       'Dudağı tablanın altındaki cepten kayarak çıkan rampa: dorsenin içine 1000 mman uzanır, yükü kapıya yakın istiflenmiş dorselerde bile alır. 3000 × 2000 mm tabla. KAYNAK: Stertil X serisi.',
-    icon: '/icons/warehouse/dock-leveller-telescopic.webp',
+    icon: '/icons/warehouse/dock-leveller-telescopic.png',
     brush: { kind: 'dockleveller', patch: { length: '3000', lip: 'telescopic' } },
   },
   {
@@ -689,7 +689,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Kapalı ofis dolabı: sac arka panel + iki kanatlı kapı. Arka panel çapraz bağın YERİNİ alır (katalog kuralı), kapı yalnız 1.000 mm gözde var. RAL 5014 dikme + RAL 7035 gövde.',
-    icon: '/icons/warehouse/m3-cabinet.webp',
+    icon: '/icons/warehouse/m3-cabinet.png',
     brush: {
       kind: 'm3',
       patch: {
@@ -712,7 +712,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Biriktirerek depolama: araç şeridin içine girer, paletler derinlemesine istiflenir. Şerit başına tek SKU, tek koridor yüzünden LIFO. [ ve ] ile derinliği ayarlayın.',
-    icon: '/icons/warehouse/drive-in-rack.webp',
+    icon: '/icons/warehouse/drive-in-rack.png',
     brush: {
       kind: 'drive-in',
       patch: {
@@ -731,7 +731,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'İki ucu da açık şerit: bir yüzden yükle, öbüründen al — FIFO. Katalog bu düzenle CS3 çaprazlamasını yasaklıyor (s.13).',
-    icon: '/icons/warehouse/drive-through-rack.webp',
+    icon: '/icons/warehouse/drive-through-rack.png',
     brush: {
       kind: 'drive-in',
       patch: {
@@ -750,7 +750,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'storage',
     description:
       'Yerçekimi akışlı kanal: palet yüksek uçtan yüklenir, %4 eğimle çıkışa akar. İki koridor, kanal başına tek SKU. [ ve ] ile derinliği ayarlayın.',
-    icon: '/icons/warehouse/live-racking-fifo.webp',
+    icon: '/icons/warehouse/live-racking-fifo.png',
     brush: {
       kind: 'live-racking',
       patch: { variant: 'FIFO', palletsDeep: 8, levels: 4, withRetainers: false },
@@ -762,7 +762,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     label: 'Live Racking (LIFO Push-back)',
     sectionId: 'storage',
     description: 'Tek koridorlu push-back: aynı uçtan yükle ve al. Sığ kanallar için, tutuculu.',
-    icon: '/icons/warehouse/live-racking-lifo.webp',
+    icon: '/icons/warehouse/live-racking-lifo.png',
     brush: {
       kind: 'live-racking',
       patch: { variant: 'LIFO', palletsDeep: 4, levels: 4, withRetainers: true },
@@ -775,7 +775,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'mezzanine',
     description:
       'Soğuk şekillendirilmiş Sigma profil, tek kat. 4×3 göz, 3 m tavan boşluğu, 500 kg/m².',
-    icon: '/icons/warehouse/mezzanine-sigma.webp',
+    icon: '/icons/warehouse/mezzanine-sigma.png',
     brush: {
       kind: 'mezzanine',
       patch: {
@@ -825,7 +825,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'mezzanine',
     description:
       'Sıcak haddelenmiş IPE/HEA, ağır yük, iki kat. 5×4 göz, çelik ızgara döşeme, 1000 kg/m².',
-    icon: '/icons/warehouse/mezzanine-gl2000.webp',
+    icon: '/icons/warehouse/mezzanine-gl2000.png',
     brush: {
       kind: 'mezzanine',
       patch: {
@@ -890,7 +890,7 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     sectionId: 'mezzanine',
     description:
       'Sigma dikme + IPE kiriş karması, büyük açıklık. 3×3 göz × 8 m, sunta döşeme, 350 kg/m².',
-    icon: '/icons/warehouse/mezzanine-mixed.webp',
+    icon: '/icons/warehouse/mezzanine-mixed.png',
     brush: {
       kind: 'mezzanine',
       patch: {

@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`52c0316`](https://github.com/ovurrsl/plugin-warehouse/commit/52c0316f72c751927c0f64f67994678d0bf7acb2))
 - Refresh generated README blocks [skip ci] ([`fa0bdc3`](https://github.com/ovurrsl/plugin-warehouse/commit/fa0bdc34b933d49136939b590e1f312308a7707b))
 - Refresh generated README blocks [skip ci] ([`a0ccfb7`](https://github.com/ovurrsl/plugin-warehouse/commit/a0ccfb710ae64d75af9366298da77cdc6acc89e2))
 - Refresh generated README blocks [skip ci] ([`fe2798e`](https://github.com/ovurrsl/plugin-warehouse/commit/fe2798e246b7f81121bfa0502d3c97f898f72a87))
@@ -297,6 +298,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Align number values in Asset Stats panel ([`6375e88`](https://github.com/ovurrsl/plugin-warehouse/commit/6375e8844492019b013f0dc84b5accc400e14a51))
 - Resolve Bug #50-D3 ambient preview and disarming ([`fc39034`](https://github.com/ovurrsl/plugin-warehouse/commit/fc390346c1709298714147bd41b20ee019353327))
 - Sarmal host paletinden gizli — cift yerlestirme giderildi (#28) ([`cb989d7`](https://github.com/ovurrsl/plugin-warehouse/commit/cb989d7d447f9b7dae8b4d499b7685cd02c540fa))
 - Sarmalda koliler aksin, asansore gercek palet, tek fis (#27) ([`042c45a`](https://github.com/ovurrsl/plugin-warehouse/commit/042c45a1ea4b848fb129757cebeda80a9d2dd89f))

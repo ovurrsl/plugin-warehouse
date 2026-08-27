@@ -5,6 +5,7 @@ import { useScene } from '@pascal-app/core'
 import { SegmentedControl, useEditor } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useState } from 'react'
+import { calculateWarehouseBOM, exportWarehouseBomPdf } from '../bom'
 import {
   CATALOG_ITEMS,
   CATALOG_SECTIONS,
@@ -12,7 +13,6 @@ import {
   chipIsArmed,
   itemsInSection,
 } from '../catalog'
-import { calculateWarehouseBOM, exportWarehouseBomPdf } from '../bom'
 import { reportHostCompatibility } from '../compat'
 import { CARGO_COLOR_IDS, CARGO_COLORS } from '../pallet/cargo-constants'
 import {
@@ -884,14 +884,10 @@ function Figure({
       ? areaValue(value, areaUnit, 1)
       : value.toLocaleString()
 
-  const displayUnit = unavailable
-    ? ''
-    : areaUnit
-      ? areaUnitLabel(areaUnit)
-      : (unit ?? '')
+  const displayUnit = unavailable ? '' : areaUnit ? areaUnitLabel(areaUnit) : (unit ?? '')
 
   return (
-    <>
+    <div style={tokens.figureRow}>
       <span style={tokens.figureLabel}>
         <Icon height={12} icon={icon} width={12} />
         {label}
@@ -899,7 +895,7 @@ function Figure({
       <span style={tokens.figureValue}>{displayValue}</span>
       <span style={tokens.figureUnit}>{displayUnit}</span>
       {note && !unavailable && <p style={tokens.figureNote}>{note}</p>}
-    </>
+    </div>
   )
 }
 

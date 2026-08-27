@@ -181,7 +181,7 @@ export const tokens = {
   // Column 3 (Unit suffix). Dedicated columns ensure numbers and suffixes vertically align.
   figures: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(max-content, auto) 1fr auto',
+    gridTemplateColumns: 'max-content 1fr max-content',
     alignItems: 'baseline',
     rowGap: '0.5rem',
     columnGap: '0.375rem',

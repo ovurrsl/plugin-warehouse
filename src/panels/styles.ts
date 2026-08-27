@@ -177,18 +177,17 @@ export const tokens = {
   },
 
   // ── The statistics readout ───────────────────────────────────────────────
-  // Two columns, never three: the rail is 256 px, and a third column would
-  // either wrap or truncate the one number the user came to read.
+  // 3-column grid alignment: Column 1 (Label), Column 2 (Value, tabular numbers),
+  // Column 3 (Unit suffix). Dedicated columns ensure numbers and suffixes vertically align.
   figures: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(max-content, auto) 1fr auto',
+    alignItems: 'baseline',
+    rowGap: '0.5rem',
+    columnGap: '0.375rem',
   },
   figureRow: {
-    display: 'flex',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: '0.5rem',
+    display: 'contents',
   },
   figureLabel: {
     display: 'flex',
@@ -196,21 +195,26 @@ export const tokens = {
     gap: '0.375rem',
     fontSize: '0.6875rem',
     color: fade(60),
+    whiteSpace: 'nowrap',
   },
   figureValue: {
     fontSize: '0.875rem',
     fontWeight: 600,
     fontVariantNumeric: 'tabular-nums',
     color: FG,
+    textAlign: 'right',
+    whiteSpace: 'nowrap',
   },
   figureUnit: {
-    marginLeft: '0.25rem',
     fontSize: '0.625rem',
     fontWeight: 400,
     color: fade(45),
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
   },
   figureNote: {
-    margin: '0 0 0 1.375rem',
+    gridColumn: '1 / -1',
+    margin: '0.125rem 0 0 1.375rem',
     fontSize: '0.625rem',
     lineHeight: 1.45,
     color: fade(40),

@@ -167,6 +167,18 @@ export {
   type WarehouseZoneTakeoffInput,
   warehouseZoneTakeoffExtension,
 } from './takeoff'
+export {
+  calculateEquipmentFootprint,
+  calculateFacilityZDSUReport,
+  calculateZoneZDSUAudit,
+  exportZoneAuditJson,
+  exportZoneAuditMarkdown,
+  inferZoneRole,
+  polygonArea,
+  polygonPerimeter,
+} from './stats/zero-defect'
+export * from './stats/zero-defect-types'
+export { ZeroDefectZoneReportSection } from './stats/zero-defect-section'
 export { truckDefinition } from './truck/definition'
 export { TruckNode } from './truck/schema'
 export default warehousePlugin

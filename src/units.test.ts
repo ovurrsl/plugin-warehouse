@@ -9,6 +9,8 @@ import {
 } from '@pascal-app/editor'
 import {
   areaLabel,
+  areaUnitLabel,
+  areaValue,
   DEFAULT_UNIT,
   fieldToMetres,
   lengthLabel,
@@ -37,6 +39,20 @@ describe('çeviri host ile birebir aynı', () => {
       const host = `${squareMetersToAreaUnit(m2, 'imperial').toFixed(4)} ${getAreaUnitLabel('imperial')}`
       expect({ m2, mine }).toEqual({ m2, mine: host })
     }
+  })
+
+  test('ayrıştırılmış alan değeri ve birim etiketi (areaValue / areaUnitLabel)', () => {
+    expect(areaUnitLabel('metric')).toBe('m²')
+    expect(areaUnitLabel('imperial')).toBe('ft²')
+
+    expect(areaValue(100, 'metric', 1)).toBe('100.0')
+    expect(areaValue(Number.NaN, 'metric')).toBe('––')
+    expect(areaValue(Number.POSITIVE_INFINITY, 'imperial')).toBe('––')
+
+    const imperialSqFt = squareMetersToAreaUnit(100, 'imperial')
+    expect(areaValue(100, 'imperial', 1)).toBe(
+      imperialSqFt.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    )
   })
 
   test('eski kopya sabit host ile aynı DEĞİL', () => {

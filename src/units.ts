@@ -191,6 +191,20 @@ export function areaLabel(squareMetres: number, unit: LinearUnit, digits = 1): s
   return `${squareMetersToAreaUnit(squareMetres, unit).toFixed(digits)} ${getAreaUnitLabel(unit)}`
 }
 
+/** Birimsiz alan değeri — kendi birim etiketini ayrı yazan kolonlu yerleşimler için. */
+export function areaValue(squareMetres: number, unit: LinearUnit, digits = 1): string {
+  if (!Number.isFinite(squareMetres)) return '––'
+  return squareMetersToAreaUnit(squareMetres, unit).toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
+}
+
+/** Alan birimi etiketi tek başına (m², ft²). */
+export function areaUnitLabel(unit: LinearUnit): string {
+  return getAreaUnitLabel(unit)
+}
+
 /** Host'un kendi biçimi, boşluksuz — host bileşeninin yanına konan yerler için. */
 export { formatAreaLabel }
 

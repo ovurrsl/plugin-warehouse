@@ -23,9 +23,10 @@ import {
   sceneStats,
   statsReport,
 } from '../stats'
+import { ZeroDefectZoneReportSection } from '../stats/zero-defect-section'
 import { type PanelTab, useWarehouseStore } from '../store'
 import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
-import { areaLabel, type LinearUnit, lengthLabel } from '../units'
+import { areaLabel, areaUnitLabel, areaValue, type LinearUnit, lengthLabel } from '../units'
 import { categoryChip, checkbox, listRow, tile, tokens } from './styles'
 
 /**
@@ -839,6 +840,10 @@ export function StatsTab() {
         )}
       </section>
 
+      <ZeroDefectZoneReportSection
+        levelId={resolution.resolved === 'level' ? resolution.levelId : null}
+      />
+
       {(resolution.widenedNote || report.qualifications.length > 0) && (
         <section style={tokens.section}>
           {resolution.widenedNote && <div style={tokens.advisory}>{resolution.widenedNote}</div>}
@@ -873,18 +878,26 @@ function Figure({
   note?: string
   unavailable: boolean
 }) {
+  const displayValue = unavailable
+    ? '––'
+    : areaUnit
+      ? areaValue(value, areaUnit, 1)
+      : value.toLocaleString()
+
+  const displayUnit = unavailable
+    ? ''
+    : areaUnit
+      ? areaUnitLabel(areaUnit)
+      : (unit ?? '')
+
   return (
     <>
-      <div style={tokens.figureRow}>
-        <span style={tokens.figureLabel}>
-          <Icon height={12} icon={icon} width={12} />
-          {label}
-        </span>
-        <span style={tokens.figureValue}>
-          {unavailable ? '––' : areaUnit ? formatArea(value, areaUnit, 1) : value.toLocaleString()}
-          {!unavailable && unit && <span style={tokens.figureUnit}>{unit}</span>}
-        </span>
-      </div>
+      <span style={tokens.figureLabel}>
+        <Icon height={12} icon={icon} width={12} />
+        {label}
+      </span>
+      <span style={tokens.figureValue}>{displayValue}</span>
+      <span style={tokens.figureUnit}>{displayUnit}</span>
       {note && !unavailable && <p style={tokens.figureNote}>{note}</p>}
     </>
   )

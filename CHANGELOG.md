@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`fa0bdc3`](https://github.com/ovurrsl/plugin-warehouse/commit/fa0bdc34b933d49136939b590e1f312308a7707b))
 - Refresh generated README blocks [skip ci] ([`a0ccfb7`](https://github.com/ovurrsl/plugin-warehouse/commit/a0ccfb710ae64d75af9366298da77cdc6acc89e2))
 - Refresh generated README blocks [skip ci] ([`fe2798e`](https://github.com/ovurrsl/plugin-warehouse/commit/fe2798e246b7f81121bfa0502d3c97f898f72a87))
 - Refresh generated README blocks [skip ci] ([`119716b`](https://github.com/ovurrsl/plugin-warehouse/commit/119716b748326eb05d4096a6c8828663b0dc4116))
@@ -176,6 +177,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Implement Zero Defect Zone Report and stats UI alignment ([`373a1e0`](https://github.com/ovurrsl/plugin-warehouse/commit/373a1e0bf0777c64d9321acbd1a991936ada63ef))
 - Multi-level conveyor schema, pallet lift parity, PDF BOM export, and catalog UI fixes ([`392e22b`](https://github.com/ovurrsl/plugin-warehouse/commit/392e22b2ca7d74e1340b238823fc9e1524825e40))
 - Implement detailed capacity calculations and add 3D webp logos ([`5aa3415`](https://github.com/ovurrsl/plugin-warehouse/commit/5aa3415b4908327180b36f812b78361d6cec01b2))
 - Migrate to native ItemCatalog with filters and vector icons ([`f17977d`](https://github.com/ovurrsl/plugin-warehouse/commit/f17977d0f5e2d704c8c5ccf18f56b961ca26074f))

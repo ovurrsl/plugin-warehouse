@@ -141,7 +141,7 @@ export const liveRackingDefinition = {
     label: 'Live Pallet Racking',
     description:
       'A gravity-flow channel: pallets load at the high end and roll to the exit. FIFO or LIFO push-back, up to 30 pallets deep.',
-    icon: { kind: 'iconify', name: 'lucide:chevrons-down' },
+    icon: { kind: 'url', src: '/icons/warehouse/live-racking-fifo.png' },
     hidden: true,
     paletteSection: 'furnish',
   },

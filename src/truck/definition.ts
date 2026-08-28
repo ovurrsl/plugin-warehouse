@@ -132,7 +132,7 @@ export const truckDefinition = {
     label: 'Handling Truck',
     description:
       'Hand and electric pallet trucks, an electric forklift, a reach truck and a turret truck — each with its published aisle figures.',
-    icon: { kind: 'iconify', name: 'lucide:forklift' },
+    icon: { kind: 'url', src: '/icons/warehouse/truck-forklift.png' },
     // Pallet'in gerekçesi: kind bu eklentinin kataloğundan erişilir, host'un
     // Build paletinden değil.
     hidden: true,

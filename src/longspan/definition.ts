@@ -142,7 +142,7 @@ export const longspanDefinition = {
     label: 'M7 Longspan',
     description:
       'One bay of M7 longspan shelving. Levels mix freely: beam-and-board, beamless HM, bare beams for long goods, or a garment rail.',
-    icon: { kind: 'iconify', name: 'lucide:library' },
+    icon: { kind: 'url', src: '/icons/warehouse/longspan-picking.png' },
     hidden: true,
     paletteSection: 'furnish',
   },

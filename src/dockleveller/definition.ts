@@ -103,7 +103,7 @@ export const dockLevellerDefinition = {
     label: 'Dock Leveller',
     description:
       'Pit-mounted hydraulic dock leveller: flush with the floor at rest, hinged or telescopic lip onto the trailer bed. Platform, lip, capacity and incline are all set from the inspector.',
-    icon: { kind: 'iconify', name: 'lucide:import' },
+    icon: { kind: 'url', src: '/icons/warehouse/dock-leveller-hinged.png' },
     paletteSection: 'furnish',
   },
 

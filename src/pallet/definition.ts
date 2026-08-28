@@ -125,7 +125,7 @@ export const palletDefinition = {
   presentation: {
     label: 'Pallet',
     description: 'EPAL, GMA and plastic pallets. Set a load height to fill a rack position.',
-    icon: { kind: 'iconify', name: 'lucide:package' },
+    icon: { kind: 'url', src: '/icons/warehouse/pallet-loaded.webp' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog. Also sidesteps a live gap:
     // `build-tab.tsx` enumerates the registry without checking install state,

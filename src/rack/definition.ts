@@ -192,7 +192,7 @@ export const palletRackDefinition = {
     label: 'Pallet Rack',
     description:
       'One bay of adjustable pallet racking. Multiply it into a run — each bay is its own object, and bays standing together share a post.',
-    icon: { kind: 'iconify', name: 'lucide:rows-3' },
+    icon: { kind: 'url', src: '/icons/warehouse/pallet-rack.png' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog. Also sidesteps a live gap:
     // `build-tab.tsx` enumerates the registry without checking install state,

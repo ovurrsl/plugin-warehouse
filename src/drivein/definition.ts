@@ -143,7 +143,7 @@ export const driveInRackDefinition = {
     label: 'Drive-in Rack',
     description:
       'One lane of drive-in racking — storage by accumulation, one SKU per lane. Lanes standing together share a frame line.',
-    icon: { kind: 'iconify', name: 'lucide:rows-4' },
+    icon: { kind: 'url', src: '/icons/warehouse/drive-in-rack.png' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog.
     hidden: true,

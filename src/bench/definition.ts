@@ -101,7 +101,7 @@ export const benchDefinition = {
     label: 'Packing Bench',
     description:
       'Packing and processing benches: dispatch and mail-order packing tables, a processing bench, a weighing-scale station, a mobile workbench and a plain eco table. Width, worktop height and depth are all adjustable.',
-    icon: { kind: 'iconify', name: 'lucide:table' },
+    icon: { kind: 'url', src: '/icons/warehouse/bench-dispatch.png' },
     paletteSection: 'furnish',
   },
 

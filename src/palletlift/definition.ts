@@ -151,7 +151,7 @@ export const palletLiftDefinition = {
     label: 'Pallet Lift',
     description:
       'A mast-guided, chain-driven vertical pallet lift with an integrated roller conveyor on the platform. Serves the building’s levels (floors are derived, not a field); capacity, mast count, enclosure and doors are set from the inspector.',
-    icon: { kind: 'iconify', name: 'lucide:arrow-up-down' },
+    icon: { kind: 'url', src: '/icons/warehouse/pallet-lift.png' },
     paletteSection: 'furnish',
   },
 

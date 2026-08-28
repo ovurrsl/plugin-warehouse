@@ -167,7 +167,7 @@ export const conveyorRollerDefinition = {
     label: 'Roller Conveyor',
     description:
       'One module of continuously driven roller conveyor. Place a run of them; each module is its own object.',
-    icon: { kind: 'iconify', name: 'lucide:move-right' },
+    icon: { kind: 'url', src: '/icons/warehouse/conveyor-roller.png' },
     // Keeps the kind out of the host's auto-derived Build palette so it is
     // reachable only from this plugin's catalog.
     hidden: true,

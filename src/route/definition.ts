@@ -113,7 +113,7 @@ export const routeDefinition = {
   presentation: {
     label: 'Route',
     description: 'Yaya veya araç yolu — zemine boyanmış iki şerit.',
-    icon: { kind: 'iconify', name: 'lucide:route' },
+    icon: { kind: 'url', src: '/icons/warehouse/route-pedestrian.png' },
   },
 
   mcp: {

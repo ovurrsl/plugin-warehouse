@@ -115,7 +115,7 @@ export const mezzanineDefinition = {
     label: 'Mezzanine',
     description:
       'Multi-tier structural steel platform. Sigma, GL2000 or Mixed construction; each tier carries its own load class and floor type.',
-    icon: { kind: 'iconify', name: 'lucide:layers-3' },
+    icon: { kind: 'url', src: '/icons/warehouse/mezzanine-sigma.png' },
     hidden: true,
     paletteSection: 'furnish',
   },

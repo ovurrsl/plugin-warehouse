@@ -100,7 +100,7 @@ export const toteCartDefinition = {
     label: 'Tote Cart',
     description:
       'Order-picking trolley: a wheeled steel frame carrying one Euro tote per tier. Tier count, tote size and castors are set from the inspector; the overall height follows from them.',
-    icon: { kind: 'iconify', name: 'lucide:shopping-cart' },
+    icon: { kind: 'url', src: '/icons/warehouse/tote-cart.png' },
     paletteSection: 'furnish',
   },
 

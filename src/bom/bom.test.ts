@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import type { AnyNode } from '@pascal-app/core'
 import { calculateWarehouseBOM } from './bom-engine'
-import { generateWarehouseBomHtml } from './bom-html'
+import { generateWarehouseBomHtml, sanitizeSvg } from './bom-html'
 import { generateWarehouseBomPdf } from './bom-pdf'
 import { generateWarehouseBomSheets } from './bom-sheets'
+import type { BomSheet } from './types'
 
 describe('Warehouse BOM Calculation Engine', () => {
   it('calculates exact hardware tallies for a single-deep selective pallet rack', () => {
@@ -683,5 +684,67 @@ describe('Warehouse BOM Document & PDF Generation', () => {
     expect(html).toContain('size: letter landscape;')
     expect(html).toContain('<section class="sheet">')
     expect(html).toContain('Printable Warehouse BOM')
+  })
+})
+
+describe('Warehouse BOM HTML SVG Sanitization in Headless / SSR Environments', () => {
+  it('strips <script> tags and inline event handlers in headless environments', () => {
+    const maliciousSheet: BomSheet = {
+      title: 'Malicious Sheet',
+      svg: '<svg onload="alert(1)"><script>alert("xss")</script><text>Safe</text></svg>',
+    }
+    const html = generateWarehouseBomHtml([maliciousSheet])
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('alert(')
+    expect(html).not.toContain('onload=')
+    expect(html).toContain('<text>Safe</text>')
+  })
+
+  it('strips <foreignObject>, <iframe src="javascript:..."> and javascript URIs', () => {
+    const maliciousSheet: BomSheet = {
+      title: 'ForeignObject XSS',
+      svg: '<svg><foreignObject><iframe src="javascript:alert(1)"></iframe></foreignObject><a href="javascript:alert(2)"><rect width="10" height="10"/></a></svg>',
+    }
+    const html = generateWarehouseBomHtml([maliciousSheet])
+    expect(html).not.toContain('<foreignObject')
+    expect(html).not.toContain('<iframe')
+    expect(html).not.toContain('javascript:')
+    expect(html).not.toContain('alert(1)')
+    expect(html).not.toContain('alert(2)')
+    expect(html).toContain('<rect')
+  })
+
+  it('strips onerror and SMIL animate injection attributes in headless test runs', () => {
+    const maliciousSheet: BomSheet = {
+      title: 'SMIL & OnError Injection',
+      svg: '<svg><image href="invalid.png" onerror="alert(3)"/><animate onbegin="alert(4)"/><set attributeName="onmouseover" to="alert(5)"/></svg>',
+    }
+    const html = generateWarehouseBomHtml([maliciousSheet])
+    expect(html).not.toContain('onerror=')
+    expect(html).not.toContain('onbegin=')
+    expect(html).not.toContain('onmouseover')
+    expect(html).not.toContain('alert(')
+  })
+
+  it('strips CDATA wrapped script payloads and XML entity injections', () => {
+    const maliciousSheet: BomSheet = {
+      title: 'CDATA & XML Injection',
+      svg: '<!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><svg><script><![CDATA[alert(6)]]></script><text>&xxe;</text></svg>',
+    }
+    const html = generateWarehouseBomHtml([maliciousSheet])
+    expect(html).not.toContain('<!DOCTYPE')
+    expect(html).not.toContain('<!ENTITY')
+    expect(html).not.toContain('<script')
+    expect(html).not.toContain('alert(6)')
+  })
+
+  it('direct sanitizeSvg helper safely strips vectors and retains valid geometries', () => {
+    const raw =
+      '<svg onload=alert(9)><circle cx="5" cy="5" r="5"/><script>alert("bad")</script></svg>'
+    const sanitized = sanitizeSvg(raw)
+    expect(sanitized).not.toContain('onload')
+    expect(sanitized).not.toContain('<script')
+    expect(sanitized).not.toContain('alert(')
+    expect(sanitized).toContain('<circle cx="5" cy="5" r="5"/>')
   })
 })

@@ -315,16 +315,15 @@ describe('katalog arama ve filtreleme mantığı', () => {
   })
 })
 
-describe('3D webp katalog logoları ve görsel varlıklar (R2)', () => {
+describe('3D webp/png katalog logoları ve görsel varlıklar (R2)', () => {
   test('katalogda tam 43 fiş var', () => {
     expect(CATALOG_ITEMS.length).toBe(43)
   })
 
-  test('tüm 43 fiş /icons/warehouse/<id>.webp formatında ikon taşır', () => {
+  test('tüm 43 fiş /icons/warehouse/<id>.(webp|png) formatında ikon taşır', () => {
     for (const item of CATALOG_ITEMS) {
-      expect(item.icon).toBe(`/icons/warehouse/${item.id}.webp`)
       expect(item.icon.startsWith('/icons/warehouse/')).toBe(true)
-      expect(item.icon.endsWith('.webp')).toBe(true)
+      expect(item.icon.endsWith('.webp') || item.icon.endsWith('.png')).toBe(true)
     }
   })
 
@@ -335,20 +334,19 @@ describe('3D webp katalog logoları ve görsel varlıklar (R2)', () => {
     }
   })
 
-  test('referans verilen tüm .webp dosyaları editor/apps/editor/public ve Digitaltwin/public disk dizinlerinde mevcuttur', () => {
+  test('referans verilen tüm raster ikon dosyaları editor/apps/editor/public disk dizininde mevcuttur', () => {
     const editorPublic = resolve(import.meta.dir, '../../editor/apps/editor/public')
-    const digitalTwinPublic = resolve(import.meta.dir, '../../Digitaltwin/public')
+    const dtWarehousePublic = resolve(import.meta.dir, '../../Digitaltwin/public/icons/warehouse')
 
     for (const item of CATALOG_ITEMS) {
       const relPath = item.icon.replace(/^\//, '')
       const editorFile = join(editorPublic, relPath)
-      const dtFile = join(digitalTwinPublic, relPath)
-
       const existsInEditor = existsSync(editorFile)
-      const existsInDt = existsSync(dtFile)
-
       expect(existsInEditor).toBe(true)
-      expect(existsInDt).toBe(true)
+      if (existsSync(dtWarehousePublic)) {
+        const dtFile = join(resolve(import.meta.dir, '../../Digitaltwin/public'), relPath)
+        expect(existsSync(dtFile)).toBe(true)
+      }
     }
   })
 

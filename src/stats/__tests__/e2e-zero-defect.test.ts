@@ -81,7 +81,7 @@ describe('Tier 1: Feature Coverage', () => {
   describe('F1: Stats Panel Vertical Number & Suffix UI Alignment (R1)', () => {
     it('T1.F1.1: figures container enforces a strict 3-column CSS Grid layout', () => {
       expect(tokens.figures.display).toBe('grid')
-      expect(tokens.figures.gridTemplateColumns).toBe('minmax(max-content, auto) 1fr auto')
+      expect(tokens.figures.gridTemplateColumns).toBe('max-content 1fr max-content')
       expect(tokens.figures.alignItems).toBe('baseline')
       expect(tokens.figures.rowGap).toBe('0.5rem')
       expect(tokens.figures.columnGap).toBe('0.375rem')
@@ -599,13 +599,13 @@ describe('Tier 3: Cross-Feature Interactions', () => {
 
     // Create 2 Zones covering the equipment
     const zoneA = createTestZone({
-      id: 'za' as AnyNodeId,
+      id: 'zone_za' as any,
       name: 'Zone A - Selective 4-High',
       parentId: 'lvl-1' as AnyNodeId,
       polygon: [[0, 0], [10, 0], [10, 10], [0, 10]],
     })
     const zoneB = createTestZone({
-      id: 'zb' as AnyNodeId,
+      id: 'zone_zb' as any,
       name: 'Zone B - Selective 5-High',
       parentId: 'lvl-1' as AnyNodeId,
       ceilingHeight: 12.0,
@@ -650,8 +650,8 @@ describe('Tier 3: Cross-Feature Interactions', () => {
   })
 
   it('T3.X3: moving blocking equipment from one zone to another shifts defect and recalculates scores', () => {
-    const zoneA = createTestZone({ id: 'za' as AnyNodeId, name: 'Zone A', ceilingHeight: 5.0 })
-    const zoneB = createTestZone({ id: 'zb' as AnyNodeId, name: 'Zone B', ceilingHeight: 10.0 })
+    const zoneA = createTestZone({ id: 'zone_za' as any, name: 'Zone A', ceilingHeight: 5.0 })
+    const zoneB = createTestZone({ id: 'zone_zb' as any, name: 'Zone B', ceilingHeight: 10.0 })
 
     const nodes: Record<string, AnyNode> = {
       'pallet-rack_tall': {
@@ -698,12 +698,12 @@ describe('Tier 3: Cross-Feature Interactions', () => {
 
   it('T3.X5: multi-zone facility report strictly weights readiness score by zone area', () => {
     const smallZone = createTestZone({
-      id: 'z-small' as AnyNodeId,
+      id: 'zone_small' as any,
       name: 'Small Staging',
       polygon: [[0, 0], [10, 0], [10, 5], [0, 5]], // 50 m²
     })
     const largeZone = createTestZone({
-      id: 'z-large' as AnyNodeId,
+      id: 'zone_large' as any,
       name: 'Large Reserve',
       polygon: [[0, 0], [50, 0], [50, 20], [0, 20]], // 1000 m²
     })
@@ -723,7 +723,7 @@ describe('Tier 4: Real-World Warehouse Scenarios', () => {
   it('T4.S1: Greenfield Automated E-Commerce Fulfillment Center', () => {
     // 5,000 m² automated facility with 4 distinct zones
     const zoneReserve = createTestZone({
-      id: 'z-reserve' as AnyNodeId,
+      id: 'zone_reserve' as any,
       name: 'High-Bay Reserve Racking',
       parentId: 'level-1' as AnyNodeId,
       polygon: [[0, 0], [50, 0], [50, 50], [0, 50]], // 2,500 m²
@@ -732,7 +732,7 @@ describe('Tier 4: Real-World Warehouse Scenarios', () => {
     })
 
     const zonePick = createTestZone({
-      id: 'z-pick' as AnyNodeId,
+      id: 'zone_pick' as any,
       name: 'Multi-Tier Pick Mezzanine',
       parentId: 'level-1' as AnyNodeId,
       polygon: [[50, 0], [80, 0], [80, 50], [50, 50]], // 1,500 m²
@@ -741,7 +741,7 @@ describe('Tier 4: Real-World Warehouse Scenarios', () => {
     })
 
     const zoneVas = createTestZone({
-      id: 'z-vas' as AnyNodeId,
+      id: 'zone_vas' as any,
       name: 'Packing & Kitting Hub',
       parentId: 'level-1' as AnyNodeId,
       polygon: [[80, 0], [100, 0], [100, 30], [80, 30]], // 600 m²
@@ -750,7 +750,7 @@ describe('Tier 4: Real-World Warehouse Scenarios', () => {
     })
 
     const zoneInbound = createTestZone({
-      id: 'z-dock' as AnyNodeId,
+      id: 'zone_dock' as any,
       name: 'Inbound Receiving Docks',
       parentId: 'level-1' as AnyNodeId,
       polygon: [[80, 30], [100, 30], [100, 50], [80, 50]], // 400 m²

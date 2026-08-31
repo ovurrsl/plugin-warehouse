@@ -5,7 +5,7 @@ import { areaLabel, areaUnitLabel, areaValue, lengthLabel, lengthValue } from '.
 describe('Stats Panel UI Alignment & Typography Tokens', () => {
   it('defines 3-column CSS Grid layout for figures container', () => {
     expect(tokens.figures.display).toBe('grid')
-    expect(tokens.figures.gridTemplateColumns).toBe('minmax(max-content, auto) 1fr auto')
+    expect(tokens.figures.gridTemplateColumns).toBe('max-content 1fr max-content')
     expect(tokens.figures.alignItems).toBe('baseline')
     expect(tokens.figures.rowGap).toBe('0.5rem')
     expect(tokens.figures.columnGap).toBe('0.375rem')

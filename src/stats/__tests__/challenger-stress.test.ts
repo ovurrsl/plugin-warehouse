@@ -684,7 +684,7 @@ describe('Task 2: 12 Defect Rules Boundary Stress Harness', () => {
 describe('Task 3: Stats Panel Layout & Extreme Value Length Stress Harness', () => {
   it('CSS Grid configuration strictly isolates 3 vertical column tracks', () => {
     expect(tokens.figures.display).toBe('grid')
-    expect(tokens.figures.gridTemplateColumns).toBe('minmax(max-content, auto) 1fr auto')
+    expect(tokens.figures.gridTemplateColumns).toBe('max-content 1fr max-content')
     expect(tokens.figureRow.display).toBe('contents')
     expect(tokens.figureNote.gridColumn).toBe('1 / -1')
   })

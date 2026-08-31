@@ -38,7 +38,10 @@ describe('Challenger Adversarial: Catalog Completeness & Invariants', () => {
       expect(item.description.trim().length).toBeGreaterThan(0)
 
       expect(item.icon).toBeDefined()
-      expect(item.icon.startsWith('/icons/warehouse/') && item.icon.endsWith('.webp')).toBe(true)
+      expect(
+        item.icon.startsWith('/icons/warehouse/') &&
+          (item.icon.endsWith('.webp') || item.icon.endsWith('.png')),
+      ).toBe(true)
     }
   })
 

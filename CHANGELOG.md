@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6c04523`](https://github.com/ovurrsl/plugin-warehouse/commit/6c0452340d770109079f0ac17cd139cbb3c3dafe))
 - Refresh generated README blocks [skip ci] ([`bb56c06`](https://github.com/ovurrsl/plugin-warehouse/commit/bb56c0639f8bc8c92bc262478ace8252958191d8))
 - Refresh generated README blocks [skip ci] ([`52c0316`](https://github.com/ovurrsl/plugin-warehouse/commit/52c0316f72c751927c0f64f67994678d0bf7acb2))
 - Refresh generated README blocks [skip ci] ([`fa0bdc3`](https://github.com/ovurrsl/plugin-warehouse/commit/fa0bdc34b933d49136939b590e1f312308a7707b))
@@ -300,6 +301,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Update package dependencies and sanitize SVG with DOMPurify ([`ffd1122`](https://github.com/ovurrsl/plugin-warehouse/commit/ffd11223f9b1492dc384f7f12f8c71acaeecbc07))
 - Align number values in Asset Stats panel ([`6375e88`](https://github.com/ovurrsl/plugin-warehouse/commit/6375e8844492019b013f0dc84b5accc400e14a51))
 - Resolve Bug #50-D3 ambient preview and disarming ([`fc39034`](https://github.com/ovurrsl/plugin-warehouse/commit/fc390346c1709298714147bd41b20ee019353327))
 - Sarmal host paletinden gizli — cift yerlestirme giderildi (#28) ([`cb989d7`](https://github.com/ovurrsl/plugin-warehouse/commit/cb989d7d447f9b7dae8b4d499b7685cd02c540fa))

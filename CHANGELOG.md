@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1f99750`](https://github.com/ovurrsl/plugin-warehouse/commit/1f997509a380cd09cd7c799886d7a40d5cb7fd9e))
 - Refresh generated README blocks [skip ci] ([`6c04523`](https://github.com/ovurrsl/plugin-warehouse/commit/6c0452340d770109079f0ac17cd139cbb3c3dafe))
 - Refresh generated README blocks [skip ci] ([`bb56c06`](https://github.com/ovurrsl/plugin-warehouse/commit/bb56c0639f8bc8c92bc262478ace8252958191d8))
 - Refresh generated README blocks [skip ci] ([`52c0316`](https://github.com/ovurrsl/plugin-warehouse/commit/52c0316f72c751927c0f64f67994678d0bf7acb2))
@@ -180,6 +181,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- E2E uyumluluk, Zone silinme mantığı ve supersampling entegrasyonları ([`e047cd1`](https://github.com/ovurrsl/plugin-warehouse/commit/e047cd18d42d1571ad3a8a8a15ff54aea1d3cb47))
 - Use png/webp raster icons instead of lucide svgs for outliner presentations ([`7ebc4af`](https://github.com/ovurrsl/plugin-warehouse/commit/7ebc4afc2bfb2bcf8d464d2214f9db2835404b2d))
 - Implement Zero Defect Zone Report and stats UI alignment ([`373a1e0`](https://github.com/ovurrsl/plugin-warehouse/commit/373a1e0bf0777c64d9321acbd1a991936ada63ef))
 - Multi-level conveyor schema, pallet lift parity, PDF BOM export, and catalog UI fixes ([`392e22b`](https://github.com/ovurrsl/plugin-warehouse/commit/392e22b2ca7d74e1340b238823fc9e1524825e40))

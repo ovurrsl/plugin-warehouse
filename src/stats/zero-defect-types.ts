@@ -2,8 +2,56 @@
  * Type definitions for the Zero Defect Start-up (ZDSU) Zone Report & Audit Engine.
  *
  * Implements the 6-Pillar Metric Suite based on international warehouse engineering
- * standards (NFPA 13/230, EN 15635, FEM 10.2.02, OSHA 1910.176/178, ANSI B56.1, WERC).
+ * standards (NFPA 13/230, EN 15635, FEM 10.2.02, OSHA 1910.176/178, ANSI B56.1, WERC,
+ * TSE, BYKHY, İSG).
  */
+
+export type RegulatoryStandardId = 'TR' | 'EU' | 'US'
+
+export interface StandardThresholds {
+  sprinklerClearanceM: number
+  sprinklerHighHazardClearanceM: number
+  minFlueSpaceM: number
+  egressAisleMinClearM: number
+  mainAisleMinClearM: number
+  stagingAreaPerDockM2: number
+  criticalStagingBufferDeficitM2: number
+  minDockClearanceM: number
+  dockApronDepthM: number
+  maxMezzanineOccupancyPerM2?: number
+  defaultBeamClearanceMm: number
+  maxStorageUtilizationPct: number
+  maxStagingUtilizationPct: number
+  maxContinuousRackRowLengthM: number
+  enforceUprightProtectors: boolean
+  mezzanineMinGuardrailHeightM: number
+  mezzanineMinKickPlateHeightM: number
+  mezzanineMinHeadroomM: number
+  aisleWidths: {
+    counterbalance: { min: number; rec: number }
+    reach: { min: number; rec: number }
+    vnaTurret: { min: number; rec: number }
+  }
+}
+
+export interface RegulatoryStandardProfile {
+  id: RegulatoryStandardId
+  name: string
+  shortName: string
+  region: 'Turkey' | 'Europe' | 'United States'
+  governingBodies: string[]
+  citations: {
+    sprinkler: string
+    flueSpace: string
+    aisles: string
+    racking: string
+    staging: string
+    mezzanine: string
+    floorUtilization?: string
+    emergencyEgress?: string
+  }
+  thresholds: StandardThresholds
+}
 
 export type ZDSUZoneRole =
   | 'storage-selective'
@@ -49,6 +97,11 @@ export interface ZDSUDefect {
   severity: ZDSUDefectSeverity
   pillar: ZDSUPillarCategory
   standardRef?: string
+  targetNodeId?: string
+  targetNodeName?: string
+  targetLevel?: number
+  targetLayer?: string
+  floorName?: string
 }
 
 export type ZDSUStatus = 'ready' | 'warning' | 'blocked'
@@ -141,6 +194,9 @@ export interface ZDSUReadinessPillar {
 export interface ZoneZDSUAudit {
   zoneId: string
   zoneName: string
+  floorName: string
+  levelId: string | null
+  standardId?: RegulatoryStandardId | null
   role: ZDSUZoneRole
   geometry: ZDSUGeometryPillar
   storage: ZDSUStoragePillar
@@ -167,4 +223,5 @@ export interface FacilityZDSUReport {
     advisory: number
   }
   zoneAudits: ZoneZDSUAudit[]
+  standardId?: RegulatoryStandardId | null
 }

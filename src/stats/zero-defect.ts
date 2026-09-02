@@ -1,7 +1,8 @@
 /**
  * Zero Defect Start-up (ZDSU) Pure Calculation Engine.
  *
- * Grounded in NFPA 13/230, EN 15635, FEM 10.2.02, OSHA 1910.176/178, ANSI B56.1, and WERC standards.
+ * Grounded in NFPA 13/230, EN 15635, EN 15620, FEM 10.2.02, OSHA 1910.176/178, ANSI B56.1,
+ * WERC, TSE, BYKHY, and İSG standards.
  * Pure mathematical functions for zone geometry, capacity, floor utilization, aisle clearances,
  * dock staging ratios, defect detection, and readiness score calculation.
  */
@@ -10,6 +11,7 @@ import type { AnyNode, AnyNodeId, ZoneNode } from '@pascal-app/core'
 import { pointInPolygon2D } from '@pascal-app/core'
 import {
   type FacilityZDSUReport,
+  type RegulatoryStandardId,
   type ZDSUClearancePillar,
   type ZDSUDefect,
   type ZDSUGeometryPillar,
@@ -22,7 +24,11 @@ import {
   type ZDSUZoneRole,
   type ZoneZDSUAudit,
 } from './zero-defect-types'
+import { getStandardProfile } from './zero-defect-standards'
 import { calculateWarehouseZoneTakeoff } from '../takeoff/zone-takeoff'
+import type { PalletRackNode } from '../rack/schema'
+import { fittedLevelCount, levelClearOpening, levelSurfaceY } from '../rack/slots'
+import type { MezzanineNode, MezzanineTier } from '../mezzanine/schema'
 
 // ── Point & Geometry Calculations ───────────────────────────────────────────
 
@@ -279,13 +285,14 @@ export function calculateEquipmentFootprint(
       case 'warehouse:conveyor-launcher':
       case 'warehouse:conveyor-oblique':
       case 'warehouse:conveyor-transfer': {
-        const length = typeof n.length === 'number'
-          ? n.length
-          : typeof n.lengthM === 'number'
-            ? n.lengthM
-            : typeof n.travelHeight === 'number'
-              ? n.travelHeight
-              : 3.0
+        const length =
+          typeof n.length === 'number'
+            ? n.length
+            : typeof n.lengthM === 'number'
+              ? n.lengthM
+              : typeof n.travelHeight === 'number'
+                ? n.travelHeight
+                : 3.0
         totalM2 += length * 0.8 // Standard 800mm conveyor width
         break
       }
@@ -376,6 +383,7 @@ export interface CalculateZoneZDSUAuditOptions {
   contentIds?: AnyNodeId[]
   ceilingHeightOverride?: number
   defaultMheClass?: 'counterbalance' | 'reach' | 'vna'
+  standardId?: RegulatoryStandardId | null
 }
 
 /**
@@ -387,6 +395,21 @@ export function calculateZoneZDSUAudit(
   nodes: Readonly<Record<AnyNodeId, AnyNode>>,
   options: CalculateZoneZDSUAuditOptions = {},
 ): ZoneZDSUAudit {
+  const standardId = options.standardId ?? null
+  const standardProfile = standardId ? getStandardProfile(standardId) : null
+  const thresholds = standardProfile ? standardProfile.thresholds : null
+
+  // Resolve architectural floor / level information
+  const parentLevel = zone.parentId
+    ? ((nodes as Record<string, unknown>)[zone.parentId] as unknown as { id?: string; name?: string; level?: number })
+    : null
+  const levelId = zone.parentId ?? null
+  const floorName =
+    parentLevel?.name ||
+    (parentLevel && typeof parentLevel.level === 'number'
+      ? `Level ${parentLevel.level}`
+      : 'General Floor')
+
   const contentIds = options.contentIds ?? collectZoneContentIds(nodes, zone)
 
   // 1. Pillar 1: Geometry & Spatial Envelope
@@ -394,7 +417,10 @@ export function calculateZoneZDSUAudit(
   const areaM2 = polygonArea(rawPolygon)
   const perimeterM = polygonPerimeter(rawPolygon)
   const clearHeightM =
-    options.ceilingHeightOverride ?? (typeof zone.ceilingHeight === 'number' && zone.ceilingHeight > 0 ? zone.ceilingHeight : 2.7)
+    options.ceilingHeightOverride ??
+    (typeof zone.ceilingHeight === 'number' && zone.ceilingHeight > 0
+      ? zone.ceilingHeight
+      : 2.7)
   const volumeM3 = Math.round(areaM2 * clearHeightM * 100) / 100
   const vertexCount = rawPolygon.length
   const isValidPolygon = vertexCount >= 3 && areaM2 > 0
@@ -414,19 +440,29 @@ export function calculateZoneZDSUAudit(
   let shelfAreaM2 = 0
 
   let maxRackHeight = 0
+  let topOffendingRackId: string | undefined
+  let topOffendingRackName: string | undefined
+  let topOffendingRackLevel: number | undefined
   let minMeasuredFlueSpace = 0.1 // 100mm default
+  let flueOffendingRackId: string | undefined
+  let flueOffendingRackName: string | undefined
   const mheClassesSet = new Set<string>()
   let dockCount = 0
   let routeCount = 0
   let hasEmergencyRoute = false
+
+  // Deep inspection records
+  const deepDefects: ZDSUDefect[] = []
 
   for (const id of contentIds) {
     const node = nodes[id]
     if (!node) continue
     const n = node as unknown as Record<string, unknown>
     const type = typeof n.type === 'string' ? n.type : ''
+    const nodeName = typeof n.name === 'string' ? n.name : undefined
 
     if (type === 'warehouse:pallet-rack') {
+      const rackNode = n as unknown as PalletRackNode
       const levels = typeof n.levels === 'number' ? n.levels : 4
       const positionsPerLevel = 3
       const palletSlots = levels * positionsPerLevel
@@ -437,11 +473,59 @@ export function calculateZoneZDSUAudit(
       }
 
       const rackH = typeof n.height === 'number' ? n.height : levels * 1.5
-      if (rackH > maxRackHeight) maxRackHeight = rackH
+      if (rackH > maxRackHeight) {
+        maxRackHeight = rackH
+        topOffendingRackId = id
+        topOffendingRackName = nodeName || `Selective Rack (${id})`
+        topOffendingRackLevel = levels
+      }
 
       const gap = n.depthGap
       if (typeof gap === 'number' && gap < minMeasuredFlueSpace) {
         minMeasuredFlueSpace = gap
+        flueOffendingRackId = id
+        flueOffendingRackName = nodeName || `Selective Rack (${id})`
+      }
+
+      // Deep level-by-level inspection for pallet rack
+      const fittedCount = fittedLevelCount(rackNode)
+      for (let lvl = 1; lvl <= levels; lvl++) {
+        let opening = levelClearOpening(rackNode, lvl - 1)
+        if (typeof n.beamLevelSpacing === 'number') {
+          const beamThick = typeof n.beamThickness === 'number' ? (n.beamThickness as number) : 0.1
+          opening = (n.beamLevelSpacing as number) - beamThick
+        }
+        if (Array.isArray(n.levelClears) && typeof n.levelClears[lvl - 1] === 'number') {
+          opening = n.levelClears[lvl - 1] as number
+        } else if (typeof n.levelClear === 'number') {
+          opening = n.levelClear as number
+        }
+        const surfY = levelSurfaceY(rackNode, lvl)
+
+        // Check if individual beam clear opening is critically restricted (< 0.60m)
+        if (opening < 0.6) {
+          deepDefects.push({
+            code: 'ZDSU-R02',
+            title: 'Restricted Rack Beam Level Opening',
+            message: `Beam Level ${lvl} clear opening (${opening.toFixed(2)}m) is severely restricted.`,
+            severity: 'warning',
+            pillar: 'clearance',
+            standardRef: standardProfile?.citations.racking ?? 'TS EN 15620 / ANSI MH16.1',
+            targetNodeId: id,
+            targetNodeName: nodeName || `Selective Rack (${id})`,
+            targetLevel: lvl,
+            targetLayer: `Level ${lvl}`,
+            floorName,
+          })
+        }
+
+        // If top level surface approaches ceiling clearance
+        if (lvl === fittedCount && clearHeightM - surfY < (thresholds?.sprinklerClearanceM ?? 0.5)) {
+          // Top storage level clearance recorded for deep inspection
+          topOffendingRackId = id
+          topOffendingRackName = nodeName || `Selective Rack (${id})`
+          topOffendingRackLevel = lvl
+        }
       }
     } else if (type === 'warehouse:drive-in-rack') {
       const lanes = 1
@@ -452,7 +536,12 @@ export function calculateZoneZDSUAudit(
       driveInDirect += lanes * levels
 
       const laneH = levels * 1.6
-      if (laneH > maxRackHeight) maxRackHeight = laneH
+      if (laneH > maxRackHeight) {
+        maxRackHeight = laneH
+        topOffendingRackId = id
+        topOffendingRackName = nodeName || `Drive-In Rack (${id})`
+        topOffendingRackLevel = levels
+      }
     } else if (type === 'warehouse:live-rack') {
       const levels = typeof n.levels === 'number' ? n.levels : 3
       const channels = typeof n.channels === 'number' ? n.channels : 2
@@ -462,7 +551,12 @@ export function calculateZoneZDSUAudit(
       liveDirect += levels * channels
 
       const liveH = levels * 1.6
-      if (liveH > maxRackHeight) maxRackHeight = liveH
+      if (liveH > maxRackHeight) {
+        maxRackHeight = liveH
+        topOffendingRackId = id
+        topOffendingRackName = nodeName || `Live Rack (${id})`
+        topOffendingRackLevel = levels
+      }
     } else if (type === 'warehouse:pallet') {
       const slotRackId = n.slotRackId
       if (!slotRackId) {
@@ -493,6 +587,28 @@ export function calculateZoneZDSUAudit(
       if (routeRole === 'pedestrian' || routeRole === 'escape' || routeRole === 'egress') {
         hasEmergencyRoute = true
       }
+    } else if (type === 'warehouse:mezzanine') {
+      const mezzNode = n as unknown as MezzanineNode
+      if (Array.isArray(mezzNode.tiers)) {
+        for (const tier of mezzNode.tiers) {
+          const minHeadroom = thresholds?.mezzanineMinHeadroomM ?? 2.0
+          if (typeof tier.clearHeightM === 'number' && tier.clearHeightM < minHeadroom) {
+            deepDefects.push({
+              code: 'ZDSU-R01',
+              title: 'Insufficient Mezzanine Headroom Clearance',
+              message: `Mezzanine Tier ${tier.index} clear headroom is ${tier.clearHeightM.toFixed(2)}m (standard requires ≥ ${minHeadroom.toFixed(2)}m).`,
+              severity: 'blocking',
+              pillar: 'safety',
+              standardRef: standardProfile?.citations.mezzanine ?? 'EN ISO 14122-2 / OSHA 1910.28',
+              targetNodeId: id,
+              targetNodeName: nodeName || `Mezzanine (${id})`,
+              targetLevel: tier.index,
+              targetLayer: `Tier ${tier.index} Deck`,
+              floorName,
+            })
+          }
+        }
+      }
     }
   }
 
@@ -509,17 +625,21 @@ export function calculateZoneZDSUAudit(
   const health = evaluateUtilizationHealth(floorUtilizationPct, role, contentIds.length > 0)
 
   // 4. Pillar 4: Clearance & Equipment Matching
-  const sprinklerClearanceM = maxRackHeight > 0 ? Math.max(0, Math.round((clearHeightM - maxRackHeight) * 100) / 100) : clearHeightM
-  const sprinklerCompliant = sprinklerClearanceM >= 0.50 // NFPA 13 minimum 18" (457mm -> 0.50m)
-  const flueSpaceCompliant = minMeasuredFlueSpace >= 0.075 // NFPA 13 75mm continuous flue gap
+  const minSprinklerReq = thresholds?.sprinklerClearanceM ?? 0.5
+  const minFlueReq = thresholds?.minFlueSpaceM ?? 0.075
+
+  const sprinklerClearanceM =
+    maxRackHeight > 0 ? Math.max(0, Math.round((clearHeightM - maxRackHeight) * 100) / 100) : clearHeightM
+  const sprinklerCompliant = sprinklerClearanceM >= minSprinklerReq
+  const flueSpaceCompliant = minMeasuredFlueSpace >= minFlueReq
 
   const mheClassesPresent = Array.from(mheClassesSet)
   const requiredAisleWidthM = mheClassesPresent.includes('vna-turret')
-    ? 1.65
+    ? (thresholds?.aisleWidths.vnaTurret.min ?? 1.65)
     : mheClassesPresent.includes('reach')
-      ? 2.70
-      : 3.50 // Counterbalance standard
-  const estimatedAisleWidthM = areaM2 > 0 && selectivePallets > 0 ? 3.10 : undefined
+      ? (thresholds?.aisleWidths.reach.min ?? 2.7)
+      : (thresholds?.aisleWidths.counterbalance.min ?? 3.5) // Counterbalance standard
+  const estimatedAisleWidthM = areaM2 > 0 && selectivePallets > 0 ? 3.1 : undefined
 
   // 5. Pillar 5: Staging Buffer & Dock Ratios
   const stagingAreaPerDockM2 = dockCount > 0 && areaM2 > 0 ? Math.round((areaM2 / dockCount) * 10) / 10 : null
@@ -529,44 +649,66 @@ export function calculateZoneZDSUAudit(
   // 6. Defect Rule Engine Checks (ZDSU-R01 to ZDSU-R12)
   const defects: ZDSUDefect[] = []
 
-  // ZDSU-R01: Sprinkler Clearance (<0.50m)
-  if (maxRackHeight > 0 && sprinklerClearanceM < 0.50) {
+  // Add any deep element defects discovered
+  for (const dd of deepDefects) {
+    defects.push(dd)
+  }
+
+  // ZDSU-R01: Sprinkler Clearance (< minSprinklerReq)
+  if (maxRackHeight > 0 && sprinklerClearanceM < minSprinklerReq) {
+    const isUSorDefault = !standardId || standardId === 'US'
+    const standardNameShort = standardProfile ? standardProfile.name.split(' ')[0] : 'NFPA 13'
+    const reqNote = isUSorDefault
+      ? `NFPA 13 requires ≥ ${minSprinklerReq.toFixed(2)}m / 18"`
+      : `${standardNameShort} requires ≥ ${minSprinklerReq.toFixed(2)}m`
+
     defects.push({
       code: 'ZDSU-R01',
       title: 'Insufficient Sprinkler Head Clearance',
-      message: `Top of storage to ceiling clear height is ${sprinklerClearanceM.toFixed(2)}m (NFPA 13 requires ≥ 0.50m / 18").`,
+      message: `Top of storage to ceiling clear height is ${sprinklerClearanceM.toFixed(2)}m (${reqNote}).`,
       severity: 'blocking',
       pillar: 'safety',
-      standardRef: 'NFPA 13 §20.6 / FM Global 8-9',
+      standardRef: standardProfile?.citations.sprinkler ?? 'NFPA 13 §20.6 / FM Global 8-9',
+      targetNodeId: topOffendingRackId,
+      targetNodeName: topOffendingRackName,
+      targetLevel: topOffendingRackLevel,
+      targetLayer: topOffendingRackLevel ? `Level ${topOffendingRackLevel}` : undefined,
+      floorName,
     })
   }
 
   // ZDSU-R02: Severe Aisle Width Restriction
-  if (estimatedAisleWidthM !== undefined && estimatedAisleWidthM < (requiredAisleWidthM - 0.2)) {
+  if (estimatedAisleWidthM !== undefined && estimatedAisleWidthM < requiredAisleWidthM - 0.2) {
     defects.push({
       code: 'ZDSU-R02',
       title: 'Severe Operating Aisle Restriction',
       message: `Estimated aisle width (${estimatedAisleWidthM.toFixed(2)}m) is below the minimum required turning clearance (${requiredAisleWidthM.toFixed(2)}m).`,
       severity: 'blocking',
       pillar: 'clearance',
-      standardRef: 'ANSI B56.1 / OSHA 1910.176(a)',
+      standardRef: standardProfile?.citations.aisles ?? 'ANSI B56.1 / OSHA 1910.176(a)',
+      floorName,
     })
   }
 
-  // ZDSU-R03: Critical Staging Buffer Deficit (<25m²/dock)
-  if (dockCount > 0 && stagingAreaPerDockM2 !== null && stagingAreaPerDockM2 < 25.0) {
+  // ZDSU-R03: Critical Staging Buffer Deficit
+  const criticalBufferDeficit = thresholds?.criticalStagingBufferDeficitM2 ?? 25.0
+  const recommendedBuffer = thresholds?.stagingAreaPerDockM2 ?? 35.0
+  if (dockCount > 0 && stagingAreaPerDockM2 !== null && stagingAreaPerDockM2 < criticalBufferDeficit) {
     defects.push({
       code: 'ZDSU-R03',
       title: 'Critical Staging Buffer Deficit',
-      message: `Staging buffer area is ${stagingAreaPerDockM2.toFixed(1)} m²/dock door (WERC minimum is 25.0 m²/dock, recommended ≥ 35 m²).`,
+      message: `Staging buffer area is ${stagingAreaPerDockM2.toFixed(1)} m²/dock door (WERC minimum is ${criticalBufferDeficit.toFixed(1)} m²/dock, recommended ≥ ${recommendedBuffer.toFixed(0)} m²).`,
       severity: 'blocking',
       pillar: 'staging',
-      standardRef: 'WERC Warehouse Benchmarks',
+      standardRef: standardProfile?.citations.staging ?? 'WERC Warehouse Benchmarks',
+      floorName,
     })
   }
 
   // ZDSU-R04: Severe Floor Over-Congestion (>70% storage, >55% staging/picking)
-  const severeCongestionLimit = role.startsWith('storage') ? 70 : 55
+  const severeCongestionLimit = role.startsWith('storage')
+    ? (thresholds?.maxStorageUtilizationPct ?? 70)
+    : (thresholds?.maxStagingUtilizationPct ?? 55)
   if (floorUtilizationPct > severeCongestionLimit) {
     defects.push({
       code: 'ZDSU-R04',
@@ -574,7 +716,8 @@ export function calculateZoneZDSUAudit(
       message: `Floor utilization is ${floorUtilizationPct.toFixed(1)}%, exceeding the safety threshold (${severeCongestionLimit}%). Forklift maneuvering is compromised.`,
       severity: 'blocking',
       pillar: 'utilization',
-      standardRef: 'FEM 10.2.02 / Lean Logistics',
+      standardRef: standardProfile?.citations.floorUtilization ?? 'FEM 10.2.02 / Lean Logistics',
+      floorName,
     })
   }
 
@@ -586,19 +729,25 @@ export function calculateZoneZDSUAudit(
       message: 'High-density storage zone lacks dedicated pedestrian escape path demarcation.',
       severity: 'advisory',
       pillar: 'safety',
-      standardRef: 'OSHA 1910.36 / IBC Ch. 10',
+      standardRef: standardProfile?.citations.emergencyEgress ?? 'OSHA 1910.36 / IBC Ch. 10',
+      floorName,
     })
   }
 
-  // ZDSU-R06: Narrow Flue Space Hazard (<75mm)
+  // ZDSU-R06: Narrow Flue Space Hazard
   if (selectivePallets > 0 && !flueSpaceCompliant) {
+    const minFlueMm = Math.round(minFlueReq * 1000)
     defects.push({
       code: 'ZDSU-R06',
       title: 'Narrow Flue Space Fire Hazard',
-      message: `Longitudinal flue space (${(minMeasuredFlueSpace * 1000).toFixed(0)}mm) is below NFPA 13 minimum (75mm).`,
+      message: `Longitudinal flue space (${(minMeasuredFlueSpace * 1000).toFixed(0)}mm) is below ${standardProfile ? standardProfile.name.split(' ')[0] : 'NFPA 13'} minimum (${minFlueMm}mm).`,
       severity: 'warning',
       pillar: 'safety',
-      standardRef: 'NFPA 13 §20.6.3',
+      standardRef: standardProfile?.citations.flueSpace ?? 'NFPA 13 §20.6.3',
+      targetNodeId: flueOffendingRackId,
+      targetNodeName: flueOffendingRackName,
+      targetLayer: 'Flue Space',
+      floorName,
     })
   }
 
@@ -610,7 +759,8 @@ export function calculateZoneZDSUAudit(
       message: `Floor utilization is ${floorUtilizationPct.toFixed(1)}% (optimal range: ${optimalRange[0]}% - ${optimalRange[1]}%).`,
       severity: 'warning',
       pillar: 'utilization',
-      standardRef: 'WERC Guidelines',
+      standardRef: standardProfile?.citations.floorUtilization ?? 'WERC Guidelines',
+      floorName,
     })
   }
 
@@ -622,7 +772,8 @@ export function calculateZoneZDSUAudit(
       message: 'Active operating zone has no marked MHE traffic or pedestrian route lines.',
       severity: 'warning',
       pillar: 'clearance',
-      standardRef: 'OSHA 1910.176(a)',
+      standardRef: standardProfile?.citations.aisles ?? 'OSHA 1910.176(a)',
+      floorName,
     })
   }
 
@@ -635,18 +786,25 @@ export function calculateZoneZDSUAudit(
       severity: 'warning',
       pillar: 'storage',
       standardRef: 'Order Fulfillment Standards',
+      floorName,
     })
   }
 
   // ZDSU-R10: Marginal Dock Buffer Space (25 - 35 m²/dock)
-  if (dockCount > 0 && stagingAreaPerDockM2 !== null && stagingAreaPerDockM2 >= 25.0 && stagingAreaPerDockM2 < 35.0) {
+  if (
+    dockCount > 0 &&
+    stagingAreaPerDockM2 !== null &&
+    stagingAreaPerDockM2 >= criticalBufferDeficit &&
+    stagingAreaPerDockM2 < recommendedBuffer
+  ) {
     defects.push({
       code: 'ZDSU-R10',
       title: 'Marginal Dock Staging Buffer',
-      message: `Staging buffer (${stagingAreaPerDockM2.toFixed(1)} m²/dock) is operational but below best practice benchmark (≥ 35 m²/dock).`,
+      message: `Staging buffer (${stagingAreaPerDockM2.toFixed(1)} m²/dock) is operational but below best practice benchmark (≥ ${recommendedBuffer.toFixed(0)} m²/dock).`,
       severity: 'warning',
       pillar: 'staging',
-      standardRef: 'WERC Guidelines',
+      standardRef: standardProfile?.citations.staging ?? 'WERC Guidelines',
+      floorName,
     })
   }
 
@@ -659,11 +817,17 @@ export function calculateZoneZDSUAudit(
       severity: 'advisory',
       pillar: 'utilization',
       standardRef: 'Lean Warehouse Engineering',
+      floorName,
     })
   }
 
   // ZDSU-R12: Unbalanced MHE Truck Assignment
-  if (maxRackHeight >= 6.0 && mheClassesPresent.length > 0 && !mheClassesPresent.includes('reach') && !mheClassesPresent.includes('vna-turret')) {
+  if (
+    maxRackHeight >= 6.0 &&
+    mheClassesPresent.length > 0 &&
+    !mheClassesPresent.includes('reach') &&
+    !mheClassesPresent.includes('vna-turret')
+  ) {
     defects.push({
       code: 'ZDSU-R12',
       title: 'High-Bay MHE Equipment Mismatch',
@@ -671,6 +835,7 @@ export function calculateZoneZDSUAudit(
       severity: 'advisory',
       pillar: 'clearance',
       standardRef: 'Operations Research',
+      floorName,
     })
   }
 
@@ -709,11 +874,11 @@ export function calculateZoneZDSUAudit(
   subTraffic = Math.max(0, Math.min(100, subTraffic))
 
   let rawScore =
-    0.30 * subSpatial +
+    0.3 * subSpatial +
     0.25 * subFireSafety +
-    0.20 * subUtilization +
+    0.2 * subUtilization +
     0.15 * subMhe +
-    0.10 * subTraffic
+    0.1 * subTraffic
 
   // Defect penalty deductions
   rawScore -= blockingCount * 30 + warningCount * 10 + advisoryCount * 3
@@ -737,6 +902,9 @@ export function calculateZoneZDSUAudit(
   return {
     zoneId: zone.id,
     zoneName: zone.name || 'Unnamed Zone',
+    floorName,
+    levelId,
+    standardId,
     role,
     geometry: {
       areaM2: Math.round(areaM2 * 100) / 100,
@@ -805,6 +973,8 @@ export function calculateFacilityZDSUReport(
   zones: ZoneNode[],
   options: CalculateZoneZDSUAuditOptions = {},
 ): FacilityZDSUReport {
+  const standardId = options.standardId ?? null
+
   if (zones.length === 0) {
     return {
       zonesAudited: 0,
@@ -815,6 +985,7 @@ export function calculateFacilityZDSUReport(
       averageFloorUtilizationPct: 0,
       totalDefects: { blocking: 0, warning: 0, advisory: 0 },
       zoneAudits: [],
+      standardId,
     }
   }
 
@@ -881,6 +1052,7 @@ export function calculateFacilityZDSUReport(
       advisory: totalAdvisory,
     },
     zoneAudits,
+    standardId,
   }
 }
 
@@ -891,6 +1063,7 @@ export function exportZoneAuditJson(report: FacilityZDSUReport): string {
     {
       documentType: 'DigitalTwin-ZeroDefectStartup-AuditReport',
       version: '1.0.0',
+      standardId: report.standardId ?? null,
       timestamp: new Date().toISOString(),
       facilitySummary: {
         readinessScore: report.overallReadinessScore,
@@ -904,6 +1077,9 @@ export function exportZoneAuditJson(report: FacilityZDSUReport): string {
       zones: report.zoneAudits.map((z) => ({
         id: z.zoneId,
         name: z.zoneName,
+        floorName: z.floorName,
+        levelId: z.levelId,
+        standardId: z.standardId ?? null,
         role: z.role,
         readinessScore: z.readiness.score,
         status: z.readiness.status.toUpperCase(),
@@ -921,6 +1097,11 @@ export function exportZoneAuditJson(report: FacilityZDSUReport): string {
           severity: d.severity,
           message: d.message,
           standardRef: d.standardRef,
+          targetNodeId: d.targetNodeId,
+          targetNodeName: d.targetNodeName,
+          targetLevel: d.targetLevel,
+          targetLayer: d.targetLayer,
+          floorName: d.floorName,
         })),
       })),
     },
@@ -930,9 +1111,11 @@ export function exportZoneAuditJson(report: FacilityZDSUReport): string {
 }
 
 export function exportZoneAuditMarkdown(report: FacilityZDSUReport): string {
+  const standardName = report.standardId ? getStandardProfile(report.standardId).name : 'International NFPA/EN/OSHA'
   const lines: string[] = [
     '# Zero Defect Start-up (ZDSU) Facility Audit Certificate',
     '',
+    `**Regulatory Framework**: ${standardName}  `,
     `**Generated**: ${new Date().toISOString()}  `,
     `**Facility Readiness Score**: ${report.overallReadinessScore}% [${report.overallStatus.toUpperCase()}]  `,
     `**Zones Audited**: ${report.zonesAudited}  `,
@@ -948,7 +1131,9 @@ export function exportZoneAuditMarkdown(report: FacilityZDSUReport): string {
   ]
 
   for (const z of report.zoneAudits) {
-    lines.push(`### ${z.zoneName} (${z.role}) — ${z.readiness.score}% [${z.readiness.status.toUpperCase()}]`)
+    lines.push(
+      `### ${z.zoneName} [${z.floorName}] (${z.role}) — ${z.readiness.score}% [${z.readiness.status.toUpperCase()}]`,
+    )
     lines.push(`- **Geometry**: ${z.geometry.areaM2} m² | Perimeter: ${z.geometry.perimeterM} m | Clear Height: ${z.geometry.clearHeightM} m`)
     lines.push(
       `- **Storage**: ${z.storage.totalPalletPositions.toLocaleString()} pallets (${z.storage.selectivityIndex}% direct access) | Pick Slots: ${z.storage.pickingSlots}`,
@@ -968,7 +1153,10 @@ export function exportZoneAuditMarkdown(report: FacilityZDSUReport): string {
     if (z.defects.length > 0) {
       lines.push('- **Active Defects & Advisories**:')
       for (const d of z.defects) {
-        lines.push(`  - \`[${d.severity.toUpperCase()}]\` **${d.code}**: ${d.title} — ${d.message} *(Ref: ${d.standardRef || 'Industry Standard'})*`)
+        const layerBadge = d.targetLayer ? ` [${d.targetLayer}]` : ''
+        lines.push(
+          `  - \`[${d.severity.toUpperCase()}]\` **${d.code}**${layerBadge}: ${d.title} — ${d.message} *(Ref: ${d.standardRef || 'Industry Standard'})*`,
+        )
       }
     } else {
       lines.push('- **Active Defects**: None (100% Start-up Compliant)')

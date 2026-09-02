@@ -380,6 +380,160 @@ describe('Zero Defect Start-up (ZDSU) Calculation Engine', () => {
     })
   })
 
+  describe('Multi-Standard Regulatory Engine & Standard Switching', () => {
+    it('alters sprinkler clearance defect thresholds when switching between TR and US', () => {
+      // Zone with 5.0m ceiling and 4.53m rack -> clearance = 0.47m
+      // Under TR / EU (min 0.50m): triggers ZDSU-R01 (0.47m < 0.50m)
+      // Under US (min 0.457m / 18"): PASSES without ZDSU-R01 (0.47m >= 0.457m)
+      const zone = makeZone({ ceilingHeight: 5.0 })
+      const nodes: Record<string, AnyNode> = {
+        'rack-1': {
+          id: 'rack-1',
+          type: 'warehouse:pallet-rack',
+          height: 4.53,
+        } as any,
+      }
+
+      const trAudit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['rack-1' as any],
+        standardId: 'TR',
+      })
+      expect(trAudit.defects.some((d) => d.code === 'ZDSU-R01')).toBe(true)
+      expect(trAudit.defects.find((d) => d.code === 'ZDSU-R01')?.standardRef).toContain('BYKHY')
+
+      const usAudit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['rack-1' as any],
+        standardId: 'US',
+      })
+      expect(usAudit.defects.some((d) => d.code === 'ZDSU-R01')).toBe(false)
+    })
+
+    it('alters staging buffer defect threshold between US and TR', () => {
+      // 48 m² zone with 2 dock levellers = 24.0 m²/dock
+      // Under US (critical deficit < 25.0 m²/dock): triggers blocking defect ZDSU-R03 (24.0 < 25.0)
+      // Under TR (critical deficit < 20.0 m²/dock): does not trigger ZDSU-R03 (24.0 >= 20.0), triggers marginal warning ZDSU-R10
+      const zone = makeZone({
+        name: 'Staging Area',
+        polygon: [
+          [0, 0],
+          [10, 0],
+          [10, 4.8],
+          [0, 4.8],
+        ], // 48 m²
+      })
+      const nodes: Record<string, AnyNode> = {
+        'dock-1': { id: 'dock-1', type: 'warehouse:dock-leveller' } as any,
+        'dock-2': { id: 'dock-2', type: 'warehouse:dock-leveller' } as any,
+      }
+
+      const usAudit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['dock-1' as any, 'dock-2' as any],
+        standardId: 'US',
+      })
+      expect(usAudit.defects.some((d) => d.code === 'ZDSU-R03')).toBe(true)
+
+      const trAudit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['dock-1' as any, 'dock-2' as any],
+        standardId: 'TR',
+      })
+      expect(trAudit.defects.some((d) => d.code === 'ZDSU-R03')).toBe(false)
+      expect(trAudit.defects.some((d) => d.code === 'ZDSU-R10')).toBe(true)
+    })
+  })
+
+  describe('Deep Rack-Level and Mezzanine Inspection Engine', () => {
+    it('pinpoints rack-level defect to specific level layer', () => {
+      const zone = makeZone({
+        name: 'Multi-Level Storage',
+        ceilingHeight: 6.0,
+      })
+      const nodes: Record<string, AnyNode> = {
+        'rack-1': {
+          id: 'rack-1',
+          name: 'Selective Rack Row A',
+          type: 'warehouse:pallet-rack',
+          levels: 4,
+          firstLevelClear: 1.5,
+          levelClear: 1.4,
+          levelClears: [null, 0.35, null, null], // Level 2 opening restricted to 0.35m
+          bayClearWidth: 2.7,
+          depth: 1.1,
+          uprightHeight: 6.5,
+        } as any,
+      }
+
+      const audit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['rack-1' as any],
+        standardId: 'EU',
+      })
+
+      const levelDefect = audit.defects.find((d) => d.targetLevel === 2)
+      expect(levelDefect).toBeDefined()
+      expect(levelDefect?.targetLayer).toBe('Level 2')
+      expect(levelDefect?.targetNodeId).toBe('rack-1')
+      expect(levelDefect?.targetNodeName).toBe('Selective Rack Row A')
+    })
+
+    it('pinpoints mezzanine tier headroom defect to exact tier index', () => {
+      const zone = makeZone({
+        name: 'Mezzanine Zone',
+        ceilingHeight: 7.0,
+      })
+      const nodes: Record<string, AnyNode> = {
+        'mezz-1': {
+          id: 'mezz-1',
+          name: 'Main Platform',
+          type: 'warehouse:mezzanine',
+          tiers: [
+            { index: 0, clearHeightM: 3.0, loadClass: 500, floorType: 'WOOD_CHIPBOARD_30' },
+            { index: 1, clearHeightM: 1.8, loadClass: 350, floorType: 'WOOD_CHIPBOARD_30' }, // 1.8m fails < 2.0m EU standard
+          ],
+        } as any,
+      }
+
+      const audit = calculateZoneZDSUAudit(zone, null, nodes, {
+        contentIds: ['mezz-1' as any],
+        standardId: 'EU',
+      })
+
+      const tierDefect = audit.defects.find((d) => d.targetLevel === 1 && d.targetLayer?.includes('Tier 1'))
+      expect(tierDefect).toBeDefined()
+      expect(tierDefect?.code).toBe('ZDSU-R01')
+      expect(tierDefect?.targetNodeId).toBe('mezz-1')
+    })
+  })
+
+  describe('Architectural Floor / Level Awareness', () => {
+    it('resolves floorName and levelId from parent level node', () => {
+      const zone = makeZone({
+        name: 'Ground Storage Zone',
+        parentId: 'level-ground' as any,
+      })
+      const nodes: Record<string, AnyNode> = {
+        'level-ground': {
+          id: 'level-ground',
+          type: 'level',
+          name: 'Zemin Kat (Floor 0)',
+          level: 0,
+        } as any,
+      }
+
+      const audit = calculateZoneZDSUAudit(zone, null, nodes, { contentIds: [] })
+      expect(audit.floorName).toBe('Zemin Kat (Floor 0)')
+      expect(audit.levelId).toBe('level-ground')
+    })
+
+    it('falls back to default floor name when parent node is missing', () => {
+      const zone = makeZone({
+        name: 'Floating Zone',
+        parentId: undefined,
+      })
+      const audit = calculateZoneZDSUAudit(zone, null, {}, { contentIds: [] })
+      expect(audit.floorName).toBe('General Floor')
+      expect(audit.levelId).toBeNull()
+    })
+  })
+
   describe('Export Helpers', () => {
     it('exports audit report to valid JSON', () => {
       const zone = makeZone({ name: 'Export Test Zone' })
@@ -404,3 +558,4 @@ describe('Zero Defect Start-up (ZDSU) Calculation Engine', () => {
     })
   })
 })
+

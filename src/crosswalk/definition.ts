@@ -46,15 +46,11 @@ export const crosswalkDefinition = {
     },
   },
 
-  renderer: () => import('./renderer'),
+  renderer: {
+    kind: 'parametric',
+    module: () => import('./renderer'),
+  },
   floorplan: buildCrosswalkFloorplan,
   parametrics: crosswalkParametrics,
-
-  extensions: {
-    'pascal:editor/floorplan': {
-      tool: () => import('./tool'),
-      availableModes: ['default', 'expert'],
-      preferredView: '3d',
-    },
-  },
+  tool: () => import('./tool'),
 } satisfies NodeDefinition<typeof CrosswalkNode>

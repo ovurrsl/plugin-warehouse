@@ -1,3 +1,5 @@
+'use client'
+
 import { type AnyNodeId, useLiveTransforms, useRegistry } from '@pascal-app/core'
 import { useNodeEvents } from '@pascal-app/viewer'
 import { useMemo, useRef } from 'react'

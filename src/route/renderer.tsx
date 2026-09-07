@@ -103,10 +103,19 @@ function RouteBody({ node }: { node: RouteNode }) {
   }, [node, livePoints])
 
   const geometry = useMemo(() => getRouteGeometry(effectiveNode), [effectiveNode])
-  const appearance = useAppearance()
+  const effectiveFillColor =
+    effectiveNode.fillEnabled !== false
+      ? (effectiveNode.fillColor ?? effectiveNode.laneColor)
+      : null
   const materials = useMemo(
-    () => getRouteMaterials(effectiveNode.role, appearance, effectiveNode.laneColor),
-    [effectiveNode.role, appearance, effectiveNode.laneColor],
+    () =>
+      getRouteMaterials(
+        effectiveNode.role,
+        appearance,
+        effectiveFillColor,
+        effectiveNode.edgeColor,
+      ),
+    [effectiveNode.role, appearance, effectiveFillColor, effectiveNode.edgeColor],
   )
 
   // Claim the buffer while it is on screen. Eviction must never free a shape

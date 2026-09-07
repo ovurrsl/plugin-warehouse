@@ -9,6 +9,7 @@ import { conveyorObliqueDefinition } from './conveyor/oblique-definition'
 import { conveyorSpiralDefinition } from './conveyor/spiral-definition'
 import { conveyorTelescopicDefinition } from './conveyor/telescopic-definition'
 import { conveyorTransferDefinition } from './conveyor/transfer-definition'
+import { crosswalkDefinition } from './crosswalk/definition'
 import { dockLevellerDefinition } from './dockleveller/definition'
 import { driveInRackDefinition } from './drivein/definition'
 import { liveRackingDefinition } from './live-racking/definition'
@@ -68,6 +69,7 @@ export const warehousePlugin: Plugin = {
     dockLevellerDefinition as unknown as AnyNodeDefinition,
     toteCartDefinition as unknown as AnyNodeDefinition,
     palletLiftDefinition as unknown as AnyNodeDefinition,
+    crosswalkDefinition as unknown as AnyNodeDefinition,
   ],
   zoneTakeoffExtensions: [warehouseZoneTakeoffExtension],
 }
@@ -106,6 +108,7 @@ export const warehouseCatalogPanel: EditorHostPanel = {
     'warehouse:conveyor-telescopic',
     'warehouse:conveyor-spiral',
     'warehouse:route',
+    'warehouse:crosswalk',
     'warehouse:truck',
     'warehouse:mezzanine',
     'warehouse:live-rack',

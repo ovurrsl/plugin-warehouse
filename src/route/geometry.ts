@@ -93,8 +93,8 @@ function emitRibbon(
 }
 
 /** Where along a leg the arrows sit, as fractions of its length. */
-function arrowFractions(lengthM: number): number[] {
-  const count = Math.min(ARROWS_PER_LEG_MAX, 1 + Math.floor(lengthM / ARROW_SPACING_M))
+function arrowFractions(lengthM: number, spacingM = ARROW_SPACING_M): number[] {
+  const count = Math.min(ARROWS_PER_LEG_MAX, 1 + Math.floor(lengthM / spacingM))
   return Array.from({ length: count }, (_, i) => (i + 0.5) / count)
 }
 
@@ -103,6 +103,8 @@ function emitArrows(
   into: number[],
   points: readonly Point[],
   y = ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS,
+  direction: 'forward' | 'backward' | 'both' = 'forward',
+  spacingM = ARROW_SPACING_M,
 ) {
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i]
@@ -112,36 +114,50 @@ function emitArrows(
     const dz = to[1] - from[1]
     const length = Math.hypot(dx, dz)
     if (length < ARROW_LENGTH_M) continue
-    const ux = dx / length
-    const uz = dz / length
-    // The arrow is drawn about the leg's own direction, so a route that bends
-    // has an arrow per leg pointing the way that leg actually runs — not one
-    // heading averaged over a corner.
+
+    const dirMultiplier = direction === 'backward' ? -1 : 1
+    const ux = (dx / length) * dirMultiplier
+    const uz = (dz / length) * dirMultiplier
     const nx = -uz
     const nz = ux
 
-    for (const fraction of arrowFractions(length)) {
+    const fractions = arrowFractions(length, spacingM)
+    for (let fIdx = 0; fIdx < fractions.length; fIdx++) {
+      const fraction = fractions[fIdx]!
       const cx = from[0] + dx * fraction
       const cz = from[1] + dz * fraction
-      const tipX = cx + ux * (ARROW_LENGTH_M / 2)
-      const tipZ = cz + uz * (ARROW_LENGTH_M / 2)
-      const backX = cx - ux * (ARROW_LENGTH_M / 2)
-      const backZ = cz - uz * (ARROW_LENGTH_M / 2)
+
+      let curUx = ux
+      let curUz = uz
+      let curNx = nx
+      let curNz = nz
+      if (direction === 'both') {
+        const alt = fIdx % 2 === 0 ? 1 : -1
+        curUx = (dx / length) * alt
+        curUz = (dz / length) * alt
+        curNx = -curUz
+        curNz = curUx
+      }
+
+      const tipX = cx + curUx * (ARROW_LENGTH_M / 2)
+      const tipZ = cz + curUz * (ARROW_LENGTH_M / 2)
+      const backX = cx - curUx * (ARROW_LENGTH_M / 2)
+      const backZ = cz - curUz * (ARROW_LENGTH_M / 2)
 
       const tip = pushVertex(sink, tipX, y, tipZ, 0.5, 1)
       const left = pushVertex(
         sink,
-        backX + nx * ARROW_HALF_WIDTH_M,
+        backX + curNx * ARROW_HALF_WIDTH_M,
         y,
-        backZ + nz * ARROW_HALF_WIDTH_M,
+        backZ + curNz * ARROW_HALF_WIDTH_M,
         0,
         0,
       )
       const right = pushVertex(
         sink,
-        backX - nx * ARROW_HALF_WIDTH_M,
+        backX - curNx * ARROW_HALF_WIDTH_M,
         y,
-        backZ - nz * ARROW_HALF_WIDTH_M,
+        backZ - curNz * ARROW_HALF_WIDTH_M,
         1,
         0,
       )
@@ -213,18 +229,25 @@ function relativePoints(route: RouteNode): Point[] {
   return route.points.map((p) => [p[0] - origin[0], p[1] - origin[1]] as Point)
 }
 
+export function resolveRouteFill(route: RouteNode): string | null {
+  const isFilled = route.fillEnabled !== undefined ? route.fillEnabled : Boolean(route.laneColor)
+  if (!isFilled) return null
+  return route.fillColor ?? route.laneColor ?? (route.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
+}
+
 export function routeGeometryKey(route: RouteNode): string {
   const gates = markingGates(route)
   const digest = relativePoints(route)
     .map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`)
     .join(';')
+  const fill = resolveRouteFill(route)
   return [
     'route',
     route.width.toFixed(4),
     route.lineWidth,
     gates.arrows ? 'a' : '-',
     gates.divider ? 'd' : '-',
-    route.laneColor ? `c:${route.laneColor}` : '-',
+    fill ? `c:${fill}` : '-',
     route.directionalArrows !== false ? 'da' : '-',
     route.points.length,
     digest,
@@ -338,13 +361,15 @@ export function buildRouteGeometry(
   const centre = stripeCentreOffsetM(route.width, route.lineWidth)
   const half = LINE_WIDTHS[route.lineWidth] / 2
 
-  // 1. If laneColor is defined, emit filled planar corridor ribbon geometry at ROUTE_ELEVATIONS.PAINTED_CORRIDOR (+0.002m)
-  if (route.laneColor) {
+  // 1. If fill is enabled, emit filled planar corridor ribbon geometry at ROUTE_ELEVATIONS.PAINTED_CORRIDOR (+0.002m)
+  const effectiveFillColor = resolveRouteFill(route)
+
+  if (effectiveFillColor) {
     const leftBoundary = offsetCentreline(points, -(centre + half))
     const rightBoundary = offsetCentreline(points, centre + half)
     let parsedColor: [number, number, number] | undefined
     try {
-      const c = new THREE.Color(route.laneColor)
+      const c = new THREE.Color(effectiveFillColor)
       parsedColor = [c.r, c.g, c.b]
     } catch {
       parsedColor = undefined
@@ -384,7 +409,16 @@ export function buildRouteGeometry(
 
   // 3. Stratify directional flow arrows and dividers at ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS (+0.012m)
   const gates = markingGates(route)
-  if (gates.arrows) emitArrows(sink, groups.contrast, points, ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS)
+  if (gates.arrows) {
+    emitArrows(
+      sink,
+      groups.contrast,
+      points,
+      ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS,
+      route.arrowDirection ?? 'forward',
+      route.arrowSpacing ?? ARROW_SPACING_M,
+    )
+  }
   if (gates.divider)
     emitDivider(sink, groups.contrast, points, half, ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS)
 

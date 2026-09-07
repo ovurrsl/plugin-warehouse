@@ -52,11 +52,19 @@ const CONTRAST_COLOUR = 0x1e293b
 
 const cache = new Map<string, THREE.Material[]>()
 
-function specFor(role: RouteRole, part: 'stripe' | 'contrast'): SurfaceSpec {
+function specFor(role: RouteRole, part: 'stripe' | 'contrast', edgeColor?: string | null): SurfaceSpec {
   const isStripe = part === 'stripe'
+  let color = isStripe ? STRIPE_COLOURS[role] : CONTRAST_COLOUR
+  if (isStripe && edgeColor) {
+    try {
+      color = new THREE.Color(edgeColor).getHex()
+    } catch {
+      color = STRIPE_COLOURS[role]
+    }
+  }
   return {
-    family: `route:${role}:${part}`,
-    color: isStripe ? STRIPE_COLOURS[role] : CONTRAST_COLOUR,
+    family: `route:${role}:${part}:${edgeColor ?? 'default'}`,
+    color,
     roughness: 0.85,
     metalness: 0,
     depthWrite: false,
@@ -89,12 +97,14 @@ export function getRouteMaterials(
   role: RouteRole,
   appearance: Appearance,
   laneColor?: string | null,
+  edgeColor?: string | null,
 ): THREE.Material[] {
   const color = laneColor ?? '#ffffff'
-  const key = `${role}|${appearanceKey(appearance)}|${color}`
+  const edge = edgeColor ?? 'default'
+  const key = `${role}|${appearanceKey(appearance)}|${color}|${edge}`
   const hit = cache.get(key)
   if (hit) return hit
-  const stripeMat = surfaceMaterial(specFor(role, 'stripe'), appearance)
+  const stripeMat = surfaceMaterial(specFor(role, 'stripe', edgeColor), appearance)
   const contrastMat = surfaceMaterial(specFor(role, 'contrast'), appearance)
   const paintMat = getCorridorPaintMaterial(color, appearance)
 

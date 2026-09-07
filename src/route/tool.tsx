@@ -17,6 +17,7 @@ import {
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { slabAt } from '../host-adapter'
 import {
   clearPlacementPreview,
@@ -252,6 +253,21 @@ export default function RouteTool() {
    */
   const draft: Point[] = (cursor ? [...vertices, cursor] : vertices).slice(0, MAX_VERTICES)
 
+  const lastVertex = vertices.at(-1)
+  const legDist = lastVertex && cursor ? Math.hypot(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) : 0
+  const legAngle =
+    lastVertex && cursor
+      ? (Math.atan2(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) * 180 / Math.PI + 360) % 360
+      : 0
+
+  let totalDist = 0
+  for (let i = 0; i < vertices.length - 1; i++) {
+    totalDist += Math.hypot(vertices[i + 1]![0] - vertices[i]![0], vertices[i + 1]![1] - vertices[i]![1])
+  }
+  if (lastVertex && cursor) {
+    totalDist += legDist
+  }
+
   return (
     <>
       {/* Mounted from the first cursor move, not from the second vertex. The
@@ -295,6 +311,45 @@ export default function RouteTool() {
       ))}
 
       {draft.length >= 2 && <RoutePreview brush={brush} points={draft} surfaceY={surfaceY} />}
+
+      {/* Streetscape-style drawing HUD */}
+      {typeof document !== 'undefined' && cursor && (
+        createPortal(
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-border/80 bg-background/95 px-4 py-2 text-xs shadow-xl backdrop-blur-md select-none">
+            <span className="flex items-center gap-1.5 font-semibold text-foreground">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: brush.role === 'vehicle' ? '#f2c31d' : '#2f9e58' }}
+              />
+              {brush.role === 'vehicle' ? 'Araç Koridoru' : 'Yaya Yolu'}
+            </span>
+            <div className="h-3.5 w-px bg-border/80" />
+            {lastVertex ? (
+              <>
+                <span className="text-muted-foreground">
+                  Mesafe: <strong className="text-foreground">{legDist.toFixed(2)} m</strong>
+                </span>
+                <span className="text-muted-foreground">
+                  Açı: <strong className="text-foreground">{legAngle.toFixed(1)}°</strong>
+                </span>
+                {totalDist > legDist && (
+                  <span className="text-muted-foreground">
+                    Toplam: <strong className="text-foreground">{totalDist.toFixed(2)} m</strong>
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">Başlangıç noktasını tıklayın</span>
+            )}
+            <div className="h-3.5 w-px bg-border/80" />
+            <span className="text-[11px] text-muted-foreground/80">
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Çift Tık / Enter</kbd> Bitir ·{' '}
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd> İptal
+            </span>
+          </div>,
+          document.body,
+        )
+      )}
     </>
   )
 }

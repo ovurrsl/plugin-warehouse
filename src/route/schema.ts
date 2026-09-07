@@ -19,6 +19,11 @@ import { LINE_WIDTH_IDS, MAX_VERTICES } from './constants'
 export const ROUTE_ROLES = ['pedestrian', 'vehicle'] as const
 export const ROUTE_TRAFFIC = ['one-way', 'two-way'] as const
 export const ROUTE_DATUMS = ['load-face', 'frame-face'] as const
+export const ROUTE_ARROW_DIRECTIONS = ['forward', 'backward', 'both'] as const
+export const ROUTE_EDGE_STYLES = ['solid', 'dashed'] as const
+
+export type RouteArrowDirection = (typeof ROUTE_ARROW_DIRECTIONS)[number]
+export type RouteEdgeStyle = (typeof ROUTE_EDGE_STYLES)[number]
 
 export const RouteNode = BaseNode.extend({
   id: objectId('route'),
@@ -64,6 +69,36 @@ export const RouteNode = BaseNode.extend({
    * When defined, emits a filled planar corridor ribbon geometry between the edge stripes.
    */
   laneColor: z.string().nullable().optional(),
+
+  /**
+   * Whether the interior of the corridor floor is filled with paint or left empty.
+   */
+  fillEnabled: z.boolean().optional(),
+
+  /**
+   * Interior floor fill color (hex string e.g. "#3b82f6").
+   */
+  fillColor: z.string().optional(),
+
+  /**
+   * Border edge lines color (hex string e.g. "#eab308").
+   */
+  edgeColor: z.string().optional(),
+
+  /**
+   * Border line style: solid or dashed.
+   */
+  edgeStyle: z.enum(['solid', 'dashed']).default('solid'),
+
+  /**
+   * Direction of flow arrows along the route: forward, backward, or both.
+   */
+  arrowDirection: z.enum(['forward', 'backward', 'both']).default('forward'),
+
+  /**
+   * Step spacing (in metres) between directional arrows.
+   */
+  arrowSpacing: z.number().min(1).max(30).default(5),
 
   /**
    * Whether to draw directional flow arrows along the route legs.

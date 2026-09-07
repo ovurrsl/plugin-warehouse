@@ -194,3 +194,20 @@ export const ARROWS_PER_LEG_MAX = 4
  */
 export const DIVIDER_DASH_M = 1
 export const DIVIDER_GAP_M = 1
+
+/**
+ * Standard industrial safety color palette used across logistics facilities.
+ */
+export const INDUSTRIAL_COLOR_PALETTE = [
+  { id: 'safety-yellow', label: 'İş Güvenliği Sarı', hex: '#eab308' },
+  { id: 'pedestrian-blue', label: 'Yaya Mavi', hex: '#3b82f6' },
+  { id: 'safety-green', label: 'Emniyet Yeşil', hex: '#22c55e' },
+  { id: 'warning-red', label: 'Uyarı Kırmızı', hex: '#ef4444' },
+  { id: 'pure-white', label: 'Beyaz', hex: '#ffffff' },
+] as const
+
+export const DEFAULT_PEDESTRIAN_FILL_COLOR = '#3b82f6'
+export const DEFAULT_VEHICLE_FILL_COLOR = '#f59e0b'
+export const DEFAULT_VEHICLE_EDGE_COLOR = '#eab308'
+export const DEFAULT_PEDESTRIAN_EDGE_COLOR = '#ffffff'
+

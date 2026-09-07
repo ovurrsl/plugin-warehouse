@@ -342,6 +342,14 @@ export const CATALOG_ITEMS: readonly CatalogItem[] = [
     icon: '/icons/warehouse/route-vehicle.png',
     brush: { kind: 'route', role: 'vehicle', traffic: 'one-way' },
   },
+  {
+    id: 'route-crosswalk',
+    kind: 'warehouse:crosswalk',
+    label: 'Yaya Geçidi',
+    sectionId: 'layout',
+    description: 'Forklift veya araç yolu üzerine yerleştirilebilir zebra yaya geçidi.',
+    icon: '/icons/warehouse/route-crosswalk.png',
+  },
   // Aile başına bir tile — kullanıcının seçtiği beş makine, İngilizce
   // adlarıyla. Tek tile + panel model listesi (plan §6.5) yerine beş tile:
   // seçim kataloğun kendisinde durur ve panel özel bölüm istemez.

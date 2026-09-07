@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`a484b61`](https://github.com/ovurrsl/plugin-warehouse/commit/a484b61b61517fa593adbf86c10e669b5e34c526))
 - Refresh generated README blocks [skip ci] ([`7230146`](https://github.com/ovurrsl/plugin-warehouse/commit/7230146ddeed4722989c7fdc066ab1c80c22edb6))
 - Refresh generated README blocks [skip ci] ([`2f480f2`](https://github.com/ovurrsl/plugin-warehouse/commit/2f480f274c02a4304483b2ffb60d9e20d8cce8d2))
 - Refresh generated README blocks [skip ci] ([`1f99750`](https://github.com/ovurrsl/plugin-warehouse/commit/1f997509a380cd09cd7c799886d7a40d5cb7fd9e))
@@ -445,6 +446,7 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- Assert laneColor field kind is color ([`f93ac0d`](https://github.com/ovurrsl/plugin-warehouse/commit/f93ac0d4ebe31281b914a3a52939d55352138a4f))
 - T7–T10, in the half a node process can actually measure ([`3ccb27e`](https://github.com/ovurrsl/plugin-warehouse/commit/3ccb27eab72c3de277534ecb6ca1e4bb3707581c))
 - Test simple red material ([`b611bce`](https://github.com/ovurrsl/plugin-warehouse/commit/b611bceef6a7c685834a704f355dfb673015bb52))
 

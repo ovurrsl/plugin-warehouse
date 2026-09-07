@@ -1,4 +1,4 @@
-import type * as THREE from 'three'
+import * as THREE from 'three'
 import {
   finish,
   getCachedGeometry,
@@ -14,6 +14,7 @@ import {
   DIVIDER_DASH_M,
   DIVIDER_GAP_M,
   LINE_WIDTHS,
+  ROUTE_ELEVATIONS,
 } from './constants'
 import type { RouteNode } from './schema'
 import { offsetCentreline, type Point, stripeCentreOffsetM } from './stripes'
@@ -21,57 +22,73 @@ import { offsetCentreline, type Point, stripeCentreOffsetM } from './stripes'
 /**
  * The paint, as one merged buffer.
  *
- * **Two stripes and no fill.** That is what 92/58/EEC Annex V describes, and it
- * is also what the fill-rate arithmetic demands: two thousand lined routes are
- * about one screen of opaque fragments, two thousand filled ones about eight
- * screens of overdraw — and the floor is the largest surface in the building.
- * Opaque with depth writing keeps markings out of the sorted transparent queue
- * the older editor put them in.
- *
- * Everything is emitted flat at local y = 0. The mesh's height comes from the
- * host's floor-placed lift and nothing else, and the paint is kept off the slab
- * by `polygonOffset` rather than by a metric rise — see `./constants`.
+ * Emits stratified floor markings using strict monotonic vertical Y-offsets
+ * coupled with WebGL depth biasing to eliminate z-fighting:
+ * - Painted corridor floor fill at ROUTE_ELEVATIONS.PAINTED_CORRIDOR (+0.002m)
+ * - Edge boundary stripes at ROUTE_ELEVATIONS.EDGE_STRIPES (+0.008m)
+ * - Directional flow arrows / dividers at ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS (+0.012m)
  */
 
-/** Which draw group a triangle belongs to, so one buffer serves two colours
+/** Which draw group a triangle belongs to, so one buffer serves three colours
  *  without a second draw call per marking. */
-const GROUP_STRIPE = 0
-const GROUP_CONTRAST = 1
+export const GROUP_STRIPE = 0
+export const GROUP_CONTRAST = 1
+export const GROUP_PAINT = 2
 
-type Groups = { stripe: number[]; contrast: number[] }
+type Groups = { stripe: number[]; contrast: number[]; paint: number[] }
 
-function pushVertex(sink: Sink, x: number, z: number, u: number, v: number): number {
+function pushVertex(
+  sink: Sink,
+  x: number,
+  y: number,
+  z: number,
+  u: number,
+  v: number,
+  color: [number, number, number] = [1, 1, 1],
+): number {
   const index = sink.positions.length / 3
-  sink.positions.push(x, 0, z)
+  sink.positions.push(x, y, z)
   sink.normals.push(0, 1, 0)
-  // Colour lives in the material, not the buffer: a route's colours are a
-  // consequence of its role and are not user-editable, so nothing about them
-  // belongs in a geometry key. The conveyor keys its colours because they ARE
-  // user fields; this one must not.
-  sink.colors.push(1, 1, 1)
+  sink.colors.push(color[0], color[1], color[2])
   sink.uvs.push(u, v)
   return index
 }
 
 /** Two triangles, wound counter-clockwise seen from above so the paint faces
  *  the camera a warehouse is looked at from. */
-function pushQuad(sink: Sink, into: number[], a: Point, b: Point, c: Point, d: Point) {
-  const ia = pushVertex(sink, a[0], a[1], 0, 0)
-  const ib = pushVertex(sink, b[0], b[1], 1, 0)
-  const ic = pushVertex(sink, c[0], c[1], 1, 1)
-  const id = pushVertex(sink, d[0], d[1], 0, 1)
+function pushQuad(
+  sink: Sink,
+  into: number[],
+  a: Point,
+  b: Point,
+  c: Point,
+  d: Point,
+  y: number = 0,
+  color?: [number, number, number],
+) {
+  const ia = pushVertex(sink, a[0], y, a[1], 0, 0, color)
+  const ib = pushVertex(sink, b[0], y, b[1], 1, 0, color)
+  const ic = pushVertex(sink, c[0], y, c[1], 1, 1, color)
+  const id = pushVertex(sink, d[0], y, d[1], 0, 1, color)
   into.push(ia, ic, ib, ia, id, ic)
 }
 
 /** A ribbon of constant width following a polyline, from its two offset edges. */
-function emitRibbon(sink: Sink, into: number[], inner: Point[], outer: Point[]) {
+function emitRibbon(
+  sink: Sink,
+  into: number[],
+  inner: Point[],
+  outer: Point[],
+  y: number = 0,
+  color?: [number, number, number],
+) {
   for (let i = 0; i < inner.length - 1; i++) {
     const a = inner[i]
     const b = outer[i]
     const c = outer[i + 1]
     const d = inner[i + 1]
     if (!a || !b || !c || !d) continue
-    pushQuad(sink, into, a, b, c, d)
+    pushQuad(sink, into, a, b, c, d, y, color)
   }
 }
 
@@ -81,7 +98,12 @@ function arrowFractions(lengthM: number): number[] {
   return Array.from({ length: count }, (_, i) => (i + 0.5) / count)
 }
 
-function emitArrows(sink: Sink, into: number[], points: readonly Point[]) {
+function emitArrows(
+  sink: Sink,
+  into: number[],
+  points: readonly Point[],
+  y = ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS,
+) {
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i]
     const to = points[i + 1]
@@ -106,10 +128,11 @@ function emitArrows(sink: Sink, into: number[], points: readonly Point[]) {
       const backX = cx - ux * (ARROW_LENGTH_M / 2)
       const backZ = cz - uz * (ARROW_LENGTH_M / 2)
 
-      const tip = pushVertex(sink, tipX, tipZ, 0.5, 1)
+      const tip = pushVertex(sink, tipX, y, tipZ, 0.5, 1)
       const left = pushVertex(
         sink,
         backX + nx * ARROW_HALF_WIDTH_M,
+        y,
         backZ + nz * ARROW_HALF_WIDTH_M,
         0,
         0,
@@ -117,6 +140,7 @@ function emitArrows(sink: Sink, into: number[], points: readonly Point[]) {
       const right = pushVertex(
         sink,
         backX - nx * ARROW_HALF_WIDTH_M,
+        y,
         backZ - nz * ARROW_HALF_WIDTH_M,
         1,
         0,
@@ -126,7 +150,13 @@ function emitArrows(sink: Sink, into: number[], points: readonly Point[]) {
   }
 }
 
-function emitDivider(sink: Sink, into: number[], points: readonly Point[], halfWidth: number) {
+function emitDivider(
+  sink: Sink,
+  into: number[],
+  points: readonly Point[],
+  halfWidth: number,
+  y = ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS,
+) {
   const period = DIVIDER_DASH_M + DIVIDER_GAP_M
   for (let i = 0; i < points.length - 1; i++) {
     const from = points[i]
@@ -155,6 +185,7 @@ function emitDivider(sink: Sink, into: number[], points: readonly Point[], halfW
         [ax - nx, az - nz],
         [bx - nx, bz - nz],
         [bx + nx, bz + nz],
+        y,
       )
     }
   }
@@ -165,14 +196,12 @@ function emitDivider(sink: Sink, into: number[], points: readonly Point[], halfW
  *
  * **Derived, and the key names these rather than `role` and `traffic`.** The
  * raw fields reach the mesh only through these two gates, so listing them raw
- * would split the cache on a change that moves no vertex — the conveyor's own
- * `legHeight + hasCrossbar, not raw transportHeight` reasoning. The good
- * consequence: a 12 m walkway and a 12 m one-way vehicle aisle of the same
- * width are byte-identical and share one buffer.
+ * would split the cache on a change that moves no vertex.
+ * Directional arrows are gated by `directionalArrows !== false`.
  */
 export function markingGates(route: RouteNode): { arrows: boolean; divider: boolean } {
   return {
-    arrows: route.traffic === 'one-way',
+    arrows: route.traffic === 'one-way' && route.directionalArrows !== false,
     divider: route.role === 'vehicle' && route.traffic === 'two-way',
   }
 }
@@ -195,6 +224,8 @@ export function routeGeometryKey(route: RouteNode): string {
     route.lineWidth,
     gates.arrows ? 'a' : '-',
     gates.divider ? 'd' : '-',
+    route.laneColor ? `c:${route.laneColor}` : '-',
+    route.directionalArrows !== false ? 'da' : '-',
     route.points.length,
     digest,
   ].join('|')
@@ -202,12 +233,35 @@ export function routeGeometryKey(route: RouteNode): string {
 
 export function buildRouteGeometry(route: RouteNode): THREE.BufferGeometry {
   const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
-  const groups: Groups = { stripe: [], contrast: [] }
+  const groups: Groups = { stripe: [], contrast: [], paint: [] }
 
   const points = relativePoints(route)
   const centre = stripeCentreOffsetM(route.width, route.lineWidth)
   const half = LINE_WIDTHS[route.lineWidth] / 2
 
+  // 1. If laneColor is defined, emit filled planar corridor ribbon geometry at ROUTE_ELEVATIONS.PAINTED_CORRIDOR (+0.002m)
+  if (route.laneColor) {
+    const leftBoundary = offsetCentreline(points, -(centre + half))
+    const rightBoundary = offsetCentreline(points, centre + half)
+    let parsedColor: [number, number, number] | undefined
+    try {
+      const c = new THREE.Color(route.laneColor)
+      parsedColor = [c.r, c.g, c.b]
+    } catch {
+      parsedColor = undefined
+    }
+    // Winding order: rightBoundary as inner, leftBoundary as outer so face normal is positive Y (+1)
+    emitRibbon(
+      sink,
+      groups.paint,
+      rightBoundary,
+      leftBoundary,
+      ROUTE_ELEVATIONS.PAINTED_CORRIDOR,
+      parsedColor,
+    )
+  }
+
+  // 2. Stratify outer boundary edge stripes at ROUTE_ELEVATIONS.EDGE_STRIPES (+0.008m)
   for (const side of [1, -1]) {
     const near = offsetCentreline(points, side * (centre - half))
     const far = offsetCentreline(points, side * (centre + half))
@@ -219,24 +273,33 @@ export function buildRouteGeometry(route: RouteNode): THREE.BufferGeometry {
      * aynaladığı için elleri de aynalar: takas olmadan sol şerit saat
      * yönünde sarılır, `side: FrontSide` onu arka yüz sayar ve **her
      * rotanın iki şeridinden biri hiç görünmez.**
-     *
-     * Normal attribute'u bunu yakalayamaz — o elle `(0,1,0)` yazılıyor ve
-     * culling kararı sarımdan verilir, normalden değil. `geometry.test.ts`
-     * artık sarımı ayrıca ölçüyor.
      */
-    emitRibbon(sink, groups.stripe, side === 1 ? far : near, side === 1 ? near : far)
+    emitRibbon(
+      sink,
+      groups.stripe,
+      side === 1 ? far : near,
+      side === 1 ? near : far,
+      ROUTE_ELEVATIONS.EDGE_STRIPES,
+    )
   }
 
+  // 3. Stratify directional flow arrows and dividers at ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS (+0.012m)
   const gates = markingGates(route)
-  if (gates.arrows) emitArrows(sink, groups.contrast, points)
-  if (gates.divider) emitDivider(sink, groups.contrast, points, half)
+  if (gates.arrows) emitArrows(sink, groups.contrast, points, ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS)
+  if (gates.divider)
+    emitDivider(sink, groups.contrast, points, half, ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS)
 
-  sink.indices = [...groups.stripe, ...groups.contrast]
+  sink.indices = [...groups.stripe, ...groups.contrast, ...groups.paint]
   const geometry = finish(sink)
   geometry.clearGroups()
   geometry.addGroup(0, groups.stripe.length, GROUP_STRIPE)
+  let offset = groups.stripe.length
   if (groups.contrast.length > 0) {
-    geometry.addGroup(groups.stripe.length, groups.contrast.length, GROUP_CONTRAST)
+    geometry.addGroup(offset, groups.contrast.length, GROUP_CONTRAST)
+    offset += groups.contrast.length
+  }
+  if (groups.paint.length > 0) {
+    geometry.addGroup(offset, groups.paint.length, GROUP_PAINT)
   }
   return geometry
 }

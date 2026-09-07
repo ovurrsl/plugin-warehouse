@@ -53,17 +53,20 @@ const CONTRAST_COLOUR = 0x1e293b
 const cache = new Map<string, THREE.Material[]>()
 
 function specFor(role: RouteRole, part: 'stripe' | 'contrast'): SurfaceSpec {
+  const isStripe = part === 'stripe'
   return {
     family: `route:${role}:${part}`,
-    color: part === 'stripe' ? STRIPE_COLOURS[role] : CONTRAST_COLOUR,
+    color: isStripe ? STRIPE_COLOURS[role] : CONTRAST_COLOUR,
     roughness: 0.85,
     metalness: 0,
-    // Her modda korunur — bkz. `../appearance`. Gölgeleme modunun eş düzlem
-    // sorunuyla ilgisi yok; offset düşerse rota slab ile z-savaşına girer.
+    depthWrite: false,
     polygonOffset: true,
-    polygonOffsetFactor: DEPTH_BIAS.factor,
-    polygonOffsetUnits:
-      role === 'pedestrian' ? DEPTH_BIAS.pedestrianUnits : DEPTH_BIAS.vehicleUnits,
+    polygonOffsetFactor: isStripe
+      ? DEPTH_BIAS.STRIPES.polygonOffsetFactor
+      : DEPTH_BIAS.ARROWS.polygonOffsetFactor,
+    polygonOffsetUnits: isStripe
+      ? DEPTH_BIAS.STRIPES.polygonOffsetUnits
+      : DEPTH_BIAS.ARROWS.polygonOffsetUnits,
     side: THREE.FrontSide,
   }
 }
@@ -82,14 +85,91 @@ function specFor(role: RouteRole, part: 'stripe' | 'contrast'): SurfaceSpec {
  * ve duvar renklerini de aynı şekilde siliyor, ve rotayı ayrıcalıklı kılmak
  * "bazı nesneler ayarı dinliyor" hâline geri dönmek olurdu.
  */
-export function getRouteMaterials(role: RouteRole, appearance: Appearance): THREE.Material[] {
-  const key = `${role}|${appearanceKey(appearance)}`
+export function getRouteMaterials(
+  role: RouteRole,
+  appearance: Appearance,
+  laneColor?: string | null,
+): THREE.Material[] {
+  const color = laneColor ?? '#ffffff'
+  const key = `${role}|${appearanceKey(appearance)}|${color}`
   const hit = cache.get(key)
   if (hit) return hit
-  const built = [
-    surfaceMaterial(specFor(role, 'stripe'), appearance),
-    surfaceMaterial(specFor(role, 'contrast'), appearance),
-  ]
+  const stripeMat = surfaceMaterial(specFor(role, 'stripe'), appearance)
+  const contrastMat = surfaceMaterial(specFor(role, 'contrast'), appearance)
+  const paintMat = getCorridorPaintMaterial(color, appearance)
+
+  ;(stripeMat as unknown as { renderOrder: number }).renderOrder = DEPTH_BIAS.STRIPES.renderOrder
+  ;(contrastMat as unknown as { renderOrder: number }).renderOrder = DEPTH_BIAS.ARROWS.renderOrder
+  ;(paintMat as unknown as { renderOrder: number }).renderOrder = DEPTH_BIAS.PAINT_FILL.renderOrder
+
+  const built = [stripeMat, contrastMat, paintMat]
   cache.set(key, built)
   return built
 }
+
+const corridorPaintCache = new Map<string, THREE.Material>()
+
+/**
+ * Returns a cached surface paint material for filled corridor ribbons.
+ *
+ * Configured with depthWrite: false, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+ * and renderOrder: 1 (DEPTH_BIAS.PAINT_FILL).
+ */
+export function getCorridorPaintMaterial(color: string, appearance?: Appearance): THREE.Material {
+  const resolvedAppearance: Appearance = appearance ?? {
+    shading: 'rendered',
+    textures: true,
+    colorPreset: 'light' as never,
+  }
+  const key = `corridor:${color}|${appearanceKey(resolvedAppearance)}`
+  const hit = corridorPaintCache.get(key)
+  if (hit) return hit
+
+  const spec: SurfaceSpec = {
+    family: `route:corridor:${color}`,
+    color: color,
+    roughness: 0.85,
+    metalness: 0.05,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: DEPTH_BIAS.PAINT_FILL.polygonOffsetFactor,
+    polygonOffsetUnits: DEPTH_BIAS.PAINT_FILL.polygonOffsetUnits,
+    side: THREE.FrontSide,
+  }
+
+  const mat = surfaceMaterial(spec, resolvedAppearance)
+  ;(mat as unknown as { renderOrder: number }).renderOrder = DEPTH_BIAS.PAINT_FILL.renderOrder
+  corridorPaintCache.set(key, mat)
+  return mat
+}
+
+let cachedZebraMat: THREE.MeshStandardMaterial | null = null
+
+/**
+ * Returns the cached shared material for dynamic zebra crossings.
+ *
+ * Configured with DoubleSide, depthWrite: false, renderOrder: 10, and
+ * polygonOffset to prevent z-fighting with painted corridors and floor slabs.
+ */
+export function getZebraMaterial(_appearance?: Appearance): THREE.MeshStandardMaterial {
+  if (!cachedZebraMat) {
+    cachedZebraMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.8,
+      metalness: 0.1,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: DEPTH_BIAS.ZEBRA.polygonOffsetFactor,
+      polygonOffsetUnits: DEPTH_BIAS.ZEBRA.polygonOffsetUnits,
+      side: THREE.DoubleSide,
+    })
+    ;(cachedZebraMat as unknown as { renderOrder: number }).renderOrder =
+      DEPTH_BIAS.ZEBRA.renderOrder
+  }
+  return cachedZebraMat
+}
+
+/**
+ * Cached singleton zebra crosswalk material.
+ */
+export const cachedZebraMaterial: THREE.MeshStandardMaterial = getZebraMaterial()

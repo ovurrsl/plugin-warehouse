@@ -102,6 +102,10 @@ export const routeDefinition = {
 
   tool: () => import('./tool'),
 
+  affordanceTools: {
+    selection: () => import('./route-controls'),
+  },
+
   toolHints: [
     { key: 'Left click', label: 'Add a corner' },
     { key: 'Double click / Enter', label: 'Finish the route' },

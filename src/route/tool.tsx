@@ -62,7 +62,7 @@ const NO_RAYCAST = () => {}
 
 export default function RouteTool() {
   const activeLevelId = useActiveLevelId()
-  const activeLevelNode = useActiveLevel()
+  const _activeLevelNode = useActiveLevel()
   const gridStep = useEditor((s) => s.gridSnapStep)
   const brush = useWarehouseStore((s) => s.routeBrush)
 

@@ -1,6 +1,12 @@
 'use client'
 
-import { type AnyNodeId, useLiveTransforms, useRegistry } from '@pascal-app/core'
+import {
+  type AnyNodeId,
+  useLiveNodeOverrides,
+  useLiveTransforms,
+  useRegistry,
+  useScene,
+} from '@pascal-app/core'
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
@@ -9,7 +15,13 @@ import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
-import { getRouteMaterials } from './materials'
+import {
+  buildZebraGeometry,
+  findZebraCrossingsForRoute,
+  type ZebraCrossingInstance,
+} from './intersections'
+import { getRouteMaterials, getZebraMaterial } from './materials'
+import RouteControls from './route-controls'
 import type { RouteNode } from './schema'
 import { outerHalfWidthM } from './stripes'
 
@@ -76,16 +88,51 @@ function RouteBody({ node }: { node: RouteNode }) {
   // kanal yazarken bayrak three'ye geri verilir (`../static-transform`).
   useStaticTransform(registeredRef, position, rotation, live !== undefined)
 
-  const geometry = useMemo(() => getRouteGeometry(node), [node])
+  // The live points during a curve/vertex drag; the committed ones otherwise.
+  const liveOverride = useLiveNodeOverrides((s) => {
+    return (
+      (s.overrides instanceof Map
+        ? s.overrides.get(node.id)
+        : (s.overrides as Record<string, unknown>)?.[node.id]) ?? s.get?.(node.id)
+    )
+  })
+  const livePoints = (liveOverride as { points?: RouteNode['points'] } | undefined)?.points
+  const effectiveNode = useMemo(() => {
+    if (!livePoints) return node
+    return { ...node, points: livePoints }
+  }, [node, livePoints])
+
+  const geometry = useMemo(() => getRouteGeometry(effectiveNode), [effectiveNode])
   const appearance = useAppearance()
-  const materials = getRouteMaterials(node.role, appearance)
+  const materials = useMemo(
+    () => getRouteMaterials(effectiveNode.role, appearance, effectiveNode.laneColor),
+    [effectiveNode.role, appearance, effectiveNode.laneColor],
+  )
 
   // Claim the buffer while it is on screen. Eviction must never free a shape
   // something is drawing, and this is the only place that knows.
   useEffect(() => {
-    const key = retainRouteGeometry(node)
+    const key = retainRouteGeometry(effectiveNode)
     return () => releaseRouteGeometry(key)
-  }, [node])
+  }, [effectiveNode])
+
+  // Only pedestrian routes render dynamic zebra crossings at intersections with vehicle corridors
+  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const zebraCrossings = useMemo(() => {
+    if (effectiveNode.role !== 'pedestrian' || effectiveNode.zebraCrossing === false) return []
+    const otherRoutes: RouteNode[] = []
+    for (const other of Object.values(sceneNodes)) {
+      if (
+        (other as { type?: string })?.type === 'warehouse:route' &&
+        (other as { id?: string })?.id !== effectiveNode.id
+      ) {
+        otherRoutes.push(other as unknown as RouteNode)
+      }
+    }
+    return findZebraCrossingsForRoute(effectiveNode, otherRoutes)
+  }, [effectiveNode, sceneNodes])
+
+  const isSelected = useViewer((s) => s.selection.selectedIds.includes(node.id))
 
   return (
     <group
@@ -118,7 +165,50 @@ function RouteBody({ node }: { node: RouteNode }) {
         // depth buffer that has already been laid down.
         renderOrder={isExporting ? 0 : 1}
       />
+      {zebraCrossings.map((crossing) => (
+        <ZebraCrossingMesh
+          key={crossing.id}
+          crossing={crossing}
+          nodePosition={position}
+          nodeRotation={rotation}
+        />
+      ))}
+      {isSelected && <RouteControls node={effectiveNode} />}
     </group>
+  )
+}
+
+function ZebraCrossingMesh({
+  crossing,
+  nodePosition,
+  nodeRotation,
+}: {
+  crossing: ZebraCrossingInstance
+  nodePosition: [number, number, number]
+  nodeRotation: [number, number, number]
+}) {
+  const geometry = useMemo(
+    () => buildZebraGeometry(crossing, nodePosition, nodeRotation),
+    [crossing, nodePosition, nodeRotation],
+  )
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose()
+    }
+  }, [geometry])
+
+  const material = getZebraMaterial()
+
+  return (
+    <mesh
+      castShadow={false}
+      dispose={null}
+      geometry={geometry}
+      material={material}
+      receiveShadow
+      renderOrder={10}
+    />
   )
 }
 

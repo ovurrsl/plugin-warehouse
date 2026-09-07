@@ -24,6 +24,10 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
         { key: 'traffic', kind: 'enum', options: ROUTE_TRAFFIC, display: 'segmented' },
         { key: 'width', kind: 'number', unit: 'm', min: 0.3, max: 20, step: 0.05 },
         { key: 'lineWidth', kind: 'enum', options: LINE_WIDTH_IDS, display: 'select' },
+        { key: 'zebraCrossing', kind: 'boolean' },
+        { key: 'laneColor', kind: 'string' },
+        { key: 'directionalArrows', kind: 'boolean' },
+        { key: 'curved', kind: 'boolean' },
       ],
     },
     {

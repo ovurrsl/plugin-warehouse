@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { LINE_WIDTHS, MAX_VERTICES } from './constants'
-import { buildRouteGeometry, markingGates, routeGeometryKey } from './geometry'
+import { LINE_WIDTHS, MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
+import { buildRouteGeometry, GROUP_PAINT, markingGates, routeGeometryKey } from './geometry'
 import { RouteNode } from './schema'
 import { outerHalfWidthM, type Point } from './stripes'
 
@@ -118,13 +118,15 @@ describe('what gets built is paint, and only paint', () => {
     expect(triangles(route({ points: STRAIGHT, traffic: 'two-way' }))).toBe(4)
   })
 
-  test('every vertex lies flat, at local zero', () => {
-    // The height comes from the host's floor lift and nothing else. A builder
-    // that baked its own Y would fight the slab elevation and float the paint.
+  test('every vertex is stratified according to monotonic elevations', () => {
     const geometry = buildRouteGeometry(route({ points: STRAIGHT, traffic: 'one-way' }))
     const position = geometry.getAttribute('position')
     for (let i = 0; i < position.count; i++) {
-      expect(position.getY(i)).toBe(0)
+      const y = position.getY(i)
+      const valid =
+        Math.abs(y - ROUTE_ELEVATIONS.EDGE_STRIPES) < 1e-6 ||
+        Math.abs(y - ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS) < 1e-6
+      expect(valid).toBe(true)
     }
   })
 
@@ -203,6 +205,23 @@ describe('what gets built is paint, and only paint', () => {
     const arrowed = buildRouteGeometry(route({ points: STRAIGHT, traffic: 'one-way' }))
     expect(arrowed.groups).toHaveLength(2)
     expect(arrowed.groups[1]?.materialIndex).toBe(1)
+  })
+
+  test('corridor paint ribbon lands in GROUP_PAINT (materialIndex 2)', () => {
+    const painted = buildRouteGeometry(
+      route({ points: STRAIGHT, traffic: 'two-way', laneColor: '#10b981' }),
+    )
+    expect(painted.groups).toHaveLength(2)
+    expect(painted.groups[0]?.materialIndex).toBe(0) // stripe
+    expect(painted.groups[1]?.materialIndex).toBe(GROUP_PAINT) // paint
+
+    const paintedAndArrowed = buildRouteGeometry(
+      route({ points: STRAIGHT, traffic: 'one-way', laneColor: '#10b981' }),
+    )
+    expect(paintedAndArrowed.groups).toHaveLength(3)
+    expect(paintedAndArrowed.groups[0]?.materialIndex).toBe(0) // stripe
+    expect(paintedAndArrowed.groups[1]?.materialIndex).toBe(1) // contrast
+    expect(paintedAndArrowed.groups[2]?.materialIndex).toBe(GROUP_PAINT) // paint
   })
 
   test('a long leg gets more arrows, but never an unbounded number', () => {

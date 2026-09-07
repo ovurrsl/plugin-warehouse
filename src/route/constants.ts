@@ -64,10 +64,54 @@ export const MITER_LIMIT = 4
  * mutually exclusive), so the only overlap is route over route. A pedestrian
  * route paints over a vehicle aisle, which is also the real-world reading order.
  */
+/**
+ * Strict monotonic Y-elevation hierarchy for warehouse floor markings and controls.
+ * Guarantees that upper markings (stripes, arrows, zebra crossings) sit physically
+ * above the slab and painted corridor floor, eliminating depth precision contention:
+ *
+ * Slab (0.000) < Raycast (0.001) < Paint Fill (0.002) < Edge Stripes (0.008) < Directional Arrows (0.012) < Zebra (0.016) < Grips (0.050)
+ */
+export const ROUTE_ELEVATIONS = {
+  BASE_SLAB: 0.0,
+  SLAB: 0.0,
+  RAYCAST_PICK: 0.001,
+  RAYCAST: 0.001,
+  PAINTED_CORRIDOR: 0.002,
+  PAINT_CORRIDOR: 0.002,
+  PAINT_FILL: 0.002,
+  EDGE_STRIPES: 0.008,
+  DIRECTIONAL_ARROWS: 0.012,
+  ZEBRA_CROSSWALK: 0.016,
+  CONTROLS_GRIPS: 0.05,
+  GRIPS: 0.05,
+} as const
+
+export type RouteElevations = typeof ROUTE_ELEVATIONS
+
 export const DEPTH_BIAS = {
   factor: -1,
   vehicleUnits: -2,
   pedestrianUnits: -4,
+  PAINT_FILL: {
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+    renderOrder: 1,
+  },
+  STRIPES: {
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    renderOrder: 5,
+  },
+  ARROWS: {
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+    renderOrder: 8,
+  },
+  ZEBRA: {
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+    renderOrder: 10,
+  },
 } as const
 
 /**

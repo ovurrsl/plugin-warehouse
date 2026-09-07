@@ -54,6 +54,28 @@ export const RouteNode = BaseNode.extend({
   role: z.enum(ROUTE_ROLES).default('pedestrian'),
 
   /**
+   * Whether to automatically generate zebra crossings where this route
+   * intersects another route of differing role (pedestrian crossing vehicle).
+   */
+  zebraCrossing: z.boolean().default(true),
+
+  /**
+   * Optional custom painted color for the entire corridor floor (e.g. hex string "#10b981").
+   * When defined, emits a filled planar corridor ribbon geometry between the edge stripes.
+   */
+  laneColor: z.string().nullable().optional(),
+
+  /**
+   * Whether to draw directional flow arrows along the route legs.
+   */
+  directionalArrows: z.boolean().default(true),
+
+  /**
+   * Whether curve interpolation is active for this route.
+   */
+  curved: z.boolean().default(false),
+
+  /**
    * One-way or two-way, and **not cosmetic**.
    *
    * In the older editor `direction` toggled a scrolling stripe animation that

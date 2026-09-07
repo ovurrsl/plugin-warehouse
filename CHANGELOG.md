@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`1f51d5d`](https://github.com/ovurrsl/plugin-warehouse/commit/1f51d5da196a50cfbf4844c0a56089b1d5f5cfad))
 - Refresh generated README blocks [skip ci] ([`6f70d44`](https://github.com/ovurrsl/plugin-warehouse/commit/6f70d4425ecc0d0b0584ea771a949f0dd5b863bf))
 - Refresh generated README blocks [skip ci] ([`326424c`](https://github.com/ovurrsl/plugin-warehouse/commit/326424c4b62dd45abae6d3c66efb0239ce9384ed))
 - Refresh generated README blocks [skip ci] ([`a484b61`](https://github.com/ovurrsl/plugin-warehouse/commit/a484b61b61517fa593adbf86c10e669b5e34c526))
@@ -309,6 +310,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Add use client directive and parametric renderer module format ([`27f08c2`](https://github.com/ovurrsl/plugin-warehouse/commit/27f08c27a33fdfe651934a1f99f31cf315441f30))
 - Import useRegistry from @pascal-app/core and bind handlers ([`b4b74e7`](https://github.com/ovurrsl/plugin-warehouse/commit/b4b74e7d0b33d8b70e1dd3cd6ed5190858f6bdef))
 - Restore monotonic layering hierarchy, apply Biome formatting and clean workspace ([`8c4675b`](https://github.com/ovurrsl/plugin-warehouse/commit/8c4675bf9b724875393660506e33bc7f5cb4a463))
 - Change laneColor parametric field kind to color ([`03b1815`](https://github.com/ovurrsl/plugin-warehouse/commit/03b18155144197b775c2144989ccd6256ada5366))

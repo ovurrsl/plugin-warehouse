@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6f70d44`](https://github.com/ovurrsl/plugin-warehouse/commit/6f70d4425ecc0d0b0584ea771a949f0dd5b863bf))
 - Refresh generated README blocks [skip ci] ([`326424c`](https://github.com/ovurrsl/plugin-warehouse/commit/326424c4b62dd45abae6d3c66efb0239ce9384ed))
 - Refresh generated README blocks [skip ci] ([`a484b61`](https://github.com/ovurrsl/plugin-warehouse/commit/a484b61b61517fa593adbf86c10e669b5e34c526))
 - Refresh generated README blocks [skip ci] ([`7230146`](https://github.com/ovurrsl/plugin-warehouse/commit/7230146ddeed4722989c7fdc066ab1c80c22edb6))
@@ -308,6 +309,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Import useRegistry from @pascal-app/core and bind handlers ([`b4b74e7`](https://github.com/ovurrsl/plugin-warehouse/commit/b4b74e7d0b33d8b70e1dd3cd6ed5190858f6bdef))
 - Restore monotonic layering hierarchy, apply Biome formatting and clean workspace ([`8c4675b`](https://github.com/ovurrsl/plugin-warehouse/commit/8c4675bf9b724875393660506e33bc7f5cb4a463))
 - Change laneColor parametric field kind to color ([`03b1815`](https://github.com/ovurrsl/plugin-warehouse/commit/03b18155144197b775c2144989ccd6256ada5366))
 - Update package dependencies and sanitize SVG with DOMPurify ([`ffd1122`](https://github.com/ovurrsl/plugin-warehouse/commit/ffd11223f9b1492dc384f7f12f8c71acaeecbc07))

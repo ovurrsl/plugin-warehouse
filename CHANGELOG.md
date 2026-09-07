@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`2f480f2`](https://github.com/ovurrsl/plugin-warehouse/commit/2f480f274c02a4304483b2ffb60d9e20d8cce8d2))
 - Refresh generated README blocks [skip ci] ([`1f99750`](https://github.com/ovurrsl/plugin-warehouse/commit/1f997509a380cd09cd7c799886d7a40d5cb7fd9e))
 - Refresh generated README blocks [skip ci] ([`6c04523`](https://github.com/ovurrsl/plugin-warehouse/commit/6c0452340d770109079f0ac17cd139cbb3c3dafe))
 - Refresh generated README blocks [skip ci] ([`bb56c06`](https://github.com/ovurrsl/plugin-warehouse/commit/bb56c0639f8bc8c92bc262478ace8252958191d8))
@@ -369,6 +370,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Port streetscape architecture to plugin-warehouse: dynamic zebra crossings, z-fighting fixes, interactive curve bends, geometry lifecycle improvements ([`16f8b25`](https://github.com/ovurrsl/plugin-warehouse/commit/16f8b25d357af7e8e9f9ede3124d0d6f8a965f05))
 - Use transparent png icons instead of webp ([`b5f7999`](https://github.com/ovurrsl/plugin-warehouse/commit/b5f7999015be4e2b6999ab02b0c3502cb002ceee))
 - Palet asansörü ve spiral konveyör kat döşemelerini delsin, sürükleme de denetlensin (#34) ([`d3c6700`](https://github.com/ovurrsl/plugin-warehouse/commit/d3c6700f213ecb59930212202a14b5ad12461547))
 - Izgara 4'lü olsun (#33) ([`f9e1467`](https://github.com/ovurrsl/plugin-warehouse/commit/f9e14670b8035447e92ddef629dea64fb6e58ac2))

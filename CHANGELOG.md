@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7230146`](https://github.com/ovurrsl/plugin-warehouse/commit/7230146ddeed4722989c7fdc066ab1c80c22edb6))
 - Refresh generated README blocks [skip ci] ([`2f480f2`](https://github.com/ovurrsl/plugin-warehouse/commit/2f480f274c02a4304483b2ffb60d9e20d8cce8d2))
 - Refresh generated README blocks [skip ci] ([`1f99750`](https://github.com/ovurrsl/plugin-warehouse/commit/1f997509a380cd09cd7c799886d7a40d5cb7fd9e))
 - Refresh generated README blocks [skip ci] ([`6c04523`](https://github.com/ovurrsl/plugin-warehouse/commit/6c0452340d770109079f0ac17cd139cbb3c3dafe))
@@ -304,6 +305,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Change laneColor parametric field kind to color ([`03b1815`](https://github.com/ovurrsl/plugin-warehouse/commit/03b18155144197b775c2144989ccd6256ada5366))
 - Update package dependencies and sanitize SVG with DOMPurify ([`ffd1122`](https://github.com/ovurrsl/plugin-warehouse/commit/ffd11223f9b1492dc384f7f12f8c71acaeecbc07))
 - Align number values in Asset Stats panel ([`6375e88`](https://github.com/ovurrsl/plugin-warehouse/commit/6375e8844492019b013f0dc84b5accc400e14a51))
 - Resolve Bug #50-D3 ambient preview and disarming ([`fc39034`](https://github.com/ovurrsl/plugin-warehouse/commit/fc390346c1709298714147bd41b20ee019353327))

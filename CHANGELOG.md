@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`326424c`](https://github.com/ovurrsl/plugin-warehouse/commit/326424c4b62dd45abae6d3c66efb0239ce9384ed))
 - Refresh generated README blocks [skip ci] ([`a484b61`](https://github.com/ovurrsl/plugin-warehouse/commit/a484b61b61517fa593adbf86c10e669b5e34c526))
 - Refresh generated README blocks [skip ci] ([`7230146`](https://github.com/ovurrsl/plugin-warehouse/commit/7230146ddeed4722989c7fdc066ab1c80c22edb6))
 - Refresh generated README blocks [skip ci] ([`2f480f2`](https://github.com/ovurrsl/plugin-warehouse/commit/2f480f274c02a4304483b2ffb60d9e20d8cce8d2))
@@ -184,6 +185,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Add fill toggle, custom edge/fill colors, arrow directions and manual crosswalk tool ([`f385996`](https://github.com/ovurrsl/plugin-warehouse/commit/f3859961b9ca8fd3575eabbcca35c8ffbfaf0b7b))
 - E2E uyumluluk, Zone silinme mantığı ve supersampling entegrasyonları ([`e047cd1`](https://github.com/ovurrsl/plugin-warehouse/commit/e047cd18d42d1571ad3a8a8a15ff54aea1d3cb47))
 - Use png/webp raster icons instead of lucide svgs for outliner presentations ([`7ebc4af`](https://github.com/ovurrsl/plugin-warehouse/commit/7ebc4afc2bfb2bcf8d464d2214f9db2835404b2d))
 - Implement Zero Defect Zone Report and stats UI alignment ([`373a1e0`](https://github.com/ovurrsl/plugin-warehouse/commit/373a1e0bf0777c64d9321acbd1a991936ada63ef))
@@ -306,6 +308,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Restore monotonic layering hierarchy, apply Biome formatting and clean workspace ([`8c4675b`](https://github.com/ovurrsl/plugin-warehouse/commit/8c4675bf9b724875393660506e33bc7f5cb4a463))
 - Change laneColor parametric field kind to color ([`03b1815`](https://github.com/ovurrsl/plugin-warehouse/commit/03b18155144197b775c2144989ccd6256ada5366))
 - Update package dependencies and sanitize SVG with DOMPurify ([`ffd1122`](https://github.com/ovurrsl/plugin-warehouse/commit/ffd11223f9b1492dc384f7f12f8c71acaeecbc07))
 - Align number values in Asset Stats panel ([`6375e88`](https://github.com/ovurrsl/plugin-warehouse/commit/6375e8844492019b013f0dc84b5accc400e14a51))
@@ -446,6 +449,7 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- Track and format junction adversarial challenger suite ([`c0bc460`](https://github.com/ovurrsl/plugin-warehouse/commit/c0bc4602a8555ea3e532514d9751ee582f923902))
 - Assert laneColor field kind is color ([`f93ac0d`](https://github.com/ovurrsl/plugin-warehouse/commit/f93ac0d4ebe31281b914a3a52939d55352138a4f))
 - T7–T10, in the half a node process can actually measure ([`3ccb27e`](https://github.com/ovurrsl/plugin-warehouse/commit/3ccb27eab72c3de277534ecb6ca1e4bb3707581c))
 - Test simple red material ([`b611bce`](https://github.com/ovurrsl/plugin-warehouse/commit/b611bceef6a7c685834a704f355dfb673015bb52))

@@ -231,11 +231,110 @@ export function routeGeometryKey(route: RouteNode): string {
   ].join('|')
 }
 
-export function buildRouteGeometry(route: RouteNode): THREE.BufferGeometry {
+/**
+ * Trims a polyline by cutback distances from the start and/or end.
+ * Used to set back corridor ribbons arriving at intersections so they don't overlap zebra meshes.
+ *
+ * @param points Array of 2D points [x, z]
+ * @param startCut Distance to trim from start of polyline (metres)
+ * @param endCut Distance to trim from end of polyline (metres)
+ * @returns Trimmed polyline points
+ */
+export function trimPolylineByCuts(
+  points: Point[],
+  startCut: number = 0,
+  endCut: number = 0,
+): Point[] {
+  if (points.length < 2) return [...points]
+  if (startCut <= 0 && endCut <= 0) return [...points]
+
+  const segLengths: number[] = []
+  let totalLength = 0
+  for (let i = 0; i < points.length - 1; i++) {
+    const d = Math.hypot(points[i + 1]![0] - points[i]![0], points[i + 1]![1] - points[i]![1])
+    segLengths.push(d)
+    totalLength += d
+  }
+
+  if (totalLength <= startCut + endCut) {
+    const midX = (points[0]![0] + points[points.length - 1]![0]) / 2
+    const midZ = (points[0]![1] + points[points.length - 1]![1]) / 2
+    return [
+      [midX, midZ],
+      [midX, midZ],
+    ]
+  }
+
+  let remainingStartCut = Math.max(0, startCut)
+  let startIndex = 0
+  let newStartPoint: Point = points[0]!
+
+  for (let i = 0; i < segLengths.length; i++) {
+    const segLen = segLengths[i]!
+    if (remainingStartCut >= segLen) {
+      remainingStartCut -= segLen
+      startIndex = i + 1
+      newStartPoint = points[startIndex]!
+    } else if (remainingStartCut > 1e-6) {
+      const t = remainingStartCut / segLen
+      const pA = points[i]!
+      const pB = points[i + 1]!
+      newStartPoint = [pA[0] + (pB[0] - pA[0]) * t, pA[1] + (pB[1] - pA[1]) * t]
+      startIndex = i
+      break
+    } else {
+      break
+    }
+  }
+
+  let remainingEndCut = Math.max(0, endCut)
+  let endIndex = points.length - 1
+  let newEndPoint: Point = points[endIndex]!
+
+  for (let i = segLengths.length - 1; i >= 0; i--) {
+    const segLen = segLengths[i]!
+    if (remainingEndCut >= segLen) {
+      remainingEndCut -= segLen
+      endIndex = i
+      newEndPoint = points[endIndex]!
+    } else if (remainingEndCut > 1e-6) {
+      const t = 1 - remainingEndCut / segLen
+      const pA = points[i]!
+      const pB = points[i + 1]!
+      newEndPoint = [pA[0] + (pB[0] - pA[0]) * t, pA[1] + (pB[1] - pA[1]) * t]
+      endIndex = i + 1
+      break
+    } else {
+      break
+    }
+  }
+
+  const result: Point[] = [newStartPoint]
+  for (let i = startIndex + 1; i < endIndex; i++) {
+    result.push(points[i]!)
+  }
+  result.push(newEndPoint)
+
+  return result
+}
+
+export interface RouteGeometryOptions {
+  startCut?: number
+  endCut?: number
+}
+
+export function buildRouteGeometry(
+  route: RouteNode,
+  options?: RouteGeometryOptions,
+): THREE.BufferGeometry {
   const sink: Sink = { positions: [], normals: [], colors: [], uvs: [], indices: [] }
   const groups: Groups = { stripe: [], contrast: [], paint: [] }
 
-  const points = relativePoints(route)
+  let rawPoints = relativePoints(route)
+  if (options?.startCut || options?.endCut) {
+    rawPoints = trimPolylineByCuts(rawPoints, options.startCut ?? 0, options.endCut ?? 0)
+  }
+  const points = rawPoints
   const centre = stripeCentreOffsetM(route.width, route.lineWidth)
   const half = LINE_WIDTHS[route.lineWidth] / 2
 

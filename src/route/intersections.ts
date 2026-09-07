@@ -1,8 +1,8 @@
 import * as THREE from 'three'
-import { ROUTE_ELEVATIONS } from './constants'
+import { ROUTE_ELEVATIONS, ROUTE_JUNCTION_THRESHOLDS } from './constants'
 import type { RouteNode } from './schema'
 
-export { ROUTE_ELEVATIONS } from './constants'
+export { ROUTE_ELEVATIONS, ROUTE_JUNCTION_THRESHOLDS } from './constants'
 
 export const ZEBRA_BAR_COUNT = 6
 export const ZEBRA_BAR_DEPTH_M = 0.34
@@ -12,6 +12,30 @@ export const ZEBRA_TOTAL_SPAN_M =
   ZEBRA_BAR_COUNT * ZEBRA_BAR_DEPTH_M + (ZEBRA_BAR_COUNT - 1) * ZEBRA_BAR_GAP_M // 3.74m
 export const ZEBRA_TOTAL_LENGTH_M = 4.08
 export const ZEBRA_ELEVATION_M = ROUTE_ELEVATIONS.ZEBRA_CROSSWALK
+
+/**
+ * The 10 discrete topological route junction archetypes.
+ */
+export type RouteJunctionKind =
+  | 'isolated'
+  | 'dead-end'
+  | 'straight'
+  | 'bend-l'
+  | 'bend-v'
+  | 'tee'
+  | 'y'
+  | 'four-way-plus'
+  | 'four-way-x'
+  | 'multi-leg'
+
+/**
+ * Specification for a corridor approaching a junction node.
+ */
+export interface ApproachSpec {
+  id: string
+  angle: number // heading in radians from junction center
+  halfWidth: number
+}
 
 export interface ZebraCrossingBar {
   center: [number, number, number]
@@ -28,6 +52,8 @@ export interface ZebraCrossingInstance {
   bars: ZebraCrossingBar[]
   pedestrianRouteId?: string
   vehicleRouteId?: string
+  junctionKind?: RouteJunctionKind
+  approachCuts?: Record<string, number>
 }
 
 export interface SegmentIntersection {
@@ -114,6 +140,195 @@ export function areRoutesOnSameLevel(routeA: RouteNode, routeB: RouteNode): bool
 }
 
 /**
+ * Calculates the smallest angle (radians) between two 2D vectors.
+ */
+export function angleBetweenVectors2D(
+  v1: readonly [number, number] | [number, number],
+  v2: readonly [number, number] | [number, number],
+): number {
+  const m1 = Math.hypot(v1[0], v1[1])
+  const m2 = Math.hypot(v2[0], v2[1])
+  if (m1 < 1e-9 || m2 < 1e-9) return 0
+  const dot = (v1[0] * v2[0] + v1[1] * v2[1]) / (m1 * m2)
+  const clamped = Math.max(-1, Math.min(1, dot))
+  return Math.acos(clamped)
+}
+
+/**
+ * Classifies a junction into one of 10 discrete topological archetypes:
+ * - isolated: 0 incident legs
+ * - dead-end: 1 incident leg
+ * - straight: 2 legs collinear (>= 165 deg)
+ * - bend-l: 2 legs orthogonal (75..105 deg)
+ * - bend-v: 2 legs acute/obtuse non-orthogonal
+ * - tee: 3 legs with a through-pair (>= 150 deg)
+ * - y: 3 legs without a through-pair (< 150 deg)
+ * - four-way-plus: 4 legs with 2 straight through-pairs (>= 165 deg) and orthogonal axes (75..105 deg)
+ * - four-way-x: 4 legs without orthogonal through-axes
+ * - multi-leg: >= 5 legs
+ *
+ * @param incidentDirections Vectors directed AWAY from the junction center [dx, dz]
+ */
+export function classifyRouteJunction(
+  incidentDirections: Array<readonly [number, number]> | Array<[number, number]>,
+): RouteJunctionKind {
+  const k = incidentDirections.length
+  if (k === 0) return 'isolated'
+  if (k === 1) return 'dead-end'
+  if (k >= 5) return 'multi-leg'
+
+  const pairs: Array<{ a: number; b: number; angleRad: number; angleDeg: number }> = []
+  for (let a = 0; a < k; a++) {
+    for (let b = a + 1; b < k; b++) {
+      const angleRad = angleBetweenVectors2D(incidentDirections[a]!, incidentDirections[b]!)
+      pairs.push({
+        a,
+        b,
+        angleRad,
+        angleDeg: (angleRad * 180.0) / Math.PI,
+      })
+    }
+  }
+
+  pairs.sort((p1, p2) => p2.angleRad - p1.angleRad)
+  const widestDeg = pairs[0]?.angleDeg ?? 0
+
+  if (k === 2) {
+    if (widestDeg >= ROUTE_JUNCTION_THRESHOLDS.STRAIGHT_MIN_DEG) {
+      return 'straight'
+    }
+    if (
+      widestDeg >= ROUTE_JUNCTION_THRESHOLDS.ORTHOGONAL_MIN_DEG &&
+      widestDeg <= ROUTE_JUNCTION_THRESHOLDS.ORTHOGONAL_MAX_DEG
+    ) {
+      return 'bend-l'
+    }
+    return 'bend-v'
+  }
+
+  if (k === 3) {
+    return widestDeg >= ROUTE_JUNCTION_THRESHOLDS.TEE_MIN_DEG ? 'tee' : 'y'
+  }
+
+  // k === 4: Plus (+) vs X-crossing
+  const first = pairs[0]!
+  const remaining = [0, 1, 2, 3].filter((idx) => idx !== first.a && idx !== first.b)
+  const secondAngleRad = angleBetweenVectors2D(
+    incidentDirections[remaining[0]!]!,
+    incidentDirections[remaining[1]!]!,
+  )
+  const secondAngleDeg = (secondAngleRad * 180.0) / Math.PI
+
+  if (
+    first.angleDeg < ROUTE_JUNCTION_THRESHOLDS.STRAIGHT_MIN_DEG ||
+    secondAngleDeg < ROUTE_JUNCTION_THRESHOLDS.STRAIGHT_MIN_DEG
+  ) {
+    return 'four-way-x'
+  }
+
+  const axisAngleRad = angleBetweenVectors2D(
+    incidentDirections[first.a]!,
+    incidentDirections[remaining[0]!]!,
+  )
+  const acuteAxisAngleRad = Math.min(axisAngleRad, Math.PI - axisAngleRad)
+  const acuteAxisDeg = (acuteAxisAngleRad * 180.0) / Math.PI
+
+  return acuteAxisDeg >= ROUTE_JUNCTION_THRESHOLDS.ORTHOGONAL_MIN_DEG &&
+    acuteAxisDeg <= ROUTE_JUNCTION_THRESHOLDS.ORTHOGONAL_MAX_DEG
+    ? 'four-way-plus'
+    : 'four-way-x'
+}
+
+/**
+ * Solves approach cutbacks (metres) for arriving route corridors at a junction.
+ * Calculates corner fillets and setbacks to prevent corridor overlapping meshes beneath crossings.
+ */
+export function solveApproachCuts(
+  approaches: ApproachSpec[],
+  requestedRadius = 3.0,
+): Record<string, number> {
+  const cuts: Record<string, number> = {}
+  const n = approaches.length
+  if (n === 0) return cuts
+  if (n === 1) {
+    cuts[approaches[0]!.id] = approaches[0]!.halfWidth
+    return cuts
+  }
+
+  if (n === 2) {
+    const angle = angleBetweenVectors2D(
+      [Math.cos(approaches[0]!.angle), Math.sin(approaches[0]!.angle)],
+      [Math.cos(approaches[1]!.angle), Math.sin(approaches[1]!.angle)],
+    )
+    const halfAngle = angle / 2
+    const sinHalf = Math.max(0.2, Math.sin(halfAngle))
+    for (const app of approaches) {
+      cuts[app.id] = Math.max(app.halfWidth, Math.min(app.halfWidth * 3, app.halfWidth / sinHalf))
+    }
+    return cuts
+  }
+
+  const sorted = [...approaches].sort((a, b) => a.angle - b.angle)
+  const cornerDistances: Array<{ fromDist: number; toDist: number }> = []
+
+  for (let i = 0; i < n; i++) {
+    const from = sorted[i]!
+    const to = sorted[(i + 1) % n]!
+    let gap = to.angle - from.angle
+    while (gap < 0) gap += 2 * Math.PI
+
+    const fromDir = [Math.cos(from.angle), Math.sin(from.angle)] as const
+    const toDir = [Math.cos(to.angle), Math.sin(to.angle)] as const
+    const fromLeft = [-fromDir[1], fromDir[0]] as const
+    const toLeft = [-toDir[1], toDir[0]] as const
+    const fallback = Math.max(from.halfWidth, to.halfWidth, requestedRadius, 0.5)
+
+    if (gap >= Math.PI - 1e-4) {
+      cornerDistances.push({ fromDist: fallback, toDist: fallback })
+      continue
+    }
+
+    const p1 = [
+      fromLeft[0] * (from.halfWidth + requestedRadius),
+      fromLeft[1] * (from.halfWidth + requestedRadius),
+    ] as const
+    const p2 = [
+      -toLeft[0] * (to.halfWidth + requestedRadius),
+      -toLeft[1] * (to.halfWidth + requestedRadius),
+    ] as const
+
+    const denom = fromDir[0] * toDir[1] - fromDir[1] * toDir[0]
+    if (Math.abs(denom) < 1e-6) {
+      cornerDistances.push({ fromDist: fallback, toDist: fallback })
+      continue
+    }
+
+    const dx = p2[0] - p1[0]
+    const dz = p2[1] - p1[1]
+    const t1 = (dx * toDir[1] - dz * toDir[0]) / denom
+    const t2 = (dx * fromDir[1] - dz * fromDir[0]) / denom
+
+    if (t1 < 0 || t2 < 0) {
+      cornerDistances.push({ fromDist: fallback, toDist: fallback })
+    } else {
+      cornerDistances.push({
+        fromDist: Math.min(t1, from.halfWidth * 4),
+        toDist: Math.min(t2, to.halfWidth * 4),
+      })
+    }
+  }
+
+  for (let i = 0; i < n; i++) {
+    const app = sorted[i]!
+    const prevCorner = cornerDistances[(i - 1 + n) % n]!
+    const nextCorner = cornerDistances[i]!
+    cuts[app.id] = Math.max(app.halfWidth, prevCorner.toDist, nextCorner.fromDist)
+  }
+
+  return cuts
+}
+
+/**
  * Creates a single ZebraCrossingInstance with 6 bars aligned with the pedestrian route direction.
  */
 export function createZebraCrossingInstance(
@@ -123,6 +338,8 @@ export function createZebraCrossingInstance(
   pedSegEnd: [number, number],
   pedestrianRoute: RouteNode,
   vehicleRoute: RouteNode,
+  vehSegStart?: [number, number],
+  vehSegEnd?: [number, number],
 ): ZebraCrossingInstance {
   const dx = pedSegEnd[0] - pedSegStart[0]
   const dz = pedSegEnd[1] - pedSegStart[1]
@@ -169,6 +386,42 @@ export function createZebraCrossingInstance(
     })
   }
 
+  // Approaches and junction topological classification
+  const approaches: ApproachSpec[] = []
+  const incidentDirs: Array<[number, number]> = []
+
+  // Pedestrian entry & exit
+  approaches.push({
+    id: `${pedestrianRoute.id}:in`,
+    angle: Math.atan2(-dx, -dz),
+    halfWidth: (pedestrianRoute.width ?? 1.2) / 2,
+  })
+  approaches.push({
+    id: `${pedestrianRoute.id}:out`,
+    angle: Math.atan2(dx, dz),
+    halfWidth: (pedestrianRoute.width ?? 1.2) / 2,
+  })
+  incidentDirs.push([-dx, -dz], [dx, dz])
+
+  if (vehSegStart && vehSegEnd) {
+    const vdx = vehSegEnd[0] - vehSegStart[0]
+    const vdz = vehSegEnd[1] - vehSegStart[1]
+    approaches.push({
+      id: `${vehicleRoute.id}:in`,
+      angle: Math.atan2(-vdx, -vdz),
+      halfWidth: (vehicleRoute.width ?? 3.0) / 2,
+    })
+    approaches.push({
+      id: `${vehicleRoute.id}:out`,
+      angle: Math.atan2(vdx, vdz),
+      halfWidth: (vehicleRoute.width ?? 3.0) / 2,
+    })
+    incidentDirs.push([-vdx, -vdz], [vdx, vdz])
+  }
+
+  const junctionKind = classifyRouteJunction(incidentDirs)
+  const approachCuts = solveApproachCuts(approaches)
+
   return {
     id,
     position,
@@ -178,6 +431,8 @@ export function createZebraCrossingInstance(
     bars,
     pedestrianRouteId: pedestrianRoute.id,
     vehicleRouteId: vehicleRoute.id,
+    junctionKind,
+    approachCuts,
   }
 }
 
@@ -215,7 +470,7 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
             if (!isDuplicate) {
               pairCrossings.push(hit.point)
               const id = `zebra:${ped.id}:${veh.id}:${p}:${v}`
-              crossings.push(createZebraCrossingInstance(id, hit.point, p1, p2, ped, veh))
+              crossings.push(createZebraCrossingInstance(id, hit.point, p1, p2, ped, veh, v1, v2))
             }
           }
         }
@@ -224,6 +479,28 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
   }
 
   return crossings
+}
+
+/**
+ * Detects intersections between warehouse routes and returns enriched zebra crossing instances.
+ * Backward-compatible helper that supports passing an array of routes or two individual routes.
+ */
+export function findRouteIntersections(routes: RouteNode[]): ZebraCrossingInstance[]
+export function findRouteIntersections(
+  routeA: RouteNode,
+  routeB: RouteNode,
+): ZebraCrossingInstance[]
+export function findRouteIntersections(
+  arg1: RouteNode[] | RouteNode,
+  arg2?: RouteNode,
+): ZebraCrossingInstance[] {
+  if (Array.isArray(arg1)) {
+    return computeRouteIntersections(arg1)
+  }
+  if (arg2) {
+    return computeRouteIntersections([arg1, arg2])
+  }
+  return []
 }
 
 /**

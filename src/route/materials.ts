@@ -173,3 +173,13 @@ export function getZebraMaterial(_appearance?: Appearance): THREE.MeshStandardMa
  * Cached singleton zebra crosswalk material.
  */
 export const cachedZebraMaterial: THREE.MeshStandardMaterial = getZebraMaterial()
+
+/**
+ * Standard shadow policy for all floor route markings:
+ * castShadow is strictly false to eliminate diagonal self-shadow artifacts on curves and coplanar slabs,
+ * receiveShadow is true so scene lighting and environment shadows cast cleanly across floor markings.
+ */
+export const ROUTE_SHADOW_POLICY = {
+  castShadow: false,
+  receiveShadow: true,
+} as const

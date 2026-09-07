@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { LINE_WIDTHS, MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
-import { buildRouteGeometry, GROUP_PAINT, markingGates, routeGeometryKey } from './geometry'
+import {
+  buildRouteGeometry,
+  GROUP_PAINT,
+  markingGates,
+  routeGeometryKey,
+  trimPolylineByCuts,
+} from './geometry'
 import { RouteNode } from './schema'
 import { outerHalfWidthM, type Point } from './stripes'
 
@@ -273,5 +279,54 @@ describe('taslak şema sınırını aşamaz — beyaz ekran çökmesi', () => {
     expect(() => RouteNode.parse({ points: clamped })).not.toThrow()
     // Kırpılmamış hâl gerçekten fırlatıyor — testin kendisi de kanıt.
     expect(() => RouteNode.parse({ points: withCursor })).toThrow()
+  })
+})
+
+describe('trimPolylineByCuts', () => {
+  test('returns identical points when startCut and endCut are 0', () => {
+    const pts: Point[] = [
+      [0, 0],
+      [10, 0],
+    ]
+    const trimmed = trimPolylineByCuts(pts, 0, 0)
+    expect(trimmed).toEqual(pts)
+  })
+
+  test('trims straight polyline by specified distances from start and end', () => {
+    const pts: Point[] = [
+      [0, 0],
+      [10, 0],
+    ]
+    const trimmed = trimPolylineByCuts(pts, 2, 3)
+    expect(trimmed).toHaveLength(2)
+    expect(trimmed[0]![0]).toBeCloseTo(2, 4)
+    expect(trimmed[0]![1]).toBeCloseTo(0, 4)
+    expect(trimmed[1]![0]).toBeCloseTo(7, 4)
+    expect(trimmed[1]![1]).toBeCloseTo(0, 4)
+  })
+
+  test('handles multi-segment polyline trimming across vertices', () => {
+    const pts: Point[] = [
+      [0, 0],
+      [5, 0],
+      [5, 10],
+    ]
+    // Total length is 5 + 10 = 15m. Cut 7m from start (consumes first segment + 2m of second segment)
+    const trimmed = trimPolylineByCuts(pts, 7, 0)
+    expect(trimmed[0]![0]).toBeCloseTo(5, 4)
+    expect(trimmed[0]![1]).toBeCloseTo(2, 4)
+    expect(trimmed[trimmed.length - 1]![0]).toBeCloseTo(5, 4)
+    expect(trimmed[trimmed.length - 1]![1]).toBeCloseTo(10, 4)
+  })
+
+  test('clamps to midpoint if total cuts exceed polyline length', () => {
+    const pts: Point[] = [
+      [0, 0],
+      [10, 0],
+    ]
+    const trimmed = trimPolylineByCuts(pts, 8, 8)
+    expect(trimmed).toHaveLength(2)
+    expect(trimmed[0]![0]).toBeCloseTo(5, 4)
+    expect(trimmed[1]![0]).toBeCloseTo(5, 4)
   })
 })

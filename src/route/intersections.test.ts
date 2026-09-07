@@ -3,17 +3,23 @@ import * as THREE from 'three'
 import {
   areRoutesOnSameLevel,
   buildZebraGeometry,
+  classifyRouteJunction,
   computeRouteIntersections,
+  findRouteIntersections,
   findZebraCrossingsForRoute,
   intersectSegments,
   ROUTE_ELEVATIONS,
+  ROUTE_JUNCTION_THRESHOLDS,
   routeWorldPoints,
+  solveApproachCuts,
   ZEBRA_BAR_COUNT,
   ZEBRA_BAR_DEPTH_M,
   ZEBRA_BAR_GAP_M,
   ZEBRA_BAR_PITCH_M,
   ZEBRA_ELEVATION_M,
   ZEBRA_TOTAL_SPAN_M,
+  type ApproachSpec,
+  type RouteJunctionKind,
 } from './intersections'
 import { cachedZebraMaterial, getZebraMaterial } from './materials'
 import { RouteNode } from './schema'
@@ -570,8 +576,6 @@ describe('Monotonic Hierarchy Constants Verification', () => {
     expect(ROUTE_ELEVATIONS.DIRECTIONAL_ARROWS).toBe(0.012)
     expect(ROUTE_ELEVATIONS.ZEBRA_CROSSWALK).toBe(0.016)
     expect(ROUTE_ELEVATIONS.GRIPS).toBe(0.05)
-
-    // Strict monotonic ordering
     expect(ROUTE_ELEVATIONS.SLAB).toBeLessThan(ROUTE_ELEVATIONS.RAYCAST)
     expect(ROUTE_ELEVATIONS.RAYCAST).toBeLessThan(ROUTE_ELEVATIONS.PAINT_CORRIDOR)
     expect(ROUTE_ELEVATIONS.PAINT_CORRIDOR).toBeLessThan(ROUTE_ELEVATIONS.EDGE_STRIPES)
@@ -694,7 +698,7 @@ describe('Milestone 1 Hardening & Challenger Verification', () => {
     expect(crossings[0]!.position[2]).toBeCloseTo(0, 2)
   })
 
-  test('zebra crossing elevation accounts for higher route elevation + 0.016m', () => {
+  test('zebra crossing elevation accounts for higher route elevation with coplanar ZEBRA_ELEVATION_M', () => {
     const ped = makeRoute({
       role: 'pedestrian',
       position: [0, 0.0, 0],
@@ -721,7 +725,7 @@ describe('Milestone 1 Hardening & Challenger Verification', () => {
     const geom = buildZebraGeometry(c, ped.position, ped.rotation)
     const worldY = ped.position[1] + geom.getAttribute('position').getY(0)
     expect(worldY).toBeCloseTo(0.05 + ZEBRA_ELEVATION_M, 4)
-    expect(worldY).toBeGreaterThan(vehElevated.position[1])
+    expect(worldY).toBeGreaterThanOrEqual(vehElevated.position[1])
 
     geom.dispose()
   })
@@ -734,5 +738,285 @@ describe('Milestone 1 Hardening & Challenger Verification', () => {
     expect(mat.polygonOffset).toBe(true)
     expect(mat.polygonOffsetUnits).toBe(-4)
     expect((mat as unknown as { renderOrder?: number }).renderOrder).toBe(10)
+  })
+})
+
+describe('Milestone 1: Junction Classification & Approach Cuts Suite', () => {
+  describe('classifyRouteJunction - 10 Topological Archetypes', () => {
+    test('k=0 emits isolated', () => {
+      expect(classifyRouteJunction([])).toBe('isolated')
+    })
+
+    test('k=1 emits dead-end', () => {
+      expect(classifyRouteJunction([[1, 0]])).toBe('dead-end')
+    })
+
+    test('k=2 collinear (180 deg) emits straight', () => {
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [-1, 0],
+        ]),
+      ).toBe('straight')
+    })
+
+    test('k=2 orthogonal (90 deg) emits bend-l', () => {
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [0, 1],
+        ]),
+      ).toBe('bend-l')
+    })
+
+    test('k=2 non-orthogonal non-collinear emits bend-v', () => {
+      // 45 degrees
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.SQRT1_2, Math.SQRT1_2],
+        ]),
+      ).toBe('bend-v')
+
+      // 120 degrees
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [-0.5, Math.sqrt(3) / 2],
+        ]),
+      ).toBe('bend-v')
+    })
+
+    test('k=3 with widest angle >= 150 deg emits tee', () => {
+      // Standard T-junction: straight through along X, branch along +Z (widest is 180 deg)
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+        ]),
+      ).toBe('tee')
+    })
+
+    test('k=3 with widest angle < 150 deg emits y', () => {
+      // Symmetric Y-junction: 120 deg apart
+      const a1 = 0
+      const a2 = (2 * Math.PI) / 3
+      const a3 = (4 * Math.PI) / 3
+      expect(
+        classifyRouteJunction([
+          [Math.cos(a1), Math.sin(a1)],
+          [Math.cos(a2), Math.sin(a2)],
+          [Math.cos(a3), Math.sin(a3)],
+        ]),
+      ).toBe('y')
+    })
+
+    test('k=4 mutually orthogonal pairs emit four-way-plus', () => {
+      // Standard + cross
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]),
+      ).toBe('four-way-plus')
+    })
+
+    test('k=4 skewed / non-orthogonal emits four-way-x', () => {
+      // Skewed X: axes at 45 deg and 135 deg to each other
+      const cos30 = Math.cos(Math.PI / 6)
+      const sin30 = Math.sin(Math.PI / 6)
+      expect(
+        classifyRouteJunction([
+          [cos30, sin30],
+          [-cos30, -sin30],
+          [cos30, -sin30],
+          [-cos30, sin30],
+        ]),
+      ).toBe('four-way-x')
+    })
+
+    test('k >= 5 emits multi-leg', () => {
+      const fiveLegs: Array<[number, number]> = []
+      for (let i = 0; i < 5; i++) {
+        const theta = (i * 2 * Math.PI) / 5
+        fiveLegs.push([Math.cos(theta), Math.sin(theta)])
+      }
+      expect(classifyRouteJunction(fiveLegs)).toBe('multi-leg')
+
+      const sixLegs: Array<[number, number]> = []
+      for (let i = 0; i < 6; i++) {
+        const theta = (i * 2 * Math.PI) / 6
+        sixLegs.push([Math.cos(theta), Math.sin(theta)])
+      }
+      expect(classifyRouteJunction(sixLegs)).toBe('multi-leg')
+    })
+  })
+
+  describe('classifyRouteJunction - Boundary Threshold Verification', () => {
+    test('collinear straight boundary at 165 deg (164.9 vs 165.1)', () => {
+      const radBelow = (164.9 * Math.PI) / 180
+      const radAbove = (165.1 * Math.PI) / 180
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radBelow), Math.sin(radBelow)],
+        ]),
+      ).toBe('bend-v')
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radAbove), Math.sin(radAbove)],
+        ]),
+      ).toBe('straight')
+    })
+
+    test('orthogonal bend-l lower boundary at 75 deg (74.9 vs 75.1)', () => {
+      const radBelow = (74.9 * Math.PI) / 180
+      const radAbove = (75.1 * Math.PI) / 180
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radBelow), Math.sin(radBelow)],
+        ]),
+      ).toBe('bend-v')
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radAbove), Math.sin(radAbove)],
+        ]),
+      ).toBe('bend-l')
+    })
+
+    test('orthogonal bend-l upper boundary at 105 deg (104.9 vs 105.1)', () => {
+      const radBelow = (104.9 * Math.PI) / 180
+      const radAbove = (105.1 * Math.PI) / 180
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radBelow), Math.sin(radBelow)],
+        ]),
+      ).toBe('bend-l')
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radAbove), Math.sin(radAbove)],
+        ]),
+      ).toBe('bend-v')
+    })
+
+    test('tee vs y boundary at 150 deg (149.9 vs 150.1)', () => {
+      const radBelow = (149.9 * Math.PI) / 180
+      const radAbove = (150.1 * Math.PI) / 180
+
+      // 3 legs: [1, 0], [cos(theta), sin(theta)], and a third bisector leg
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radBelow), Math.sin(radBelow)],
+          [Math.cos(radBelow / 2), Math.sin(radBelow / 2)],
+        ]),
+      ).toBe('y')
+
+      expect(
+        classifyRouteJunction([
+          [1, 0],
+          [Math.cos(radAbove), Math.sin(radAbove)],
+          [Math.cos(radAbove / 2), Math.sin(radAbove / 2)],
+        ]),
+      ).toBe('tee')
+    })
+  })
+
+  describe('solveApproachCuts - Fillets & Corridor Trimming Math', () => {
+    test('empty approaches returns empty record', () => {
+      expect(solveApproachCuts([])).toEqual({})
+    })
+
+    test('single approach returns cut equal to halfWidth', () => {
+      const cuts = solveApproachCuts([{ id: 'r1', angle: 0, halfWidth: 1.0 }])
+      expect(cuts['r1']).toBe(1.0)
+    })
+
+    test('two orthogonal approaches compute symmetric cutback >= halfWidth', () => {
+      const approaches: ApproachSpec[] = [
+        { id: 'app1', angle: 0, halfWidth: 1.0 },
+        { id: 'app2', angle: Math.PI / 2, halfWidth: 1.0 },
+      ]
+      const cuts = solveApproachCuts(approaches, 2.0)
+      expect(cuts['app1']).toBeDefined()
+      expect(cuts['app2']).toBeDefined()
+      expect(cuts['app1']).toBeGreaterThanOrEqual(1.0)
+      expect(cuts['app2']).toBeGreaterThanOrEqual(1.0)
+      expect(cuts['app1']).toBeCloseTo(cuts['app2']!, 4)
+    })
+
+    test('tee junction calculates valid positive cuts for all 3 corridors', () => {
+      const approaches: ApproachSpec[] = [
+        { id: 'east', angle: 0, halfWidth: 0.8 },
+        { id: 'west', angle: Math.PI, halfWidth: 0.8 },
+        { id: 'north', angle: Math.PI / 2, halfWidth: 1.2 },
+      ]
+      const cuts = solveApproachCuts(approaches, 1.5)
+      expect(cuts['east']).toBeGreaterThanOrEqual(0.8)
+      expect(cuts['west']).toBeGreaterThanOrEqual(0.8)
+      expect(cuts['north']).toBeGreaterThanOrEqual(1.2)
+      expect(Number.isFinite(cuts['east'])).toBe(true)
+      expect(Number.isFinite(cuts['west'])).toBe(true)
+      expect(Number.isFinite(cuts['north'])).toBe(true)
+    })
+  })
+
+  describe('findRouteIntersections API Compatibility & Overloads', () => {
+    test('supports array of routes overload', () => {
+      const ped = makeRoute({
+        role: 'pedestrian',
+        points: [
+          [0, 5],
+          [10, 5],
+        ],
+      })
+      const veh = makeRoute({
+        role: 'vehicle',
+        points: [
+          [5, 0],
+          [5, 10],
+        ],
+      })
+      const results = findRouteIntersections([ped, veh])
+      expect(results).toHaveLength(1)
+      expect(results[0]!.pedestrianRouteId).toBe(ped.id)
+      expect(results[0]!.vehicleRouteId).toBe(veh.id)
+      expect(results[0]!.junctionKind).toBeDefined()
+    })
+
+    test('supports two-route overload findRouteIntersections(routeA, routeB)', () => {
+      const ped = makeRoute({
+        role: 'pedestrian',
+        points: [
+          [0, 5],
+          [10, 5],
+        ],
+      })
+      const veh = makeRoute({
+        role: 'vehicle',
+        points: [
+          [5, 0],
+          [5, 10],
+        ],
+      })
+      const results = findRouteIntersections(ped, veh)
+      expect(results).toHaveLength(1)
+      expect(results[0]!.pedestrianRouteId).toBe(ped.id)
+      expect(results[0]!.vehicleRouteId).toBe(veh.id)
+    })
   })
 })

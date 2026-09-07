@@ -76,17 +76,29 @@ export const ROUTE_ELEVATIONS = {
   SLAB: 0.0,
   RAYCAST_PICK: 0.001,
   RAYCAST: 0.001,
+  PAINT_RIBBON: 0.002,
   PAINTED_CORRIDOR: 0.002,
   PAINT_CORRIDOR: 0.002,
   PAINT_FILL: 0.002,
+  STRIPES: 0.008,
   EDGE_STRIPES: 0.008,
+  DIVIDERS: 0.012,
+  ARROWS: 0.012,
   DIRECTIONAL_ARROWS: 0.012,
   ZEBRA_CROSSWALK: 0.016,
+  ZEBRA: 0.016,
   CONTROLS_GRIPS: 0.05,
   GRIPS: 0.05,
 } as const
 
 export type RouteElevations = typeof ROUTE_ELEVATIONS
+
+export const ROUTE_DEPTH_BIAS = {
+  PAINT_RIBBON: { factor: -1, units: -1, renderOrder: 1 },
+  STRIPES: { factor: -2, units: -2, renderOrder: 5 },
+  ARROWS: { factor: -3, units: -3, renderOrder: 8 },
+  ZEBRA: { factor: -4, units: -4, renderOrder: 10 },
+} as const
 
 export const DEPTH_BIAS = {
   factor: -1,
@@ -112,6 +124,16 @@ export const DEPTH_BIAS = {
     polygonOffsetUnits: -4,
     renderOrder: 10,
   },
+} as const
+
+/**
+ * Geometric angle thresholds for topological junction classification.
+ */
+export const ROUTE_JUNCTION_THRESHOLDS = {
+  STRAIGHT_MIN_DEG: 165,
+  ORTHOGONAL_MIN_DEG: 75,
+  ORTHOGONAL_MAX_DEG: 105,
+  TEE_MIN_DEG: 150,
 } as const
 
 /**

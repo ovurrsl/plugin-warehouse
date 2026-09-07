@@ -1,32 +1,19 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
-import { type Appearance, appearanceKey, resetSurfaceMaterials } from '../../appearance'
-import {
-  ARROW_LENGTH_M,
-  DEPTH_BIAS,
-  LINE_WIDTHS,
-  MAX_VERTICES,
-  MITER_LIMIT,
-  ROUTE_ELEVATIONS,
-} from '../constants'
+import type { Appearance } from '../../appearance'
+import { DEPTH_BIAS, MAX_VERTICES, ROUTE_ELEVATIONS } from '../constants'
 import {
   buildRouteGeometry,
-  getRouteGeometry,
   GROUP_CONTRAST,
   GROUP_PAINT,
   GROUP_STRIPE,
-  markingGates,
   releaseRouteGeometry,
   retainRouteGeometry,
   routeGeometryKey,
 } from '../geometry'
 import {
-  areRoutesOnSameLevel,
   buildZebraGeometry,
   computeRouteIntersections,
-  createZebraCrossingInstance,
-  intersectSegments,
-  routeWorldPoints,
   ZEBRA_BAR_COUNT,
   ZEBRA_ELEVATION_M,
 } from '../intersections'
@@ -37,7 +24,7 @@ import {
   getZebraMaterial,
 } from '../materials'
 import { RouteNode } from '../schema'
-import { offsetCentreline, outerHalfWidthM, stripeCentreOffsetM } from '../stripes'
+import { outerHalfWidthM } from '../stripes'
 
 function makeRoute(patch: Record<string, unknown> = {}): RouteNode {
   const customId =

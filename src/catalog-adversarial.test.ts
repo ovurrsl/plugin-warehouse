@@ -66,7 +66,7 @@ describe('Adversarial Challenge: Category Switching Across All 8 Sections', () =
   })
 
   test('all items in catalog have valid icons (lucide:* or iconify format) and non-empty descriptions', () => {
-    expect(CATALOG_ITEMS.length).toBe(43)
+    expect(CATALOG_ITEMS.length).toBe(44)
     for (const item of CATALOG_ITEMS) {
       expect(typeof item.id).toBe('string')
       expect(item.id.length).toBeGreaterThan(0)
@@ -84,17 +84,17 @@ describe('Adversarial Challenge: Category Switching Across All 8 Sections', () =
     for (const section of CATALOG_SECTIONS) {
       counts[section.id] = itemsInSection(section.id).length
     }
-    // Verify each section contains at least 2 items and all 43 items are distributed
+    // Verify each section contains at least 2 items and all 44 items are distributed
     expect(counts['unit-loads']).toBe(2)
-    expect(counts['storage']).toBe(11)
-    expect(counts['handling']).toBe(7)
-    expect(counts['conveyance']).toBe(10)
-    expect(counts['stations']).toBe(6)
-    expect(counts['docks']).toBe(2)
-    expect(counts['mezzanine']).toBe(3)
-    expect(counts['layout']).toBe(2)
+    expect(counts.storage).toBe(11)
+    expect(counts.handling).toBe(7)
+    expect(counts.conveyance).toBe(10)
+    expect(counts.stations).toBe(6)
+    expect(counts.docks).toBe(2)
+    expect(counts.mezzanine).toBe(3)
+    expect(counts.layout).toBe(3)
     const sum = Object.values(counts).reduce((a, b) => a + b, 0)
-    expect(sum).toBe(43)
+    expect(sum).toBe(44)
   })
 })
 

@@ -252,6 +252,9 @@ export const CLICK_TRIGGER_KINDS = [
   'warehouse:drive-in-rack',
   'warehouse:longspan-rack',
   'warehouse:m3-rack',
+  // Yaya geçidi zeminde bir alan kaplar ve diğer geçitlerin üzerindeyken
+  // tıklanarak yeni geçit konulabilir — tıpkı diğer zemin nesnelerinde olduğu gibi.
+  'warehouse:crosswalk',
 ] as const
 
 export type PlacementClickEvent = { stopPropagation?: () => void }

@@ -165,6 +165,19 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'points', kind: 'CUSTOM', where: 'çizim aracı; nokta listesi generic alan değil' },
   ],
+  'warehouse:crosswalk': [
+    { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
+    {
+      field: 'routeId',
+      kind: 'SYSTEM',
+      where: 'CrosswalkTool rota üzerine yapıştırıldığında araç yazar; bağlantısız geçitte null',
+    },
+    {
+      field: 't',
+      kind: 'SYSTEM',
+      where: 'CrosswalkTool rota boyunca bağıl konum (0–1) yazar; routeId null ise anlamsız',
+    },
+  ],
   'warehouse:truck': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },
     { field: 'routeId', kind: 'SYSTEM', where: 'filo sistemi yazar' },

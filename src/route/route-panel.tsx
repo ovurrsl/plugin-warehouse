@@ -41,7 +41,8 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
   }
 
   const isFilled = node.fillEnabled !== false
-  const fillColor = node.fillColor ?? node.laneColor ?? (node.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
+  const fillColor =
+    node.fillColor ?? node.laneColor ?? (node.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
   const edgeColor = node.edgeColor ?? (node.role === 'vehicle' ? '#eab308' : '#ffffff')
   const arrowsEnabled = node.directionalArrows !== false
 
@@ -78,7 +79,11 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
           >
             {arrowsEnabled && (
               <span className="font-bold text-foreground/70 tracking-widest select-none">
-                {node.arrowDirection === 'backward' ? '◀◀' : node.arrowDirection === 'both' ? '◀▶' : '▶▶'}
+                {node.arrowDirection === 'backward'
+                  ? '◀◀'
+                  : node.arrowDirection === 'both'
+                    ? '◀▶'
+                    : '▶▶'}
               </span>
             )}
             {!isFilled && (

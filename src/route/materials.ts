@@ -52,7 +52,11 @@ const CONTRAST_COLOUR = 0x1e293b
 
 const cache = new Map<string, THREE.Material[]>()
 
-function specFor(role: RouteRole, part: 'stripe' | 'contrast', edgeColor?: string | null): SurfaceSpec {
+function specFor(
+  role: RouteRole,
+  part: 'stripe' | 'contrast',
+  edgeColor?: string | null,
+): SurfaceSpec {
   const isStripe = part === 'stripe'
   let color = isStripe ? STRIPE_COLOURS[role] : CONTRAST_COLOUR
   if (isStripe && edgeColor) {

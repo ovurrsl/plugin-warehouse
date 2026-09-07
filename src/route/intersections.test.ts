@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import * as THREE from 'three'
 import {
+  type ApproachSpec,
   areRoutesOnSameLevel,
   buildZebraGeometry,
   classifyRouteJunction,
@@ -9,7 +10,6 @@ import {
   findZebraCrossingsForRoute,
   intersectSegments,
   ROUTE_ELEVATIONS,
-  ROUTE_JUNCTION_THRESHOLDS,
   routeWorldPoints,
   solveApproachCuts,
   ZEBRA_BAR_COUNT,
@@ -18,8 +18,6 @@ import {
   ZEBRA_BAR_PITCH_M,
   ZEBRA_ELEVATION_M,
   ZEBRA_TOTAL_SPAN_M,
-  type ApproachSpec,
-  type RouteJunctionKind,
 } from './intersections'
 import { cachedZebraMaterial, getZebraMaterial } from './materials'
 import { RouteNode } from './schema'
@@ -943,7 +941,7 @@ describe('Milestone 1: Junction Classification & Approach Cuts Suite', () => {
 
     test('single approach returns cut equal to halfWidth', () => {
       const cuts = solveApproachCuts([{ id: 'r1', angle: 0, halfWidth: 1.0 }])
-      expect(cuts['r1']).toBe(1.0)
+      expect(cuts.r1).toBe(1.0)
     })
 
     test('two orthogonal approaches compute symmetric cutback >= halfWidth', () => {
@@ -952,11 +950,11 @@ describe('Milestone 1: Junction Classification & Approach Cuts Suite', () => {
         { id: 'app2', angle: Math.PI / 2, halfWidth: 1.0 },
       ]
       const cuts = solveApproachCuts(approaches, 2.0)
-      expect(cuts['app1']).toBeDefined()
-      expect(cuts['app2']).toBeDefined()
-      expect(cuts['app1']).toBeGreaterThanOrEqual(1.0)
-      expect(cuts['app2']).toBeGreaterThanOrEqual(1.0)
-      expect(cuts['app1']).toBeCloseTo(cuts['app2']!, 4)
+      expect(cuts.app1).toBeDefined()
+      expect(cuts.app2).toBeDefined()
+      expect(cuts.app1).toBeGreaterThanOrEqual(1.0)
+      expect(cuts.app2).toBeGreaterThanOrEqual(1.0)
+      expect(cuts.app1).toBeCloseTo(cuts.app2!, 4)
     })
 
     test('tee junction calculates valid positive cuts for all 3 corridors', () => {
@@ -966,12 +964,12 @@ describe('Milestone 1: Junction Classification & Approach Cuts Suite', () => {
         { id: 'north', angle: Math.PI / 2, halfWidth: 1.2 },
       ]
       const cuts = solveApproachCuts(approaches, 1.5)
-      expect(cuts['east']).toBeGreaterThanOrEqual(0.8)
-      expect(cuts['west']).toBeGreaterThanOrEqual(0.8)
-      expect(cuts['north']).toBeGreaterThanOrEqual(1.2)
-      expect(Number.isFinite(cuts['east'])).toBe(true)
-      expect(Number.isFinite(cuts['west'])).toBe(true)
-      expect(Number.isFinite(cuts['north'])).toBe(true)
+      expect(cuts.east).toBeGreaterThanOrEqual(0.8)
+      expect(cuts.west).toBeGreaterThanOrEqual(0.8)
+      expect(cuts.north).toBeGreaterThanOrEqual(1.2)
+      expect(Number.isFinite(cuts.east)).toBe(true)
+      expect(Number.isFinite(cuts.west)).toBe(true)
+      expect(Number.isFinite(cuts.north)).toBe(true)
     })
   })
 

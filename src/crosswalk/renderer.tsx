@@ -56,12 +56,7 @@ export default function CrosswalkRenderer({ node }: { node: CrosswalkNode }) {
   }, [stripeColor])
 
   return (
-    <group
-      position={position}
-      rotation={rotation}
-      ref={registeredRef}
-      {...handlers}
-    >
+    <group position={position} rotation={rotation} ref={registeredRef} {...handlers}>
       {bars.map((bar, i) => (
         <mesh
           key={i}

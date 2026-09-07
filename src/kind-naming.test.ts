@@ -66,6 +66,9 @@ const SINGLETONS = [
   // varyantı değil, konveyör hattının bir parçası değil, ve bir "lift"
   // ailesi de yok (tek üye). `elevator` gibi eksiz.
   'pallet-lift',
+  // Kural 3 — tekil şey, eksiz. Bir yaya geçidi, tek başına duran bir işaret;
+  // ne konveyör hattının parçası ne de başka bir ailenin varyantı.
+  'crosswalk',
 ] as const
 
 describe('kind isimlendirme standardı', () => {

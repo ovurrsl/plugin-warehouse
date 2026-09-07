@@ -10,7 +10,6 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
-import { useAppearance } from '../appearance'
 import { useAdmitted } from '../instancing/admission'
 import { useStaticTransform } from '../static-transform'
 import { PAINT_LIFT_M } from './constants'

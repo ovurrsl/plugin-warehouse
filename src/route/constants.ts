@@ -210,4 +210,3 @@ export const DEFAULT_PEDESTRIAN_FILL_COLOR = '#3b82f6'
 export const DEFAULT_VEHICLE_FILL_COLOR = '#f59e0b'
 export const DEFAULT_VEHICLE_EDGE_COLOR = '#eab308'
 export const DEFAULT_PEDESTRIAN_EDGE_COLOR = '#ffffff'
-

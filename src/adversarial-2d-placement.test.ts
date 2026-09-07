@@ -1,13 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { type AnyNode, emitter } from '@pascal-app/core'
-import { useEditor, useFacingPose, usePlacementPreview } from '@pascal-app/editor'
+import { useEditor, usePlacementPreview } from '@pascal-app/editor'
 import { warehousePlugin } from './index'
 import {
   clearPlacementPreview,
   disarmPlacementToolOnCommit,
   publishPlacementPreview,
   resolveActiveLevelId,
-  samePlacementPoint,
   subscribeGridMove,
   subscribePlacementClicks,
 } from './placement'
@@ -621,7 +620,7 @@ describe('Adversarial Challenge 5: Immediate 2D FloorplanRegistry Rendering with
     return visitedIds
   }
 
-  test('all 21 warehouse node types receive ambient Level 0 parentId and appear in 2D Floorplan DFS immediately', () => {
+  test('all 22 warehouse node types receive ambient Level 0 parentId and appear in 2D Floorplan DFS immediately', () => {
     const initialScene: Record<string, unknown> = {
       'bldg-main': {
         id: 'bldg-main',
@@ -649,7 +648,7 @@ describe('Adversarial Challenge 5: Immediate 2D FloorplanRegistry Rendering with
     level0.children = []
 
     const registeredKinds = (warehousePlugin.nodes ?? []).map((n) => (n as { kind: string }).kind)
-    expect(registeredKinds.length).toBe(21)
+    expect(registeredKinds.length).toBe(22)
 
     // For each registered kind, instantiate and commit to level0
     for (let i = 0; i < registeredKinds.length; i++) {
@@ -675,9 +674,9 @@ describe('Adversarial Challenge 5: Immediate 2D FloorplanRegistry Rendering with
       expect(visited).toContain(nodeId)
     }
 
-    // Verify all 21 items + level-main-0 are in visited list
+    // Verify all 22 items + level-main-0 are in visited list
     const finalVisited = simulateFloorplanRegistryDFS(currentNodes, activeLevelId!)
-    expect(finalVisited.length).toBe(22) // 1 level + 21 equipment items
+    expect(finalVisited.length).toBe(23) // 1 level + 22 equipment items
   })
 
   test('ephemeral 2D placement preview updates without modifying scene nodes', () => {

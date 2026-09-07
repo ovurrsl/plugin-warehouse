@@ -15,25 +15,16 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { type AnyNodeId, useLiveNodeOverrides, useScene } from '@pascal-app/core'
 import { useViewer } from '@pascal-app/viewer'
-import { MAX_VERTICES, ROUTE_ELEVATIONS } from '../constants'
 import { getRouteGeometry } from '../geometry'
 import {
-  calculatePolylineLength,
   COLLINEAR_SNAP_THRESHOLD_M,
-  deleteControlPoint,
-  getRouteMidpoint,
-  getRouteMidpoints,
   insertControlPoint,
-  localToWorldXZ,
-  MIN_SEGMENT_LENGTH_M,
   ORTHOGONAL_SNAP_THRESHOLD_M,
-  shiftControlPoint,
   snapCollinear,
   snapOrthogonal,
   withRouteVertexInserted,
   withRouteVertexMoved,
   withRouteVertexRemoved,
-  worldToLocalXZ,
 } from '../route-controls-math'
 import { RouteNode } from '../schema'
 import type { Point } from '../stripes'
@@ -957,7 +948,7 @@ describe('Suite 5: Interaction Edge Cases & Robustness', () => {
     useScene.getState().createNode(route)
 
     // Drag in progress with draft at [10, 5]
-    let draftPoints: Point[] = [
+    const draftPoints: Point[] = [
       [0, 0],
       [10, 5],
     ]

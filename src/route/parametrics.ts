@@ -42,7 +42,12 @@ export const routeParametrics: ParametricDescriptor<RouteNode> = {
     {
       label: 'Flow & Arrows',
       fields: [
-        { key: 'arrowDirection', kind: 'enum', options: ['forward', 'backward', 'both'], display: 'segmented' },
+        {
+          key: 'arrowDirection',
+          kind: 'enum',
+          options: ['forward', 'backward', 'both'],
+          display: 'segmented',
+        },
         { key: 'arrowSpacing', kind: 'number', unit: 'm', min: 1, max: 30, step: 1 },
       ],
     },

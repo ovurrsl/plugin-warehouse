@@ -254,15 +254,20 @@ export default function RouteTool() {
   const draft: Point[] = (cursor ? [...vertices, cursor] : vertices).slice(0, MAX_VERTICES)
 
   const lastVertex = vertices.at(-1)
-  const legDist = lastVertex && cursor ? Math.hypot(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) : 0
+  const legDist =
+    lastVertex && cursor ? Math.hypot(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) : 0
   const legAngle =
     lastVertex && cursor
-      ? (Math.atan2(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) * 180 / Math.PI + 360) % 360
+      ? ((Math.atan2(cursor[0] - lastVertex[0], cursor[1] - lastVertex[1]) * 180) / Math.PI + 360) %
+        360
       : 0
 
   let totalDist = 0
   for (let i = 0; i < vertices.length - 1; i++) {
-    totalDist += Math.hypot(vertices[i + 1]![0] - vertices[i]![0], vertices[i + 1]![1] - vertices[i]![1])
+    totalDist += Math.hypot(
+      vertices[i + 1]![0] - vertices[i]![0],
+      vertices[i + 1]![1] - vertices[i]![1],
+    )
   }
   if (lastVertex && cursor) {
     totalDist += legDist
@@ -313,7 +318,8 @@ export default function RouteTool() {
       {draft.length >= 2 && <RoutePreview brush={brush} points={draft} surfaceY={surfaceY} />}
 
       {/* Streetscape-style drawing HUD */}
-      {typeof document !== 'undefined' && cursor && (
+      {typeof document !== 'undefined' &&
+        cursor &&
         createPortal(
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-border/80 bg-background/95 px-4 py-2 text-xs shadow-xl backdrop-blur-md select-none">
             <span className="flex items-center gap-1.5 font-semibold text-foreground">
@@ -343,13 +349,15 @@ export default function RouteTool() {
             )}
             <div className="h-3.5 w-px bg-border/80" />
             <span className="text-[11px] text-muted-foreground/80">
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Çift Tık / Enter</kbd> Bitir ·{' '}
+              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                Çift Tık / Enter
+              </kbd>{' '}
+              Bitir ·{' '}
               <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd> İptal
             </span>
           </div>,
           document.body,
-        )
-      )}
+        )}
     </>
   )
 }

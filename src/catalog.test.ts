@@ -317,7 +317,7 @@ describe('katalog arama ve filtreleme mantığı', () => {
 
 describe('3D webp/png katalog logoları ve görsel varlıklar (R2)', () => {
   test('katalogda tam 43 fiş var', () => {
-    expect(CATALOG_ITEMS.length).toBe(43)
+    expect(CATALOG_ITEMS.length).toBe(44)
   })
 
   test('tüm 43 fiş /icons/warehouse/<id>.(webp|png) formatında ikon taşır', () => {
@@ -358,4 +358,3 @@ describe('3D webp/png katalog logoları ve görsel varlıklar (R2)', () => {
     expect(source).toContain('objectFit')
   })
 })
-

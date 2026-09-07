@@ -1,14 +1,7 @@
 'use client'
 
-import {
-  type AnyNode,
-  type AnyNodeId,
-  useScene,
-} from '@pascal-app/core'
-import {
-  PlacementBox,
-  triggerSFX,
-} from '@pascal-app/editor'
+import { type AnyNode, type AnyNodeId, useScene } from '@pascal-app/core'
+import { PlacementBox, triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef, useState } from 'react'
 import { slabAt } from '../host-adapter'
@@ -17,6 +10,7 @@ import {
   collectSlabs,
   disarmPlacementToolOnCommit,
   electSupportSlab,
+  resolveAlignedPlacement,
   subscribeGridClicks,
   subscribeGridMove,
   useActiveLevelId,
@@ -140,8 +134,18 @@ export default function CrosswalkTool() {
         setActiveT(snap.t)
         setValid(true)
       } else {
-        const slab = slabAt(collectSlabs(nodes, activeLevelId), rawX, rawZ)
-        setCursor([rawX, slab?.elevation ?? 0, rawZ])
+        // Honour grid-snap by resolving through the aligned placement ladder
+        // (empty candidates = no alignment guides, but grid quantize is applied).
+        const placeholder = CrosswalkNode.parse({}) as unknown as AnyNode
+        const { position } = resolveAlignedPlacement({
+          candidates: [],
+          node: placeholder,
+          rawX,
+          rawZ,
+          rotationY: 0,
+        })
+        const slab = slabAt(collectSlabs(nodes, activeLevelId), position[0], position[2])
+        setCursor([position[0], slab?.elevation ?? 0, position[2]])
         setRotationY(0)
         setActiveWidth(3.5)
         setActiveRouteId(null)
@@ -165,7 +169,6 @@ export default function CrosswalkTool() {
         t: activeT,
         parentId: activeLevelId,
         supportSlabId: electSupportSlab(nodes, activeLevelId, point[0], point[2]),
-        name: 'Yaya Geçidi',
       })
 
       useScene.getState().createNode(crosswalk as unknown as AnyNode, activeLevelId as AnyNodeId)

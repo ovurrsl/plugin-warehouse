@@ -48,6 +48,7 @@ const INTENTIONALLY_UNITLESS: Record<string, string> = {
   'warehouse:pallet-rack/tunnelLevels': 'adet',
   'warehouse:tote-cart/loadedTiers': 'adet',
   'warehouse:tote-cart/tiers': 'adet',
+  'warehouse:crosswalk/stripeCount': 'adet — zebra çizgi sayısı, metre değil',
 }
 
 function unitlessNumberFields(): string[] {

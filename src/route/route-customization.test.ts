@@ -1,15 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  DEFAULT_PEDESTRIAN_FILL_COLOR,
-  DEFAULT_VEHICLE_EDGE_COLOR,
-  INDUSTRIAL_COLOR_PALETTE,
-} from './constants'
-import {
-  buildRouteGeometry,
-  getRouteGeometry,
-  resolveRouteFill,
-  routeGeometryKey,
-} from './geometry'
+import { DEFAULT_PEDESTRIAN_FILL_COLOR, INDUSTRIAL_COLOR_PALETTE } from './constants'
+import { buildRouteGeometry, resolveRouteFill } from './geometry'
 import { getRouteMaterials } from './materials'
 import { routeParametrics } from './parametrics'
 import { RouteNode } from './schema'
@@ -47,7 +38,11 @@ describe('Route Customization & Streetscape Parity Suite', () => {
     const filledVehicleDefault = makeRoute({ fillEnabled: true, fillColor: undefined })
     expect(resolveRouteFill(filledVehicleDefault)).toBe('#f59e0b')
 
-    const filledPedestrianDefault = makeRoute({ role: 'pedestrian', fillEnabled: true, fillColor: undefined })
+    const filledPedestrianDefault = makeRoute({
+      role: 'pedestrian',
+      fillEnabled: true,
+      fillColor: undefined,
+    })
     expect(resolveRouteFill(filledPedestrianDefault)).toBe(DEFAULT_PEDESTRIAN_FILL_COLOR)
   })
 

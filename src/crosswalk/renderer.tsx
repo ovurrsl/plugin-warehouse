@@ -1,13 +1,19 @@
-'use client'
-
-import { useRegisterNode } from '@pascal-app/viewer'
-import { useMemo } from 'react'
+import { type AnyNodeId, useLiveTransforms, useRegistry } from '@pascal-app/core'
+import { useNodeEvents } from '@pascal-app/viewer'
+import { useMemo, useRef } from 'react'
+import type { Object3D } from 'three'
 import * as THREE from 'three'
 import { DEPTH_BIAS, ROUTE_ELEVATIONS } from '../route/constants'
 import type { CrosswalkNode } from './schema'
 
 export default function CrosswalkRenderer({ node }: { node: CrosswalkNode }) {
-  const registeredRef = useRegisterNode(node.id)
+  const handlers = useNodeEvents(node as never, node.type as never)
+  const registeredRef = useRef<Object3D>(null!)
+  useRegistry(node.id as AnyNodeId, node.type, registeredRef)
+
+  const live = useLiveTransforms((s) => s.get(node.id))
+  const position = live?.position ?? node.position
+  const rotation = live?.rotation ?? node.rotation
 
   const width = node.width ?? 3.5
   const length = node.length ?? 2.5
@@ -49,9 +55,10 @@ export default function CrosswalkRenderer({ node }: { node: CrosswalkNode }) {
 
   return (
     <group
-      position={node.position}
-      rotation={node.rotation}
+      position={position}
+      rotation={rotation}
       ref={registeredRef}
+      {...handlers}
     >
       {bars.map((bar, i) => (
         <mesh

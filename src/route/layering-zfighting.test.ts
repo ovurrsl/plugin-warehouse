@@ -450,7 +450,7 @@ describe('Milestone 2: Monotonic Y-Elevation Hierarchy & Z-Fighting Prevention',
 
       const laneColorField = routeGroup!.fields.find((f) => f.key === 'laneColor')
       expect(laneColorField).toBeDefined()
-      expect(laneColorField!.kind).toBe('string')
+      expect(laneColorField!.kind).toBe('color')
 
       const arrowsField = routeGroup!.fields.find((f) => f.key === 'directionalArrows')
       expect(arrowsField).toBeDefined()

@@ -45,7 +45,7 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
   const issues = routeParametrics.invariants?.flatMap((check) => check(node)) ?? []
 
   const updateNode = (patch: Partial<RouteNode>) => {
-    useScene.getState().updateNode(node.id as AnyNodeId, patch)
+    useScene.getState().updateNode(node.id as AnyNodeId, patch as never)
   }
 
   const isFilled = node.fillEnabled !== false

@@ -35,14 +35,12 @@ export const crosswalkDefinition = {
     floorPlaced: {
       footprint: (node) => {
         const cw = node as unknown as CrosswalkNode
-        const w = (cw.width ?? 3.5) / 2
-        const l = (cw.length ?? 2.5) / 2
-        return [
-          [-w, -l],
-          [w, -l],
-          [w, l],
-          [-w, l],
-        ]
+        const w = cw.width ?? 3.5
+        const l = cw.length ?? 2.5
+        return {
+          dimensions: [w, 0.002, l],
+          rotation: cw.rotation ?? [0, 0, 0],
+        }
       },
     },
   },

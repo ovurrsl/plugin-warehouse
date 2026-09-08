@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`866ae6a`](https://github.com/ovurrsl/plugin-warehouse/commit/866ae6a0c365e77f60b6589fbc417f21b26425ad))
 - Refresh generated README blocks [skip ci] ([`7b6dc4b`](https://github.com/ovurrsl/plugin-warehouse/commit/7b6dc4b8cb7822bf099441d4e404b5df6aa79c32))
 - Refresh generated README blocks [skip ci] ([`65842b6`](https://github.com/ovurrsl/plugin-warehouse/commit/65842b63042b2ad445a3076f3e8aad2fa55e7c46))
 - Refresh generated README blocks [skip ci] ([`f6bd6b3`](https://github.com/ovurrsl/plugin-warehouse/commit/f6bd6b3657925caaaf8a51c129777ecd652df6d8))
@@ -318,6 +319,8 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Resolve severe React Hooks violation in RouteControls causing editor lockup on click ([`d9b98a0`](https://github.com/ovurrsl/plugin-warehouse/commit/d9b98a0b96819d3fbcece31f75398fd473749f70))
+- Resolve severe React Hooks violation in RouteControls causing editor lockup on click ([`9b33ffb`](https://github.com/ovurrsl/plugin-warehouse/commit/9b33ffb2dc529806d38d7b2d45e362a78ad757fc))
 - Prevent elevation drop on settings edit, unify fill logic, support curved/dashed styles ([`f6571fc`](https://github.com/ovurrsl/plugin-warehouse/commit/f6571fc189f51500ed6cf9414cfdee9578285991))
 - Ensure RouteControls handles always respect node position and rotation ([`a21c820`](https://github.com/ovurrsl/plugin-warehouse/commit/a21c8201e9a56539c71c34563ed5859860305bf4))
 - Prevent route disappearing under slab and resolve editor freeze on click ([`e0a49d3`](https://github.com/ovurrsl/plugin-warehouse/commit/e0a49d3c3c019286dbce003c7bf9dd940b82848b))

@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6ac9fde`](https://github.com/ovurrsl/plugin-warehouse/commit/6ac9fde7f78566261cd386ef19e70a95c6cce5da))
 - Refresh generated README blocks [skip ci] ([`b58d3cc`](https://github.com/ovurrsl/plugin-warehouse/commit/b58d3cc2436d23ea43f47b70248d8e0919642285))
 - Refresh generated README blocks [skip ci] ([`5d9f050`](https://github.com/ovurrsl/plugin-warehouse/commit/5d9f0502583be6dc487fc2a6801873e4263c1592))
 - Refresh generated README blocks [skip ci] ([`c841769`](https://github.com/ovurrsl/plugin-warehouse/commit/c841769d6d70a2b7ef3e2be8544aacecf304c757))

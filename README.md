@@ -3,7 +3,7 @@
 <!-- BADGES:START -->
 [![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
-![Version](https://img.shields.io/badge/version-0.1.4-blue)
+![Version](https://img.shields.io/badge/version-0.1.5-blue)
 ![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
 ![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
 ![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
@@ -228,6 +228,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`6ac9fde`](https://github.com/ovurrsl/plugin-warehouse/commit/6ac9fde7f78566261cd386ef19e70a95c6cce5da))
 - Refresh generated README blocks [skip ci] ([`b58d3cc`](https://github.com/ovurrsl/plugin-warehouse/commit/b58d3cc2436d23ea43f47b70248d8e0919642285))
 - Refresh generated README blocks [skip ci] ([`5d9f050`](https://github.com/ovurrsl/plugin-warehouse/commit/5d9f0502583be6dc487fc2a6801873e4263c1592))
 - Refresh generated README blocks [skip ci] ([`c841769`](https://github.com/ovurrsl/plugin-warehouse/commit/c841769d6d70a2b7ef3e2be8544aacecf304c757))
@@ -235,7 +236,6 @@ bunx git-cliff --output CHANGELOG.md
 - Refresh generated README blocks [skip ci] ([`1f51d5d`](https://github.com/ovurrsl/plugin-warehouse/commit/1f51d5da196a50cfbf4844c0a56089b1d5f5cfad))
 - Refresh generated README blocks [skip ci] ([`6f70d44`](https://github.com/ovurrsl/plugin-warehouse/commit/6f70d4425ecc0d0b0584ea771a949f0dd5b863bf))
 - Refresh generated README blocks [skip ci] ([`326424c`](https://github.com/ovurrsl/plugin-warehouse/commit/326424c4b62dd45abae6d3c66efb0239ce9384ed))
-- Refresh generated README blocks [skip ci] ([`a484b61`](https://github.com/ovurrsl/plugin-warehouse/commit/a484b61b61517fa593adbf86c10e669b5e34c526))
 
 …
 

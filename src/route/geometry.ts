@@ -81,7 +81,34 @@ function emitRibbon(
   outer: Point[],
   y: number = 0,
   color?: [number, number, number],
+  dashed = false,
 ) {
+  if (dashed) {
+    const dashLen = 0.4
+    const gapLen = 0.2
+    const period = dashLen + gapLen
+    for (let i = 0; i < inner.length - 1; i++) {
+      const a = inner[i]
+      const b = outer[i]
+      const c = outer[i + 1]
+      const d = inner[i + 1]
+      if (!a || !b || !c || !d) continue
+      const segLen = Math.hypot(d[0] - a[0], d[1] - a[1])
+      if (segLen < 1e-6) continue
+      for (let dist = 0; dist < segLen; dist += period) {
+        const t0 = dist / segLen
+        const t1 = Math.min(1, (dist + dashLen) / segLen)
+        if (t1 - t0 < 1e-4) continue
+        const a0: Point = [a[0] + (d[0] - a[0]) * t0, a[1] + (d[1] - a[1]) * t0]
+        const b0: Point = [b[0] + (c[0] - b[0]) * t0, b[1] + (c[1] - b[1]) * t0]
+        const b1: Point = [b[0] + (c[0] - b[0]) * t1, b[1] + (c[1] - b[1]) * t1]
+        const a1: Point = [a[0] + (d[0] - a[0]) * t1, a[1] + (d[1] - a[1]) * t1]
+        pushQuad(sink, into, a0, b0, b1, a1, y, color)
+      }
+    }
+    return
+  }
+
   for (let i = 0; i < inner.length - 1; i++) {
     const a = inner[i]
     const b = outer[i]
@@ -229,8 +256,22 @@ function relativePoints(route: RouteNode): Point[] {
   return route.points.map((p) => [p[0] - origin[0], p[1] - origin[1]] as Point)
 }
 
+/**
+ * Smoothly interpolates a 2D polyline with Catmull-Rom spline when curved is enabled.
+ */
+export function interpolateCurvedPoints(points: readonly Point[], segmentsPerLeg = 6): Point[] {
+  if (points.length < 3) return points.map((p) => [p[0], p[1]] as Point)
+  const v3 = points.map((p) => new THREE.Vector3(p[0], 0, p[1]))
+  const curve = new THREE.CatmullRomCurve3(v3, false, 'catmullrom', 0.5)
+  const totalSamples = Math.max(8, (points.length - 1) * segmentsPerLeg)
+  const sampled = curve.getPoints(totalSamples)
+  return sampled.map((v) => [v.x, v.z] as Point)
+}
+
 export function resolveRouteFill(route: RouteNode): string | null {
-  const isFilled = route.fillEnabled !== undefined ? route.fillEnabled : Boolean(route.laneColor)
+  const isFilled =
+    route.fillEnabled === true ||
+    (route.fillEnabled !== false && Boolean(route.fillColor || route.laneColor))
   if (!isFilled) return null
   return route.fillColor ?? route.laneColor ?? (route.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
 }
@@ -245,9 +286,11 @@ export function routeGeometryKey(route: RouteNode): string {
     'route',
     route.width.toFixed(4),
     route.lineWidth,
-    gates.arrows ? 'a' : '-',
+    gates.arrows ? `a:${route.arrowDirection ?? 'forward'}:${route.arrowSpacing ?? ARROW_SPACING_M}` : '-',
     gates.divider ? 'd' : '-',
     fill ? `c:${fill}` : '-',
+    route.edgeStyle === 'dashed' ? 'dashed' : 'solid',
+    route.curved ? 'curved' : 'straight',
     route.directionalArrows !== false ? 'da' : '-',
     route.points.length,
     digest,
@@ -357,6 +400,9 @@ export function buildRouteGeometry(
   if (options?.startCut || options?.endCut) {
     rawPoints = trimPolylineByCuts(rawPoints, options.startCut ?? 0, options.endCut ?? 0)
   }
+  if (route.curved && rawPoints.length >= 3) {
+    rawPoints = interpolateCurvedPoints(rawPoints)
+  }
   const points = rawPoints
   const centre = stripeCentreOffsetM(route.width, route.lineWidth)
   const half = LINE_WIDTHS[route.lineWidth] / 2
@@ -386,6 +432,7 @@ export function buildRouteGeometry(
   }
 
   // 2. Stratify outer boundary edge stripes at ROUTE_ELEVATIONS.EDGE_STRIPES (+0.008m)
+  const isDashed = route.edgeStyle === 'dashed'
   for (const side of [1, -1]) {
     const near = offsetCentreline(points, side * (centre - half))
     const far = offsetCentreline(points, side * (centre + half))
@@ -404,6 +451,8 @@ export function buildRouteGeometry(
       side === 1 ? far : near,
       side === 1 ? near : far,
       ROUTE_ELEVATIONS.EDGE_STRIPES,
+      undefined,
+      isDashed,
     )
   }
 
@@ -425,8 +474,11 @@ export function buildRouteGeometry(
   sink.indices = [...groups.stripe, ...groups.contrast, ...groups.paint]
   const geometry = finish(sink)
   geometry.clearGroups()
-  geometry.addGroup(0, groups.stripe.length, GROUP_STRIPE)
-  let offset = groups.stripe.length
+  let offset = 0
+  if (groups.stripe.length > 0) {
+    geometry.addGroup(offset, groups.stripe.length, GROUP_STRIPE)
+    offset += groups.stripe.length
+  }
   if (groups.contrast.length > 0) {
     geometry.addGroup(offset, groups.contrast.length, GROUP_CONTRAST)
     offset += groups.contrast.length
@@ -434,6 +486,20 @@ export function buildRouteGeometry(
   if (groups.paint.length > 0) {
     geometry.addGroup(offset, groups.paint.length, GROUP_PAINT)
   }
+
+  // Safe bounding box and bounding sphere check
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  if (
+    geometry.boundingBox &&
+    (!Number.isFinite(geometry.boundingBox.min.x) || !Number.isFinite(geometry.boundingBox.max.x))
+  ) {
+    geometry.boundingBox.set(new THREE.Vector3(-10, -1, -10), new THREE.Vector3(10, 1, 10))
+  }
+  if (geometry.boundingSphere && !Number.isFinite(geometry.boundingSphere.radius)) {
+    geometry.boundingSphere.set(new THREE.Vector3(0, 0, 0), 10)
+  }
+
   return geometry
 }
 

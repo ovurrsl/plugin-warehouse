@@ -71,6 +71,11 @@ export const routeDefinition = {
        * them could not be drawn down an aisle at all. Whether something stands
        * inside a corridor is a question the route asks about the scene, not a
        * reason to refuse the drawing.
+       *
+       * **`applies: () => false`**: Routes are floor surface markings that
+       * manage their own vertical datum and slab elevation resolution in
+       * `RouteRenderer`. FloorElevationSystem must not overwrite the group Y
+       * to 0 on node mutation/dirty ticks.
        */
       footprint: (node) => {
         const route = node as unknown as RouteNode
@@ -80,7 +85,7 @@ export const routeDefinition = {
           rotation: route.rotation ?? [0, 0, 0],
         }
       },
-      applies: () => true,
+      applies: () => false,
       collides: false,
     },
 

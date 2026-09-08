@@ -15,7 +15,12 @@ import { slabAt } from '../host-adapter'
 import { useAdmitted } from '../instancing/admission'
 import { collectSlabs } from '../placement'
 import { PAINT_LIFT_M } from './constants'
-import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
+import {
+  getRouteGeometry,
+  releaseRouteGeometry,
+  resolveRouteFill,
+  retainRouteGeometry,
+} from './geometry'
 import {
   buildZebraGeometry,
   findZebraCrossingsForRoute,
@@ -127,10 +132,7 @@ function RouteBody({ node }: { node: RouteNode }) {
   const appearance = useAppearance()
 
   const geometry = useMemo(() => getRouteGeometry(effectiveNode), [effectiveNode])
-  const effectiveFillColor =
-    effectiveNode.fillEnabled !== false
-      ? (effectiveNode.fillColor ?? effectiveNode.laneColor)
-      : null
+  const effectiveFillColor = resolveRouteFill(effectiveNode)
   const materials = useMemo(
     () =>
       getRouteMaterials(
@@ -141,6 +143,13 @@ function RouteBody({ node }: { node: RouteNode }) {
       ),
     [effectiveNode.role, appearance, effectiveFillColor, effectiveNode.edgeColor],
   )
+
+  // Enforce correct registered group Y elevation against any external system mutations
+  useEffect(() => {
+    if (registeredRef.current) {
+      registeredRef.current.position.y = resolvedY
+    }
+  }, [resolvedY])
 
   // Claim the buffer while it is on screen. Eviction must never free a shape
   // something is drawing, and this is the only place that knows.

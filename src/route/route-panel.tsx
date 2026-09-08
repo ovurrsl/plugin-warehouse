@@ -5,6 +5,7 @@ import { triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { routeParametrics } from './parametrics'
+import { resolveRouteFill } from './geometry'
 import {
   appendControlPoint,
   calculatePolylineLength,
@@ -48,7 +49,7 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
     useScene.getState().updateNode(node.id as AnyNodeId, patch as never)
   }
 
-  const isFilled = node.fillEnabled !== false
+  const isFilled = Boolean(resolveRouteFill(node))
   const fillColor =
     node.fillColor ?? node.laneColor ?? (node.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
   const edgeColor = node.edgeColor ?? (node.role === 'vehicle' ? '#eab308' : '#ffffff')
@@ -112,7 +113,20 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
 
       {/* Industrial Color Quick Swatches */}
       <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
-        <div className="text-[11px] font-medium text-foreground/70">Endüstriyel Renk Paleti</div>
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-medium text-foreground/70">Zemin Boya Rengi</div>
+          <button
+            type="button"
+            onClick={() => updateNode({ fillEnabled: !isFilled })}
+            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+              isFilled
+                ? 'bg-primary/20 text-primary border border-primary/40'
+                : 'bg-muted text-muted-foreground border border-border'
+            }`}
+          >
+            {isFilled ? 'Dolu Boya' : 'Boş Zemin'}
+          </button>
+        </div>
         <div className="flex items-center gap-1.5">
           {[
             { label: 'Sarı', hex: '#eab308' },
@@ -125,7 +139,7 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
               key={c.hex}
               type="button"
               title={c.label}
-              onClick={() => updateNode({ fillColor: c.hex, laneColor: c.hex })}
+              onClick={() => updateNode({ fillEnabled: true, fillColor: c.hex, laneColor: c.hex })}
               className="h-5 w-5 rounded border border-border shadow-xs hover:scale-110 transition-transform cursor-pointer"
               style={{ backgroundColor: c.hex }}
             />
@@ -135,7 +149,41 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
             <input
               type="color"
               value={fillColor}
-              onChange={(e) => updateNode({ fillColor: e.target.value, laneColor: e.target.value })}
+              onChange={(e) => updateNode({ fillEnabled: true, fillColor: e.target.value, laneColor: e.target.value })}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Edge Stripes Quick Swatches */}
+      <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-medium text-foreground/70">Kenar Çizgi Rengi</div>
+          <span className="text-[10px] text-muted-foreground uppercase">{node.edgeStyle === 'dashed' ? 'Kesikli' : 'Düz'}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {[
+            { label: 'Sarı', hex: '#eab308' },
+            { label: 'Beyaz', hex: '#ffffff' },
+            { label: 'Yeşil', hex: '#22c55e' },
+            { label: 'Kırmızı', hex: '#ef4444' },
+          ].map((c) => (
+            <button
+              key={`edge-${c.hex}`}
+              type="button"
+              title={c.label}
+              onClick={() => updateNode({ edgeColor: c.hex })}
+              className="h-5 w-5 rounded border border-border shadow-xs hover:scale-110 transition-transform cursor-pointer"
+              style={{ backgroundColor: c.hex }}
+            />
+          ))}
+          <label className="relative flex h-5 w-5 cursor-pointer items-center justify-center overflow-hidden rounded border border-border bg-background text-[10px]">
+            <span>🎨</span>
+            <input
+              type="color"
+              value={edgeColor}
+              onChange={(e) => updateNode({ edgeColor: e.target.value })}
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
           </label>

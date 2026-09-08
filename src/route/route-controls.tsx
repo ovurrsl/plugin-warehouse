@@ -5,6 +5,8 @@ import { EDITOR_LAYER, triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import type { ThreeEvent } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { slabAt } from '../host-adapter'
+import { collectSlabs } from '../placement'
 import { MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
 import {
   getRouteMidpoints,
@@ -24,6 +26,8 @@ const NO_RAYCAST = () => null
 
 export interface RouteControlsProps {
   node?: RouteNode
+  position?: [number, number, number]
+  rotation?: [number, number, number]
   selectedIds?: string[]
   active?: boolean
   readOnly?: boolean
@@ -189,13 +193,26 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     }
   }, [dragging, commit, cancelDrag])
 
+  // Clean up dragging state if component unmounts mid-drag
+  useEffect(() => {
+    return () => {
+      if (dragIndexRef.current !== null) {
+        cancelDrag()
+      }
+    }
+  }, [cancelDrag])
+
   // Keyboard deletion on Delete or Backspace key
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
       if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target as HTMLElement)?.isContentEditable
+        target &&
+        (target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target instanceof HTMLSelectElement ||
+          target.isContentEditable ||
+          target.closest?.('input, textarea, select, [contenteditable="true"], [role="listbox"]'))
       ) {
         return
       }
@@ -604,8 +621,30 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     </group>
   )
 
+  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const rawPosition = node.position ?? [0, 0, 0]
+  const slabElevation = useMemo(() => {
+    if (node.supportSlabId) {
+      const slab = sceneNodes[node.supportSlabId] as { elevation?: number } | undefined
+      if (typeof slab?.elevation === 'number') {
+        return slab.elevation
+      }
+    }
+    const slabs = node.parentId ? collectSlabs(sceneNodes, node.parentId) : []
+    const slab = slabAt(slabs, rawPosition[0], rawPosition[2])
+    return slab?.elevation ?? 0
+  }, [node.supportSlabId, node.parentId, sceneNodes, rawPosition])
+
+  const resolvedY = Math.max(rawPosition[1] ?? 0, slabElevation)
+  const effectivePosition: [number, number, number] = props?.position ?? [
+    rawPosition[0],
+    resolvedY,
+    rawPosition[2],
+  ]
+  const effectiveRotation = props?.rotation ?? node.rotation ?? [0, 0, 0]
+
   return (
-    <group position={node.position ?? [0, 0, 0]} rotation={node.rotation ?? [0, 0, 0]}>
+    <group position={effectivePosition} rotation={effectiveRotation}>
       {content}
     </group>
   )

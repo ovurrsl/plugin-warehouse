@@ -444,14 +444,40 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
   const pedestrianRoutes = routes.filter((r) => r.role === 'pedestrian')
   const vehicleRoutes = routes.filter((r) => r.role === 'vehicle')
 
+  // Pre-calculate vehicle world points and bounding boxes to avoid O(P*V) redundant calculations
+  const vehData = vehicleRoutes.map(veh => {
+    const world = routeWorldPoints(veh)
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (const p of world) {
+      if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]
+      if (p[1] < minZ) minZ = p[1]; if (p[1] > maxZ) maxZ = p[1]
+    }
+    return { veh, world, minX, maxX, minZ, maxZ }
+  })
+
   for (const ped of pedestrianRoutes) {
     if (ped.zebraCrossing === false) continue
-    for (const veh of vehicleRoutes) {
+    
+    const pedWorld = routeWorldPoints(ped)
+    let pedMinX = Infinity, pedMaxX = -Infinity, pedMinZ = Infinity, pedMaxZ = -Infinity
+    for (const p of pedWorld) {
+      if (p[0] < pedMinX) pedMinX = p[0]; if (p[0] > pedMaxX) pedMaxX = p[0]
+      if (p[1] < pedMinZ) pedMinZ = p[1]; if (p[1] > pedMaxZ) pedMaxZ = p[1]
+    }
+
+    for (const data of vehData) {
+      const { veh, world: vehWorld, minX: vehMinX, maxX: vehMaxX, minZ: vehMinZ, maxZ: vehMaxZ } = data
       if (veh.zebraCrossing === false) continue
       if (!areRoutesOnSameLevel(ped, veh)) continue
 
-      const pedWorld = routeWorldPoints(ped)
-      const vehWorld = routeWorldPoints(veh)
+      // AABB Broadphase Pre-Filtering
+      if (
+        pedMaxX < vehMinX || pedMinX > vehMaxX ||
+        pedMaxZ < vehMinZ || pedMinZ > vehMaxZ
+      ) {
+        continue
+      }
+
       const pairCrossings: Array<[number, number]> = []
 
       for (let p = 0; p < pedWorld.length - 1; p++) {

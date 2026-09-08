@@ -231,14 +231,20 @@ function ZebraCrossingMesh({
   nodePosition: [number, number, number]
   nodeRotation: [number, number, number]
 }) {
+  const crossingHash = `${crossing.id}:${crossing.position.join(',')}`
+  const posHash = nodePosition.join(',')
+  const rotHash = nodeRotation.join(',')
+  
   const geometry = useMemo(
     () => buildZebraGeometry(crossing, nodePosition, nodeRotation),
-    [crossing, nodePosition, nodeRotation],
+    [crossingHash, posHash, rotHash],
   )
 
   useEffect(() => {
     return () => {
-      geometry.dispose()
+      const timer = setTimeout(() => {
+        geometry.dispose()
+      }, 500)
     }
   }, [geometry])
 

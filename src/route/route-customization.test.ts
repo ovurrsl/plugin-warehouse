@@ -142,4 +142,13 @@ describe('Route Customization & Streetscape Parity Suite', () => {
     expect(flowKeys).toContain('arrowDirection')
     expect(flowKeys).toContain('arrowSpacing')
   })
+
+  test('routeParametrics trailingSection correctly loads RoutePanel with post-draw editing capabilities', async () => {
+    expect(routeParametrics.trailingSection).toBeDefined()
+    expect(typeof routeParametrics.trailingSection).toBe('function')
+
+    const module = await routeParametrics.trailingSection!()
+    expect(module).toBeDefined()
+    expect(typeof module.default).toBe('function')
+  })
 })

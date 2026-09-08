@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`f6bd6b3`](https://github.com/ovurrsl/plugin-warehouse/commit/f6bd6b3657925caaaf8a51c129777ecd652df6d8))
 - Refresh generated README blocks [skip ci] ([`6ac9fde`](https://github.com/ovurrsl/plugin-warehouse/commit/6ac9fde7f78566261cd386ef19e70a95c6cce5da))
 - Refresh generated README blocks [skip ci] ([`b58d3cc`](https://github.com/ovurrsl/plugin-warehouse/commit/b58d3cc2436d23ea43f47b70248d8e0919642285))
 - Refresh generated README blocks [skip ci] ([`5d9f050`](https://github.com/ovurrsl/plugin-warehouse/commit/5d9f0502583be6dc487fc2a6801873e4263c1592))
@@ -315,6 +316,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Prevent route disappearing under slab and resolve editor freeze on click ([`e0a49d3`](https://github.com/ovurrsl/plugin-warehouse/commit/e0a49d3c3c019286dbce003c7bf9dd940b82848b))
 - Satisfy FloorPlacedFootprintResolver contract and RouteNode updateNode typecast ([`e328b6e`](https://github.com/ovurrsl/plugin-warehouse/commit/e328b6ec625b80fca2264fd99c0b9073e0ae2d78))
 - Restore post-draw vertex extension, panel controls, and visibility depth layering ([`103793e`](https://github.com/ovurrsl/plugin-warehouse/commit/103793e26f0e8b7b40a999098d35472e8213bdfe))
 - All compliance tests green — clashGuardedMove, resolveAlignedPlacement, CLICK_TRIGGER_KINDS, kind-naming, panel-reachability, field-units, catalog counts updated to 44; biome formatted ([`d7e8514`](https://github.com/ovurrsl/plugin-warehouse/commit/d7e85145b8413cfdcd1f40d560d41f55434bb1bd))

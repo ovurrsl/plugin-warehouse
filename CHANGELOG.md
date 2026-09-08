@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`b58d3cc`](https://github.com/ovurrsl/plugin-warehouse/commit/b58d3cc2436d23ea43f47b70248d8e0919642285))
 - Refresh generated README blocks [skip ci] ([`5d9f050`](https://github.com/ovurrsl/plugin-warehouse/commit/5d9f0502583be6dc487fc2a6801873e4263c1592))
 - Refresh generated README blocks [skip ci] ([`c841769`](https://github.com/ovurrsl/plugin-warehouse/commit/c841769d6d70a2b7ef3e2be8544aacecf304c757))
 - Refresh generated README blocks [skip ci] ([`330b4b5`](https://github.com/ovurrsl/plugin-warehouse/commit/330b4b506ca0d7729f535cb2d3d370cf14cbac0f))
@@ -459,6 +460,7 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- Verify trailingSection loads RoutePanel with post-draw editing capabilities ([`b7d0aad`](https://github.com/ovurrsl/plugin-warehouse/commit/b7d0aad61c84d0dea880d52acff3492488d41717))
 - Track and format junction adversarial challenger suite ([`c0bc460`](https://github.com/ovurrsl/plugin-warehouse/commit/c0bc4602a8555ea3e532514d9751ee582f923902))
 - Assert laneColor field kind is color ([`f93ac0d`](https://github.com/ovurrsl/plugin-warehouse/commit/f93ac0d4ebe31281b914a3a52939d55352138a4f))
 - T7–T10, in the half a node process can actually measure ([`3ccb27e`](https://github.com/ovurrsl/plugin-warehouse/commit/3ccb27eab72c3de277534ecb6ca1e4bb3707581c))

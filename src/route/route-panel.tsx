@@ -1,9 +1,17 @@
 'use client'
 
 import { type AnyNodeId, useScene } from '@pascal-app/core'
+import { triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { IssueList } from '../panels/issue-list'
 import { routeParametrics } from './parametrics'
+import {
+  appendControlPoint,
+  calculatePolylineLength,
+  deleteControlPoint,
+  prependControlPoint,
+  reverseRouteDirection,
+} from './route-controls-math'
 import type { RouteNode } from './schema'
 
 /**
@@ -131,6 +139,116 @@ export default function RoutePanel({ node: provided }: { node?: RouteNode }) {
               className="absolute inset-0 opacity-0 cursor-pointer"
             />
           </label>
+        </div>
+      </div>
+
+      {/* Route Points & Interactive Polyline Editing Controls */}
+      <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-medium text-foreground/70">Güzergah Noktaları</div>
+          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <span className="rounded bg-background/80 px-1.5 py-0.5 border border-border/40 font-mono">
+              {node.points.length} nokta
+            </span>
+            <span className="rounded bg-background/80 px-1.5 py-0.5 border border-border/40 font-mono">
+              {calculatePolylineLength(node.points).toFixed(1)} m
+            </span>
+          </div>
+        </div>
+
+        {/* Global Action Buttons */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            disabled={node.points.length >= 64}
+            onClick={() => {
+              try {
+                const updated = prependControlPoint(node)
+                updateNode({ points: updated.points })
+                triggerSFX('sfx:item-place')
+              } catch {}
+            }}
+            className="flex items-center justify-center gap-1 rounded border border-border/60 bg-background/70 px-2 py-1.5 text-[11px] font-medium text-foreground/80 hover:bg-accent hover:text-accent-foreground disabled:opacity-40 cursor-pointer"
+            title="Güzergahın başına 2 metre yeni nokta ekler"
+          >
+            <span>➕ Başa</span>
+          </button>
+          <button
+            type="button"
+            disabled={node.points.length >= 64}
+            onClick={() => {
+              try {
+                const updated = appendControlPoint(node)
+                updateNode({ points: updated.points })
+                triggerSFX('sfx:item-place')
+              } catch {}
+            }}
+            className="flex items-center justify-center gap-1 rounded border border-border/60 bg-background/70 px-2 py-1.5 text-[11px] font-medium text-foreground/80 hover:bg-accent hover:text-accent-foreground disabled:opacity-40 cursor-pointer"
+            title="Güzergahın sonuna 2 metre yeni nokta ekler"
+          >
+            <span>➕ Sona</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const updated = reverseRouteDirection(node)
+                updateNode({ points: updated.points })
+                triggerSFX('sfx:item-place')
+              } catch {}
+            }}
+            className="flex items-center justify-center gap-1 rounded border border-border/60 bg-background/70 px-2 py-1.5 text-[11px] font-medium text-foreground/80 hover:bg-accent hover:text-accent-foreground cursor-pointer"
+            title="Yolun yönünü tersine çevirir (başlangıç ve bitişi yer değiştirir)"
+          >
+            <span>🔄 Çevir</span>
+          </button>
+        </div>
+
+        {/* Individual Points List (Scrollable) */}
+        <div className="flex max-h-36 flex-col gap-1 overflow-y-auto pr-0.5">
+          {node.points.map((pt, idx) => (
+            <div
+              key={`pt-${idx}-${pt[0]}-${pt[1]}`}
+              className="flex items-center justify-between rounded border border-border/30 bg-background/40 px-2 py-1 text-[10px]"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-muted-foreground w-4">#{idx + 1}</span>
+                <span className="font-mono text-foreground/80">
+                  X: {pt[0].toFixed(2)}m, Z: {pt[1].toFixed(2)}m
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={node.points.length <= 2}
+                onClick={() => {
+                  try {
+                    const updated = deleteControlPoint(node, idx)
+                    updateNode({ points: updated.points })
+                    triggerSFX('sfx:item-delete')
+                  } catch {}
+                }}
+                className="rounded p-0.5 text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:opacity-30 cursor-pointer"
+                title={node.points.length <= 2 ? 'En az 2 nokta gereklidir' : 'Noktayı sil'}
+              >
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* 3D Interaction Tip */}
+        <div className="rounded bg-muted/40 p-1.5 text-[10px] text-muted-foreground leading-relaxed">
+          💡 <span className="font-medium text-foreground/70">3D Düzenleme:</span> Uçlardaki mavi
+          (+) tutamaçlarla yolu uzatabilir, ara (+) butonlarıyla yeni viraj ekleyebilir, 3D ekranda
+          noktayı seçip{' '}
+          <kbd className="rounded border px-1 py-0.2 bg-background font-mono text-[9px]">
+            Delete
+          </kbd>{' '}
+          veya{' '}
+          <kbd className="rounded border px-1 py-0.2 bg-background font-mono text-[9px]">
+            Alt+Tık
+          </kbd>{' '}
+          ile silebilirsiniz.
         </div>
       </div>
 

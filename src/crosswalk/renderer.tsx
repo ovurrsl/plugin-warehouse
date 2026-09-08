@@ -45,13 +45,12 @@ export default function CrosswalkRenderer({ node }: { node: CrosswalkNode }) {
   const material = useMemo(() => {
     const mat = new THREE.MeshBasicMaterial({
       color: new THREE.Color(stripeColor),
-      depthWrite: false,
+      depthWrite: true,
       polygonOffset: true,
       polygonOffsetFactor: DEPTH_BIAS.ZEBRA.polygonOffsetFactor,
       polygonOffsetUnits: DEPTH_BIAS.ZEBRA.polygonOffsetUnits,
-      side: THREE.FrontSide,
+      side: THREE.DoubleSide,
     })
-    mat.renderOrder = DEPTH_BIAS.ZEBRA.renderOrder
     return mat
   }, [stripeColor])
 
@@ -63,6 +62,7 @@ export default function CrosswalkRenderer({ node }: { node: CrosswalkNode }) {
           position={[bar.x, ROUTE_ELEVATIONS.ZEBRA_CROSSWALK, bar.z]}
           rotation={[-Math.PI / 2, 0, 0]}
           material={material}
+          renderOrder={DEPTH_BIAS.ZEBRA.renderOrder}
         >
           <planeGeometry args={[bar.w, bar.d]} />
         </mesh>

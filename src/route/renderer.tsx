@@ -10,8 +10,8 @@ import {
 import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
+import { useAppearance } from '../appearance'
 import { useAdmitted } from '../instancing/admission'
-import { useStaticTransform } from '../static-transform'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
 import {
@@ -83,9 +83,7 @@ function RouteBody({ node }: { node: RouteNode }) {
     ? [node.rotation[0], live.rotation, node.rotation[2]]
     : node.rotation
 
-  // Sürüklenmeyen boya, three'nin kare başına matris hesabından çıkar; canlı
-  // kanal yazarken bayrak three'ye geri verilir (`../static-transform`).
-  useStaticTransform(registeredRef, position, rotation, live !== undefined)
+  const appearance = useAppearance()
 
   // The live points during a curve/vertex drag; the committed ones otherwise.
   const liveOverride = useLiveNodeOverrides((s) => {

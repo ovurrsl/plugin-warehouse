@@ -6,6 +6,7 @@ import { EDITOR_LAYER } from '@pascal-app/editor'
 import { MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
 import { routeDefinition } from './definition'
 import RouteControls, {
+  appendControlPoint,
   COLLINEAR_SNAP_THRESHOLD_M,
   calculatePolylineLength,
   deleteControlPoint,
@@ -16,11 +17,15 @@ import RouteControls, {
   MIN_SEGMENT_LENGTH_M,
   RouteControls as NamedRouteControls,
   ORTHOGONAL_SNAP_THRESHOLD_M,
+  prependControlPoint,
+  reverseRouteDirection,
   shiftControlPoint,
   snapCollinear,
   snapOrthogonal,
+  withRouteVertexAppended,
   withRouteVertexInserted,
   withRouteVertexMoved,
+  withRouteVertexPrepended,
   withRouteVertexRemoved,
   worldToLocalXZ,
 } from './route-controls'
@@ -506,6 +511,84 @@ describe('Route Controls: Milestone 3 Unit Tests', () => {
       expect(typeof RouteControls).toBe('function')
       expect(typeof NamedRouteControls).toBe('function')
       expect(RouteControls).toBe(NamedRouteControls)
+    })
+  })
+
+  describe('10. Route Extension, Prepending, Appending & Reversing', () => {
+    it('appends a vertex along end tangent or at custom coordinates', () => {
+      const pts: Point[] = [
+        [0, 0],
+        [10, 0],
+      ]
+      const appended = withRouteVertexAppended(pts)
+      expect(appended).not.toBeNull()
+      expect(appended!.length).toBe(3)
+      expect(appended![2]).toEqual([12, 0])
+
+      const customAppended = withRouteVertexAppended(pts, [15, 5])
+      expect(customAppended).not.toBeNull()
+      expect(customAppended!.length).toBe(3)
+      expect(customAppended![2]).toEqual([15, 5])
+    })
+
+    it('prepends a vertex along start tangent backwards or at custom coordinates', () => {
+      const pts: Point[] = [
+        [10, 0],
+        [20, 0],
+      ]
+      const prepended = withRouteVertexPrepended(pts)
+      expect(prepended).not.toBeNull()
+      expect(prepended!.length).toBe(3)
+      expect(prepended![0]).toEqual([8, 0])
+
+      const customPrepended = withRouteVertexPrepended(pts, [5, -5])
+      expect(customPrepended).not.toBeNull()
+      expect(customPrepended!.length).toBe(3)
+      expect(customPrepended![0]).toEqual([5, -5])
+    })
+
+    it('reverses route polyline direction atomically', () => {
+      const route = RouteNode.parse({
+        id: 'route_reverse_test',
+        type: 'warehouse:route',
+        points: [
+          [0, 0],
+          [5, 5],
+          [10, 0],
+        ],
+      })
+      const reversed = reverseRouteDirection(route)
+      expect(reversed.points).toEqual([
+        [10, 0],
+        [5, 5],
+        [0, 0],
+      ])
+    })
+
+    it('high-level appendControlPoint and prependControlPoint validate capacity boundary (MAX_VERTICES)', () => {
+      const route = RouteNode.parse({
+        id: 'route_ext_test',
+        type: 'warehouse:route',
+        points: [
+          [0, 0],
+          [10, 0],
+        ],
+      })
+      const appended = appendControlPoint(route)
+      expect(appended.points.length).toBe(3)
+
+      const prepended = prependControlPoint(route)
+      expect(prepended.points.length).toBe(3)
+
+      // At max vertices (64), append/prepend throws
+      const at64Points: Point[] = Array.from({ length: 64 }, (_, i) => [i, 0])
+      const at64Route = RouteNode.parse({
+        id: 'route_at_64',
+        type: 'warehouse:route',
+        points: at64Points,
+      })
+      expect(() => appendControlPoint(at64Route)).toThrow()
+      expect(() => prependControlPoint(at64Route)).toThrow()
     })
   })
 })

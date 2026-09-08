@@ -259,3 +259,88 @@ export function calculatePolylineLength(points: readonly Point[]): number {
   }
   return len
 }
+
+/**
+ * Appends a new vertex to the end of the polyline.
+ * If no point is provided, extrapolates along the last segment direction by 2 metres.
+ * Rejects if points.length >= MAX_VERTICES.
+ */
+export function withRouteVertexAppended(
+  points: readonly Point[],
+  customPoint?: Point,
+): Point[] | null {
+  if (points.length >= MAX_VERTICES || points.length < 1) return null
+  if (customPoint) {
+    return [...points, customPoint]
+  }
+  if (points.length >= 2) {
+    const pPrev = points[points.length - 2]!
+    const pLast = points[points.length - 1]!
+    const dx = pLast[0] - pPrev[0]
+    const dz = pLast[1] - pPrev[1]
+    const len = Math.hypot(dx, dz)
+    const dist = 2.0
+    const ux = len > 1e-6 ? dx / len : 1
+    const uz = len > 1e-6 ? dz / len : 0
+    return [...points, [pLast[0] + ux * dist, pLast[1] + uz * dist]]
+  }
+  const only = points[0]!
+  return [only, [only[0] + 2.0, only[1]]]
+}
+
+/**
+ * Prepends a new vertex before the start of the polyline.
+ * If no point is provided, extrapolates backwards along the first segment direction by 2 metres.
+ * Rejects if points.length >= MAX_VERTICES.
+ */
+export function withRouteVertexPrepended(
+  points: readonly Point[],
+  customPoint?: Point,
+): Point[] | null {
+  if (points.length >= MAX_VERTICES || points.length < 1) return null
+  if (customPoint) {
+    return [customPoint, ...points]
+  }
+  if (points.length >= 2) {
+    const pFirst = points[0]!
+    const pNext = points[1]!
+    const dx = pFirst[0] - pNext[0]
+    const dz = pFirst[1] - pNext[1]
+    const len = Math.hypot(dx, dz)
+    const dist = 2.0
+    const ux = len > 1e-6 ? dx / len : -1
+    const uz = len > 1e-6 ? dz / len : 0
+    return [[pFirst[0] + ux * dist, pFirst[1] + uz * dist], ...points]
+  }
+  const only = points[0]!
+  return [[only[0] - 2.0, only[1]], only]
+}
+
+/**
+ * High-level helper to append a control point to a RouteNode.
+ */
+export function appendControlPoint(route: RouteNode, customPoint?: [number, number]): RouteNode {
+  const next = withRouteVertexAppended(route.points, customPoint)
+  if (!next) {
+    throw new Error(`Cannot append point: maximum vertices (${MAX_VERTICES}) reached`)
+  }
+  return RouteNode.parse({ ...route, points: next })
+}
+
+/**
+ * High-level helper to prepend a control point to a RouteNode.
+ */
+export function prependControlPoint(route: RouteNode, customPoint?: [number, number]): RouteNode {
+  const next = withRouteVertexPrepended(route.points, customPoint)
+  if (!next) {
+    throw new Error(`Cannot prepend point: maximum vertices (${MAX_VERTICES}) reached`)
+  }
+  return RouteNode.parse({ ...route, points: next })
+}
+
+/**
+ * Reverses the ordering of the route polyline points (flipping start and end).
+ */
+export function reverseRouteDirection(route: RouteNode): RouteNode {
+  return RouteNode.parse({ ...route, points: [...route.points].reverse() })
+}

@@ -4,12 +4,14 @@ import { type AnyNodeId, useLiveNodeOverrides, useScene } from '@pascal-app/core
 import { EDITOR_LAYER, triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import type { ThreeEvent } from '@react-three/fiber'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ROUTE_ELEVATIONS } from './constants'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
 import {
   getRouteMidpoints,
+  withRouteVertexAppended,
   withRouteVertexInserted,
   withRouteVertexMoved,
+  withRouteVertexPrepended,
   withRouteVertexRemoved,
   worldToLocalXZ,
 } from './route-controls-math'
@@ -75,6 +77,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
   const [hoveredMidpoint, setHoveredMidpoint] = useState<number | null>(null)
+  const [hoveredExt, setHoveredExt] = useState<'start' | 'end' | null>(null)
 
   const dragIndexRef = useRef<number | null>(null)
   const draftRef = useRef<Point[] | null>(null)
@@ -87,6 +90,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     setSelectedIndex(null)
     setHoveredIndex(null)
     setHoveredMidpoint(null)
+    setHoveredExt(null)
   }, [nodeId])
 
   const commit = useCallback(() => {
@@ -193,6 +197,30 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
   const points = draftPoints ?? node.points
   const midpoints = getRouteMidpoints(points)
 
+  const terminalHandles = useMemo(() => {
+    if (points.length < 2) return null
+
+    const pFirst = points[0]!
+    const pNext = points[1]!
+    const sDx = pFirst[0] - pNext[0]
+    const sDz = pFirst[1] - pNext[1]
+    const sLen = Math.hypot(sDx, sDz)
+    const sUx = sLen > 1e-6 ? sDx / sLen : -1
+    const sUz = sLen > 1e-6 ? sDz / sLen : 0
+    const startPos: Point = [pFirst[0] + sUx * 1.0, pFirst[1] + sUz * 1.0]
+
+    const pLast = points[points.length - 1]!
+    const pPrev = points[points.length - 2]!
+    const eDx = pLast[0] - pPrev[0]
+    const eDz = pLast[1] - pPrev[1]
+    const eLen = Math.hypot(eDx, eDz)
+    const eUx = eLen > 1e-6 ? eDx / eLen : 1
+    const eUz = eLen > 1e-6 ? eDz / eLen : 0
+    const endPos: Point = [pLast[0] + eUx * 1.0, pLast[1] + eUz * 1.0]
+
+    return { startPos, endPos }
+  }, [points])
+
   const beginDrag = (index: number) => (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation()
 
@@ -251,6 +279,70 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
 
     try {
       useLiveNodeOverrides.getState().set(node.id, { points: inserted })
+      useScene.getState().markDirty?.(node.id as AnyNodeId)
+    } catch {}
+
+    try {
+      triggerSFX('sfx:item-pick')
+    } catch {}
+  }
+
+  const beginAppend = (event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation()
+    if (points.length >= MAX_VERTICES) return
+
+    const nextPoints = withRouteVertexAppended(points)
+    if (!nextPoints) return
+
+    const newIndex = nextPoints.length - 1
+    dragIndexRef.current = newIndex
+    draftRef.current = nextPoints
+    setDraftPoints(nextPoints)
+    setSelectedIndex(newIndex)
+    document.body.style.cursor = 'grabbing'
+
+    try {
+      useViewer.getState().setInputDragging?.(true)
+    } catch {}
+
+    try {
+      useScene.temporal?.getState()?.pause?.()
+    } catch {}
+
+    try {
+      useLiveNodeOverrides.getState().set(node.id, { points: nextPoints })
+      useScene.getState().markDirty?.(node.id as AnyNodeId)
+    } catch {}
+
+    try {
+      triggerSFX('sfx:item-pick')
+    } catch {}
+  }
+
+  const beginPrepend = (event: ThreeEvent<PointerEvent>) => {
+    event.stopPropagation()
+    if (points.length >= MAX_VERTICES) return
+
+    const nextPoints = withRouteVertexPrepended(points)
+    if (!nextPoints) return
+
+    const newIndex = 0
+    dragIndexRef.current = newIndex
+    draftRef.current = nextPoints
+    setDraftPoints(nextPoints)
+    setSelectedIndex(newIndex)
+    document.body.style.cursor = 'grabbing'
+
+    try {
+      useViewer.getState().setInputDragging?.(true)
+    } catch {}
+
+    try {
+      useScene.temporal?.getState()?.pause?.()
+    } catch {}
+
+    try {
+      useLiveNodeOverrides.getState().set(node.id, { points: nextPoints })
       useScene.getState().markDirty?.(node.id as AnyNodeId)
     } catch {}
 
@@ -361,6 +453,99 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
           </group>
         )
       })}
+
+      {/* Terminal Extension Handles (Başa / Sona Nokta Ekleme) */}
+      {!dragging && points.length < MAX_VERTICES && terminalHandles && (
+        <>
+          {/* Start Extension Handle (Başa Nokta Ekle) */}
+          <group position={[terminalHandles.startPos[0], 0, terminalHandles.startPos[1]]}>
+            <mesh
+              onPointerDown={beginPrepend}
+              onPointerEnter={() => setHoveredExt('start')}
+              onPointerLeave={() => setHoveredExt((cur) => (cur === 'start' ? null : cur))}
+              renderOrder={1012}
+            >
+              <sphereGeometry args={[0.18, 16, 12]} />
+              <meshBasicMaterial
+                color={hoveredExt === 'start' ? '#38bdf8' : '#0284c7'}
+                depthTest={false}
+                depthWrite={false}
+              />
+            </mesh>
+
+            {/* Cyan outline ring */}
+            <mesh renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.21, 0.03, 8, 28]} />
+              <meshBasicMaterial color="#0369a1" depthTest={false} depthWrite={false} />
+            </mesh>
+
+            {/* Plus sign cross */}
+            <mesh position={[0, 0, 0]} renderOrder={1014}>
+              <boxGeometry args={[0.16, 0.035, 0.04]} />
+              <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
+            </mesh>
+            <mesh position={[0, 0, 0]} renderOrder={1014}>
+              <boxGeometry args={[0.04, 0.035, 0.16]} />
+              <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
+            </mesh>
+
+            {/* Pick box */}
+            <mesh
+              onPointerDown={beginPrepend}
+              onPointerEnter={() => setHoveredExt('start')}
+              onPointerLeave={() => setHoveredExt((cur) => (cur === 'start' ? null : cur))}
+              visible={false}
+            >
+              <boxGeometry args={[0.6, 0.18, 0.6]} />
+              <meshBasicMaterial depthWrite={false} />
+            </mesh>
+          </group>
+
+          {/* End Extension Handle (Sona Nokta Ekle) */}
+          <group position={[terminalHandles.endPos[0], 0, terminalHandles.endPos[1]]}>
+            <mesh
+              onPointerDown={beginAppend}
+              onPointerEnter={() => setHoveredExt('end')}
+              onPointerLeave={() => setHoveredExt((cur) => (cur === 'end' ? null : cur))}
+              renderOrder={1012}
+            >
+              <sphereGeometry args={[0.18, 16, 12]} />
+              <meshBasicMaterial
+                color={hoveredExt === 'end' ? '#38bdf8' : '#0284c7'}
+                depthTest={false}
+                depthWrite={false}
+              />
+            </mesh>
+
+            {/* Cyan outline ring */}
+            <mesh renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.21, 0.03, 8, 28]} />
+              <meshBasicMaterial color="#0369a1" depthTest={false} depthWrite={false} />
+            </mesh>
+
+            {/* Plus sign cross */}
+            <mesh position={[0, 0, 0]} renderOrder={1014}>
+              <boxGeometry args={[0.16, 0.035, 0.04]} />
+              <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
+            </mesh>
+            <mesh position={[0, 0, 0]} renderOrder={1014}>
+              <boxGeometry args={[0.04, 0.035, 0.16]} />
+              <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
+            </mesh>
+
+            {/* Pick box */}
+            <mesh
+              onPointerDown={beginAppend}
+              onPointerEnter={() => setHoveredExt('end')}
+              onPointerLeave={() => setHoveredExt((cur) => (cur === 'end' ? null : cur))}
+              visible={false}
+            >
+              <boxGeometry args={[0.6, 0.18, 0.6]} />
+              <meshBasicMaterial depthWrite={false} />
+            </mesh>
+          </group>
+        </>
+      )}
 
       {/* Invisible XZ drag interception plane */}
       {dragging && (

@@ -154,12 +154,16 @@ export default function RouteTool() {
       }
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
+      const supportSlabId = electSupportSlab(nodes, activeLevelId, origin[0], origin[1])
+      const slab = supportSlabId ? (nodes[supportSlabId] as { elevation?: number } | undefined) : null
+      const surfaceY = slab?.elevation ?? 0
+
       const node = RouteNode.parse({
         ...brushRef.current,
-        position: [origin[0], 0, origin[1]],
+        position: [origin[0], surfaceY, origin[1]],
         points: drawn.map((p) => [p[0] - origin[0], p[1] - origin[1]]),
         parentId: activeLevelId,
-        supportSlabId: electSupportSlab(nodes, activeLevelId, origin[0], origin[1]),
+        supportSlabId,
         name: brushRef.current.role === 'vehicle' ? 'Araç Koridoru' : 'Yaya Yolu',
       })
 

@@ -162,7 +162,7 @@ let cachedZebraMat: THREE.MeshStandardMaterial | null = null
 /**
  * Returns the cached shared material for dynamic zebra crossings.
  *
- * Configured with DoubleSide, depthWrite: false, renderOrder: 10, and
+ * Configured with FrontSide, depthWrite: false, renderOrder: 10, and
  * polygonOffset to prevent z-fighting with painted corridors and floor slabs.
  */
 export function getZebraMaterial(_appearance?: Appearance): THREE.MeshStandardMaterial {

@@ -11,7 +11,9 @@ import { useNodeEvents, useViewer } from '@pascal-app/viewer'
 import { useEffect, useMemo, useRef } from 'react'
 import type { Object3D } from 'three'
 import { useAppearance } from '../appearance'
+import { slabAt } from '../host-adapter'
 import { useAdmitted } from '../instancing/admission'
+import { collectSlabs } from '../placement'
 import { PAINT_LIFT_M } from './constants'
 import { getRouteGeometry, releaseRouteGeometry, retainRouteGeometry } from './geometry'
 import {
@@ -67,7 +69,46 @@ function RouteBody({ node }: { node: RouteNode }) {
 
   // The live position during a drag; the committed one otherwise.
   const live = useLiveTransforms((s) => s.get(node.id))
-  const position = live?.position ?? node.position
+  const rawPosition = live?.position ?? node.position
+
+  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
+
+  // The live points during a curve/vertex drag; the committed ones otherwise.
+  const liveOverride = useLiveNodeOverrides((s) => {
+    return (
+      (s.overrides instanceof Map
+        ? s.overrides.get(node.id)
+        : (s.overrides as Record<string, unknown>)?.[node.id]) ?? s.get?.(node.id)
+    )
+  })
+  const livePoints = (liveOverride as { points?: RouteNode['points'] } | undefined)?.points
+  const effectiveNode = useMemo(() => {
+    if (!livePoints) return node
+    return { ...node, points: livePoints }
+  }, [node, livePoints])
+
+  // Auto-resolve support slab elevation so route never sits buried below the floor slab
+  const slabElevation = useMemo(() => {
+    if (effectiveNode.supportSlabId) {
+      const slab = sceneNodes[effectiveNode.supportSlabId] as { elevation?: number } | undefined
+      if (typeof slab?.elevation === 'number') {
+        return slab.elevation
+      }
+    }
+    const slabs = effectiveNode.parentId ? collectSlabs(sceneNodes, effectiveNode.parentId) : []
+    const slab = slabAt(slabs, rawPosition[0], rawPosition[2])
+    return slab?.elevation ?? 0
+  }, [
+    effectiveNode.supportSlabId,
+    effectiveNode.parentId,
+    sceneNodes,
+    rawPosition[0],
+    rawPosition[2],
+  ])
+
+  const resolvedY = Math.max(rawPosition[1] ?? 0, slabElevation)
+  const position: [number, number, number] = [rawPosition[0], resolvedY, rawPosition[2]]
+
   /**
    * Kanonik türetim (`longspan/renderer.tsx`) — ve bir hatayı kapatıyor.
    *
@@ -84,20 +125,6 @@ function RouteBody({ node }: { node: RouteNode }) {
     : node.rotation
 
   const appearance = useAppearance()
-
-  // The live points during a curve/vertex drag; the committed ones otherwise.
-  const liveOverride = useLiveNodeOverrides((s) => {
-    return (
-      (s.overrides instanceof Map
-        ? s.overrides.get(node.id)
-        : (s.overrides as Record<string, unknown>)?.[node.id]) ?? s.get?.(node.id)
-    )
-  })
-  const livePoints = (liveOverride as { points?: RouteNode['points'] } | undefined)?.points
-  const effectiveNode = useMemo(() => {
-    if (!livePoints) return node
-    return { ...node, points: livePoints }
-  }, [node, livePoints])
 
   const geometry = useMemo(() => getRouteGeometry(effectiveNode), [effectiveNode])
   const effectiveFillColor =
@@ -123,7 +150,6 @@ function RouteBody({ node }: { node: RouteNode }) {
   }, [effectiveNode])
 
   // Only pedestrian routes render dynamic zebra crossings at intersections with vehicle corridors
-  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
   const zebraCrossings = useMemo(() => {
     if (effectiveNode.role !== 'pedestrian' || effectiveNode.zebraCrossing === false) return []
     const otherRoutes: RouteNode[] = []
@@ -141,46 +167,49 @@ function RouteBody({ node }: { node: RouteNode }) {
   const isSelected = useViewer((s) => s.selection.selectedIds.includes(node.id))
 
   return (
-    <group
-      position={position}
-      ref={registeredRef}
-      rotation={rotation}
-      visible={node.visible !== false}
-      {...handlers}
-    >
-      <mesh
-        /**
-         * Paint casts nothing and receives everything.
-         *
-         * `receiveShadow` is not optional: the slab under it receives, so a
-         * marking that did not would glow in every shadowed aisle — brighter
-         * than the floor it is painted on, which reads as an error long before
-         * anyone works out why.
-         */
-        castShadow={false}
-        dispose={null}
-        geometry={geometry}
-        material={materials}
-        // Clear of the slab by a millimetre so a click reaches the paint rather
-        // than the floor it is coplanar with. See PAINT_LIFT_M — this answers
-        // picking, `polygonOffset` answers the depth buffer, and neither
-        // substitutes for the other.
-        position={[0, PAINT_LIFT_M, 0]}
-        receiveShadow
-        // After every default-0 opaque, so a flat surface is drawn against a
-        // depth buffer that has already been laid down.
-        renderOrder={isExporting ? 0 : 1}
-      />
-      {zebraCrossings.map((crossing) => (
-        <ZebraCrossingMesh
-          key={crossing.id}
-          crossing={crossing}
-          nodePosition={position}
-          nodeRotation={rotation}
+    <>
+      <group
+        position={position}
+        ref={registeredRef}
+        rotation={rotation}
+        visible={node.visible !== false}
+        {...handlers}
+      >
+        <mesh
+          /**
+           * Paint casts nothing and receives everything.
+           *
+           * `receiveShadow` is not optional: the slab under it receives, so a
+           * marking that did not would glow in every shadowed aisle — brighter
+           * than the floor it is painted on, which reads as an error long before
+           * anyone works out why.
+           */
+          castShadow={false}
+          dispose={null}
+          frustumCulled={false}
+          geometry={geometry}
+          material={materials}
+          // Clear of the slab by a millimetre so a click reaches the paint rather
+          // than the floor it is coplanar with. See PAINT_LIFT_M — this answers
+          // picking, `polygonOffset` answers the depth buffer, and neither
+          // substitutes for the other.
+          position={[0, PAINT_LIFT_M, 0]}
+          receiveShadow
+          // After every default-0 opaque, so a flat surface is drawn against a
+          // depth buffer that has already been laid down.
+          renderOrder={isExporting ? 0 : 1}
         />
-      ))}
+        {zebraCrossings.map((crossing) => (
+          <ZebraCrossingMesh
+            key={crossing.id}
+            crossing={crossing}
+            nodePosition={position}
+            nodeRotation={rotation}
+          />
+        ))}
+      </group>
       {isSelected && <RouteControls node={effectiveNode} />}
-    </group>
+    </>
   )
 }
 
@@ -210,6 +239,7 @@ function ZebraCrossingMesh({
     <mesh
       castShadow={false}
       dispose={null}
+      frustumCulled={false}
       geometry={geometry}
       material={material}
       receiveShadow

@@ -4,7 +4,7 @@ import { type AnyNodeId, useLiveNodeOverrides, useScene } from '@pascal-app/core
 import { EDITOR_LAYER, triggerSFX } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import type { ThreeEvent } from '@react-three/fiber'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
 import {
   getRouteMidpoints,
@@ -20,6 +20,8 @@ import type { Point } from './stripes'
 
 export * from './route-controls-math'
 
+const NO_RAYCAST = () => null
+
 export interface RouteControlsProps {
   node?: RouteNode
   selectedIds?: string[]
@@ -31,7 +33,33 @@ export interface RouteControlsProps {
   embedded?: boolean
 }
 
-const activeAffordanceNodes = new Set<string>()
+const activeAffordanceListeners = new Set<() => void>()
+export const activeAffordanceNodes = new Set<string>()
+
+function notifyAffordanceChange() {
+  for (const listener of activeAffordanceListeners) {
+    listener()
+  }
+}
+
+export function registerAffordanceNode(nodeId: string): () => void {
+  activeAffordanceNodes.add(nodeId)
+  notifyAffordanceChange()
+  return () => {
+    activeAffordanceNodes.delete(nodeId)
+    notifyAffordanceChange()
+  }
+}
+
+export function useIsAffordanceActive(nodeId: string | null): boolean {
+  return useSyncExternalStore(
+    (callback) => {
+      activeAffordanceListeners.add(callback)
+      return () => activeAffordanceListeners.delete(callback)
+    },
+    () => (nodeId ? activeAffordanceNodes.has(nodeId) : false),
+  )
+}
 
 function swallowNextClick() {
   const handler = (e: MouseEvent) => {
@@ -57,19 +85,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
   const node = props?.node ?? storeNode
 
   const nodeId = node?.id ?? null
+  const isAffordanceActive = useIsAffordanceActive(nodeId)
 
   // Manage affordance presence to avoid duplicate handles when both SelectionAffordanceManager
   // and RouteRenderer fallback mount
   useEffect(() => {
     if (!nodeId || !isStandaloneAffordance) return
-    activeAffordanceNodes.add(nodeId)
-    return () => {
-      activeAffordanceNodes.delete(nodeId)
-    }
+    return registerAffordanceNode(nodeId)
   }, [nodeId, isStandaloneAffordance])
 
   // If mounted inside renderer as fallback but SelectionAffordanceManager is already handling it
-  if (!isStandaloneAffordance && nodeId && activeAffordanceNodes.has(nodeId)) {
+  if (!isStandaloneAffordance && nodeId && isAffordanceActive) {
     return null
   }
 
@@ -384,9 +410,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
         return (
           <group key={`vertex-${i}-${points.length}`} position={[pt[0], 0, pt[1]]}>
             <mesh
-              onPointerDown={beginDrag(i)}
-              onPointerEnter={() => setHoveredIndex(i)}
-              onPointerLeave={() => setHoveredIndex((cur) => (cur === i ? null : cur))}
+              raycast={NO_RAYCAST}
               renderOrder={1010}
             >
               <sphereGeometry args={[0.22, 16, 12]} />
@@ -394,7 +418,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             </mesh>
 
             {/* Dark green outline ring */}
-            <mesh renderOrder={1011} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh raycast={NO_RAYCAST} renderOrder={1011} rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.245, 0.035, 8, 28]} />
               <meshBasicMaterial color="#14532d" depthTest={false} depthWrite={false} />
             </mesh>
@@ -402,12 +426,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             {/* Invisible pick box for easy cursor grabbing */}
             <mesh
               onPointerDown={beginDrag(i)}
-              onPointerEnter={() => setHoveredIndex(i)}
-              onPointerLeave={() => setHoveredIndex((cur) => (cur === i ? null : cur))}
-              visible={false}
+              onPointerEnter={(e) => {
+                e.stopPropagation()
+                setHoveredIndex(i)
+              }}
+              onPointerLeave={(e) => {
+                e.stopPropagation()
+                setHoveredIndex((cur) => (cur === i ? null : cur))
+              }}
             >
               <boxGeometry args={[0.6, 0.12, 0.6]} />
-              <meshBasicMaterial depthWrite={false} />
+              <meshBasicMaterial depthWrite={false} transparent opacity={0} />
             </mesh>
           </group>
         )
@@ -421,9 +450,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
         return (
           <group key={`mid-${i}-${points.length}`} position={[mid[0], 0, mid[1]]}>
             <mesh
-              onPointerDown={beginInsert(i)}
-              onPointerEnter={() => setHoveredMidpoint(i)}
-              onPointerLeave={() => setHoveredMidpoint((cur) => (cur === i ? null : cur))}
+              raycast={NO_RAYCAST}
               renderOrder={1010}
             >
               <sphereGeometry args={[0.14, 14, 10]} />
@@ -431,11 +458,11 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             </mesh>
 
             {/* Cross indicator boxes */}
-            <mesh position={[0, 0, 0]} renderOrder={1011}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1011}>
               <boxGeometry args={[0.16, 0.03, 0.04]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
-            <mesh position={[0, 0, 0]} renderOrder={1011}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1011}>
               <boxGeometry args={[0.04, 0.03, 0.16]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
@@ -443,12 +470,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             {/* Pick box for midpoint */}
             <mesh
               onPointerDown={beginInsert(i)}
-              onPointerEnter={() => setHoveredMidpoint(i)}
-              onPointerLeave={() => setHoveredMidpoint((cur) => (cur === i ? null : cur))}
-              visible={false}
+              onPointerEnter={(e) => {
+                e.stopPropagation()
+                setHoveredMidpoint(i)
+              }}
+              onPointerLeave={(e) => {
+                e.stopPropagation()
+                setHoveredMidpoint((cur) => (cur === i ? null : cur))
+              }}
             >
               <boxGeometry args={[0.45, 0.12, 0.45]} />
-              <meshBasicMaterial depthWrite={false} />
+              <meshBasicMaterial depthWrite={false} transparent opacity={0} />
             </mesh>
           </group>
         )
@@ -460,9 +492,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
           {/* Start Extension Handle (Başa Nokta Ekle) */}
           <group position={[terminalHandles.startPos[0], 0, terminalHandles.startPos[1]]}>
             <mesh
-              onPointerDown={beginPrepend}
-              onPointerEnter={() => setHoveredExt('start')}
-              onPointerLeave={() => setHoveredExt((cur) => (cur === 'start' ? null : cur))}
+              raycast={NO_RAYCAST}
               renderOrder={1012}
             >
               <sphereGeometry args={[0.18, 16, 12]} />
@@ -474,17 +504,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             </mesh>
 
             {/* Cyan outline ring */}
-            <mesh renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh raycast={NO_RAYCAST} renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.21, 0.03, 8, 28]} />
               <meshBasicMaterial color="#0369a1" depthTest={false} depthWrite={false} />
             </mesh>
 
             {/* Plus sign cross */}
-            <mesh position={[0, 0, 0]} renderOrder={1014}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1014}>
               <boxGeometry args={[0.16, 0.035, 0.04]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
-            <mesh position={[0, 0, 0]} renderOrder={1014}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1014}>
               <boxGeometry args={[0.04, 0.035, 0.16]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
@@ -492,21 +522,24 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             {/* Pick box */}
             <mesh
               onPointerDown={beginPrepend}
-              onPointerEnter={() => setHoveredExt('start')}
-              onPointerLeave={() => setHoveredExt((cur) => (cur === 'start' ? null : cur))}
-              visible={false}
+              onPointerEnter={(e) => {
+                e.stopPropagation()
+                setHoveredExt('start')
+              }}
+              onPointerLeave={(e) => {
+                e.stopPropagation()
+                setHoveredExt((cur) => (cur === 'start' ? null : cur))
+              }}
             >
               <boxGeometry args={[0.6, 0.18, 0.6]} />
-              <meshBasicMaterial depthWrite={false} />
+              <meshBasicMaterial depthWrite={false} transparent opacity={0} />
             </mesh>
           </group>
 
           {/* End Extension Handle (Sona Nokta Ekle) */}
           <group position={[terminalHandles.endPos[0], 0, terminalHandles.endPos[1]]}>
             <mesh
-              onPointerDown={beginAppend}
-              onPointerEnter={() => setHoveredExt('end')}
-              onPointerLeave={() => setHoveredExt((cur) => (cur === 'end' ? null : cur))}
+              raycast={NO_RAYCAST}
               renderOrder={1012}
             >
               <sphereGeometry args={[0.18, 16, 12]} />
@@ -518,17 +551,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             </mesh>
 
             {/* Cyan outline ring */}
-            <mesh renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
+            <mesh raycast={NO_RAYCAST} renderOrder={1013} rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[0.21, 0.03, 8, 28]} />
               <meshBasicMaterial color="#0369a1" depthTest={false} depthWrite={false} />
             </mesh>
 
             {/* Plus sign cross */}
-            <mesh position={[0, 0, 0]} renderOrder={1014}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1014}>
               <boxGeometry args={[0.16, 0.035, 0.04]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
-            <mesh position={[0, 0, 0]} renderOrder={1014}>
+            <mesh raycast={NO_RAYCAST} position={[0, 0, 0]} renderOrder={1014}>
               <boxGeometry args={[0.04, 0.035, 0.16]} />
               <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} />
             </mesh>
@@ -536,12 +569,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
             {/* Pick box */}
             <mesh
               onPointerDown={beginAppend}
-              onPointerEnter={() => setHoveredExt('end')}
-              onPointerLeave={() => setHoveredExt((cur) => (cur === 'end' ? null : cur))}
-              visible={false}
+              onPointerEnter={(e) => {
+                e.stopPropagation()
+                setHoveredExt('end')
+              }}
+              onPointerLeave={(e) => {
+                e.stopPropagation()
+                setHoveredExt((cur) => (cur === 'end' ? null : cur))
+              }}
             >
               <boxGeometry args={[0.6, 0.18, 0.6]} />
-              <meshBasicMaterial depthWrite={false} />
+              <meshBasicMaterial depthWrite={false} transparent opacity={0} />
             </mesh>
           </group>
         </>

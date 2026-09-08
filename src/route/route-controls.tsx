@@ -234,7 +234,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
       if (removed) {
         setSelectedIndex(null)
         try {
-          useScene.getState().updateNode(node.id as AnyNodeId, { points: removed } as never)
+          useScene.getState().updateNode(node?.id as AnyNodeId, { points: removed } as never)
           triggerSFX('sfx:item-delete')
         } catch {}
       }
@@ -281,7 +281,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
       if (removed) {
         setSelectedIndex(null)
         try {
-          useScene.getState().updateNode(node.id as AnyNodeId, { points: removed } as never)
+          useScene.getState().updateNode(node?.id as AnyNodeId, { points: removed } as never)
           triggerSFX('sfx:item-delete')
         } catch {}
       }
@@ -328,8 +328,8 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     } catch {}
 
     try {
-      useLiveNodeOverrides.getState().set(node.id, { points: inserted })
-      useScene.getState().markDirty?.(node.id as AnyNodeId)
+      useLiveNodeOverrides.getState().set(node?.id as string, { points: inserted })
+      useScene.getState().markDirty?.(node?.id as AnyNodeId)
     } catch {}
 
     try {
@@ -360,8 +360,8 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     } catch {}
 
     try {
-      useLiveNodeOverrides.getState().set(node.id, { points: nextPoints })
-      useScene.getState().markDirty?.(node.id as AnyNodeId)
+      useLiveNodeOverrides.getState().set(node?.id as string, { points: nextPoints })
+      useScene.getState().markDirty?.(node?.id as AnyNodeId)
     } catch {}
 
     try {
@@ -392,8 +392,8 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     } catch {}
 
     try {
-      useLiveNodeOverrides.getState().set(node.id, { points: nextPoints })
-      useScene.getState().markDirty?.(node.id as AnyNodeId)
+      useLiveNodeOverrides.getState().set(node?.id as string, { points: nextPoints })
+      useScene.getState().markDirty?.(node?.id as AnyNodeId)
     } catch {}
 
     try {
@@ -409,16 +409,16 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     event.stopPropagation()
     const local = worldToLocalXZ(
       [event.point.x, event.point.z],
-      node.position ?? [0, 0, 0],
-      node.rotation?.[1] ?? 0,
+      node?.position ?? [0, 0, 0],
+      node?.rotation?.[1] ?? 0,
     )
     const moved = withRouteVertexMoved(basePoints, index, local)
     if (moved) {
       draftRef.current = moved
       setDraftPoints(moved)
       try {
-        useLiveNodeOverrides.getState().set(node.id, { points: moved })
-        useScene.getState().markDirty?.(node.id as AnyNodeId)
+        useLiveNodeOverrides.getState().set(node?.id as string, { points: moved })
+        useScene.getState().markDirty?.(node?.id as AnyNodeId)
       } catch {}
     }
   }

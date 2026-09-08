@@ -38,7 +38,29 @@ export const routeDefinition = {
   kind: 'warehouse:route',
   schemaVersion: 1,
   schema: RouteNode,
-  category: 'site',
+  /**
+   * **`furnish`, like every other kind in this package — and it was `site`.**
+   *
+   * `category` is not a shelf label. The host reads it three times and each
+   * read moved the route away from its siblings:
+   *
+   * - `editor/lib/selection-routing.ts` routes a click to `phase: 'furnish'`
+   *   for a `furnish` kind and to `phase: 'structure'` for everything else. So
+   *   clicking a route SWITCHED THE EDITOR'S PHASE out of the one this
+   *   plugin's catalog and tools live in — including an armed route tool.
+   * - `editor/components/editor/selection-manager.tsx` accepts a node in the
+   *   furnish phase only when its definition says `furnish`, so a route was
+   *   not selectable there at all.
+   * - `core/registry.ts` (`categoryOfDef`) puts it in the **Site** visibility
+   *   group rather than Furnish, so the Site toggle hid the paint while every
+   *   other warehouse object stayed.
+   *
+   * The tell that this was an oversight rather than a decision is two lines
+   * apart: `surfaceRole: 'furnishing'` on the next line, and `crosswalk` — the
+   * other floor marking in this package, added later — already declares
+   * `furnish`. `kind-naming.test.ts` now holds all 22 kinds to one answer.
+   */
+  category: 'furnish',
   surfaceRole: 'furnishing',
   snapProfile: 'structural',
 

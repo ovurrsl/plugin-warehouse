@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`3c54ba9`](https://github.com/ovurrsl/plugin-warehouse/commit/3c54ba9b410835eb2c5dc11b92030369be6000e8))
 - Refresh generated README blocks [skip ci] ([`866ae6a`](https://github.com/ovurrsl/plugin-warehouse/commit/866ae6a0c365e77f60b6589fbc417f21b26425ad))
 - Refresh generated README blocks [skip ci] ([`7b6dc4b`](https://github.com/ovurrsl/plugin-warehouse/commit/7b6dc4b8cb7822bf099441d4e404b5df6aa79c32))
 - Refresh generated README blocks [skip ci] ([`65842b6`](https://github.com/ovurrsl/plugin-warehouse/commit/65842b63042b2ad445a3076f3e8aad2fa55e7c46))
@@ -397,6 +398,7 @@ index to it, not a replacement for it.
 
 ### Other
 
+- Optimize RouteReconciler intersection calculations and Zebra crossing memoization ([`77538bd`](https://github.com/ovurrsl/plugin-warehouse/commit/77538bd65887dccd94b97854194d5a7c3a6a24eb))
 - Port streetscape architecture to plugin-warehouse: dynamic zebra crossings, z-fighting fixes, interactive curve bends, geometry lifecycle improvements ([`16f8b25`](https://github.com/ovurrsl/plugin-warehouse/commit/16f8b25d357af7e8e9f9ede3124d0d6f8a965f05))
 - Use transparent png icons instead of webp ([`b5f7999`](https://github.com/ovurrsl/plugin-warehouse/commit/b5f7999015be4e2b6999ab02b0c3502cb002ceee))
 - Palet asansörü ve spiral konveyör kat döşemelerini delsin, sürükleme de denetlensin (#34) ([`d3c6700`](https://github.com/ovurrsl/plugin-warehouse/commit/d3c6700f213ecb59930212202a14b5ad12461547))

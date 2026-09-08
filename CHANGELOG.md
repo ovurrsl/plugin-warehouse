@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5d9f050`](https://github.com/ovurrsl/plugin-warehouse/commit/5d9f0502583be6dc487fc2a6801873e4263c1592))
 - Refresh generated README blocks [skip ci] ([`c841769`](https://github.com/ovurrsl/plugin-warehouse/commit/c841769d6d70a2b7ef3e2be8544aacecf304c757))
 - Refresh generated README blocks [skip ci] ([`330b4b5`](https://github.com/ovurrsl/plugin-warehouse/commit/330b4b506ca0d7729f535cb2d3d370cf14cbac0f))
 - Refresh generated README blocks [skip ci] ([`1f51d5d`](https://github.com/ovurrsl/plugin-warehouse/commit/1f51d5da196a50cfbf4844c0a56089b1d5f5cfad))
@@ -312,6 +313,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Satisfy FloorPlacedFootprintResolver contract and RouteNode updateNode typecast ([`e328b6e`](https://github.com/ovurrsl/plugin-warehouse/commit/e328b6ec625b80fca2264fd99c0b9073e0ae2d78))
 - Restore post-draw vertex extension, panel controls, and visibility depth layering ([`103793e`](https://github.com/ovurrsl/plugin-warehouse/commit/103793e26f0e8b7b40a999098d35472e8213bdfe))
 - All compliance tests green — clashGuardedMove, resolveAlignedPlacement, CLICK_TRIGGER_KINDS, kind-naming, panel-reachability, field-units, catalog counts updated to 44; biome formatted ([`d7e8514`](https://github.com/ovurrsl/plugin-warehouse/commit/d7e85145b8413cfdcd1f40d560d41f55434bb1bd))
 - Add use client directive and parametric renderer module format ([`27f08c2`](https://github.com/ovurrsl/plugin-warehouse/commit/27f08c27a33fdfe651934a1f99f31cf315441f30))

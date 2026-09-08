@@ -19,6 +19,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`7b6dc4b`](https://github.com/ovurrsl/plugin-warehouse/commit/7b6dc4b8cb7822bf099441d4e404b5df6aa79c32))
 - Refresh generated README blocks [skip ci] ([`65842b6`](https://github.com/ovurrsl/plugin-warehouse/commit/65842b63042b2ad445a3076f3e8aad2fa55e7c46))
 - Refresh generated README blocks [skip ci] ([`f6bd6b3`](https://github.com/ovurrsl/plugin-warehouse/commit/f6bd6b3657925caaaf8a51c129777ecd652df6d8))
 - Refresh generated README blocks [skip ci] ([`6ac9fde`](https://github.com/ovurrsl/plugin-warehouse/commit/6ac9fde7f78566261cd386ef19e70a95c6cce5da))
@@ -317,6 +318,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Prevent elevation drop on settings edit, unify fill logic, support curved/dashed styles ([`f6571fc`](https://github.com/ovurrsl/plugin-warehouse/commit/f6571fc189f51500ed6cf9414cfdee9578285991))
 - Ensure RouteControls handles always respect node position and rotation ([`a21c820`](https://github.com/ovurrsl/plugin-warehouse/commit/a21c8201e9a56539c71c34563ed5859860305bf4))
 - Prevent route disappearing under slab and resolve editor freeze on click ([`e0a49d3`](https://github.com/ovurrsl/plugin-warehouse/commit/e0a49d3c3c019286dbce003c7bf9dd940b82848b))
 - Satisfy FloorPlacedFootprintResolver contract and RouteNode updateNode typecast ([`e328b6e`](https://github.com/ovurrsl/plugin-warehouse/commit/e328b6ec625b80fca2264fd99c0b9073e0ae2d78))

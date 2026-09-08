@@ -17,7 +17,6 @@ import {
 } from '@pascal-app/editor'
 import { useViewer } from '@pascal-app/viewer'
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { slabAt } from '../host-adapter'
 import {
   clearPlacementPreview,
@@ -31,6 +30,7 @@ import {
 } from '../placement'
 import { useWarehouseStore } from '../store'
 import { MAX_VERTICES } from './constants'
+import { createRouteDrawHud, type RouteDrawHud } from './draw-hud'
 import RoutePreview from './preview'
 import { RouteNode } from './schema'
 import type { Point } from './stripes'
@@ -59,6 +59,12 @@ const NO_RAYCAST = () => {}
  *    backwards, and the chip labelled "Angles" gave a raw cursor.
  * 3. It rendered nothing until two draft points existed, so arming the tool and
  *    moving the cursor showed no feedback at all.
+ * 4. Its readout was DOM JSX returned through `react-dom`'s `createPortal`. A
+ *    tool is mounted inside the canvas, where R3F owns reconciliation and a
+ *    portal does not hand that back — so the first cursor move after arming
+ *    threw out of the render pass and the viewer's error boundary replaced the
+ *    entire 3D scene with `null`, camera controls included. The readout now
+ *    lives in `./draw-hud.ts`, outside React.
  */
 
 export default function RouteTool() {
@@ -155,7 +161,9 @@ export default function RouteTool() {
 
       const nodes = useScene.getState().nodes as Readonly<Record<string, unknown>>
       const supportSlabId = electSupportSlab(nodes, activeLevelId, origin[0], origin[1])
-      const slab = supportSlabId ? (nodes[supportSlabId] as { elevation?: number } | undefined) : null
+      const slab = supportSlabId
+        ? (nodes[supportSlabId] as { elevation?: number } | undefined)
+        : null
       const surfaceY = slab?.elevation ?? 0
 
       const node = RouteNode.parse({
@@ -277,6 +285,42 @@ export default function RouteTool() {
     totalDist += legDist
   }
 
+  /**
+   * The readout, owned imperatively.
+   *
+   * It used to be `react-dom`'s `createPortal` returned from this component's
+   * JSX. A portal does not change which reconciler owns its children, and this
+   * component is mounted by `ToolManager` INSIDE the canvas — so a `<div>` went
+   * to R3F's `createInstance`, which threw
+   * `R3F: Div is not part of the THREE namespace!` on the first cursor move
+   * after arming. `<Canvas>` re-raises what is thrown inside it and the viewer
+   * wraps its scene in `<ErrorBoundary fallback={null} scope="viewer-scene">`,
+   * so that one element unmounted the whole 3D subtree — `CustomCameraControls`
+   * with it. "The camera locks and I cannot draw" was both halves of that one
+   * throw. See `./draw-hud.ts`.
+   */
+  const hudRef = useRef<RouteDrawHud | null>(null)
+  useEffect(() => {
+    hudRef.current = createRouteDrawHud()
+    return () => {
+      hudRef.current?.destroy()
+      hudRef.current = null
+    }
+  }, [])
+  useEffect(() => {
+    hudRef.current?.update(
+      cursor
+        ? {
+            role: brush.role,
+            hasAnchor: lastVertex !== undefined,
+            legDistanceM: legDist,
+            legAngleDeg: legAngle,
+            totalDistanceM: totalDist,
+          }
+        : null,
+    )
+  }, [brush.role, cursor, lastVertex, legDist, legAngle, totalDist])
+
   return (
     <>
       {/* Mounted from the first cursor move, not from the second vertex. The
@@ -320,48 +364,6 @@ export default function RouteTool() {
       ))}
 
       {draft.length >= 2 && <RoutePreview brush={brush} points={draft} surfaceY={surfaceY} />}
-
-      {/* Streetscape-style drawing HUD */}
-      {typeof document !== 'undefined' &&
-        cursor &&
-        createPortal(
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-border/80 bg-background/95 px-4 py-2 text-xs shadow-xl backdrop-blur-md select-none">
-            <span className="flex items-center gap-1.5 font-semibold text-foreground">
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: brush.role === 'vehicle' ? '#f2c31d' : '#2f9e58' }}
-              />
-              {brush.role === 'vehicle' ? 'Araç Koridoru' : 'Yaya Yolu'}
-            </span>
-            <div className="h-3.5 w-px bg-border/80" />
-            {lastVertex ? (
-              <>
-                <span className="text-muted-foreground">
-                  Mesafe: <strong className="text-foreground">{legDist.toFixed(2)} m</strong>
-                </span>
-                <span className="text-muted-foreground">
-                  Açı: <strong className="text-foreground">{legAngle.toFixed(1)}°</strong>
-                </span>
-                {totalDist > legDist && (
-                  <span className="text-muted-foreground">
-                    Toplam: <strong className="text-foreground">{totalDist.toFixed(2)} m</strong>
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-muted-foreground">Başlangıç noktasını tıklayın</span>
-            )}
-            <div className="h-3.5 w-px bg-border/80" />
-            <span className="text-[11px] text-muted-foreground/80">
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                Çift Tık / Enter
-              </kbd>{' '}
-              Bitir ·{' '}
-              <kbd className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">Esc</kbd> İptal
-            </span>
-          </div>,
-          document.body,
-        )}
     </>
   )
 }

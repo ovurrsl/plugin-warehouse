@@ -8,6 +8,7 @@ index to it, not a replacement for it.
 
 ### Build and CI
 
+- Repair the dependency ranges that block `bun install` ([`375d24f`](https://github.com/ovurrsl/plugin-warehouse/commit/375d24f663cf1f736ee25bfc81b02a9a8a73c5bf))
 - Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
 - CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
 
@@ -19,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`30e7a6d`](https://github.com/ovurrsl/plugin-warehouse/commit/30e7a6d6c16f94ef51ecff5086780cfb79633d04))
 - Refresh generated README blocks [skip ci] ([`3c54ba9`](https://github.com/ovurrsl/plugin-warehouse/commit/3c54ba9b410835eb2c5dc11b92030369be6000e8))
 - Refresh generated README blocks [skip ci] ([`866ae6a`](https://github.com/ovurrsl/plugin-warehouse/commit/866ae6a0c365e77f60b6589fbc417f21b26425ad))
 - Refresh generated README blocks [skip ci] ([`7b6dc4b`](https://github.com/ovurrsl/plugin-warehouse/commit/7b6dc4b8cb7822bf099441d4e404b5df6aa79c32))
@@ -320,6 +322,10 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- The pedestrian route no longer takes the 3D scene down with it (#37) ([`730c5e4`](https://github.com/ovurrsl/plugin-warehouse/commit/730c5e4bda9e31602df01e5a81b5a187f559d83f))
+- Put the route in the same editor phase as every other kind ([`eade590`](https://github.com/ovurrsl/plugin-warehouse/commit/eade59001ca4e2e8c00241db5d0902df8b62fc44))
+- Leave the camera's buttons alone, and release every drag ([`8eea82a`](https://github.com/ovurrsl/plugin-warehouse/commit/8eea82a9e156d05ddfdac9e5ef246d6ce616cfbf))
+- Stop the drawing readout from unmounting the whole 3D scene ([`5683b18`](https://github.com/ovurrsl/plugin-warehouse/commit/5683b18669ca41907491e02b368a1ed13e70688c))
 - Resolve severe React Hooks violation in RouteControls causing editor lockup on click ([`d9b98a0`](https://github.com/ovurrsl/plugin-warehouse/commit/d9b98a0b96819d3fbcece31f75398fd473749f70))
 - Resolve severe React Hooks violation in RouteControls causing editor lockup on click ([`9b33ffb`](https://github.com/ovurrsl/plugin-warehouse/commit/9b33ffb2dc529806d38d7b2d45e362a78ad757fc))
 - Prevent elevation drop on settings edit, unify fill logic, support curved/dashed styles ([`f6571fc`](https://github.com/ovurrsl/plugin-warehouse/commit/f6571fc189f51500ed6cf9414cfdee9578285991))

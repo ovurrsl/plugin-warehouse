@@ -65,6 +65,16 @@ export function useIsAffordanceActive(nodeId: string | null): boolean {
   )
 }
 
+/**
+ * Eats the click the browser sends after a drag's `pointerup`.
+ *
+ * A window CAPTURE listener, so it runs before the canvas's own — which is the
+ * point, and also why it must be armed **only when a drag actually changed
+ * something**. `grid:click` is emitted from that same canvas listener
+ * (`editor/hooks/use-grid-events.ts`), and it is the only event a multi-point
+ * tool draws with: arming this on a gesture that moved nothing deletes the next
+ * corner the user tries to place anywhere in the scene.
+ */
 function swallowNextClick() {
   const handler = (e: MouseEvent) => {
     e.stopPropagation()
@@ -72,6 +82,33 @@ function swallowNextClick() {
   }
   window.addEventListener('click', handler, true)
   setTimeout(() => window.removeEventListener('click', handler, true), 100)
+}
+
+/**
+ * **The primary button, and nothing else.**
+ *
+ * The host binds RIGHT to camera ROTATE and MIDDLE to SCREEN_PAN
+ * (`editor/components/editor/custom-camera-controls.tsx`), and its own node
+ * events refuse anything but button 0 for the same reason
+ * (`viewer/hooks/use-node-events.ts`). These grips sit 50 mm above the paint
+ * and their pick boxes reach 1 m past each end of the run, so with no guard a
+ * right-drag anywhere near a selected route started a vertex drag instead of
+ * orbiting — and the drag then swallowed every `pointermove` of the gesture.
+ * The camera does not move, which is exactly what "the camera locks when I
+ * click the route" describes.
+ *
+ * Absent `button` counts as primary: synthesized events in tests and on some
+ * touch stacks omit it, and refusing those would break dragging on a phone.
+ */
+export function startsGripDrag(event: { button?: number }): boolean {
+  return (event.button ?? 0) === 0
+}
+
+/** Whether a drag ended anywhere other than where it started. */
+export function routePointsEqual(a: readonly Point[] | null, b: readonly Point[] | null): boolean {
+  if (a === b) return true
+  if (!a || !b || a.length !== b.length) return false
+  return a.every((point, index) => point[0] === b[index]![0] && point[1] === b[index]![1])
 }
 
 export function RouteControls(props?: RouteControlsProps): React.JSX.Element | null {
@@ -120,71 +157,140 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
 
   const dragIndexRef = useRef<number | null>(null)
   const draftRef = useRef<Point[] | null>(null)
+  /** Where the gesture started, so a release can tell a drag from a click. */
+  const originPointsRef = useRef<Point[] | null>(null)
+  /** The host's own undo of `beginInputDrag`, when it handed us one. */
+  const restoreInputDraggingRef = useRef<(() => void) | null>(null)
+  /** Set only while this component is the one that changed the body cursor. */
+  const ownsCursorRef = useRef(false)
 
-  // Clear state when active node changes
+  // Clear the transient UI state when the active node changes. The drag itself
+  // is released by the cleanup of the `[releaseDrag]` effect below, which runs
+  // with the OUTGOING node's closure and so clears the right node's override.
   useEffect(() => {
-    dragIndexRef.current = null
-    draftRef.current = null
-    setDraftPoints(null)
     setSelectedIndex(null)
     setHoveredIndex(null)
     setHoveredMidpoint(null)
     setHoveredExt(null)
   }, [nodeId])
 
-  const commit = useCallback(() => {
-    const finalPoints = draftRef.current
+  /**
+   * The one way out of a drag — and it must be reachable from every one of them.
+   *
+   * Raising `inputDragging` without a guaranteed lowering is what turns a
+   * mis-click into a dead editor: while it is set the host suppresses every node
+   * selection event (`viewer/hooks/use-node-events.ts`) and stands its own drag
+   * sessions down (`editor/components/editor/selection-manager.tsx`). The same
+   * goes for the paused undo stack and the `grabbing` body cursor. So all three
+   * are released here, and `commit`, `cancelDrag`, a node change and unmount all
+   * come through this function rather than each repeating it — the earlier
+   * version repeated it in two places and skipped it in a third.
+   *
+   * Idempotent, because it genuinely is called twice: the drag plane's
+   * `onPointerUp` and the window-level fail-safe both fire for one release.
+   */
+  const releaseDrag = useCallback((): { points: Point[] | null; origin: Point[] | null } => {
+    const points = draftRef.current
+    const origin = originPointsRef.current
+    const wasDragging = dragIndexRef.current !== null || points !== null
+
     dragIndexRef.current = null
     draftRef.current = null
+    originPointsRef.current = null
     setDraftPoints(null)
-    document.body.style.cursor = ''
 
+    if (ownsCursorRef.current) {
+      ownsCursorRef.current = false
+      if (typeof document !== 'undefined') document.body.style.cursor = ''
+    }
+
+    const restore = restoreInputDraggingRef.current
+    restoreInputDraggingRef.current = null
     try {
-      useViewer.getState().setInputDragging?.(false)
+      // The host's `beginInputDrag` returns a restore that puts back whatever
+      // the flag was — hard-setting `false` would clear a drag somebody else
+      // owns. Only fall back to the blunt write when we were never handed one.
+      if (restore) restore()
+      else if (wasDragging) useViewer.getState().setInputDragging?.(false)
     } catch {}
 
-    try {
-      useScene.temporal?.getState()?.resume?.()
-    } catch {}
-
-    if (finalPoints && nodeId) {
+    // Everything below costs something, so it is spent only on a gesture that
+    // actually happened: this function also runs on every deselect and unmount,
+    // and marking a node dirty there would rebuild its buffer for nothing.
+    if (wasDragging) {
       try {
-        useScene.getState().updateNode(nodeId as AnyNodeId, { points: finalPoints } as never)
+        useScene.temporal?.getState()?.resume?.()
+      } catch {}
+
+      if (nodeId) {
+        try {
+          useLiveNodeOverrides.getState().clear(nodeId)
+          useScene.getState().markDirty?.(nodeId as AnyNodeId)
+        } catch {}
+      }
+    }
+
+    return { points: wasDragging ? points : null, origin }
+  }, [nodeId])
+
+  /**
+   * Opens a drag session. Every `begin*` handler goes through here so none of
+   * them can raise half the flags.
+   */
+  const acquireDrag = useCallback(
+    (index: number, next: Point[], origin: readonly Point[]) => {
+      dragIndexRef.current = index
+      draftRef.current = next
+      originPointsRef.current = origin.map((p) => [p[0], p[1]] as Point)
+      setDraftPoints(next)
+
+      if (typeof document !== 'undefined') {
+        document.body.style.cursor = 'grabbing'
+        ownsCursorRef.current = true
+      }
+
+      const beginInputDrag = (
+        props?.interactionApi as { beginInputDrag?: () => () => void } | undefined
+      )?.beginInputDrag
+      try {
+        restoreInputDraggingRef.current = beginInputDrag ? beginInputDrag() : null
+        if (!beginInputDrag) useViewer.getState().setInputDragging?.(true)
+      } catch {}
+
+      try {
+        useScene.temporal?.getState()?.pause?.()
+      } catch {}
+
+      try {
+        triggerSFX('sfx:item-pick')
+      } catch {}
+    },
+    [props?.interactionApi],
+  )
+
+  const commit = useCallback(() => {
+    const { points, origin } = releaseDrag()
+    if (!points) return
+
+    // A press that moved nothing is a CLICK, not an edit. Writing history for
+    // it litters the undo stack with no-ops, and swallowing the click that
+    // follows kills the next corner the route tool tries to place.
+    const changed = !routePointsEqual(points, origin)
+    if (!changed) return
+
+    if (nodeId) {
+      try {
+        useScene.getState().updateNode(nodeId as AnyNodeId, { points } as never)
         triggerSFX('sfx:item-place')
       } catch {}
     }
 
-    if (nodeId) {
-      try {
-        useLiveNodeOverrides.getState().clear(nodeId)
-        useScene.getState().markDirty?.(nodeId as AnyNodeId)
-      } catch {}
-    }
-
     swallowNextClick()
-  }, [nodeId])
+  }, [nodeId, releaseDrag])
 
   const cancelDrag = useCallback(() => {
-    dragIndexRef.current = null
-    draftRef.current = null
-    setDraftPoints(null)
-    document.body.style.cursor = ''
-
-    try {
-      useViewer.getState().setInputDragging?.(false)
-    } catch {}
-
-    try {
-      useScene.temporal?.getState()?.resume?.()
-    } catch {}
-
-    if (nodeId) {
-      try {
-        useLiveNodeOverrides.getState().clear(nodeId)
-        useScene.getState().markDirty?.(nodeId as AnyNodeId)
-      } catch {}
-    }
-  }, [nodeId])
+    releaseDrag()
+  }, [releaseDrag])
 
   const dragging = draftPoints !== null && dragIndexRef.current !== null
 
@@ -202,14 +308,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     }
   }, [dragging, commit, cancelDrag])
 
-  // Clean up dragging state if component unmounts mid-drag
+  // Releases a live drag when this component unmounts OR when the node it is
+  // bound to changes — the second case is the one that used to leak, because
+  // the node-change effect reset the refs and left `inputDragging` raised with
+  // nothing able to lower it again. Unconditional now: `releaseDrag` is
+  // idempotent, so there is no state to test first and therefore no state to
+  // get wrong.
   useEffect(() => {
     return () => {
-      if (dragIndexRef.current !== null) {
-        cancelDrag()
-      }
+      releaseDrag()
     }
-  }, [cancelDrag])
+  }, [releaseDrag])
 
   // Keyboard deletion on Delete or Backspace key
   useEffect(() => {
@@ -230,7 +339,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
       if (!node || (node?.points?.length ?? 0) <= 2) return
 
       event.preventDefault()
-      const removed = withRouteVertexRemoved((node?.points ?? []), selectedIndex)
+      const removed = withRouteVertexRemoved(node?.points ?? [], selectedIndex)
       if (removed) {
         setSelectedIndex(null)
         try {
@@ -272,6 +381,9 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
   }, [points])
 
   const beginDrag = (index: number) => (event: ThreeEvent<PointerEvent>) => {
+    // Before `stopPropagation`, deliberately: a right- or middle-press belongs
+    // to the camera, and swallowing it here is what froze the view.
+    if (!startsGripDrag(event)) return
     event.stopPropagation()
 
     // Alt-click deletes vertex immediately
@@ -289,55 +401,27 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     }
 
     setSelectedIndex(index)
-    dragIndexRef.current = index
-    draftRef.current = [...points]
-    setDraftPoints([...points])
-    document.body.style.cursor = 'grabbing'
-
-    try {
-      useViewer.getState().setInputDragging?.(true)
-    } catch {}
-
-    try {
-      useScene.temporal?.getState()?.pause?.()
-    } catch {}
-
-    try {
-      triggerSFX('sfx:item-pick')
-    } catch {}
+    acquireDrag(index, [...points], points)
   }
 
   const beginInsert = (segmentIndex: number) => (event: ThreeEvent<PointerEvent>) => {
+    if (!startsGripDrag(event)) return
     event.stopPropagation()
     const inserted = withRouteVertexInserted(points, segmentIndex)
     if (!inserted) return
 
     const newIndex = segmentIndex + 1
-    dragIndexRef.current = newIndex
-    draftRef.current = inserted
-    setDraftPoints(inserted)
     setSelectedIndex(newIndex)
-    document.body.style.cursor = 'grabbing'
-
-    try {
-      useViewer.getState().setInputDragging?.(true)
-    } catch {}
-
-    try {
-      useScene.temporal?.getState()?.pause?.()
-    } catch {}
+    acquireDrag(newIndex, inserted, points)
 
     try {
       useLiveNodeOverrides.getState().set(node?.id as string, { points: inserted })
       useScene.getState().markDirty?.(node?.id as AnyNodeId)
     } catch {}
-
-    try {
-      triggerSFX('sfx:item-pick')
-    } catch {}
   }
 
   const beginAppend = (event: ThreeEvent<PointerEvent>) => {
+    if (!startsGripDrag(event)) return
     event.stopPropagation()
     if (points.length >= MAX_VERTICES) return
 
@@ -345,31 +429,17 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     if (!nextPoints) return
 
     const newIndex = nextPoints.length - 1
-    dragIndexRef.current = newIndex
-    draftRef.current = nextPoints
-    setDraftPoints(nextPoints)
     setSelectedIndex(newIndex)
-    document.body.style.cursor = 'grabbing'
-
-    try {
-      useViewer.getState().setInputDragging?.(true)
-    } catch {}
-
-    try {
-      useScene.temporal?.getState()?.pause?.()
-    } catch {}
+    acquireDrag(newIndex, nextPoints, points)
 
     try {
       useLiveNodeOverrides.getState().set(node?.id as string, { points: nextPoints })
       useScene.getState().markDirty?.(node?.id as AnyNodeId)
     } catch {}
-
-    try {
-      triggerSFX('sfx:item-pick')
-    } catch {}
   }
 
   const beginPrepend = (event: ThreeEvent<PointerEvent>) => {
+    if (!startsGripDrag(event)) return
     event.stopPropagation()
     if (points.length >= MAX_VERTICES) return
 
@@ -377,27 +447,12 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     if (!nextPoints) return
 
     const newIndex = 0
-    dragIndexRef.current = newIndex
-    draftRef.current = nextPoints
-    setDraftPoints(nextPoints)
     setSelectedIndex(newIndex)
-    document.body.style.cursor = 'grabbing'
-
-    try {
-      useViewer.getState().setInputDragging?.(true)
-    } catch {}
-
-    try {
-      useScene.temporal?.getState()?.pause?.()
-    } catch {}
+    acquireDrag(newIndex, nextPoints, points)
 
     try {
       useLiveNodeOverrides.getState().set(node?.id as string, { points: nextPoints })
       useScene.getState().markDirty?.(node?.id as AnyNodeId)
-    } catch {}
-
-    try {
-      triggerSFX('sfx:item-pick')
     } catch {}
   }
 
@@ -433,10 +488,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
 
         return (
           <group key={`vertex-${i}-${points.length}`} position={[pt[0], 0, pt[1]]}>
-            <mesh
-              raycast={NO_RAYCAST}
-              renderOrder={1010}
-            >
+            <mesh raycast={NO_RAYCAST} renderOrder={1010}>
               <sphereGeometry args={[0.22, 16, 12]} />
               <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
             </mesh>
@@ -473,10 +525,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
 
         return (
           <group key={`mid-${i}-${points.length}`} position={[mid[0], 0, mid[1]]}>
-            <mesh
-              raycast={NO_RAYCAST}
-              renderOrder={1010}
-            >
+            <mesh raycast={NO_RAYCAST} renderOrder={1010}>
               <sphereGeometry args={[0.14, 14, 10]} />
               <meshBasicMaterial color={color} depthTest={false} depthWrite={false} />
             </mesh>
@@ -515,10 +564,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
         <>
           {/* Start Extension Handle (Başa Nokta Ekle) */}
           <group position={[terminalHandles.startPos[0], 0, terminalHandles.startPos[1]]}>
-            <mesh
-              raycast={NO_RAYCAST}
-              renderOrder={1012}
-            >
+            <mesh raycast={NO_RAYCAST} renderOrder={1012}>
               <sphereGeometry args={[0.18, 16, 12]} />
               <meshBasicMaterial
                 color={hoveredExt === 'start' ? '#38bdf8' : '#0284c7'}
@@ -562,10 +608,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
 
           {/* End Extension Handle (Sona Nokta Ekle) */}
           <group position={[terminalHandles.endPos[0], 0, terminalHandles.endPos[1]]}>
-            <mesh
-              raycast={NO_RAYCAST}
-              renderOrder={1012}
-            >
+            <mesh raycast={NO_RAYCAST} renderOrder={1012}>
               <sphereGeometry args={[0.18, 16, 12]} />
               <meshBasicMaterial
                 color={hoveredExt === 'end' ? '#38bdf8' : '#0284c7'}
@@ -627,8 +670,6 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
       )}
     </group>
   )
-
-
 
   const resolvedY = Math.max(rawPosition[1] ?? 0, slabElevation)
   const effectivePosition: [number, number, number] = props?.position ?? [

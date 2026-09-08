@@ -89,6 +89,20 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
   const node = props?.node ?? storeNode
 
   const nodeId = node?.id ?? null
+  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
+  const rawPosition = node?.position ?? [0, 0, 0]
+  const slabElevation = useMemo(() => {
+    if (!node) return 0
+    if (node.supportSlabId) {
+      const slab = sceneNodes[node.supportSlabId] as { elevation?: number } | undefined
+      if (typeof slab?.elevation === 'number') {
+        return slab.elevation
+      }
+    }
+    const slabs = node.parentId ? collectSlabs(sceneNodes, node.parentId) : []
+    const slab = slabAt(slabs, rawPosition[0], rawPosition[2])
+    return slab?.elevation ?? 0
+  }, [node, sceneNodes, rawPosition])
   const isAffordanceActive = useIsAffordanceActive(nodeId)
 
   // Manage affordance presence to avoid duplicate handles when both SelectionAffordanceManager
@@ -97,11 +111,6 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     if (!nodeId || !isStandaloneAffordance) return
     return registerAffordanceNode(nodeId)
   }, [nodeId, isStandaloneAffordance])
-
-  // If mounted inside renderer as fallback but SelectionAffordanceManager is already handling it
-  if (!isStandaloneAffordance && nodeId && isAffordanceActive) {
-    return null
-  }
 
   const [draftPoints, setDraftPoints] = useState<Point[] | null>(null)
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
@@ -218,10 +227,10 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
       }
       if (event.key !== 'Delete' && event.key !== 'Backspace') return
       if (selectedIndex === null) return
-      if (!node || node.points.length <= 2) return
+      if (!node || (node?.points?.length ?? 0) <= 2) return
 
       event.preventDefault()
-      const removed = withRouteVertexRemoved(node.points, selectedIndex)
+      const removed = withRouteVertexRemoved((node?.points ?? []), selectedIndex)
       if (removed) {
         setSelectedIndex(null)
         try {
@@ -235,9 +244,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [node, selectedIndex])
 
-  if (!node || props?.active === false || props?.readOnly === true) return null
-
-  const points = draftPoints ?? node.points
+  const points = draftPoints ?? node?.points ?? []
   const midpoints = getRouteMidpoints(points)
 
   const terminalHandles = useMemo(() => {
@@ -621,19 +628,7 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     </group>
   )
 
-  const sceneNodes = useScene((s) => s.nodes as Record<string, unknown>)
-  const rawPosition = node.position ?? [0, 0, 0]
-  const slabElevation = useMemo(() => {
-    if (node.supportSlabId) {
-      const slab = sceneNodes[node.supportSlabId] as { elevation?: number } | undefined
-      if (typeof slab?.elevation === 'number') {
-        return slab.elevation
-      }
-    }
-    const slabs = node.parentId ? collectSlabs(sceneNodes, node.parentId) : []
-    const slab = slabAt(slabs, rawPosition[0], rawPosition[2])
-    return slab?.elevation ?? 0
-  }, [node.supportSlabId, node.parentId, sceneNodes, rawPosition])
+
 
   const resolvedY = Math.max(rawPosition[1] ?? 0, slabElevation)
   const effectivePosition: [number, number, number] = props?.position ?? [
@@ -641,7 +636,10 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     resolvedY,
     rawPosition[2],
   ]
-  const effectiveRotation = props?.rotation ?? node.rotation ?? [0, 0, 0]
+  const effectiveRotation = props?.rotation ?? node?.rotation ?? [0, 0, 0]
+
+  if (!node || props?.active === false || props?.readOnly === true) return null
+  if (!isStandaloneAffordance && nodeId && isAffordanceActive) return null
 
   return (
     <group position={effectivePosition} rotation={effectiveRotation}>

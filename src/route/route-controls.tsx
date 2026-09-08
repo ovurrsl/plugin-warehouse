@@ -604,15 +604,11 @@ export function RouteControls(props?: RouteControlsProps): React.JSX.Element | n
     </group>
   )
 
-  if (isStandaloneAffordance) {
-    return (
-      <group position={node.position ?? [0, 0, 0]} rotation={node.rotation ?? [0, 0, 0]}>
-        {content}
-      </group>
-    )
-  }
-
-  return content
+  return (
+    <group position={node.position ?? [0, 0, 0]} rotation={node.rotation ?? [0, 0, 0]}>
+      {content}
+    </group>
+  )
 }
 
 export default RouteControls

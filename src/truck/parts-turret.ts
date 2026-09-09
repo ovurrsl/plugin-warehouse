@@ -30,28 +30,43 @@ import {
 } from './parts'
 
 /**
- * YAYINLANMIŞ lastikler, tahmin değil: arka (tahrik) 15.7 × 6.3 in =
- * Ø0.399 × 0.160, ön (yük) 15.0 × 7.6 in = Ø0.381 × 0.193.
+ * YAYINLANMIŞ lastikler (VDI 2198, EKX 516 sütunu — y = 2.220, l1 = 4.045,
+ * b10 = 1.258): satır 3.2 ÖN (yük, 2 adet) Ø 380 × 192, satır 3.3 ARKA
+ * (tahrik — satır 3.5 onu "1x" ile işaretler) Ø 400 × 160.
  *
- * Ön lastik 0.193 yerine 0.192 çiziliyor ve bu tek milimetrenin gerekçesi var:
- * yük tekerleri b10 = 1.258 izinde durur, dış yüzleri b10 + genişlik eder ve
- * YAYINLANMIŞ GENEL GENİŞLİK ODUR — 1.258 + 0.193 = 1.451, oysa b2 = 1.450.
- * Katalog 1 mm yuvarlamış; 0.192 ile zarf tam b2'de kapanır ve `planWidthM`
- * ile çizim birbirini kesmez.
+ * mm ASIL BİRİMDİR ve bu satırda önemi var. Buradaki sayılar bir kez inç
+ * sütunundan çevrilmişti (15.7 × 6.3 → 0.399 × 0.160, 15.0 × 7.6 → 0.381 ×
+ * 0.193) çünkü elimizdeki tek nüsha 2017 tarihli ABD sayfasıydı — ve onun 3.3
+ * mm sütununda dizgi hatası var: satır 3.2'nin çevrimi olan "381 x 192"
+ * tekrarlanmış, kendi inç sütunuyla bile çelişiyor. 2018 ve 2022 ABD
+ * sürümleriyle EU EN ve DE sürümlerinin dördü de "Ø 400 x 160" basıyor.
  *
- * Eski değerler (Ø0.34 yük) uydurmaydı. Tahrik lastiği zaten doğruydu —
- * yanlış olan yalnızca X konumuydu, aşağıya bakın.
+ * Ön lastikteki "1 mm kırpma" gerekçesi de aynı çevrimin artığıydı ve
+ * GEREKSİZDİ: 192 doğrudan yayınlanmış. Kendiliğinden kapanan kontrol duruyor
+ * — yük tekerleri b10 izinde, dış yüzleri 1.258 + 0.192 = 1.450 = b2, yani
+ * yayınlanmış genel genişliği KABİN değil ÖN AKS yapıyor.
+ *
+ * Eski Ø0.34 yük tekerleği uydurmaydı; tahrik lastiğinin çapı 1 mm şaşıyordu
+ * ve asıl yanlış olan X konumuydu, aşağıya bakın.
  */
-const DRIVE_WHEEL = { diameter: 0.399, width: 0.16 }
-const LOAD_WHEEL = { diameter: 0.381, width: 0.192 }
+const DRIVE_WHEEL = { diameter: 0.4, width: 0.16 }
+const LOAD_WHEEL = { diameter: 0.38, width: 0.192 }
 
 /**
- * Dinlenmedeki mast tepesi — SEÇİLMİŞ VARSAYILAN, yayınlanmış figür değil.
+ * Dinlenmedeki mast tepesi — YAYINLANMIŞ figür, seçilmiş varsayılan DEĞİL:
+ * VDI 2198 satır 4.2 "katlanmış mast yüksekliği" h1 = 2.955, EKX 516 sütunu,
+ * sayfanın referans mastı için (satır 4.4 h3 = 3.500). Beş ayrı nüsha aynı
+ * sayıyı basıyor: 2017 / 2018 / 2022 ABD, EU EN, DE.
  *
- * Yayınlanmış katlanmış mast yüksekliği h1 = 2.955 (h3 = 3.500 iki kademeli ZT
- * satırı). Buradaki değer ona kabin tavanının üstünde kalan koruma çerçevesi
- * payını bırakır. Mast satırları katalogda olmadığı için satırdan okunamıyor;
- * girildikleri gün burası `mastRow.h1` olur.
+ * Bir süre burada "seçilmiş varsayılan" yazıyordu ve `gaps.ts` aynı figürü
+ * "yayınlanmamış" diye kaydediyordu. İkisi de yanlıştı ve birbiriyle de
+ * çelişiyordu — satır sayfada duruyor.
+ *
+ * Ne DEĞİL: bir MAST SATIRI. Standart mast tablosunda h3 = 3.500 satırı yok
+ * (BR5 ZT: 3.000 → h1 2.705, 4.000 → h1 3.205). 2.955 o bandın tam ortasına
+ * düşer — tabloyu DOĞRULAR ama ondan OKUNMAZ, ve enterpolasyonla üretilmiş
+ * değildir. BR5 satırları `MAST_ROWS`'a girildiği gün burası `mastRow.h1`
+ * olur.
  */
 const RESTING_MAST_TOP_M = 2.955
 
@@ -69,12 +84,11 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
    * direk kalıyordu; gerçek makinede mast kabin tavanının ~0,4 m üstünde biter
    * ve kabinle tek parça okunur — "man-up" hissini veren şey o bütünlük.
    *
-   * Katlanmış mast yüksekliği ayrı bir satırdır (4.2 h1 = 2.955, h3 = 3.500
-   * mastı için) ve bu ailenin mast satırları henüz katalogda yok:
-   * `MAST_ROWS`'ta `ekx-br5` için tek satır bile bulunmuyor, `mastRowsFor` sıfır
-   * döndürüyor. O yüzden burada satırdan okunamıyor ve seçilmiş bir varsayılan
-   * duruyor. Satırlar girildiğinde bu, forklift'teki gibi mast satırının h1'i
-   * olmalı.
+   * Katlanmış mast yüksekliği ayrı ve YAYINLANMIŞ bir satırdır (4.2 h1 =
+   * 2.955, sayfanın h3 = 3.500 referans mastı için). Satırdan okunamamasının
+   * sebebi verinin olmaması değil, ÇIKARILMAMIŞ olması: `MAST_ROWS`'ta
+   * `ekx-br5` için tek satır bulunmuyor, `mastRowsFor` sıfır döndürüyor.
+   * Satırlar girildiğinde bu, forklift'teki gibi mast satırının h1'i olmalı.
    */
   const mastTopY = RESTING_MAST_TOP_M
   const cabFloorY = model.h7 ?? 0.43

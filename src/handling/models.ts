@@ -100,8 +100,9 @@ export type TruckModel = {
    *
    * Bu satır bir süre "en yüksek sabit nokta" diye okundu ve mast tam bu sayıya
    * çizildi; sonuç, kabin tavanının 1,34 m üstünde duran çıplak bir direkti.
-   * Gerçek katlanmış mast yüksekliği ayrı bir satırdır (4.2 h1 = 2.955, h3 =
-   * 3.500 mastı için) ve bu ailede henüz katalogda yok — bkz. `gaps.ts`.
+   * Gerçek katlanmış mast yüksekliği ayrı ve yayınlanmış bir satırdır (4.2
+   * h1 = 2.955, sayfanın h3 = 3.500 referans mastı için); eksik olan veri
+   * değil, bu ailenin `MAST_ROWS` satırları — bkz. `gaps.ts`.
    */
   h12: number | null
   h13: number | null
@@ -369,8 +370,8 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     notes: [
       'Ast yayınlanmamış — sınıf EN 15620 trilateral-turret bandında kalır; formül ve pratik aralık gaps.ts girişinde.',
       'Koridora giriş için transfer koridoru ≥ 4.0–4.5 m — çalışma koridorundan ayrı bir kavram, route.width ile karıştırılmaz.',
-      "Zarf genişliği b2 = 1.450, gövde b1 = 1.210. Ama 1.450'yi yapan KABİN DEĞİL ÖN AKS: b10 (1.258) + yayınlanmış ön lastik genişliği (7.6 in = 0.193) = 1.451, yani yayınlanmış genel genişlik yük tekerleklerinin dış yüzüdür (1 mm yuvarlama).",
-      'Yayınlanmış lastikler: ön 15.0 × 7.6 in = Ø0.381 × 0.193, arka 15.7 × 6.3 in = Ø0.399 × 0.160.',
+      "Zarf genişliği b2 = 1.450, gövde b1 = 1.210. Ama 1.450'yi yapan KABİN DEĞİL ÖN AKS: b10 (1.258) + yayınlanmış ön lastik genişliği (0.192) = 1.450, tam — yayınlanmış genel genişlik yük tekerleklerinin dış yüzüdür.",
+      'Yayınlanmış lastikler (VDI satır 3.2/3.3, mm sütunu): ön (yük, 2 adet) Ø 380 × 192, arka (tahrik, 1 adet) Ø 400 × 160. İnç sütunundan çevirmeyin — 2017 ABD nüshasının 3.3 mm hücresi dizgi hatalı ve o yol Ø0.399/Ø0.381 veriyor.',
       'z (arka sarkma) = 0.282 — forklift zincirinin 0.190 kavramı değil, rearOverhang alanına yazılmaz. Pivot z + y = 2.502, yayınlanmış Wa ile tam örtüşür.',
       'Yardımcı kaldırma h9 = 1.780; yana itme ±0.650 (sideshiftPLUS +0.100); referans palet 1200×1200. l8 = 1.103 (satır 4.38) döner çatal PİVOTUNDAN traverse rayına mesafedir — bir turret KAFASI ölçüsü, ray kılavuz mil dayanağı değil; satır 4.41 ile teyitli: l8 − x = 1.103 − 0.445 = 0.658.',
       'Maks h3 = 18.0, ama 14.5 üzeri satır satır yayınlanmamış — özel konfigürasyon (gaps).',

@@ -11,8 +11,8 @@ import { bodiesOf, truckParts } from './parts'
  * `parts-turret.ts` tekerlekleri `rearX + 0.45` ve `bodyFrontX − 0.05` diye
  * koyuyordu: aralarında 1.17 m vardı, yayınlanmış aks aralığı ise y = 2.220.
  * Dört metrelik makinenin bütün tekerlekleri arka üçte birine toplanmıştı.
- * Yük tekerleği Ø0.34 çiziliyordu; yayınlanmış ön lastik 15.0 × 7.6 in =
- * Ø0.381 × 0.193.
+ * Yük tekerleği Ø0.34 çiziliyordu; yayınlanmış ön lastik (satır 3.2)
+ * Ø 380 × 192, arka tahrik lastiği (satır 3.3) Ø 400 × 160.
  *
  * ## Neden test
  *
@@ -106,21 +106,37 @@ describe('turret tekerlekleri yayınlanmış satırlardan', () => {
   })
 
   /**
-   * Yayınlanmış lastikler: arka 15.7 × 6.3 in, ön 15.0 × 7.6 in. Ø0.34 bir
-   * uydurmaydı ve tam bu satır onu geri gelmekten alıkoyar.
+   * Yayınlanmış lastikler, mm sütunundan: arka (tahrik) Ø 400 × 160, ön (yük)
+   * Ø 380 × 192. Ø0.34 bir uydurmaydı; 0.399/0.381 ise 2017 ABD nüshasının
+   * inç sütunundan çevrilmişti — o nüshanın 3.3 mm hücresi dizgi hatalı.
+   * Dört sonraki nüsha mm'yi doğruluyor ve bu satır çevrimin geri gelmesini
+   * de engelliyor.
    */
   test('lastik çapları yayınlanmış ölçülerde', () => {
     const drive = wheels.find((wheel) => Math.abs(wheel.center[2]!) < 1e-6)
     const load = wheels.find((wheel) => Math.abs(wheel.center[2]!) > 1e-6)
-    expect(drive?.size[1]).toBeCloseTo(0.399, 6)
-    expect(load?.size[1]).toBeCloseTo(0.381, 6)
+    expect(drive?.size[1]).toBeCloseTo(0.4, 6)
+    expect(load?.size[1]).toBeCloseTo(0.38, 6)
+  })
+
+  /**
+   * Genişlikler de satırdan: tahrik 0.160, yük 0.192. Bu ikisi çaplarla
+   * birlikte tek bir yanlış nüshadan gelmişti; ayrı ayrı iddia edilirler ki
+   * biri düzelip öteki kalmasın.
+   */
+  test('lastik genişlikleri yayınlanmış ölçülerde', () => {
+    const drive = wheels.find((wheel) => Math.abs(wheel.center[2]!) < 1e-6)
+    const load = wheels.find((wheel) => Math.abs(wheel.center[2]!) > 1e-6)
+    expect(drive?.size[2]).toBeCloseTo(0.16, 6)
+    expect(load?.size[2]).toBeCloseTo(0.192, 6)
   })
 })
 
 describe('turret zarfı çizimle kapanıyor', () => {
   /**
    * Yayınlanmış genel genişliği yapan KABİN DEĞİL ÖN AKS:
-   * b10 + ön lastik = 1.258 + 0.192 = 1.450 = b2, tam.
+   * b10 + ön lastik = 1.258 + 0.192 = 1.450 = b2, tam — ve iki sayı da
+   * satırdan geliyor, biri ötekine uydurulmuyor.
    */
   test('çizilen genişlik = planWidthM, ve onu yük tekerleri belirliyor', () => {
     let min = Number.POSITIVE_INFINITY
@@ -158,6 +174,26 @@ describe('turret zarfı çizimle kapanıyor', () => {
 
   test('h12 gerçekten h3 + h7 — okumanın aritmetik kanıtı', () => {
     expect((model.h12 ?? 0) - (model.h7 ?? 0)).toBeCloseTo(3.5, 6)
+  })
+
+  /**
+   * Dinlenmedeki tepe YAYINLANMIŞ h1 = 2.955'ten gelir: VDI 2198 satır 4.2,
+   * EKX 516 sütunu, sayfanın h3 = 3.500 referans mastı için. Bir dönem
+   * `parts-turret.ts` bu sayıya "seçilmiş varsayılan" diyordu ve `gaps.ts`
+   * aynı figürü "yayınlanmamış" diye kaydediyordu — depo kendi kendisiyle
+   * çelişiyordu. Bu satır o okumanın geri gelmesini engelliyor.
+   *
+   * Çizilen tepe h1'in KENDİSİ değil: dış ray, forklift'te de olduğu gibi
+   * birkaç santim altında biter. İddia edilen o pay değil, tepenin yayınlanmış
+   * satıra bağlı kalması — 2.905 ile 2.955 arasında başka hiçbir "makul"
+   * yuvarlama duramaz.
+   */
+  test('dinlenmedeki mast tepesi yayınlanmış h1 = 2.955 satırından', () => {
+    const publishedH1 = 2.955
+    let top = Number.NEGATIVE_INFINITY
+    for (const part of drawnParts('full')) top = Math.max(top, part.center[1]! + part.size[1]! / 2)
+    expect(top).toBeGreaterThan(publishedH1 - 0.05)
+    expect(top).toBeLessThanOrEqual(publishedH1)
   })
 })
 

@@ -34,18 +34,54 @@ import { readFileSync } from 'node:fs'
  * bilerek yalnız R3F ağacına mount edilen dosyalar.
  */
 
-/** R3F ağacına mount edilen dosyalar: araçlar, önizlemeler, çiziciler, jestler. */
-const IN_CANVAS_GLOBS = [
-  'src/*/tool.tsx',
-  'src/*/*-tool.tsx',
-  'src/*/preview.tsx',
-  'src/*/*-preview.tsx',
-  'src/*/renderer.tsx',
-  'src/*/*-renderer.tsx',
-  'src/*/*-system.tsx',
-  'src/*/route-controls.tsx',
-  'src/*/collider.tsx',
+/**
+ * Kapsam: `src` altındaki HER `.tsx` — muaf olanlar hariç.
+ *
+ * ## Bu listenin ilk hâli yanlış yöndeydi
+ *
+ * Önce ad ad bir izin listesiydi: kind klasörü + sabit dosya adı.
+ * İki şekilde sessizce kaçırıyordu, ve ikisi de bu oturumda ÇALIŞTIRILARAK
+ * gösterildi:
+ *
+ * - Her kalıp bir dizin segmenti şart koşuyordu, yani KÖKTEKİ
+ *   `src/collider.tsx` — tam adı listede yazdığı hâlde — hiç taranmıyordu.
+ * - Bir kind klasörüne listede olmayan bir adla dosya eklemek yeterliydi:
+ *   `src/route/hud.tsx` içine düzeltilen hatanın birebir aynısı (`createPortal`
+ *   + Tailwind sınıflı `<div>`) konduğunda bekçi 140 test yeşil geçti.
+ *
+ * Bir bekçinin varsayılanı "yakala" olmalı, "atla" değil. Artık her `.tsx`
+ * taranıyor ve kaçmak için GEREKÇELİ bir satır yazmak gerekiyor — yeni bir
+ * dosya eklemek yetmiyor.
+ */
+const ALL_TSX = 'src/**/*.tsx'
+
+/**
+ * Tuvalin DIŞINDA yaşayan, DOM'a yazması DOĞRU olan dosyalar.
+ *
+ * Bunlar host'un yan rayına ve panellerine mount edilir, `<Canvas>` içine
+ * değil — orada `<div>` fırlatmaz, beklenen çıktıdır. Her satır bir gerekçe
+ * taşımak zorunda: gerekçesiz bir muafiyet, bekçiyi susturmanın en kolay yolu
+ * olurdu (aynı kural `definition-category.test.ts`'te de var).
+ */
+const EXEMPT: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
+  {
+    pattern: /(^|\/)[a-z0-9-]*panel\.tsx$/,
+    reason: 'Rail paneli — host panelinin içinde, tuval dışı.',
+  },
+  {
+    pattern: /(^|\/)auto-fields\.tsx$/,
+    reason: 'Panel alan üreticisi — panel gövdesinde render edilir.',
+  },
+  { pattern: /^src\/panels\//, reason: 'Panel kiti ve katalog — tamamı DOM.' },
+  { pattern: /^src\/stats\//, reason: 'Rapor bölümü — DOM, sahneye hiç girmez.' },
+  { pattern: /(^|\/)length-field\.tsx$/, reason: 'Panel alanı — konveyör panelinin içinde.' },
+  { pattern: /(^|\/)issue-list\.tsx$/, reason: 'Panel listesi — uyarıları panelde gösterir.' },
+  { pattern: /(^|\/)kit\.tsx$/, reason: 'Panel bileşen kiti — panellerin ortak DOM parçaları.' },
 ]
+
+function exemptionFor(path: string): string | null {
+  return EXEMPT.find((entry) => entry.pattern.test(path))?.reason ?? null
+}
 
 /**
  * JSX'te göründüğünde kesin DOM olan etiketler.
@@ -60,10 +96,12 @@ function withoutComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 }
 
-const files = IN_CANVAS_GLOBS.flatMap((glob) => [...new Bun.Glob(glob).scanSync('.')])
+const allFiles = [...new Bun.Glob(ALL_TSX).scanSync('.')]
   .map((path) => path.replace(/\\/g, '/'))
   .filter((path, index, all) => all.indexOf(path) === index)
   .sort()
+
+const files = allFiles.filter((path) => exemptionFor(path) === null)
 
 const sourceOf = new Map(files.map((path) => [path, withoutComments(readFileSync(path, 'utf8'))]))
 
@@ -74,6 +112,40 @@ describe('tuval içindeki dosyalar DOM çizmez', () => {
 
   test('kapsam gerçekten rota aracını içeriyor', () => {
     expect(files).toContain('src/route/tool.tsx')
+  })
+
+  /**
+   * Kaçıran iki kalıbın ikisi de burada anılıyor, çünkü ikisi de bir daha
+   * kaçarsa hiçbir yerde gürültü çıkarmaz: biri kök seviyesindeydi, öbürü
+   * yalnızca listede olmayan bir addı.
+   */
+  test('kök seviyesindeki tuval dosyaları da kapsamda', () => {
+    expect(files).toContain('src/collider.tsx')
+  })
+
+  test('bir kind klasörüne YENİ bir ad eklemek kapsamdan çıkarmaz', () => {
+    const routeFiles = allFiles.filter((path) => path.startsWith('src/route/'))
+    const scanned = files.filter((path) => path.startsWith('src/route/'))
+    // Rota klasöründe muaf olan tek dosya paneldir; gerisi — adı ne olursa
+    // olsun — taranır.
+    expect(routeFiles.length - scanned.length).toBe(
+      routeFiles.filter((path) => exemptionFor(path) !== null).length,
+    )
+    expect(scanned).toContain('src/route/tool.tsx')
+  })
+
+  test('her muafiyet bir gerekçe taşıyor', () => {
+    for (const entry of EXEMPT) {
+      expect(entry.reason.length, String(entry.pattern)).toBeGreaterThan(20)
+    }
+    // Muaf edilen her dosya GERÇEKTEN var: ölü bir kalıp, kapsamı sessizce
+    // daraltan bir sonraki kalıbın kılıfı olur.
+    for (const entry of EXEMPT) {
+      expect(
+        allFiles.some((path) => entry.pattern.test(path)),
+        String(entry.pattern),
+      ).toBe(true)
+    }
   })
 
   test.each(files)('%s — react-dom içe aktarmıyor', (path) => {

@@ -29,9 +29,46 @@ import {
   type TruckPart,
 } from './parts'
 
-// Görsel lastikler: VNA tekerleri gövde altında gizli, Ø0.4 tahrik + Ø0.34 yük.
+/**
+ * YAYINLANMIŞ lastikler (VDI 2198, EKX 516 sütunu — y = 2.220, l1 = 4.045,
+ * b10 = 1.258): satır 3.2 ÖN (yük, 2 adet) Ø 380 × 192, satır 3.3 ARKA
+ * (tahrik — satır 3.5 onu "1x" ile işaretler) Ø 400 × 160.
+ *
+ * mm ASIL BİRİMDİR ve bu satırda önemi var. Buradaki sayılar bir kez inç
+ * sütunundan çevrilmişti (15.7 × 6.3 → 0.399 × 0.160, 15.0 × 7.6 → 0.381 ×
+ * 0.193) çünkü elimizdeki tek nüsha 2017 tarihli ABD sayfasıydı — ve onun 3.3
+ * mm sütununda dizgi hatası var: satır 3.2'nin çevrimi olan "381 x 192"
+ * tekrarlanmış, kendi inç sütunuyla bile çelişiyor. 2018 ve 2022 ABD
+ * sürümleriyle EU EN ve DE sürümlerinin dördü de "Ø 400 x 160" basıyor.
+ *
+ * Ön lastikteki "1 mm kırpma" gerekçesi de aynı çevrimin artığıydı ve
+ * GEREKSİZDİ: 192 doğrudan yayınlanmış. Kendiliğinden kapanan kontrol duruyor
+ * — yük tekerleri b10 izinde, dış yüzleri 1.258 + 0.192 = 1.450 = b2, yani
+ * yayınlanmış genel genişliği KABİN değil ÖN AKS yapıyor.
+ *
+ * Eski Ø0.34 yük tekerleği uydurmaydı; tahrik lastiğinin çapı 1 mm şaşıyordu
+ * ve asıl yanlış olan X konumuydu, aşağıya bakın.
+ */
 const DRIVE_WHEEL = { diameter: 0.4, width: 0.16 }
-const LOAD_WHEEL = { diameter: 0.34, width: 0.14 }
+const LOAD_WHEEL = { diameter: 0.38, width: 0.192 }
+
+/**
+ * Dinlenmedeki mast tepesi — YAYINLANMIŞ figür, seçilmiş varsayılan DEĞİL:
+ * VDI 2198 satır 4.2 "katlanmış mast yüksekliği" h1 = 2.955, EKX 516 sütunu,
+ * sayfanın referans mastı için (satır 4.4 h3 = 3.500). Beş ayrı nüsha aynı
+ * sayıyı basıyor: 2017 / 2018 / 2022 ABD, EU EN, DE.
+ *
+ * Bir süre burada "seçilmiş varsayılan" yazıyordu ve `gaps.ts` aynı figürü
+ * "yayınlanmamış" diye kaydediyordu. İkisi de yanlıştı ve birbiriyle de
+ * çelişiyordu — satır sayfada duruyor.
+ *
+ * Ne DEĞİL: bir MAST SATIRI. Standart mast tablosunda h3 = 3.500 satırı yok
+ * (BR5 ZT: 3.000 → h1 2.705, 4.000 → h1 3.205). 2.955 o bandın tam ortasına
+ * düşer — tabloyu DOĞRULAR ama ondan OKUNMAZ, ve enterpolasyonla üretilmiş
+ * değildir. BR5 satırları `MAST_ROWS`'a girildiği gün burası `mastRow.h1`
+ * olur.
+ */
+const RESTING_MAST_TOP_M = 2.955
 
 export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDetail): TruckPart[] {
   const halfL = model.l1 / 2
@@ -39,7 +76,21 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
   const faceX = visualForkFaceX(model)
   const bodyHalfZ = model.b1 / 2
   const cabHalfZ = (model.b2 ?? model.b1) / 2
-  const mastTopY = model.h12 ?? 3.9
+  /**
+   * **`h12` DEĞİL.** h12 VDI 2198 satır 4.14 "maksimum platform yüksekliği" —
+   * kabin tabanının çıkabildiği kot — ve mast satırına bağlıdır:
+   * h12 = h3 + h7 = 3.500 + 0.430 = 3.930, tam. 18 m mastta 18.430 olurdu.
+   * Mast ona çizilince kabin tavanının (h6 = 2.550) 1,34 m üstünde çıplak bir
+   * direk kalıyordu; gerçek makinede mast kabin tavanının ~0,4 m üstünde biter
+   * ve kabinle tek parça okunur — "man-up" hissini veren şey o bütünlük.
+   *
+   * Katlanmış mast yüksekliği ayrı ve YAYINLANMIŞ bir satırdır (4.2 h1 =
+   * 2.955, sayfanın h3 = 3.500 referans mastı için). Satırdan okunamamasının
+   * sebebi verinin olmaması değil, ÇIKARILMAMIŞ olması: `MAST_ROWS`'ta
+   * `ekx-br5` için tek satır bulunmuyor, `mastRowsFor` sıfır döndürüyor.
+   * Satırlar girildiğinde bu, forklift'teki gibi mast satırının h1'i olmalı.
+   */
+  const mastTopY = RESTING_MAST_TOP_M
   const cabFloorY = model.h7 ?? 0.43
   const cabTopY = model.h6 ?? 2.55
   const bodyFrontX = -0.35
@@ -100,12 +151,28 @@ export function turretParts(model: TruckModel, body: TruckBody, detail: TruckDet
           }
         }
       }
-      // Tekerlekler gövde altında: tahrik arkada, yük tekerleri önde —
-      // b10 = 1.258 yayınlanmış iz.
-      pushWheel(parts, { x: rearX + 0.45, z: 0, ...DRIVE_WHEEL, detail })
+      /**
+       * **Aks aralığı yayınlanmış `y`'den gelir, sabit sayıdan değil.**
+       *
+       * Buradaki iki teker `rearX + 0.45` ve `bodyFrontX − 0.05` sabitleriyle
+       * konulmuştu: aralarında 1.17 m vardı, oysa yayınlanmış aks aralığı
+       * y = 2.220. Dört metrelik bir makinenin bütün tekerlekleri arka üçte
+       * birine toplanınca uzun bir VNA istifleyicisi değil, altına tekerlek
+       * sıkıştırılmış kısa bir kutu okunuyordu.
+       *
+       * Arka sarkma z de sabit yazılmıyor, satırın kendisinden türüyor:
+       * `waPivotFromRear − y = 2.502 − 2.220 = 0.282`. Bu paketin kendi testi
+       * (`truck.test.ts`, "tt pivotu öndedir") zaten z + y = Wa eşitliğini
+       * iddia ediyor — yani doğru konumlar tek satır aritmetikle çıkıyor ve
+       * `parts-forklift.ts:75` aynısını `rearAxleX + model.y` ile yapıyor.
+       */
+      const rearOverhangM = (model.waPivotFromRear ?? 0) - model.y
+      const driveAxleX = rearX + rearOverhangM
+      const loadAxleX = driveAxleX + model.y
+      pushWheel(parts, { x: driveAxleX, z: 0, ...DRIVE_WHEEL, detail })
       for (const side of [-1, 1] as const) {
         pushWheel(parts, {
-          x: bodyFrontX - 0.05,
+          x: loadAxleX,
           z: side * ((model.b10 ?? 1.258) / 2),
           ...LOAD_WHEEL,
           detail,

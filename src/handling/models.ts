@@ -89,8 +89,21 @@ export type TruckModel = {
   h6: number | null
   h7: number | null
   h8: number | null
-  /** En yüksek sabit nokta (VDI 4.31'in kapsadığı) — `tt`'de koruma çerçevesi
-   *  3.930 ve zarf yüksekliği budur, kabin tavanı (h6 2.550) değil. */
+  /**
+   * **VDI 2198 satır 4.14 — "maksimum platform yüksekliği".** Yani kabin
+   * tabanının çıkabildiği en yüksek kot; "en yüksek sabit nokta" DEĞİL, ve
+   * kapsayan satır 4.31 değil.
+   *
+   * Ayırt edici kanıt aritmetik ve tam: `tt`'de h12 = h3 + h7 =
+   * 3.500 + 0.430 = 3.930. Yani MAST SATIRINA BAĞLI bir değer — 18 m mastta
+   * h12 = 18.430 olurdu. Sabit bir zarf gibi kullanılamaz.
+   *
+   * Bu satır bir süre "en yüksek sabit nokta" diye okundu ve mast tam bu sayıya
+   * çizildi; sonuç, kabin tavanının 1,34 m üstünde duran çıplak bir direkti.
+   * Gerçek katlanmış mast yüksekliği ayrı ve yayınlanmış bir satırdır (4.2
+   * h1 = 2.955, sayfanın h3 = 3.500 referans mastı için); eksik olan veri
+   * değil, bu ailenin `MAST_ROWS` satırları — bkz. `gaps.ts`.
+   */
   h12: number | null
   h13: number | null
   /** `ept`'te min/maks ÇİFT (1.215/1.275) — tek sayı seçmek uydurmak olur. */
@@ -357,9 +370,10 @@ export const TRUCK_MODELS: Record<TruckModelId, TruckModel> = {
     notes: [
       'Ast yayınlanmamış — sınıf EN 15620 trilateral-turret bandında kalır; formül ve pratik aralık gaps.ts girişinde.',
       'Koridora giriş için transfer koridoru ≥ 4.0–4.5 m — çalışma koridorundan ayrı bir kavram, route.width ile karıştırılmaz.',
-      'Kabin gövdeden geniş: zarf l1 × 1.45 (b2), gövde 1.21 (b1) değil.',
+      "Zarf genişliği b2 = 1.450, gövde b1 = 1.210. Ama 1.450'yi yapan KABİN DEĞİL ÖN AKS: b10 (1.258) + yayınlanmış ön lastik genişliği (0.192) = 1.450, tam — yayınlanmış genel genişlik yük tekerleklerinin dış yüzüdür.",
+      'Yayınlanmış lastikler (VDI satır 3.2/3.3, mm sütunu): ön (yük, 2 adet) Ø 380 × 192, arka (tahrik, 1 adet) Ø 400 × 160. İnç sütunundan çevirmeyin — 2017 ABD nüshasının 3.3 mm hücresi dizgi hatalı ve o yol Ø0.399/Ø0.381 veriyor.',
       'z (arka sarkma) = 0.282 — forklift zincirinin 0.190 kavramı değil, rearOverhang alanına yazılmaz. Pivot z + y = 2.502, yayınlanmış Wa ile tam örtüşür.',
-      'Yardımcı kaldırma h9 = 1.780; yana itme ±0.650 (sideshiftPLUS +0.100); ray kılavuz mil dayanağı 1.103; referans palet 1200×1200.',
+      'Yardımcı kaldırma h9 = 1.780; yana itme ±0.650 (sideshiftPLUS +0.100); referans palet 1200×1200. l8 = 1.103 (satır 4.38) döner çatal PİVOTUNDAN traverse rayına mesafedir — bir turret KAFASI ölçüsü, ray kılavuz mil dayanağı değil; satır 4.41 ile teyitli: l8 − x = 1.103 − 0.445 = 0.658.',
       'Maks h3 = 18.0, ama 14.5 üzeri satır satır yayınlanmamış — özel konfigürasyon (gaps).',
     ],
   },

@@ -109,8 +109,13 @@ export const KNOWN_GAPS: readonly GapEntry[] = [
     scope: 'turret',
     figure: 'h1 (kapalı mast), DZ h2',
     note:
-      'Yayınlanmamış. Aile, veri teyit edilene kadar BEKLETİLİR — bir Man-Up aracın kapalı ' +
-      "mastını uydurmak, araştırma brief §1'in reddettiği tek şeydir (plan §10 soru 7b).",
+      'DÜZELTME: burada "yayınlanmamış" yazıyordu, ikisi de YAYINLANMIŞ. h1 EKX 516 için VDI ' +
+      '2198 satır 4.2 = 2.955 (beş nüshada aynı: 2017/2018/2022 ABD, EU EN, DE) ve DZ serbest ' +
+      'kaldırma h2 standart mast tablosunda satır satır duruyor (DZ 4.500 → 0.160, 5.000 → ' +
+      '0.345, 14.500 → 4.300; ZT sütunu "-", yani serbest kaldırma YOK — null, sıfır değil). ' +
+      'Kalan eksik ÇIKARILMAMIŞ olmaları: BR5 tablosunun EKX 516 sütunundaki 12 ZT + 20 DZ ' +
+      "satırı MAST_ROWS'a girilmedi, o yüzden mast tepesi bugün satırdan değil sayfanın " +
+      'referans mastından (h3 = 3.500) okunuyor.',
   },
   {
     scope: 'tt-1600',

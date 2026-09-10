@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`db325a8`](https://github.com/ovurrsl/plugin-warehouse/commit/db325a81bb66d0da68dbebe5aca287bb74a722df))
 - Refresh generated README blocks [skip ci] ([`30e7a6d`](https://github.com/ovurrsl/plugin-warehouse/commit/30e7a6d6c16f94ef51ecff5086780cfb79633d04))
 - Refresh generated README blocks [skip ci] ([`3c54ba9`](https://github.com/ovurrsl/plugin-warehouse/commit/3c54ba9b410835eb2c5dc11b92030369be6000e8))
 - Refresh generated README blocks [skip ci] ([`866ae6a`](https://github.com/ovurrsl/plugin-warehouse/commit/866ae6a0c365e77f60b6589fbc417f21b26425ad))
@@ -322,6 +323,9 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Draw the turret from its published rows, not from constants (#39) ([`6e53f38`](https://github.com/ovurrsl/plugin-warehouse/commit/6e53f38fcd9f007ffae90e71f0d1d6bf073b19dd))
+- Read the turret's tyres and h1 from the metric rows ([`450fafe`](https://github.com/ovurrsl/plugin-warehouse/commit/450fafe7ea495f7304485c4ca719e5079860267f))
+- Draw the turret from its published rows, not from constants ([`aed043b`](https://github.com/ovurrsl/plugin-warehouse/commit/aed043b676b17d87aaaf3577fb3925cc75b504bb))
 - The pedestrian route no longer takes the 3D scene down with it (#37) ([`730c5e4`](https://github.com/ovurrsl/plugin-warehouse/commit/730c5e4bda9e31602df01e5a81b5a187f559d83f))
 - Put the route in the same editor phase as every other kind ([`eade590`](https://github.com/ovurrsl/plugin-warehouse/commit/eade59001ca4e2e8c00241db5d0902df8b62fc44))
 - Leave the camera's buttons alone, and release every drag ([`8eea82a`](https://github.com/ovurrsl/plugin-warehouse/commit/8eea82a9e156d05ddfdac9e5ef246d6ce616cfbf))
@@ -478,6 +482,8 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- Make the canvas-DOM guard catch by default instead of miss by default (#38) ([`c56a1b6`](https://github.com/ovurrsl/plugin-warehouse/commit/c56a1b6775248e89c8974e75de5519c5a4a449df))
+- Make the canvas-DOM guard catch by default instead of miss by default ([`6f90d19`](https://github.com/ovurrsl/plugin-warehouse/commit/6f90d19bdea04d6a2863057e5c3c881d674bd41d))
 - Verify trailingSection loads RoutePanel with post-draw editing capabilities ([`b7d0aad`](https://github.com/ovurrsl/plugin-warehouse/commit/b7d0aad61c84d0dea880d52acff3492488d41717))
 - Track and format junction adversarial challenger suite ([`c0bc460`](https://github.com/ovurrsl/plugin-warehouse/commit/c0bc4602a8555ea3e532514d9751ee582f923902))
 - Assert laneColor field kind is color ([`f93ac0d`](https://github.com/ovurrsl/plugin-warehouse/commit/f93ac0d4ebe31281b914a3a52939d55352138a4f))

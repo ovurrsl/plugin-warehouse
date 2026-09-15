@@ -12,7 +12,7 @@ export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
   const vec = useRef(new THREE.Vector3())
   const [isEndRack, setIsEndRack] = useState(false)
 
-  // Sadece ilk ve son rafta göstermek için kontrol:
+  // Sadece ilk ve son rafta gÃ¶stermek iÃ§in kontrol:
   useEffect(() => {
     if (!node.rowLabel) return
     const nodes = useScene.getState().nodes
@@ -56,4 +56,4 @@ export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
 
   return null
 }
-
+

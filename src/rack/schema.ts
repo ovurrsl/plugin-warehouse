@@ -29,6 +29,11 @@ export const PalletRackNode = BaseNode.extend({
   position: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
   rotation: z.tuple([z.number(), z.number(), z.number()]).default([0, 0, 0]),
 
+  /** Sıranın adı (Aisle / Row Label), örneğin "L1". Boşsa sıra isimlendirilmemiştir. */
+  rowLabel: z.string().default(''),
+  /** Aynı sıradaki rafların baştan sona doğru indeksi (001, 002...). Genelde otomatik hesaplanır. */
+  bayIndex: z.number().int().default(1),
+
   /**
    * Hangi ürün olarak sipariş edildi — palet rafı mı, alçak toplama rafı mı.
    *

@@ -24,6 +24,7 @@ import {
   statsReport,
 } from '../stats'
 import { ZeroDefectZoneReportSection } from '../stats/zero-defect-section'
+import { RackRowsReportSection } from '../stats/rack-rows-section'
 import { type PanelTab, useWarehouseStore } from '../store'
 import { buildFleet, EMPTY_FLEET } from '../truck/fleet'
 import { areaLabel, areaUnitLabel, areaValue, type LinearUnit, lengthLabel } from '../units'
@@ -843,6 +844,8 @@ export function StatsTab() {
       <ZeroDefectZoneReportSection
         levelId={resolution.resolved === 'level' ? resolution.levelId : null}
       />
+
+      <RackRowsReportSection />
 
       {(resolution.widenedNote || report.qualifications.length > 0) && (
         <section style={tokens.section}>

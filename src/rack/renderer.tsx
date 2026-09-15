@@ -30,6 +30,7 @@ import {
 import { getRackMaterial } from './materials'
 import { hasRightNeighbour } from './neighbours'
 import { occupiedSlots, slotDraw } from './occupancy'
+import { RowLabelRenderer } from './row-labels-renderer'
 import type { PalletRackNode } from './schema'
 import { orientedPalletFootprint, palletSlotsOf, totalDepth, totalWidth } from './slots'
 
@@ -268,6 +269,7 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
         />
       )}
       {node.ghostFill > 0 && <GhostStock node={node} />}
+      {node.rowLabel && <RowLabelRenderer node={node} />}
     </group>
   )
 }

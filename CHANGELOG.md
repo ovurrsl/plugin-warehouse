@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`2df3286`](https://github.com/ovurrsl/plugin-warehouse/commit/2df3286c2e8688f3db935cb5299cc0f35deaeaba))
 - Refresh generated README blocks [skip ci] ([`ed8be2c`](https://github.com/ovurrsl/plugin-warehouse/commit/ed8be2cdf2a2373b985ada961f3d3312df7ca792))
 - Refresh generated README blocks [skip ci] ([`359b8f2`](https://github.com/ovurrsl/plugin-warehouse/commit/359b8f27abcc9b5bb3b7f954ffb06172a86ad545))
 - Refresh generated README blocks [skip ci] ([`db325a8`](https://github.com/ovurrsl/plugin-warehouse/commit/db325a81bb66d0da68dbebe5aca287bb74a722df))
@@ -326,6 +327,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Convert row-labels-renderer.tsx to UTF-8 ([`7ea3e88`](https://github.com/ovurrsl/plugin-warehouse/commit/7ea3e88da81379f6cae1e45dce6a2c84583ad6a6))
 - Type errors in row-naming.ts ([`69e1fb7`](https://github.com/ovurrsl/plugin-warehouse/commit/69e1fb7c23a40fc9625ac230d10606646f844bba))
 - Draw the turret from its published rows, not from constants (#39) ([`6e53f38`](https://github.com/ovurrsl/plugin-warehouse/commit/6e53f38fcd9f007ffae90e71f0d1d6bf073b19dd))
 - Read the turret's tyres and h1 from the metric rows ([`450fafe`](https://github.com/ovurrsl/plugin-warehouse/commit/450fafe7ea495f7304485c4ca719e5079860267f))

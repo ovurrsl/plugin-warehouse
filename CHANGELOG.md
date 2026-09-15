@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
 - Refresh generated README blocks [skip ci] ([`2df3286`](https://github.com/ovurrsl/plugin-warehouse/commit/2df3286c2e8688f3db935cb5299cc0f35deaeaba))
 - Refresh generated README blocks [skip ci] ([`ed8be2c`](https://github.com/ovurrsl/plugin-warehouse/commit/ed8be2cdf2a2373b985ada961f3d3312df7ca792))
 - Refresh generated README blocks [skip ci] ([`359b8f2`](https://github.com/ovurrsl/plugin-warehouse/commit/359b8f27abcc9b5bb3b7f954ffb06172a86ad545))
@@ -203,6 +204,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Replace HTML row labels with 3D physical signs ([`3bd4590`](https://github.com/ovurrsl/plugin-warehouse/commit/3bd4590b2125d8f6f1fc94bdf99035da017819ce))
 - Add rack row capacities and HUD labeling ([`4d188eb`](https://github.com/ovurrsl/plugin-warehouse/commit/4d188eb5d1f2d321a46532ed0884a5a9447e2625))
 - Add fill toggle, custom edge/fill colors, arrow directions and manual crosswalk tool ([`f385996`](https://github.com/ovurrsl/plugin-warehouse/commit/f3859961b9ca8fd3575eabbcca35c8ffbfaf0b7b))
 - E2E uyumluluk, Zone silinme mantığı ve supersampling entegrasyonları ([`e047cd1`](https://github.com/ovurrsl/plugin-warehouse/commit/e047cd18d42d1571ad3a8a8a15ff54aea1d3cb47))

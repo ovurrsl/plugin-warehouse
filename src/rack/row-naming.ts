@@ -1,5 +1,5 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
-import { bayPitch } from './parametrics'
+
 import type { PalletRackNode } from './schema'
 
 const POSITION_EPSILON = 0.005
@@ -11,14 +11,14 @@ function positionKey(x: number, z: number): string {
 function leftNeighbourPosition(rack: PalletRackNode): [number, number] {
   const [x, , z] = rack.position
   const rotationY = rack.rotation?.[1] ?? 0
-  const pitch = bayPitch(rack)
+  const pitch = rack.bayClearWidth + rack.uprightWidth
   return [x - pitch * Math.cos(rotationY), z + pitch * Math.sin(rotationY)]
 }
 
 function rightNeighbourPosition(rack: PalletRackNode): [number, number] {
   const [x, , z] = rack.position
   const rotationY = rack.rotation?.[1] ?? 0
-  const pitch = bayPitch(rack)
+  const pitch = rack.bayClearWidth + rack.uprightWidth
   return [x + pitch * Math.cos(rotationY), z - pitch * Math.sin(rotationY)]
 }
 
@@ -86,6 +86,6 @@ export function applyRowLabelToContiguousRacks(startRackId: string, label: strin
     scene.updateNode(id as AnyNodeId, {
       rowLabel: label,
       bayIndex: index + 1
-    })
+    } as any)
   })
 }

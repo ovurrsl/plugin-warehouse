@@ -1,12 +1,21 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 import { Field, Figures } from '../panels/kit'
-import { PanelSection } from '@pascal-app/editor'
+import { PanelSection, SegmentedControl } from '@pascal-app/editor'
 import { useState, useEffect } from 'react'
-import { applyRowLabelToContiguousRacks, getContiguousRackRow } from './row-naming'
-import type { PalletRackNode } from './schema'
+import {
+  applyRowLabelToContiguousRacks,
+  applySignMountStyleToContiguousRacks,
+  getContiguousRackRow,
+} from './row-naming'
+import type { PalletRackNode, SignMountStyle } from './schema'
 import { directAccessSlotCount, fittedLevelCount, palletSlotCount, pickingSlotCount } from './slots'
 import { occupiedSlots } from './occupancy'
 import { lengthLabel, unitNow } from '../units'
+
+const SIGN_MOUNT_OPTIONS = [
+  { label: 'Flag', value: 'flag' as const },
+  { label: 'Flush', value: 'flush' as const },
+]
 
 export function RowNaming({ node }: { node: PalletRackNode }) {
   const [label, setLabel] = useState(node.rowLabel ?? '')
@@ -33,10 +42,18 @@ export function RowNaming({ node }: { node: PalletRackNode }) {
           style={{ flex: 1, padding: '4px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--background)', color: 'var(--foreground)' }}
         />
       </Field>
+      <Field label='Sign Mount'>
+        <SegmentedControl
+          options={SIGN_MOUNT_OPTIONS}
+          value={node.signMountStyle ?? 'flag'}
+          onChange={(val) => applySignMountStyleToContiguousRacks(node.id, val as SignMountStyle)}
+        />
+      </Field>
       {node.rowLabel && <RowCapacity node={node} />}
     </PanelSection>
   )
 }
+
 
 function RowCapacity({ node }: { node: PalletRackNode }) {
   const nodes = useScene(s => s.nodes) as Record<string, unknown>

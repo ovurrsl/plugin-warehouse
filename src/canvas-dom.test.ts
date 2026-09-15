@@ -77,6 +77,10 @@ const EXEMPT: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
   { pattern: /(^|\/)length-field\.tsx$/, reason: 'Panel alanı — konveyör panelinin içinde.' },
   { pattern: /(^|\/)issue-list\.tsx$/, reason: 'Panel listesi — uyarıları panelde gösterir.' },
   { pattern: /(^|\/)kit\.tsx$/, reason: 'Panel bileşen kiti — panellerin ortak DOM parçaları.' },
+  {
+    pattern: /(^|\/)rack-row-naming\.tsx$/,
+    reason: 'Sıra isimlendirme paneli — rack-panel içinde render edilir, tuval dışı.',
+  },
 ]
 
 function exemptionFor(path: string): string | null {

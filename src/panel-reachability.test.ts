@@ -84,6 +84,21 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       kind: 'CUSTOM',
       where: 'Levels → LevelsField, "Toplama katı" varsayılanı',
     },
+    {
+      field: 'rowLabel',
+      kind: 'CUSTOM',
+      where: 'Trailing panel → Aisle / Row Naming, sıra etiketi metin alanı',
+    },
+    {
+      field: 'bayIndex',
+      kind: 'SYSTEM',
+      where: 'Sıra isimlendirmede getContiguousRackRow ile otomatik hesaplanır',
+    },
+    {
+      field: 'signMountStyle',
+      kind: 'CUSTOM',
+      where: 'Trailing panel → Aisle / Row Naming → Sign Mount SegmentedControl',
+    },
   ],
   'warehouse:drive-in-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },

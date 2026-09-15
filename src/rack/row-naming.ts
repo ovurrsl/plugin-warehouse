@@ -1,6 +1,6 @@
 import { type AnyNodeId, useScene } from '@pascal-app/core'
 
-import type { PalletRackNode } from './schema'
+import type { PalletRackNode, SignMountStyle } from './schema'
 
 const POSITION_EPSILON = 0.005
 
@@ -89,3 +89,50 @@ export function applyRowLabelToContiguousRacks(startRackId: string, label: strin
     } as any)
   })
 }
+
+/**
+ * Belirli bir rafın bağlı olduğu sıranın ilk (en sol) rafı olup olmadığını belirler.
+ */
+export function isFirstRackOfRow(
+  nodes: Readonly<Record<string, unknown>>,
+  rackId: string
+): boolean {
+  const row = getContiguousRackRow(nodes, rackId)
+  return row.length > 0 && row[0] === rackId
+}
+
+/**
+ * Belirli bir rafın bağlı olduğu sıranın son (en sağ) rafı olup olmadığını belirler.
+ */
+export function isLastRackOfRow(
+  nodes: Readonly<Record<string, unknown>>,
+  rackId: string
+): boolean {
+  const row = getContiguousRackRow(nodes, rackId)
+  return row.length > 0 && row[row.length - 1] === rackId
+}
+
+/**
+ * Belirli bir sıradaki tüm raflara tabela montaj stilini ('flag' | 'flush') uygular.
+ */
+export function applySignMountStyleToContiguousRacks(
+  startRackId: string,
+  style: SignMountStyle
+) {
+  const scene = useScene.getState()
+  const rowIds = getContiguousRackRow(scene.nodes, startRackId)
+
+  if (rowIds.length === 0) {
+    scene.updateNode(startRackId as AnyNodeId, {
+      signMountStyle: style,
+    } as any)
+    return
+  }
+
+  rowIds.forEach((id) => {
+    scene.updateNode(id as AnyNodeId, {
+      signMountStyle: style,
+    } as any)
+  })
+}
+

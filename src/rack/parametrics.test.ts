@@ -215,7 +215,24 @@ describe('coverage', () => {
     'pickingLevelClear',
   ])
 
-  const DELIBERATELY_HIDDEN = new Set([...NOT_A_SETTING, ...EDITED_BY_LEVELS_FIELD])
+  /**
+   * Trailing panel bölümünde (`RackPanel` / `RowNaming`) düzenlenen alanlar.
+   * Host'un otomatik parametrik grupları dışında, sıraya bağlı olarak yönetilir.
+   */
+  const EDITED_IN_TRAILING_SECTION = new Set([
+    // Sıra adı (Aisle / Row Label), örneğin "L1". Trailing paneldeki RowNaming alanından girilir.
+    'rowLabel',
+    // Sıradaki raf indeksi (1, 2, 3...). Sıra isimlendirmesinde otomatik atanır.
+    'bayIndex',
+    // Tabela montaj stili ('flag' | 'flush'). Trailing paneldeki SegmentedControl ile değiştirilir.
+    'signMountStyle',
+  ])
+
+  const DELIBERATELY_HIDDEN = new Set([
+    ...NOT_A_SETTING,
+    ...EDITED_BY_LEVELS_FIELD,
+    ...EDITED_IN_TRAILING_SECTION,
+  ])
 
   test('every schema field is either shown or listed as hidden', () => {
     const shown = new Set(fields.map(({ field }) => String(field.key)))

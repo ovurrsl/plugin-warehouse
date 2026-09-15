@@ -33,6 +33,12 @@ export const PalletRackNode = BaseNode.extend({
   rowLabel: z.string().default(''),
   /** Aynı sıradaki rafların baştan sona doğru indeksi (001, 002...). Genelde otomatik hesaplanır. */
   bayIndex: z.number().int().default(1),
+  /**
+   * Sıra tabelası montaj tipi (Aisle sign mounting style).
+   * - 'flag': Dikmeden koridora doğru dik uzanır (çift taraflı).
+   * - 'flush': Dikmenin ön yüzüne düz yapışık (tek taraflı).
+   */
+  signMountStyle: z.enum(['flag', 'flush']).default('flag'),
 
   /**
    * Hangi ürün olarak sipariş edildi — palet rafı mı, alçak toplama rafı mı.
@@ -277,3 +283,4 @@ export const PalletRackNode = BaseNode.extend({
 })
 
 export type PalletRackNode = z.infer<typeof PalletRackNode>
+export type SignMountStyle = 'flag' | 'flush'

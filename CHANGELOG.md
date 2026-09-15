@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`359b8f2`](https://github.com/ovurrsl/plugin-warehouse/commit/359b8f27abcc9b5bb3b7f954ffb06172a86ad545))
 - Refresh generated README blocks [skip ci] ([`db325a8`](https://github.com/ovurrsl/plugin-warehouse/commit/db325a81bb66d0da68dbebe5aca287bb74a722df))
 - Refresh generated README blocks [skip ci] ([`30e7a6d`](https://github.com/ovurrsl/plugin-warehouse/commit/30e7a6d6c16f94ef51ecff5086780cfb79633d04))
 - Refresh generated README blocks [skip ci] ([`3c54ba9`](https://github.com/ovurrsl/plugin-warehouse/commit/3c54ba9b410835eb2c5dc11b92030369be6000e8))
@@ -200,6 +201,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Add rack row capacities and HUD labeling ([`4d188eb`](https://github.com/ovurrsl/plugin-warehouse/commit/4d188eb5d1f2d321a46532ed0884a5a9447e2625))
 - Add fill toggle, custom edge/fill colors, arrow directions and manual crosswalk tool ([`f385996`](https://github.com/ovurrsl/plugin-warehouse/commit/f3859961b9ca8fd3575eabbcca35c8ffbfaf0b7b))
 - E2E uyumluluk, Zone silinme mantığı ve supersampling entegrasyonları ([`e047cd1`](https://github.com/ovurrsl/plugin-warehouse/commit/e047cd18d42d1571ad3a8a8a15ff54aea1d3cb47))
 - Use png/webp raster icons instead of lucide svgs for outliner presentations ([`7ebc4af`](https://github.com/ovurrsl/plugin-warehouse/commit/7ebc4afc2bfb2bcf8d464d2214f9db2835404b2d))

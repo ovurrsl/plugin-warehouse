@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4bbdf56`](https://github.com/ovurrsl/plugin-warehouse/commit/4bbdf56119a79c983becf4c690f625f2065c84d1))
 - Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
 - Refresh generated README blocks [skip ci] ([`2df3286`](https://github.com/ovurrsl/plugin-warehouse/commit/2df3286c2e8688f3db935cb5299cc0f35deaeaba))
 - Refresh generated README blocks [skip ci] ([`ed8be2c`](https://github.com/ovurrsl/plugin-warehouse/commit/ed8be2cdf2a2373b985ada961f3d3312df7ca792))
@@ -329,6 +330,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Resolve UI freeze caused by reactive useScene node reads ([`b1894e0`](https://github.com/ovurrsl/plugin-warehouse/commit/b1894e0ce3232bbc089a361739c7120204982847))
 - Convert row-labels-renderer.tsx to UTF-8 ([`7ea3e88`](https://github.com/ovurrsl/plugin-warehouse/commit/7ea3e88da81379f6cae1e45dce6a2c84583ad6a6))
 - Type errors in row-naming.ts ([`69e1fb7`](https://github.com/ovurrsl/plugin-warehouse/commit/69e1fb7c23a40fc9625ac230d10606646f844bba))
 - Draw the turret from its published rows, not from constants (#39) ([`6e53f38`](https://github.com/ovurrsl/plugin-warehouse/commit/6e53f38fcd9f007ffae90e71f0d1d6bf073b19dd))
@@ -490,6 +492,7 @@ index to it, not a replacement for it.
 
 ### Tests
 
+- Add 3D physical sign geometry and end-rack detection unit tests ([`b744495`](https://github.com/ovurrsl/plugin-warehouse/commit/b744495659ba489d413963aaa302c65df14a9e4d))
 - Make the canvas-DOM guard catch by default instead of miss by default (#38) ([`c56a1b6`](https://github.com/ovurrsl/plugin-warehouse/commit/c56a1b6775248e89c8974e75de5519c5a4a449df))
 - Make the canvas-DOM guard catch by default instead of miss by default ([`6f90d19`](https://github.com/ovurrsl/plugin-warehouse/commit/6f90d19bdea04d6a2863057e5c3c881d674bd41d))
 - Verify trailingSection loads RoutePanel with post-draw editing capabilities ([`b7d0aad`](https://github.com/ovurrsl/plugin-warehouse/commit/b7d0aad61c84d0dea880d52acff3492488d41717))

@@ -1,4 +1,4 @@
-﻿import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'bun:test'
 import {
   SIGN_BACKPLATE_HEIGHT,
   SIGN_BACKPLATE_THICKNESS,
@@ -51,87 +51,88 @@ describe('PalletRackNode schema — signMountStyle', () => {
 })
 
 describe('3D physical sign geometry constants', () => {
-  test('backplate has standard warehouse dimensions (40cm x 25cm x 1.2cm)', () => {
-    expect(SIGN_BACKPLATE_WIDTH).toBe(0.40)
-    expect(SIGN_BACKPLATE_HEIGHT).toBe(0.25)
-    expect(SIGN_BACKPLATE_THICKNESS).toBe(0.012)
+  test('backplate has standard warehouse dimensions', () => {
+    expect(SIGN_BACKPLATE_WIDTH).toBe(0.80)
+    expect(SIGN_BACKPLATE_HEIGHT).toBe(0.35)
+    expect(SIGN_BACKPLATE_THICKNESS).toBe(0.016)
   })
 
   test('standoff bracket has specified clearance and dimensions', () => {
-    expect(SIGN_STANDOFF_DISTANCE).toBe(0.02)
-    expect(SIGN_STANDOFF_SIZE).toEqual([0.02, 0.04, 0.04])
+    expect(SIGN_STANDOFF_DISTANCE).toBe(0.05)
+    expect(SIGN_STANDOFF_SIZE).toEqual([0.05, 0.08, 0.05])
     expect(SIGN_FLUSH_CLEARANCE).toBe(0.002)
-    expect(SIGN_HEIGHT_OFFSET).toBe(0.35)
+    expect(SIGN_HEIGHT_OFFSET).toBe(0.45)
   })
 })
 
-describe('3D sign transform math — Flag vs Flush', () => {
+describe('3D sign transform math — Flag vs Flush between upright posts', () => {
   const tallRack = makeRack('tall', { uprightHeight: 5.0, bayClearWidth: 2.7, depth: 1.1 })
   const pitch = bayPitch(tallRack)
-  const depth = rowDepth(tallRack)
 
-  test('flag mount on left frame upright: protrudes into aisle with 90 deg rotation', () => {
+  test('flag mount on left frame upright: positioned between posts at Z=0', () => {
     const transform = computeSignTransform(tallRack, 'left', 'flag')
 
-    // Left upright post X = -pitch / 2
-    expect(transform.position[0]).toBeCloseTo(-pitch / 2, 5)
-    // Height Y = uprightHeight - 0.35 = 4.65m
-    expect(transform.position[1]).toBeCloseTo(5.0 - 0.35, 5)
-    // Z = +depth / 2 + backplateWidth / 2 + standoff = depth / 2 + 0.20 + 0.02 = depth / 2 + 0.22
-    expect(transform.position[2]).toBeCloseTo(depth / 2 + 0.40 / 2 + 0.02, 5)
-    // Rotation = [0, PI / 2, 0]
-    expect(transform.rotation).toEqual([0, Math.PI / 2, 0])
+    // Left outer upright face X = -pitch / 2 - uprightWidth / 2 - standoff - thickness / 2
+    const expectedX = -pitch / 2 - tallRack.uprightWidth / 2 - (0.05 + 0.016 / 2)
+    expect(transform.position[0]).toBeCloseTo(expectedX, 5)
+    // Height Y = uprightHeight - 0.45 = 4.55m
+    expect(transform.position[1]).toBeCloseTo(5.0 - 0.45, 5)
+    // Exactly centered between the two upright posts (front and rear)
+    expect(transform.position[2]).toBe(0)
+    // Rotation = [0, 0, 0]
+    expect(transform.rotation).toEqual([0, 0, 0])
   })
 
-  test('flag mount on right frame upright: correctly offsets X to +pitch / 2', () => {
+  test('flag mount on right frame upright: correctly offsets X to right outer face', () => {
     const transform = computeSignTransform(tallRack, 'right', 'flag')
 
-    expect(transform.position[0]).toBeCloseTo(+pitch / 2, 5)
-    expect(transform.position[1]).toBeCloseTo(4.65, 5)
-    expect(transform.position[2]).toBeCloseTo(depth / 2 + 0.22, 5)
-    expect(transform.rotation).toEqual([0, Math.PI / 2, 0])
+    const expectedX = pitch / 2 + tallRack.uprightWidth / 2 + (0.05 + 0.016 / 2)
+    expect(transform.position[0]).toBeCloseTo(expectedX, 5)
+    expect(transform.position[1]).toBeCloseTo(4.55, 5)
+    expect(transform.position[2]).toBe(0)
+    expect(transform.rotation).toEqual([0, 0, 0])
   })
 
-  test('flush mount on left frame upright: sits flat against upright front face', () => {
+  test('flush mount on left frame upright: sits flat against upright outer face between posts', () => {
     const transform = computeSignTransform(tallRack, 'left', 'flush')
 
-    expect(transform.position[0]).toBeCloseTo(-pitch / 2, 5)
-    expect(transform.position[1]).toBeCloseTo(4.65, 5)
-    // Z = +depth / 2 + backplateThickness / 2 + clearance = depth / 2 + 0.006 + 0.002 = depth / 2 + 0.008
-    expect(transform.position[2]).toBeCloseTo(depth / 2 + 0.012 / 2 + 0.002, 5)
-    // Rotation = [0, 0, 0] (no rotation offset)
+    const expectedX = -pitch / 2 - tallRack.uprightWidth / 2 - (0.002 + 0.016 / 2)
+    expect(transform.position[0]).toBeCloseTo(expectedX, 5)
+    expect(transform.position[1]).toBeCloseTo(4.55, 5)
+    expect(transform.position[2]).toBe(0)
     expect(transform.rotation).toEqual([0, 0, 0])
   })
 
-  test('flush mount on right frame upright: sits flat at +pitch / 2', () => {
+  test('flush mount on right frame upright: sits flat at right outer face between posts', () => {
     const transform = computeSignTransform(tallRack, 'right', 'flush')
 
-    expect(transform.position[0]).toBeCloseTo(+pitch / 2, 5)
-    expect(transform.position[1]).toBeCloseTo(4.65, 5)
-    expect(transform.position[2]).toBeCloseTo(depth / 2 + 0.008, 5)
+    const expectedX = pitch / 2 + tallRack.uprightWidth / 2 + (0.002 + 0.016 / 2)
+    expect(transform.position[0]).toBeCloseTo(expectedX, 5)
+    expect(transform.position[1]).toBeCloseTo(4.55, 5)
+    expect(transform.position[2]).toBe(0)
     expect(transform.rotation).toEqual([0, 0, 0])
   })
 
-  test('toggling mount style between flag and flush switches rotation and depth', () => {
+  test('toggling mount style between flag and flush switches standoff distance', () => {
     const flagTransform = computeSignTransform(tallRack, 'left', 'flag')
     const flushTransform = computeSignTransform(tallRack, 'left', 'flush')
 
-    // Rotation switches between [0, PI/2, 0] and [0, 0, 0]
-    expect(flagTransform.rotation[1]).toBe(Math.PI / 2)
-    expect(flushTransform.rotation[1]).toBe(0)
+    // Both remain centered between posts (Z=0)
+    expect(flagTransform.position[2]).toBe(0)
+    expect(flushTransform.position[2]).toBe(0)
 
-    // Flag protrudes further into aisle along +Z than flush
-    expect(flagTransform.position[2]).toBeGreaterThan(flushTransform.position[2])
-    const difference = flagTransform.position[2] - flushTransform.position[2]
-    expect(difference).toBeCloseTo(0.22 - 0.008, 5) // exactly 0.212m
+    // Flag standoff extends further out from the rack along X
+    expect(flagTransform.position[0]).toBeLessThan(flushTransform.position[0])
+    const diff = Math.abs(flagTransform.position[0] - flushTransform.position[0])
+    expect(diff).toBeCloseTo(0.05 - 0.002, 5) // exactly 48mm standoff delta
   })
 
   test('adapts to variable rack heights (e.g. 3m low rack vs 10m high-bay rack)', () => {
     const lowRack = makeRack('low', { uprightHeight: 3.0 })
     const highRack = makeRack('high', { uprightHeight: 10.0 })
 
-    expect(computeSignTransform(lowRack, 'left', 'flag').position[1]).toBeCloseTo(2.65, 5)
-    expect(computeSignTransform(highRack, 'left', 'flag').position[1]).toBeCloseTo(9.65, 5)
+    expect(computeSignTransform(lowRack, 'left', 'flag').position[1]).toBeCloseTo(2.55, 5)
+    expect(computeSignTransform(highRack, 'left', 'flag').position[1]).toBeCloseTo(9.55, 5)
   })
 })
 

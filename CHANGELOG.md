@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`5d7a65a`](https://github.com/ovurrsl/plugin-warehouse/commit/5d7a65a7884402a1ea54e4f3ec6193de6521b201))
 - Refresh generated README blocks [skip ci] ([`11b9647`](https://github.com/ovurrsl/plugin-warehouse/commit/11b964779b241324ec793a61fd64df01c91b0cc5))
 - Refresh generated README blocks [skip ci] ([`4bbdf56`](https://github.com/ovurrsl/plugin-warehouse/commit/4bbdf56119a79c983becf4c690f625f2065c84d1))
 - Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
@@ -206,6 +207,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Remediate H1, H4-H7 logic errors in warehouse routes and rack row naming ([`b712c44`](https://github.com/ovurrsl/plugin-warehouse/commit/b712c44ba5981306ddbfe6377c21a79e7c048944))
 - Replace HTML row labels with 3D physical signs ([`3bd4590`](https://github.com/ovurrsl/plugin-warehouse/commit/3bd4590b2125d8f6f1fc94bdf99035da017819ce))
 - Add rack row capacities and HUD labeling ([`4d188eb`](https://github.com/ovurrsl/plugin-warehouse/commit/4d188eb5d1f2d321a46532ed0884a5a9447e2625))
 - Add fill toggle, custom edge/fill colors, arrow directions and manual crosswalk tool ([`f385996`](https://github.com/ovurrsl/plugin-warehouse/commit/f3859961b9ca8fd3575eabbcca35c8ffbfaf0b7b))

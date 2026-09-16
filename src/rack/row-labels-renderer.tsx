@@ -91,7 +91,7 @@ function useSignTexture(label: string): THREE.CanvasTexture | null {
       // 4. Corner mounting bolt visual details
       const boltRadius = 14
       const boltOffset = 55
-      const corners = [
+      const corners: [number, number][] = [
         [boltOffset, boltOffset],
         [canvas.width - boltOffset, boltOffset],
         [boltOffset, canvas.height - boltOffset],

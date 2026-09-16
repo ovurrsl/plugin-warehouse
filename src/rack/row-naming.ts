@@ -83,9 +83,8 @@ export function getContiguousRackRow(
 export function applyRowLabelToContiguousRacks(startRackId: string, label: string) {
   const scene = useScene.getState()
   const rowIds = getContiguousRackRow(scene.nodes, startRackId)
-  
   rowIds.forEach((id, index) => {
-    const existing = scene.nodes[id] as PalletRackNode | undefined
+    const existing = (scene.nodes as Record<string, any>)[id] as PalletRackNode | undefined
     const pos = existing?.position ?? [0, 0, 0]
     scene.updateNode(id as AnyNodeId, {
       rowLabel: label,

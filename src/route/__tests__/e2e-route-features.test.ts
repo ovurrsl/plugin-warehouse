@@ -159,11 +159,11 @@ export function solveRouteIntersectionsReference(
           const dx = p2[0] - p1[0]
           const dz = p2[1] - p1[1]
           const heading = Math.atan2(dx, dz)
-          const barWidth = veh.width
+          const barWidth = ped.width
           const barDepth = 0.34
           const barGap = 0.34
-          const barCount = 6
-          const totalSpan = barCount * barDepth + (barCount - 1) * barGap // 3.74m
+          const barCount = Math.max(2, Math.round((veh.width + barGap) / (barDepth + barGap)))
+          const totalSpan = barCount * barDepth + (barCount - 1) * barGap
 
           const bars: ZebraCrossingBar[] = []
           for (let b = 0; b < barCount; b++) {
@@ -309,7 +309,7 @@ describe('Tier 1: Feature Coverage', () => {
       }
     })
 
-    test('T1.F1.2: Zebra crosswalk width clamps to vehicle route width rather than pedestrian width', () => {
+    test('T1.F1.2: Zebra crosswalk width follows pedestrian route width rather than vehicle width', () => {
       const ped = makeTestRoute({
         role: 'pedestrian',
         points: [
@@ -330,9 +330,9 @@ describe('Tier 1: Feature Coverage', () => {
       const solver = liveComputeRouteIntersections ?? solveRouteIntersectionsReference
       const crossings = solver([ped, vehWide])
       expect(crossings).toHaveLength(1)
-      expect(crossings[0]!.width).toBeCloseTo(4.8, 2)
+      expect(crossings[0]!.width).toBeCloseTo(6.0, 2)
       for (const bar of crossings[0]!.bars) {
-        expect(bar.size[0]).toBeCloseTo(4.8, 2)
+        expect(bar.size[0]).toBeCloseTo(6.0, 2)
       }
     })
 
@@ -1148,9 +1148,10 @@ describe('Tier 2: Boundary & Corner Cases', () => {
       for (const bar of crossings[0]!.bars) {
         expect(bar.size[0]).toBeCloseTo(20.0, 2)
       }
+      expect(crossings[0]!.bars).toHaveLength(30)
     })
 
-    test('T2.F1.5: Narrow vehicle aisle width (0.3m min schema bound) clamps bar width to 0.3m', () => {
+    test('T2.F1.5: Narrow vehicle aisle width (0.3m min schema bound) clamps bar count to minimum bound of 2 bars', () => {
       const ped = makeTestRoute({
         role: 'pedestrian',
         points: [
@@ -1170,10 +1171,11 @@ describe('Tier 2: Boundary & Corner Cases', () => {
       const solver = liveComputeRouteIntersections ?? solveRouteIntersectionsReference
       const crossings = solver([ped, vehMin])
       expect(crossings).toHaveLength(1)
-      expect(crossings[0]!.width).toBeCloseTo(0.3, 2)
+      expect(crossings[0]!.width).toBeCloseTo(1.2, 2)
       for (const bar of crossings[0]!.bars) {
-        expect(bar.size[0]).toBeCloseTo(0.3, 2)
+        expect(bar.size[0]).toBeCloseTo(1.2, 2)
       }
+      expect(crossings[0]!.bars).toHaveLength(2)
     })
   })
 
@@ -1923,7 +1925,7 @@ describe('Tier 4: Real-World Application Scenarios', () => {
     // 3 vehicle routes * 2 pedestrian routes = 6 total intersections
     expect(crossings).toHaveLength(6)
     for (const crossing of crossings) {
-      expect(crossing.bars).toHaveLength(6)
+      expect(crossing.bars.length).toBeGreaterThanOrEqual(5)
       expect(crossing.position[1]).toBe(0.016)
     }
 

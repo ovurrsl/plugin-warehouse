@@ -276,12 +276,14 @@ export function resolveRouteFill(route: RouteNode): string | null {
   return route.fillColor ?? route.laneColor ?? (route.role === 'vehicle' ? '#f59e0b' : '#3b82f6')
 }
 
-export function routeGeometryKey(route: RouteNode): string {
+export function routeGeometryKey(route: RouteNode, options?: RouteGeometryOptions): string {
   const gates = markingGates(route)
   const digest = relativePoints(route)
     .map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`)
     .join(';')
   const fill = resolveRouteFill(route)
+  const sc = options?.startCut ? options.startCut.toFixed(4) : '0'
+  const ec = options?.endCut ? options.endCut.toFixed(4) : '0'
   return [
     'route',
     route.width.toFixed(4),
@@ -292,6 +294,8 @@ export function routeGeometryKey(route: RouteNode): string {
     route.edgeStyle === 'dashed' ? 'dashed' : 'solid',
     route.curved ? 'curved' : 'straight',
     route.directionalArrows !== false ? 'da' : '-',
+    `sc:${sc}`,
+    `ec:${ec}`,
     route.points.length,
     digest,
   ].join('|')
@@ -506,12 +510,20 @@ export function buildRouteGeometry(
 /** Shared pool, not a fourth one. `conveyor/geometry-builder` says why: two
  *  caches would each hold their own copy of the eviction rule and the limit
  *  would mean half what it says. */
-export function getRouteGeometry(route: RouteNode): THREE.BufferGeometry {
-  return getCachedGeometry(routeGeometryKey(route), () => buildRouteGeometry(route))
+export function getRouteGeometry(
+  route: RouteNode,
+  options?: RouteGeometryOptions,
+): THREE.BufferGeometry {
+  return getCachedGeometry(routeGeometryKey(route, options), () =>
+    buildRouteGeometry(route, options),
+  )
 }
 
-export function retainRouteGeometry(route: RouteNode): string {
-  return retainGeometry(routeGeometryKey(route))
+export function retainRouteGeometry(
+  route: RouteNode,
+  options?: RouteGeometryOptions,
+): string {
+  return retainGeometry(routeGeometryKey(route, options))
 }
 
 export { releaseGeometry as releaseRouteGeometry }

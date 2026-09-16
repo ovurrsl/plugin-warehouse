@@ -367,7 +367,7 @@ describe('Tier 5 White-Box Adversarial Hardening Suite', () => {
         const c = crossings[0]!
         expect(c.position[0]).toBeCloseTo(0, 3)
         expect(c.position[2]).toBeCloseTo(0, 3)
-        expect(c.width).toBe(3.5)
+        expect(c.width).toBe(3.0)
         expect(c.bars).toHaveLength(ZEBRA_BAR_COUNT)
 
         const geom = buildZebraGeometry(c)

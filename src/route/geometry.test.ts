@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { LINE_WIDTHS, MAX_VERTICES, ROUTE_ELEVATIONS } from './constants'
 import {
   buildRouteGeometry,
+  getRouteGeometry,
   GROUP_PAINT,
   markingGates,
   routeGeometryKey,
@@ -90,6 +91,24 @@ describe('the key names what the builder consumes, and nothing else', () => {
         ),
       ).toBe(key)
     }
+  })
+
+  test('startCut and endCut options change the cache key and geometry', () => {
+    const base = route({ points: STRAIGHT })
+    const baseKey = routeGeometryKey(base)
+    const cutStartKey = routeGeometryKey(base, { startCut: 1.5 })
+    const cutEndKey = routeGeometryKey(base, { endCut: 2.0 })
+    const cutBothKey = routeGeometryKey(base, { startCut: 1.5, endCut: 2.0 })
+
+    expect(cutStartKey).not.toBe(baseKey)
+    expect(cutEndKey).not.toBe(baseKey)
+    expect(cutBothKey).not.toBe(cutStartKey)
+    expect(cutBothKey).not.toBe(cutEndKey)
+
+    const geomBase = getRouteGeometry(base)
+    const geomCut = getRouteGeometry(base, { startCut: 3.0, endCut: 3.0 })
+    expect(geomBase).not.toBe(geomCut)
+    expect(geomCut.getAttribute('position')).toBeDefined()
   })
 })
 

@@ -53,10 +53,12 @@ export function getContiguousRackRow(
 
   // Sol uca (başlangıca) git
   let currentLeft = startNode as PalletRackNode
+  const visitedLeft = new Set<string>([currentLeft.id])
   while (true) {
     const leftPos = leftNeighbourPosition(currentLeft)
     const left = findNeighbour(leftPos, currentLeft.rotation?.[1] ?? 0)
-    if (!left || left.id === currentLeft.id) break
+    if (!left || left.id === currentLeft.id || visitedLeft.has(left.id)) break
+    visitedLeft.add(left.id)
     currentLeft = left
   }
 

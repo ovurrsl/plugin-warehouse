@@ -138,7 +138,7 @@ describe('Route Transformation to World Coordinates', () => {
 })
 
 describe('Zebra Crossing Generation & Parameters', () => {
-  test('perpendicular intersection emits exactly 6 zebra bars', () => {
+  test('perpendicular intersection emits zebra crossing spanning vehicle corridor', () => {
     const ped = makeRoute({
       role: 'pedestrian',
       points: [
@@ -153,7 +153,7 @@ describe('Zebra Crossing Generation & Parameters', () => {
         [0, 0],
         [10, 0],
       ],
-      width: 3.2,
+      width: ZEBRA_TOTAL_SPAN_M,
     })
 
     const crossings = computeRouteIntersections([ped, veh])
@@ -164,17 +164,18 @@ describe('Zebra Crossing Generation & Parameters', () => {
     expect(c.position[2]).toBeCloseTo(0, 2)
     expect(c.position[1]).toBeCloseTo(ZEBRA_ELEVATION_M, 3)
     expect(c.bars).toHaveLength(ZEBRA_BAR_COUNT)
-    expect(c.width).toBeCloseTo(3.2, 2)
+    expect(c.width).toBeCloseTo(1.2, 2)
     expect(c.length).toBeCloseTo(ZEBRA_TOTAL_SPAN_M, 2)
   })
 
-  test('each zebra bar has 0.34m depth and 0.68m center pitch', () => {
+  test('each zebra bar has 0.34m depth, follows pedestrian width, and 0.68m center pitch', () => {
     const ped = makeRoute({
       role: 'pedestrian',
       points: [
         [0, 0],
         [0, 20],
       ],
+      width: 1.2,
     })
     const veh = makeRoute({
       role: 'vehicle',
@@ -189,7 +190,7 @@ describe('Zebra Crossing Generation & Parameters', () => {
     const c = crossings[0]!
 
     for (const bar of c.bars) {
-      expect(bar.size[0]).toBeCloseTo(4.0, 2)
+      expect(bar.size[0]).toBeCloseTo(1.2, 2)
       expect(bar.size[1]).toBeCloseTo(ZEBRA_BAR_DEPTH_M, 2)
       expect(bar.center[1]).toBeCloseTo(ZEBRA_ELEVATION_M, 3)
       expect(bar.points).toHaveLength(4)
@@ -253,7 +254,7 @@ describe('Zebra Crossing Generation & Parameters', () => {
     expect(c45.rotationY).toBeCloseTo(Math.PI / 4, 2)
   })
 
-  test('crosswalk width clamps to vehicle route width', () => {
+  test('crosswalk bar width follows pedestrian width and spans vehicle route corridor', () => {
     const ped = makeRoute({
       role: 'pedestrian',
       width: 1.5,
@@ -279,8 +280,13 @@ describe('Zebra Crossing Generation & Parameters', () => {
       ],
     })
 
-    expect(computeRouteIntersections([ped, vehNarrow])[0]!.width).toBeCloseTo(2.2, 2)
-    expect(computeRouteIntersections([ped, vehWide])[0]!.width).toBeCloseTo(6.0, 2)
+    const cNarrow = computeRouteIntersections([ped, vehNarrow])[0]!
+    const cWide = computeRouteIntersections([ped, vehWide])[0]!
+
+    expect(cNarrow.width).toBeCloseTo(1.5, 2)
+    expect(cWide.width).toBeCloseTo(1.5, 2)
+    expect(cNarrow.length).toBeCloseTo(2.38, 2)
+    expect(cWide.length).toBeCloseTo(5.78, 2)
   })
 })
 
@@ -537,6 +543,7 @@ describe('Three.js BufferGeometry Construction', () => {
       position: [10, 0, 20],
       rotation: [0, 0, 0],
       role: 'vehicle',
+      width: 3.74,
       points: [
         [0, 0],
         [10, 0],
@@ -547,15 +554,15 @@ describe('Three.js BufferGeometry Construction', () => {
     const localGeom = buildZebraGeometry(crossing, [10, 0, 20], [0, 0, 0])
     const posAttr = localGeom.getAttribute('position')
 
-    // Midpoint of the 6 bars in local space should be [5, 0.016, 0]
+    // Midpoint of the bars in local space should be [5, 0.016, 0]
     let avgX = 0
     let avgZ = 0
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < posAttr.count; i++) {
       avgX += posAttr.getX(i)
       avgZ += posAttr.getZ(i)
     }
-    avgX /= 24
-    avgZ /= 24
+    avgX /= posAttr.count
+    avgZ /= posAttr.count
 
     expect(avgX).toBeCloseTo(5, 2)
     expect(avgZ).toBeCloseTo(0, 2)
@@ -602,6 +609,7 @@ describe('Milestone 1 Hardening & Challenger Verification', () => {
     })
     const veh = makeRoute({
       role: 'vehicle',
+      width: 3.74,
       points: [
         [0, 0],
         [10, 0],
@@ -1018,3 +1026,167 @@ describe('Milestone 1: Junction Classification & Approach Cuts Suite', () => {
     })
   })
 })
+
+describe('Milestone 1 Regression: Multi-Floor & Slab Elevation & Corridor Geometry (H4, H5, H6)', () => {
+  test('H4: zebra crossing on elevated mezzanine slab (Y=3.5m) has world elevation 3.516m and valid local geometry', () => {
+    const sceneNodes: Record<string, unknown> = {
+      slab_mezz: {
+        id: 'slab_mezz',
+        type: 'slab',
+        elevation: 3.5,
+        thickness: 0.2,
+      },
+    }
+
+    const ped = makeRoute({
+      id: 'route_ped_mezz',
+      role: 'pedestrian',
+      supportSlabId: 'slab_mezz',
+      width: 1.5,
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    })
+    const veh = makeRoute({
+      id: 'route_veh_mezz',
+      role: 'vehicle',
+      supportSlabId: 'slab_mezz',
+      width: 3.0,
+      points: [
+        [5, 0],
+        [5, 10],
+      ],
+    })
+
+    const crossings = computeRouteIntersections([ped, veh], sceneNodes)
+    expect(crossings).toHaveLength(1)
+
+    const crossing = crossings[0]!
+    expect(crossing.position[1]).toBeCloseTo(3.5 + ZEBRA_ELEVATION_M, 4)
+
+    for (const bar of crossing.bars) {
+      expect(bar.center[1]).toBeCloseTo(3.5 + ZEBRA_ELEVATION_M, 4)
+      for (const pt of bar.points) {
+        expect(pt[1]).toBeCloseTo(3.5 + ZEBRA_ELEVATION_M, 4)
+      }
+    }
+
+    // When transformed into local coordinates of route mounted at [0, 3.5, 0],
+    // local Y must be +0.016m (ZEBRA_ELEVATION_M), NOT dropping down to -3.484m
+    const localGeom = buildZebraGeometry(crossing, [0, 3.5, 0], [0, 0, 0])
+    const posAttr = localGeom.getAttribute('position')
+    for (let i = 0; i < posAttr.count; i++) {
+      expect(posAttr.getY(i)).toBeCloseTo(ZEBRA_ELEVATION_M, 3)
+      expect(posAttr.getY(i)).toBeGreaterThan(0)
+    }
+    localGeom.dispose()
+
+    // Also verify findZebraCrossingsForRoute propagates sceneNodes correctly
+    const routeCrossings = findZebraCrossingsForRoute(ped, [veh], sceneNodes)
+    expect(routeCrossings).toHaveLength(1)
+    expect(routeCrossings[0]!.position[1]).toBeCloseTo(3.5 + ZEBRA_ELEVATION_M, 4)
+  })
+
+  test('H5: cross-floor routes on same XZ footprint produce zero intersections', () => {
+    const sceneNodes: Record<string, unknown> = {
+      slab_mezz: {
+        id: 'slab_mezz',
+        type: 'slab',
+        elevation: 3.5,
+        thickness: 0.2,
+      },
+      slab_ground: {
+        id: 'slab_ground',
+        type: 'slab',
+        elevation: 0.0,
+        thickness: 0.2,
+      },
+    }
+
+    const pedMezz = makeRoute({
+      id: 'route_ped_mezz',
+      role: 'pedestrian',
+      supportSlabId: 'slab_mezz',
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    })
+    const vehGround = makeRoute({
+      id: 'route_veh_ground',
+      role: 'vehicle',
+      supportSlabId: 'slab_ground',
+      points: [
+        [5, 0],
+        [5, 10],
+      ],
+    })
+
+    // Different slabs with different elevations (3.5m vs 0.0m)
+    expect(areRoutesOnSameLevel(pedMezz, vehGround, sceneNodes)).toBe(false)
+    expect(computeRouteIntersections([pedMezz, vehGround], sceneNodes)).toHaveLength(0)
+    expect(findZebraCrossingsForRoute(pedMezz, [vehGround], sceneNodes)).toHaveLength(0)
+
+    // Different parentId containers
+    const pedL1 = makeRoute({
+      id: 'route_ped_l1',
+      role: 'pedestrian',
+      parentId: 'building_level_1',
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    })
+    const vehL2 = makeRoute({
+      id: 'route_veh_l2',
+      role: 'vehicle',
+      parentId: 'building_level_2',
+      points: [
+        [5, 0],
+        [5, 10],
+      ],
+    })
+    expect(areRoutesOnSameLevel(pedL1, vehL2)).toBe(false)
+    expect(computeRouteIntersections([pedL1, vehL2])).toHaveLength(0)
+  })
+
+  test('H6: zebra crossing bar width matches pedestrian route width and bars span vehicle corridor', () => {
+    const pedWide = makeRoute({
+      id: 'route_ped_wide',
+      role: 'pedestrian',
+      width: 2.5,
+      points: [
+        [0, 5],
+        [10, 5],
+      ],
+    })
+    const vehWide = makeRoute({
+      id: 'route_veh_wide',
+      role: 'vehicle',
+      width: 4.8,
+      points: [
+        [5, 0],
+        [5, 10],
+      ],
+    })
+
+    const crossings = computeRouteIntersections([pedWide, vehWide])
+    expect(crossings).toHaveLength(1)
+
+    const c = crossings[0]!
+    expect(c.width).toBe(2.5)
+
+    // Vehicle width 4.8: (4.8 + 0.34) / 0.68 = 5.14 / 0.68 = ~7.55 -> rounds to 8 bars
+    expect(c.bars).toHaveLength(8)
+
+    for (const bar of c.bars) {
+      expect(bar.size[0]).toBe(2.5)
+      expect(bar.size[1]).toBe(0.34)
+    }
+
+    // Total span spans across vehicular roadway corridor
+    expect(c.length).toBeCloseTo(8 * 0.34 + 7 * 0.34, 3)
+  })
+})
+

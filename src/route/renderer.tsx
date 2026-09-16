@@ -20,6 +20,7 @@ import {
   releaseRouteGeometry,
   resolveRouteFill,
   retainRouteGeometry,
+  type RouteGeometryOptions,
 } from './geometry'
 import {
   buildZebraGeometry,
@@ -59,13 +60,18 @@ import { outerHalfWidthM } from './stripes'
  * tek karede mount olur — kapı, dev sahnede yükleme dalgasına katılmak
  * ve "kolektif çizen her kind kapılı" kapsamını tamamlamak için.
  */
-export default function RouteRenderer({ node }: { node: RouteNode }) {
-  const admitted = useAdmitted(node.id)
-  if (!admitted) return null
-  return <RouteBody node={node} />
+export interface RouteRendererProps {
+  node: RouteNode
+  options?: RouteGeometryOptions
 }
 
-function RouteBody({ node }: { node: RouteNode }) {
+export default function RouteRenderer({ node, options }: RouteRendererProps) {
+  const admitted = useAdmitted(node.id)
+  if (!admitted) return null
+  return <RouteBody node={node} options={options} />
+}
+
+function RouteBody({ node, options }: RouteRendererProps) {
   const handlers = useNodeEvents(node as never, node.type as never)
   const isExporting = useViewer((s) => s.isExporting ?? false)
 
@@ -131,7 +137,10 @@ function RouteBody({ node }: { node: RouteNode }) {
 
   const appearance = useAppearance()
 
-  const geometry = useMemo(() => getRouteGeometry(effectiveNode), [effectiveNode])
+  const geometry = useMemo(
+    () => getRouteGeometry(effectiveNode, options),
+    [effectiveNode, options?.startCut, options?.endCut],
+  )
   const effectiveFillColor = resolveRouteFill(effectiveNode)
   const materials = useMemo(
     () =>
@@ -154,9 +163,9 @@ function RouteBody({ node }: { node: RouteNode }) {
   // Claim the buffer while it is on screen. Eviction must never free a shape
   // something is drawing, and this is the only place that knows.
   useEffect(() => {
-    const key = retainRouteGeometry(effectiveNode)
+    const key = retainRouteGeometry(effectiveNode, options)
     return () => releaseRouteGeometry(key)
-  }, [effectiveNode])
+  }, [effectiveNode, options?.startCut, options?.endCut])
 
   // Only pedestrian routes render dynamic zebra crossings at intersections with vehicle corridors
   const zebraCrossings = useMemo(() => {
@@ -170,7 +179,7 @@ function RouteBody({ node }: { node: RouteNode }) {
         otherRoutes.push(other as unknown as RouteNode)
       }
     }
-    return findZebraCrossingsForRoute(effectiveNode, otherRoutes)
+    return findZebraCrossingsForRoute(effectiveNode, otherRoutes, sceneNodes)
   }, [effectiveNode, sceneNodes])
 
   const isSelected = useViewer((s) => s.selection.selectedIds.includes(node.id))

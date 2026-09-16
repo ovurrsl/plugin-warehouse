@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { asLevel, asSlab, slabAt, slabsOfLevel } from '../host-adapter'
 import { ROUTE_ELEVATIONS, ROUTE_JUNCTION_THRESHOLDS } from './constants'
 import type { RouteNode } from './schema'
 
@@ -118,21 +119,61 @@ export function intersectSegments(
 }
 
 /**
+ * Resolves the true elevation of a route, taking into account support slab or parent level elevation.
+ */
+export function resolveRouteElevation(
+  route: RouteNode,
+  sceneNodes?: Record<string, unknown>,
+): number {
+  const rawY = route.position?.[1] ?? 0
+  if (!sceneNodes) return rawY
+
+  if (route.supportSlabId) {
+    const rawSlab = sceneNodes[route.supportSlabId] as { elevation?: number } | undefined
+    if (typeof rawSlab?.elevation === 'number') {
+      return Math.max(rawY, rawSlab.elevation)
+    }
+    const slab = asSlab(rawSlab)
+    if (typeof slab?.elevation === 'number') {
+      return Math.max(rawY, slab.elevation)
+    }
+  }
+
+  if (route.parentId) {
+    const rawParent = sceneNodes[route.parentId]
+    const level = asLevel(rawParent)
+    if (level) {
+      const slabs = slabsOfLevel(sceneNodes, level)
+      const [rx, , rz] = route.position ?? [0, 0, 0]
+      const slab = slabAt(slabs, rx, rz)
+      if (typeof slab?.elevation === 'number') {
+        return Math.max(rawY, slab.elevation)
+      }
+    }
+  }
+
+  return rawY
+}
+
+/**
  * Checks if two routes reside on the same level / support slab.
  */
-export function areRoutesOnSameLevel(routeA: RouteNode, routeB: RouteNode): boolean {
-  if (routeA.parentId && routeB.parentId && routeA.parentId !== routeB.parentId) {
+export function areRoutesOnSameLevel(
+  routeA: RouteNode,
+  routeB: RouteNode,
+  sceneNodes?: Record<string, unknown>,
+): boolean {
+  if ((routeA.parentId || routeB.parentId) && routeA.parentId !== routeB.parentId) {
     return false
   }
   if (
-    routeA.supportSlabId &&
-    routeB.supportSlabId &&
+    (routeA.supportSlabId || routeB.supportSlabId) &&
     routeA.supportSlabId !== routeB.supportSlabId
   ) {
     return false
   }
-  const elevA = routeA.position?.[1] ?? 0
-  const elevB = routeB.position?.[1] ?? 0
+  const elevA = resolveRouteElevation(routeA, sceneNodes)
+  const elevB = resolveRouteElevation(routeB, sceneNodes)
   if (Math.abs(elevA - elevB) > 0.1) {
     return false
   }
@@ -329,7 +370,7 @@ export function solveApproachCuts(
 }
 
 /**
- * Creates a single ZebraCrossingInstance with 6 bars aligned with the pedestrian route direction.
+ * Creates a single ZebraCrossingInstance with bars aligned with the pedestrian route direction.
  */
 export function createZebraCrossingInstance(
   id: string,
@@ -340,6 +381,7 @@ export function createZebraCrossingInstance(
   vehicleRoute: RouteNode,
   vehSegStart?: [number, number],
   vehSegEnd?: [number, number],
+  sceneNodes?: Record<string, unknown>,
 ): ZebraCrossingInstance {
   const dx = pedSegEnd[0] - pedSegStart[0]
   const dz = pedSegEnd[1] - pedSegStart[1]
@@ -347,10 +389,23 @@ export function createZebraCrossingInstance(
   // Heading aligned with pedestrian walking direction: Math.atan2(dx, dz)
   const rotationY = Math.atan2(dx, dz)
 
-  // Clamped to vehicle route width
-  const barWidth = vehicleRoute.width ?? 3.0
+  // Bar width follows pedestrian route width (e.g. 1.2m default)
+  const barWidth = pedestrianRoute.width ?? 1.2
 
-  const baseY = Math.max(pedestrianRoute.position?.[1] ?? 0, vehicleRoute.position?.[1] ?? 0)
+  // Calculate dynamic bar count and span across vehicle corridor
+  const vehWidth = vehicleRoute.width ?? 3.0
+  const barCount = Math.max(
+    2,
+    vehWidth >= 2.8 && vehWidth <= 3.8
+      ? ZEBRA_BAR_COUNT
+      : Math.round((vehWidth + ZEBRA_BAR_GAP_M) / ZEBRA_BAR_PITCH_M),
+  )
+  const totalSpan =
+    barCount * ZEBRA_BAR_DEPTH_M + (barCount - 1) * ZEBRA_BAR_GAP_M
+
+  const pedElev = resolveRouteElevation(pedestrianRoute, sceneNodes)
+  const vehElev = resolveRouteElevation(vehicleRoute, sceneNodes)
+  const baseY = Math.max(pedElev, vehElev)
   const elevation = baseY + ZEBRA_ELEVATION_M
 
   const [ix, iz] = intersectionPoint
@@ -365,9 +420,9 @@ export function createZebraCrossingInstance(
   const nx = cosH
   const nz = -sinH
 
-  for (let b = 0; b < ZEBRA_BAR_COUNT; b++) {
+  for (let b = 0; b < barCount; b++) {
     const offsetDist =
-      -ZEBRA_TOTAL_SPAN_M / 2 + b * (ZEBRA_BAR_DEPTH_M + ZEBRA_BAR_GAP_M) + halfDepth
+      -totalSpan / 2 + b * (ZEBRA_BAR_DEPTH_M + ZEBRA_BAR_GAP_M) + halfDepth
     const bx = ix + sinH * offsetDist
     const bz = iz + cosH * offsetDist
     const center: [number, number, number] = [bx, elevation, bz]
@@ -427,7 +482,7 @@ export function createZebraCrossingInstance(
     position,
     rotationY,
     width: barWidth,
-    length: ZEBRA_TOTAL_SPAN_M,
+    length: totalSpan,
     bars,
     pedestrianRouteId: pedestrianRoute.id,
     vehicleRouteId: vehicleRoute.id,
@@ -439,7 +494,10 @@ export function createZebraCrossingInstance(
 /**
  * Computes all zebra crossing instances where pedestrian routes cross vehicle routes.
  */
-export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingInstance[] {
+export function computeRouteIntersections(
+  routes: RouteNode[],
+  sceneNodes?: Record<string, unknown>,
+): ZebraCrossingInstance[] {
   const crossings: ZebraCrossingInstance[] = []
   const pedestrianRoutes = routes.filter((r) => r.role === 'pedestrian')
   const vehicleRoutes = routes.filter((r) => r.role === 'vehicle')
@@ -468,7 +526,7 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
     for (const data of vehData) {
       const { veh, world: vehWorld, minX: vehMinX, maxX: vehMaxX, minZ: vehMinZ, maxZ: vehMaxZ } = data
       if (veh.zebraCrossing === false) continue
-      if (!areRoutesOnSameLevel(ped, veh)) continue
+      if (!areRoutesOnSameLevel(ped, veh, sceneNodes)) continue
 
       // AABB Broadphase Pre-Filtering
       if (
@@ -496,7 +554,9 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
             if (!isDuplicate) {
               pairCrossings.push(hit.point)
               const id = `zebra:${ped.id}:${veh.id}:${p}:${v}`
-              crossings.push(createZebraCrossingInstance(id, hit.point, p1, p2, ped, veh, v1, v2))
+              crossings.push(
+                createZebraCrossingInstance(id, hit.point, p1, p2, ped, veh, v1, v2, sceneNodes),
+              )
             }
           }
         }
@@ -511,20 +571,26 @@ export function computeRouteIntersections(routes: RouteNode[]): ZebraCrossingIns
  * Detects intersections between warehouse routes and returns enriched zebra crossing instances.
  * Backward-compatible helper that supports passing an array of routes or two individual routes.
  */
-export function findRouteIntersections(routes: RouteNode[]): ZebraCrossingInstance[]
+export function findRouteIntersections(
+  routes: RouteNode[],
+  sceneNodes?: Record<string, unknown>,
+): ZebraCrossingInstance[]
 export function findRouteIntersections(
   routeA: RouteNode,
   routeB: RouteNode,
+  sceneNodes?: Record<string, unknown>,
 ): ZebraCrossingInstance[]
 export function findRouteIntersections(
   arg1: RouteNode[] | RouteNode,
-  arg2?: RouteNode,
+  arg2?: RouteNode | Record<string, unknown>,
+  arg3?: Record<string, unknown>,
 ): ZebraCrossingInstance[] {
   if (Array.isArray(arg1)) {
-    return computeRouteIntersections(arg1)
+    const sceneNodes = arg2 && !('id' in arg2) ? (arg2 as Record<string, unknown>) : undefined
+    return computeRouteIntersections(arg1, sceneNodes)
   }
-  if (arg2) {
-    return computeRouteIntersections([arg1, arg2])
+  if (arg2 && 'id' in arg2) {
+    return computeRouteIntersections([arg1, arg2 as RouteNode], arg3)
   }
   return []
 }
@@ -535,15 +601,16 @@ export function findRouteIntersections(
 export function findZebraCrossingsForRoute(
   targetRoute: RouteNode,
   allRoutes: RouteNode[],
+  sceneNodes?: Record<string, unknown>,
 ): ZebraCrossingInstance[] {
   if (targetRoute.zebraCrossing === false) return []
   if (targetRoute.role === 'pedestrian') {
     const vehicles = allRoutes.filter((r) => r.role === 'vehicle' && r.id !== targetRoute.id)
-    return computeRouteIntersections([targetRoute, ...vehicles])
+    return computeRouteIntersections([targetRoute, ...vehicles], sceneNodes)
   }
   if (targetRoute.role === 'vehicle') {
     const pedestrians = allRoutes.filter((r) => r.role === 'pedestrian' && r.id !== targetRoute.id)
-    return computeRouteIntersections([...pedestrians, targetRoute])
+    return computeRouteIntersections([...pedestrians, targetRoute], sceneNodes)
   }
   return []
 }

@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`11b9647`](https://github.com/ovurrsl/plugin-warehouse/commit/11b964779b241324ec793a61fd64df01c91b0cc5))
 - Refresh generated README blocks [skip ci] ([`4bbdf56`](https://github.com/ovurrsl/plugin-warehouse/commit/4bbdf56119a79c983becf4c690f625f2065c84d1))
 - Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
 - Refresh generated README blocks [skip ci] ([`2df3286`](https://github.com/ovurrsl/plugin-warehouse/commit/2df3286c2e8688f3db935cb5299cc0f35deaeaba))
@@ -330,6 +331,7 @@ index to it, not a replacement for it.
 
 ### Fixes
 
+- Position aisle signs between uprights and use CanvasTexture for WebGPU ([`338b078`](https://github.com/ovurrsl/plugin-warehouse/commit/338b078cff35d02bdced8d93389b48ed331f0678))
 - Resolve UI freeze caused by reactive useScene node reads ([`b1894e0`](https://github.com/ovurrsl/plugin-warehouse/commit/b1894e0ce3232bbc089a361739c7120204982847))
 - Convert row-labels-renderer.tsx to UTF-8 ([`7ea3e88`](https://github.com/ovurrsl/plugin-warehouse/commit/7ea3e88da81379f6cae1e45dce6a2c84583ad6a6))
 - Type errors in row-naming.ts ([`69e1fb7`](https://github.com/ovurrsl/plugin-warehouse/commit/69e1fb7c23a40fc9625ac230d10606646f844bba))

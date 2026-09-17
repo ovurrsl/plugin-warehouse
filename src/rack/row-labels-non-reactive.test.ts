@@ -308,7 +308,7 @@ describe('RowLabelRenderer Lifecycle & Dynamic Updates', () => {
     rowNaming.applyRowLabelToContiguousRacks(r1.id, 'ROW-EXT')
 
     // Re-render harness for r2 with its updated node from scene
-    const updatedR2 = useScene.getState().nodes[r2.id] as PalletRackNode
+    const updatedR2 = (useScene.getState().nodes as Record<string, any>)[r2.id] as PalletRackNode
     harness2.render(updatedR2)
 
     // Intermediate rack r2 must now have isFirst: false, isLast: false (signs suppressed)
@@ -316,7 +316,7 @@ describe('RowLabelRenderer Lifecycle & Dynamic Updates', () => {
 
     // And new end rack r3 has isFirst: false, isLast: true
     const harness3 = new ComponentHarness()
-    const updatedR3 = useScene.getState().nodes[r3.id] as PalletRackNode
+    const updatedR3 = (useScene.getState().nodes as Record<string, any>)[r3.id] as PalletRackNode
     harness3.render(updatedR3)
     expect(harness3.getCurrentState()).toEqual({ isFirst: false, isLast: true })
   })
@@ -349,7 +349,7 @@ describe('RowLabelRenderer Lifecycle & Dynamic Updates', () => {
     expect(harness3.getCurrentState()).toEqual({ isFirst: false, isLast: true })
 
     // Simulate deleting r3 from the scene
-    const nodesWithoutR3 = { ...useScene.getState().nodes }
+    const nodesWithoutR3 = { ...useScene.getState().nodes } as Record<string, any>
     delete nodesWithoutR3[r3.id]
     useScene.setState({ nodes: nodesWithoutR3 })
 
@@ -357,7 +357,7 @@ describe('RowLabelRenderer Lifecycle & Dynamic Updates', () => {
     rowNaming.applyRowLabelToContiguousRacks(r1.id, 'ROW-DEL')
 
     // r2 is now the last rack in the row
-    const updatedR2 = useScene.getState().nodes[r2.id] as PalletRackNode
+    const updatedR2 = (useScene.getState().nodes as Record<string, any>)[r2.id] as PalletRackNode
     harness2.render(updatedR2)
     expect(harness2.getCurrentState()).toEqual({ isFirst: false, isLast: true })
   })

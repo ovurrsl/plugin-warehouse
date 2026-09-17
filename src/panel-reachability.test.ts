@@ -99,6 +99,31 @@ const EXEMPTIONS: Record<string, Exemption[]> = {
       kind: 'CUSTOM',
       where: 'Trailing panel → Aisle / Row Naming → Sign Mount SegmentedControl',
     },
+    {
+      field: 'zoneCode',
+      kind: 'SYSTEM',
+      where: 'Sıra isimlendirme ve koridor adresleme motoru',
+    },
+    {
+      field: 'accessMode',
+      kind: 'CUSTOM',
+      where: 'Sıra isimlendirme ve koridor adresleme motoru',
+    },
+    {
+      field: 'frontAisleLabel',
+      kind: 'SYSTEM',
+      where: 'Sıra isimlendirme ve koridor adresleme motoru',
+    },
+    {
+      field: 'rearAisleLabel',
+      kind: 'SYSTEM',
+      where: 'Sıra isimlendirme ve koridor adresleme motoru',
+    },
+    {
+      field: 'namingStrategy',
+      kind: 'SYSTEM',
+      where: 'Sıra isimlendirme ve koridor adresleme motoru',
+    },
   ],
   'warehouse:drive-in-rack': [
     { field: 'supportSlabId', kind: 'SYSTEM', where: 'yerleştirmede electSupportSlab yazar' },

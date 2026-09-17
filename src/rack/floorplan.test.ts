@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { buildPalletRackFloorplan, PLAN_ROLES } from './floorplan'
+import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { buildPalletRackFloorplan, parseLevelFilter, PLAN_ROLES } from './floorplan'
 import { rackParts } from './parts'
 import { PalletRackNode } from './schema'
 import { orientedPalletFootprint, totalDepth, totalWidth } from './slots'
@@ -138,5 +139,105 @@ describe('plan sembolü host mürekkebiyle çizilir', () => {
     expect(body.stroke).toBe('#123456')
     expect(body.fill).toBe('#654321')
     expect(body.strokeWidth).toBe(0.03)
+  })
+})
+
+describe('2D Floorplan Annotations & Dynamic Level Filtering (Features 11 & 12)', () => {
+  test('parseLevelFilter handles various formats robustly', () => {
+    expect(parseLevelFilter('Kat D')).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter('kat d')).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter('Level D')).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter('D')).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter(3)).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter('3')).toEqual({ active: true, levelIndex: 3, levelLetter: 'D' })
+    expect(parseLevelFilter('Kat A')).toEqual({ active: true, levelIndex: 0, levelLetter: 'A' })
+    expect(parseLevelFilter(null)).toEqual({ active: false, levelIndex: -1, levelLetter: '' })
+    expect(parseLevelFilter(undefined)).toEqual({ active: false, levelIndex: -1, levelLetter: '' })
+    expect(parseLevelFilter('')).toEqual({ active: false, levelIndex: -1, levelLetter: '' })
+    expect(parseLevelFilter('all')).toEqual({ active: false, levelIndex: -1, levelLetter: '' })
+  })
+
+  function getChildren(geom: FloorplanGeometry | null): FloorplanGeometry[] {
+    return geom && geom.kind === 'group' ? geom.children : []
+  }
+
+  test('Feature 11.1: Aisle header ("SIRA A") is emitted on bayIndex 1 when rowLabel is set', () => {
+    const node = rack({ rowLabel: 'A', bayIndex: 1 })
+    const geometry = buildPalletRackFloorplan(node, ctx)
+    expect(geometry?.kind).toBe('group')
+    const texts = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    const header = texts.find((t) => t.text === 'SIRA A')
+    expect(header).toBeDefined()
+    expect(header?.textAnchor).toBe('end')
+    expect(header?.x).toBeLessThan(-totalWidth(node) / 2)
+  })
+
+  test('Feature 11.1: Aisle header is not emitted on subsequent bays (bayIndex 2)', () => {
+    const node = rack({ rowLabel: 'A', bayIndex: 2 })
+    const geometry = buildPalletRackFloorplan(node, ctx)
+    const texts = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    const header = texts.find((t) => t.text === 'SIRA A')
+    expect(header).toBeUndefined()
+  })
+
+  test('Feature 11.2: Bay numbers ("01", "02") are displayed along the aisle', () => {
+    const n1 = rack({ bayIndex: 1 })
+    const g1 = buildPalletRackFloorplan(n1, ctx)
+    const t1 = getChildren(g1).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    expect(t1.some((t) => t.text === '01')).toBe(true)
+
+    const n2 = rack({ bayIndex: 2 })
+    const g2 = buildPalletRackFloorplan(n2, ctx)
+    const t2 = getChildren(g2).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    expect(t2.some((t) => t.text === '02')).toBe(true)
+  })
+
+  test('Feature 12: Inactive level filter emits standard footprints without address clutter', () => {
+    const node = rack({ rowLabel: 'A', bayIndex: 2, levels: 4 })
+    const geometry = buildPalletRackFloorplan(node, ctx)
+    const texts = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    const addresses = texts.filter((t) => t.text.includes('A-02-'))
+    expect(addresses).toHaveLength(0)
+
+    const rectsList = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'rect' }> => c.kind === 'rect')
+    const footprints = rectsList.filter((r) => r.fill === 'transparent')
+    expect(footprints).toHaveLength(3)
+  })
+
+  test('Feature 12: Active level filter ("Kat D") draws full industrial addresses centered on footprints', () => {
+    const node = rack({ rowLabel: 'A', bayIndex: 2, levels: 4, groundLevelStorage: true })
+    const filteredCtx = {
+      extensions: { activeFloorplanLevelFilter: 'Kat D' },
+    } as unknown as GeometryContext
+
+    const geometry = buildPalletRackFloorplan(node, filteredCtx)
+    const texts = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+    const addresses = texts.filter((t) => t.text.startsWith('A-02-D')).map((t) => t.text)
+    expect(addresses).toEqual(['A-02-D1', 'A-02-D2', 'A-02-D3'])
+  })
+
+  test('Feature 12: Active level filter on dual-facing bays differentiates front (A) and rear (B)', () => {
+    const node = rack({
+      rowLabel: 'A',
+      bayIndex: 2,
+      accessMode: 'dual-facing',
+      frontAisleLabel: 'A',
+      rearAisleLabel: 'B',
+      depthPositions: 2,
+      levels: 4,
+      groundLevelStorage: true,
+    })
+    const filteredCtx = {
+      extensions: { activeFloorplanLevelFilter: 'Kat D' },
+    } as unknown as GeometryContext
+
+    const geometry = buildPalletRackFloorplan(node, filteredCtx)
+    const texts = getChildren(geometry).filter((c): c is Extract<FloorplanGeometry, { kind: 'text' }> => c.kind === 'text')
+
+    const frontAddresses = texts.filter((t) => t.text.startsWith('A-02-D')).map((t) => t.text)
+    expect(frontAddresses).toEqual(['A-02-D1', 'A-02-D2', 'A-02-D3'])
+
+    const rearAddresses = texts.filter((t) => t.text.startsWith('B-02-D')).map((t) => t.text)
+    expect(rearAddresses).toEqual(['B-02-D1', 'B-02-D2', 'B-02-D3'])
   })
 })

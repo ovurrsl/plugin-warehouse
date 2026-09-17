@@ -1,15 +1,72 @@
 import type { FloorplanGeometry, GeometryContext } from '@pascal-app/core'
+import { useWarehouseStore } from '../store'
 import { type RackPart, rackParts } from './parts'
 import type { PalletRackNode } from './schema'
 import {
   bayCenterX,
   depthPositionZ,
+  formatIndustrialAddress,
+  letterToLevel,
+  levelToLetter,
   orientedPalletFootprint,
+  palletSlotsOf,
   slotOffsetsX,
   storageLevelsPresent,
   totalDepth,
   totalWidth,
 } from './slots'
+
+export interface LevelFilterResult {
+  active: boolean
+  levelIndex: number
+  levelLetter: string
+}
+
+export function parseLevelFilter(
+  filter: string | number | null | undefined,
+): LevelFilterResult {
+  if (filter === null || filter === undefined || filter === '') {
+    return { active: false, levelIndex: -1, levelLetter: '' }
+  }
+  if (typeof filter === 'number') {
+    return {
+      active: true,
+      levelIndex: filter,
+      levelLetter: levelToLetter(filter),
+    }
+  }
+  const str = String(filter).trim()
+  if (!str || str.toLowerCase() === 'all' || str.toLowerCase() === 'none') {
+    return { active: false, levelIndex: -1, levelLetter: '' }
+  }
+  const letterMatch = /^(?:kat|level)?\s*([A-Za-z])$/i.exec(str)
+  if (letterMatch && letterMatch[1]) {
+    const letter = letterMatch[1].toUpperCase()
+    return { active: true, levelIndex: letterToLevel(letter), levelLetter: letter }
+  }
+  const numberMatch = /^(?:kat|level)?\s*(\d+)$/i.exec(str)
+  if (numberMatch && numberMatch[1]) {
+    const num = parseInt(numberMatch[1], 10)
+    return { active: true, levelIndex: num, levelLetter: levelToLetter(num) }
+  }
+  return { active: false, levelIndex: -1, levelLetter: '' }
+}
+
+export function resolveActiveLevelFilter(ctx?: GeometryContext): LevelFilterResult {
+  const storeFilter =
+    typeof useWarehouseStore !== 'undefined'
+      ? useWarehouseStore.getState?.()?.activeFloorplanLevelFilter
+      : null
+  const raw =
+    (ctx?.extensions as Record<string, unknown> | undefined)?.activeFloorplanLevelFilter ??
+    (ctx?.extensions as Record<string, unknown> | undefined)?.activeLevelFilter ??
+    (ctx?.extensions as Record<string, unknown> | undefined)?.levelFilter ??
+    (ctx?.levelData as Record<string, unknown> | undefined)?.activeFloorplanLevelFilter ??
+    (ctx?.levelData as Record<string, unknown> | undefined)?.activeLevelFilter ??
+    storeFilter ??
+    null
+  return parseLevelFilter(raw as string | number | null | undefined)
+}
 
 /**
  * The plan symbol, projected from the same part list the 3D model is built
@@ -119,7 +176,8 @@ export function buildPalletRackFloorplan(
   // A bay tunnelled all the way up holds nothing, and drawing its positions
   // anyway is exactly the plan-against-model disagreement this file exists to
   // stop.
-  if (storageLevelsPresent(node).length > 0) {
+  const hasStorage = storageLevelsPresent(node).length > 0
+  if (hasStorage) {
     const offsets = slotOffsetsX(node)
     const [alongRun, intoDepth] = orientedPalletFootprint(node)
     const centerX = bayCenterX()
@@ -138,6 +196,94 @@ export function buildPalletRackFloorplan(
         })
       }
     }
+  }
+
+  // Dynamic Level Filtering: When active, draw industrial address text inside footprints
+  const levelFilter = resolveActiveLevelFilter(ctx)
+  if (levelFilter.active && hasStorage && storageLevelsPresent(node).includes(levelFilter.levelIndex)) {
+    const matchingSlots = palletSlotsOf(node).filter((s) => s.level === levelFilter.levelIndex)
+    for (const slot of matchingSlots) {
+      const addressText =
+        slot.aisle || (slot.id.includes('-') && !slot.id.startsWith('R'))
+          ? slot.id
+          : formatIndustrialAddress({
+              ...slot,
+              aisle: node.rowLabel || 'A',
+            })
+      children.push({
+        kind: 'text',
+        x: slot.localPosition[0],
+        y: slot.localPosition[2],
+        text: addressText,
+        fontSize: 0.12,
+        fontWeight: 'bold',
+        fill: '#0f172a',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        textAnchor: 'middle',
+        dominantBaseline: 'central',
+        upright: true,
+        metadata: { role: 'slot-address', slotId: addressText },
+      })
+    }
+  }
+
+  // Feature 11.1: Aisle Header ("SIRA A") when rowLabel is set
+  const showAisleHeader = Boolean(
+    node.rowLabel &&
+      (node.bayIndex === 1 || (ctx?.extensions as Record<string, unknown> | undefined)?.showAllAisleHeaders),
+  )
+  if (showAisleHeader) {
+    const cleanLabel = node.rowLabel.trim()
+    const aisleText = cleanLabel.toUpperCase().startsWith('SIRA') ? cleanLabel : `SIRA ${cleanLabel}`
+    children.push({
+      kind: 'text',
+      x: -width / 2 - 0.4,
+      y: 0,
+      text: aisleText,
+      fontSize: 0.28,
+      fontWeight: 'bold',
+      fill: '#18181b',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      textAnchor: 'end',
+      dominantBaseline: 'central',
+      upright: true,
+      metadata: { role: 'aisle-header', rowLabel: node.rowLabel },
+    })
+  }
+
+  // Feature 11.2: Bay numbers ("01", "02") displayed along the aisle
+  const bayNumberStr = String(node.bayIndex ?? 1).padStart(2, '0')
+  children.push({
+    kind: 'text',
+    x: bayCenterX(),
+    y: depth / 2 + 0.25,
+    text: bayNumberStr,
+    fontSize: 0.18,
+    fontWeight: '600',
+    fill: '#52525b',
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    textAnchor: 'middle',
+    dominantBaseline: 'hanging',
+    upright: true,
+    metadata: { role: 'bay-number', bayIndex: node.bayIndex },
+  })
+
+  // In dual-facing access mode, also render bay number along rear aisle
+  if (node.accessMode === 'dual-facing') {
+    children.push({
+      kind: 'text',
+      x: bayCenterX(),
+      y: -depth / 2 - 0.25,
+      text: bayNumberStr,
+      fontSize: 0.18,
+      fontWeight: '600',
+      fill: '#52525b',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
+      textAnchor: 'middle',
+      dominantBaseline: 'auto',
+      upright: true,
+      metadata: { role: 'bay-number', bayIndex: node.bayIndex, face: 'rear' },
+    })
   }
 
   const rotation = Array.isArray(node.rotation) ? (node.rotation[1] ?? 0) : 0

@@ -40,6 +40,26 @@ export const PalletRackNode = BaseNode.extend({
    */
   signMountStyle: z.enum(['flag', 'flush']).default('flag'),
 
+  /** Depo bölge kodu (Zone Code), örn. "Z1", "RECEIVING", vb. */
+  zoneCode: z.string().default(''),
+  /**
+   * Erişim modu (Access Mode):
+   * - 'single-face': Tek koridordan erişim (arkadaki palet için öndekinin alınması gerekir).
+   * - 'dual-facing': Çift taraflı erişim (ön koridordan derinlik 1, arka koridordan derinlik 2 doğrudan erişilebilir).
+   */
+  accessMode: z.enum(['single-face', 'dual-facing']).default('single-face'),
+  /** Ön koridor etiketi (Front Aisle Label), örn. "A" */
+  frontAisleLabel: z.string().default(''),
+  /** Arka koridor etiketi (Rear Aisle Label), örn. "B" */
+  rearAisleLabel: z.string().default(''),
+  /**
+   * Sıra isimlendirme stratejisi (Naming Strategy):
+   * - 'aisle-pairs': Sırt sırta koridor çiftleri ("A B", "C D").
+   * - 'face-split': Çift taraflı rafta ön ve arka koridor ayrımı.
+   * - 'odd-even': Karşılıklı koridorlarda tek/çift göz numaralandırması (01, 03... / 02, 04...).
+   */
+  namingStrategy: z.enum(['aisle-pairs', 'face-split', 'odd-even']).default('aisle-pairs'),
+
   /**
    * Hangi ürün olarak sipariş edildi — palet rafı mı, alçak toplama rafı mı.
    *
@@ -284,3 +304,7 @@ export const PalletRackNode = BaseNode.extend({
 
 export type PalletRackNode = z.infer<typeof PalletRackNode>
 export type SignMountStyle = 'flag' | 'flush'
+export type AccessMode = 'single-face' | 'dual-facing'
+export type NamingStrategy = 'aisle-pairs' | 'face-split' | 'odd-even'
+export type RackAccessMode = AccessMode
+export type RackNamingStrategy = NamingStrategy

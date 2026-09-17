@@ -14,18 +14,26 @@ import type { PalletRackNode } from './schema'
  */
 
 export type SlotAddress = {
-  /** Always 1. A bay is a node, so a node has one row — kept in the address for
-   *  the reason `formatSlotAddress` gives. */
-  row: number
-  /** Always 1, for the same reason. */
+  /**
+   * Row or aisle identifier.
+   * In legacy format, a 1-based number (1).
+   * In modern industrial format, aisle string (e.g. 'A', 'B') or string number.
+   */
+  row: number | string
+  /** Bay index along the row (1-based integer). */
   bay: number
   /** 0 is the floor inside the bay; 1..n are the beam levels. */
   level: number
   /** 1-based across the bay, left to right in the rack's local +X. */
   position: number
-  /** 1-based into the bay from the aisle. 1 is the front, 2 the rear of a
-   *  double-deep bay. */
+  /** 1-based into the bay from the aisle. 1 is front, 2 is rear. */
   depth: number
+  /** Dedicated aisle identifier string (e.g. 'A', 'B', '01'). */
+  aisle?: string
+  /** Level letter representation ('A' for level 0, 'B' for level 1, etc.). */
+  levelLetter?: string
+  /** Warehouse zone code (e.g. 'Z1', 'COLD'). */
+  zoneCode?: string
 }
 
 export type Slot = SlotAddress & {
@@ -39,44 +47,124 @@ export type Slot = SlotAddress & {
   /**
    * Whether a truck can reach this pallet without first moving another.
    *
-   * False only for the rear position of a double-deep bay. Worth carrying on
-   * the slot rather than recomputing: "how many locations, and how many of them
-   * directly accessible" is the pair of numbers that actually describes a
-   * high-density layout, and reporting only the total flatters it.
+   * In single-face double-deep: true for depth 1, false for depth 2.
+   * In dual-facing bays: true for BOTH depths (front reachable from front aisle,
+   * rear reachable from rear aisle).
    */
   directAccess: boolean
+  /**
+   * Physical bay depth position along local Z (1 = front beam, 2 = rear beam).
+   * Distinguishes physical beam line in dual-facing bays where depth === 1
+   * relative to both front and rear aisles.
+   */
+  bayDepth?: number
+}
+
+export const LEVEL_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'] as const
+
+/**
+ * Maps 0-based level index to industrial level letter.
+ * 0 -> 'A', 1 -> 'B', 2 -> 'C', 3 -> 'D', 4 -> 'E', 5 -> 'F', etc.
+ */
+export function levelToLetter(levelIndex: number): string {
+  return LEVEL_LETTERS[levelIndex] ?? String.fromCharCode(65 + levelIndex)
 }
 
 /**
- * `R1-B2-L3-P1-D1`.
- *
- * Row and bay are now always 1 — a bay is a node — and the form is kept anyway.
- * Shortening it to `L3-P1-D1` would break silently rather than loudly: every
- * pallet already standing in a rack carries a `slotAddress` in the long form,
- * `occupiedSlots` would stop matching them, and `GhostStock` would start drawing
- * phantom pallets straight through the real ones. The saving is five characters.
- *
- * A single-deep bay is depth 1 for the same reason: raising `depthPositions`
- * must not change what an already-stored address means.
+ * Maps industrial level letter back to 0-based level index.
+ * 'A' -> 0, 'B' -> 1, 'C' -> 2, 'D' -> 3, etc.
  */
-export function formatSlotAddress({ row, bay, level, position, depth }: SlotAddress): string {
-  return `R${row}-B${bay}-L${level}-P${position}-D${depth}`
+export function letterToLevel(letter: string): number {
+  const char = letter.trim().toUpperCase()
+  const idx = (LEVEL_LETTERS as readonly string[]).indexOf(char)
+  if (idx >= 0) return idx
+  const code = char.charCodeAt(0)
+  return code >= 65 && code <= 90 ? code - 65 : 0
 }
 
-const ADDRESS_PATTERN = /^R(\d+)-B(\d+)-L(\d+)-P(\d+)-D(\d+)$/
+/**
+ * Aisle label increment helper for dual-facing partner aisles (e.g. 'A' -> 'B', '01' -> '02').
+ */
+export function nextAisleLetter(label: string): string {
+  if (!label) return 'B'
+  if (/^\d+$/.test(label)) {
+    const num = parseInt(label, 10) + 1
+    return String(num).padStart(label.length, '0')
+  }
+  const lastChar = label.slice(-1)
+  const code = lastChar.charCodeAt(0)
+  if ((code >= 65 && code < 90) || (code >= 97 && code < 122)) {
+    return label.slice(0, -1) + String.fromCharCode(code + 1)
+  }
+  return `${label}-B`
+}
+
+/**
+ * Formats a slot address into standard industrial warehouse notation:
+ * `[Aisle]-[Bay (2-digit)]-[LevelLetter][Position][Optional Depth Suffix]`
+ * Examples:
+ * - Single-face, single-deep: `A-02-D2`
+ * - Single-face, double-deep rear: `A-02-D2-2`
+ * - Dual-facing, rear face: `B-02-D2`
+ */
+export function formatIndustrialAddress(addr: SlotAddress): string {
+  const aisle = addr.aisle ?? (typeof addr.row === 'string' && addr.row ? addr.row : (addr.row ? `R${addr.row}` : 'A'))
+  const padBay = String(addr.bay).padStart(2, '0')
+  const levelChar = addr.levelLetter ?? levelToLetter(addr.level)
+  const depthSuffix = addr.depth > 1 ? `-${addr.depth}` : ''
+  return `${aisle}-${padBay}-${levelChar}${addr.position}${depthSuffix}`
+}
+
+/**
+ * Backward-compatible slot address formatter.
+ * - Emits modern industrial format (`A-02-D2`) if an aisle string or string row is provided.
+ * - Emits legacy format (`R1-B1-L0-P1-D1`) when numeric row and no aisle are provided.
+ */
+export function formatSlotAddress(address: SlotAddress): string {
+  if (address.aisle || typeof address.row === 'string') {
+    return formatIndustrialAddress(address)
+  }
+  return `R${address.row ?? 1}-B${address.bay}-L${address.level}-P${address.position}-D${address.depth}`
+}
+
+const LEGACY_ADDRESS_PATTERN = /^R(\d+)-B(\d+)-L(\d+)-P(\d+)-D(\d+)$/
+const MODERN_ADDRESS_PATTERN = /^([A-Za-z0-9]+)-(\d{2,})-([A-Za-z])(\d+)(?:-(\d+))?$/
 
 export function parseSlotAddress(address: string): SlotAddress | null {
-  const match = ADDRESS_PATTERN.exec(address)
-  if (!match) return null
-  const [, row, bay, level, position, depth] = match
-  if (!row || !bay || !level || !position || !depth) return null
-  return {
-    row: Number(row),
-    bay: Number(bay),
-    level: Number(level),
-    position: Number(position),
-    depth: Number(depth),
+  if (!address) return null
+
+  // 1. Try legacy format: R1-B1-L2-P3-D1 (strictly return 5 keys for deep-equality in pin-tag.test.ts)
+  const matchLegacy = LEGACY_ADDRESS_PATTERN.exec(address)
+  if (matchLegacy) {
+    const [, row, bay, level, position, depth] = matchLegacy
+    if (!row || !bay || !level || !position || !depth) return null
+    return {
+      row: Number(row),
+      bay: Number(bay),
+      level: Number(level),
+      position: Number(position),
+      depth: Number(depth),
+    }
   }
+
+  // 2. Try modern industrial format: A-02-D2 or A-02-D2-2
+  const matchModern = MODERN_ADDRESS_PATTERN.exec(address)
+  if (matchModern) {
+    const [, aisle, bayStr, levelChar, posStr, depthStr] = matchModern
+    if (!aisle || !bayStr || !levelChar || !posStr) return null
+    const levelLetter = levelChar.toUpperCase()
+    return {
+      row: aisle,
+      bay: Number(bayStr),
+      level: letterToLevel(levelLetter),
+      position: Number(posStr),
+      depth: depthStr ? Number(depthStr) : 1,
+      aisle,
+      levelLetter,
+    }
+  }
+
+  return null
 }
 
 // ── Bay geometry ────────────────────────────────────────────────────────────
@@ -577,24 +665,69 @@ function buildPalletSlots(rack: PalletRackNode): Slot[] {
   const footprint = orientedPalletFootprint(rack)
   const slots: Slot[] = []
 
+  const isIndustrial = Boolean(rack.rowLabel || rack.frontAisleLabel || rack.accessMode === 'dual-facing')
+  const bay = rack.bayIndex ?? 1
+  const frontAisle = rack.frontAisleLabel || rack.rowLabel || 'A'
+  const rearAisle = rack.rearAisleLabel || (rack.rowLabel ? nextAisleLetter(rack.rowLabel) : 'B')
+
   for (const level of palletLevels(rack)) {
     // A tunnel's open levels hold nothing — counting them would report capacity
     // the bay does not have.
     if (!present.has(level)) continue
     const y = levelSurfaceY(rack, level)
     const clearHeight = levelClearHeight(rack, level)
+    const levelChar = levelToLetter(level)
+
     for (let depth = 1; depth <= rack.depthPositions; depth++) {
       const z = depthPositionZ(rack, depth)
+      const isDualFacing = rack.accessMode === 'dual-facing'
+      const isRear = depth === 2 && isDualFacing
+      const aisle = isRear ? rearAisle : frontAisle
+      const aisleDepth = isDualFacing ? 1 : depth
+      const isDirect = isDualFacing ? true : depth === 1
+
       offsets.forEach((offset, index) => {
-        const address = { row: 1, bay: 1, level, position: index + 1, depth }
-        slots.push({
-          ...address,
-          id: formatSlotAddress(address),
-          localPosition: [bayCenterX() + offset, y, z],
-          footprint,
-          clearHeight,
-          directAccess: depth === 1,
-        })
+        const position = index + 1
+        if (isIndustrial) {
+          const address: SlotAddress = {
+            row: aisle,
+            bay,
+            level,
+            position,
+            depth: aisleDepth,
+            aisle,
+            levelLetter: levelChar,
+            zoneCode: rack.zoneCode || undefined,
+          }
+          const id = formatIndustrialAddress(address)
+          slots.push({
+            ...address,
+            id,
+            bayDepth: depth,
+            localPosition: [bayCenterX() + offset, y, z],
+            footprint,
+            clearHeight,
+            directAccess: isDirect,
+          })
+        } else {
+          // Legacy format fallback for unassigned rack nodes
+          const address: SlotAddress = {
+            row: 1,
+            bay,
+            level,
+            position,
+            depth,
+          }
+          slots.push({
+            ...address,
+            id: formatSlotAddress(address),
+            bayDepth: depth,
+            localPosition: [bayCenterX() + offset, y, z],
+            footprint,
+            clearHeight,
+            directAccess: depth === 1,
+          })
+        }
       })
     }
   }
@@ -617,7 +750,7 @@ export function palletSlotCount(rack: PalletRackNode): number {
  * entirely.
  */
 export function directAccessSlotCount(rack: PalletRackNode): number {
-  return palletSlotCount(rack) / rack.depthPositions
+  return palletSlotsOf(rack).filter((slot) => slot.directAccess).length
 }
 
 /**
@@ -635,25 +768,65 @@ function buildPickingSlots(rack: PalletRackNode): Slot[] {
   const footprint: [number, number] = [rack.pickingBoxWidth, rack.pickingBoxDepth]
   const slots: Slot[] = []
 
+  const isIndustrial = Boolean(rack.rowLabel || rack.frontAisleLabel || rack.accessMode === 'dual-facing')
+  const bay = rack.bayIndex ?? 1
+  const frontAisle = rack.frontAisleLabel || rack.rowLabel || 'A'
+  const rearAisle = rack.rearAisleLabel || (rack.rowLabel ? nextAisleLetter(rack.rowLabel) : 'B')
+
   for (const level of pickingLevelsOf(rack)) {
     if (!present.has(level)) continue
     // Containers stand on the shelf panel, not on the beam top.
     const y = levelSurfaceY(rack, level) + (level > 0 ? rack.pickingShelfThickness : 0)
     const clearHeight = levelClearHeight(rack, level)
-    for (let depth = 1; depth <= offsetsZ.length; depth++) {
-      // Index 1 is the aisle side — the same convention pallet depth positions
-      // use, so "D1 is the one you reach first" holds throughout.
-      const offsetZ = offsetsZ[offsetsZ.length - depth] ?? 0
+    const levelChar = levelToLetter(level)
+
+    const N = offsetsZ.length
+    const isDualFacing = rack.accessMode === 'dual-facing'
+    const frontCount = isDualFacing ? Math.ceil(N / 2) : N
+
+    for (let depth = 1; depth <= N; depth++) {
+      // Index 1 is the front aisle side (+Z), depth N is the rear aisle side (-Z).
+      const offsetZ = offsetsZ[N - depth] ?? 0
+      const isRear = isDualFacing && depth > frontCount
+      const aisle = isRear ? rearAisle : frontAisle
+      const aisleDepth = isRear ? N - depth + 1 : depth
+      const isDirect = aisleDepth === 1
+
       offsetsX.forEach((offset, index) => {
-        const address = { row: 1, bay: 1, level, position: index + 1, depth }
-        slots.push({
-          ...address,
-          id: formatSlotAddress(address),
-          localPosition: [bayCenterX() + offset, y, offsetZ],
-          footprint,
-          clearHeight,
-          directAccess: depth === 1,
-        })
+        const position = index + 1
+        if (isIndustrial) {
+          const address: SlotAddress = {
+            row: aisle,
+            bay,
+            level,
+            position,
+            depth: aisleDepth,
+            aisle,
+            levelLetter: levelChar,
+            zoneCode: rack.zoneCode || undefined,
+          }
+          const id = formatIndustrialAddress(address)
+          slots.push({
+            ...address,
+            id,
+            bayDepth: depth,
+            localPosition: [bayCenterX() + offset, y, offsetZ],
+            footprint,
+            clearHeight,
+            directAccess: isDirect,
+          })
+        } else {
+          const address: SlotAddress = { row: 1, bay, level, position, depth: aisleDepth }
+          slots.push({
+            ...address,
+            id: formatSlotAddress(address),
+            bayDepth: depth,
+            localPosition: [bayCenterX() + offset, y, offsetZ],
+            footprint,
+            clearHeight,
+            directAccess: aisleDepth === 1,
+          })
+        }
       })
     }
   }
@@ -759,5 +932,9 @@ export function hasUnsupportedPallets(rack: PalletRackNode): boolean {
 }
 
 export function slotById(rack: PalletRackNode, address: string): Slot | null {
-  return palletSlotsOf(rack).find((slot) => slot.id === address) ?? null
+  return (
+    palletSlotsOf(rack).find((slot) => slot.id === address) ??
+    pickingSlotsOf(rack).find((slot) => slot.id === address) ??
+    null
+  )
 }

@@ -46,9 +46,29 @@ export type PanelTab = 'catalog' | 'stats'
  * its area figure to a single level, in the same card. */
 export type StatsScope = 'project' | 'building' | 'level'
 
+export interface WarehouseLabelToggles {
+  showAisleSigns: boolean
+  showGroundStencils: boolean
+  showLevelColorBadges: boolean
+  showBeamLipBarcodes: boolean
+}
+
 type WarehouseStore = {
   tab: PanelTab
   setTab: (tab: PanelTab) => void
+
+  showAisleSigns: boolean
+  setShowAisleSigns: (show: boolean) => void
+  showGroundStencils: boolean
+  setShowGroundStencils: (show: boolean) => void
+  showLevelColorBadges: boolean
+  setShowLevelColorBadges: (show: boolean) => void
+  showBeamLipBarcodes: boolean
+  setShowBeamLipBarcodes: (show: boolean) => void
+  setLabelToggles: (patch: Partial<WarehouseLabelToggles>) => void
+
+  activeFloorplanLevelFilter: string | number | null
+  setActiveFloorplanLevelFilter: (filter: string | number | null) => void
 
   /**
    * Katalogda en son basılan fişin kimliği, ya da katalog dışından silahlanan
@@ -469,6 +489,33 @@ export const useWarehouseStore = create<WarehouseStore>()(
 
       lodQuality: 'balanced',
       setLodQuality: (lodQuality) => set({ lodQuality }),
+
+      showAisleSigns: true,
+      setShowAisleSigns: (showAisleSigns) => set({ showAisleSigns }),
+
+      showGroundStencils: true,
+      setShowGroundStencils: (showGroundStencils) => set({ showGroundStencils }),
+
+      showLevelColorBadges: true,
+      setShowLevelColorBadges: (showLevelColorBadges) => set({ showLevelColorBadges }),
+
+      showBeamLipBarcodes: true,
+      setShowBeamLipBarcodes: (showBeamLipBarcodes) => set({ showBeamLipBarcodes }),
+
+      setLabelToggles: (patch) => set((s) => ({ ...s, ...patch })),
+
+      activeFloorplanLevelFilter: null,
+      setActiveFloorplanLevelFilter: (activeFloorplanLevelFilter) => {
+        set({ activeFloorplanLevelFilter })
+        const scene = useScene.getState?.()
+        if (scene?.nodes && scene?.markDirty) {
+          for (const n of Object.values(scene.nodes) as any[]) {
+            if (n?.type === 'warehouse:pallet-rack' && n?.id) {
+              scene.markDirty(n.id as never)
+            }
+          }
+        }
+      },
 
       palletBrush: {
         preset: 'epal-1',

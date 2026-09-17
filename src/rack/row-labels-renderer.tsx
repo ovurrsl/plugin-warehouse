@@ -1,9 +1,31 @@
 import { useScene } from '@pascal-app/core'
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
+import {
+  LEVEL_COLOR_PALETTE,
+  LEVEL_LETTERS,
+  getLevelColor,
+  getLevelLetter,
+} from './beam-label-atlas'
+export {
+  LEVEL_COLOR_PALETTE,
+  LEVEL_LETTERS,
+  getLevelColor,
+  getLevelLetter,
+}
+export {
+  BeamLipBarcodeLabels,
+  BeamLipLabelMesh,
+} from './beam-labels-renderer'
 import { isFirstRackOfRow, isLastRackOfRow } from './row-naming'
 import type { PalletRackNode, SignMountStyle } from './schema'
-import { bayPitch, rowDepth } from './slots'
+import {
+  bayPitch,
+  levelBeamHeight,
+  levelSurfaceY,
+  rowDepth,
+  storageLevelsPresent,
+} from './slots'
 
 export const SIGN_BACKPLATE_WIDTH = 0.8
 export const SIGN_BACKPLATE_HEIGHT = 0.35
@@ -13,6 +35,33 @@ export const SIGN_STANDOFF_SIZE: [number, number, number] = [0.05, 0.08, 0.05]
 export const SIGN_HEIGHT_OFFSET = 0.45
 export const SIGN_FLUSH_CLEARANCE = 0.002
 export const SIGN_TEXT_OFFSET = 0.001
+
+export const GROUND_STENCIL_WIDTH = 0.50
+export const GROUND_STENCIL_HEIGHT = 0.35
+export const GROUND_STENCIL_Y_OFFSET = 0.002
+
+export const BADGE_WIDTH = 0.06
+export const BADGE_HEIGHT = 0.04
+export const BADGE_THICKNESS = 0.006
+
+/**
+ * Resolves the text string to display on the physical aisle sign.
+ * Supports aisle pairs (e.g. "A B", "C D"), front/rear aisle labels, or explicit rowLabel.
+ */
+export function resolveAisleSignLabel(node: PalletRackNode): string {
+  const front = (node.frontAisleLabel ?? '').trim()
+  const rear = (node.rearAisleLabel ?? '').trim()
+  if (front && rear) {
+    return `${front} ${rear}`
+  }
+  const directLabel = (node.rowLabel ?? '').trim()
+  if (directLabel.length > 0) {
+    return directLabel
+  }
+  if (front) return front
+  if (rear) return rear
+  return ''
+}
 
 /**
  * Span length for sign mounted between the front and rear upright posts.
@@ -61,8 +110,6 @@ export function computeSignTransform(
 
 /**
  * High-performance 2D Canvas texture generator.
- * Eliminates WebGPU shader incompatibilities, troika-three-text crashes,
- * and font-network timeouts.
  */
 function useSignTexture(label: string): THREE.CanvasTexture | null {
   const texture = useMemo(() => {
@@ -217,6 +264,10 @@ export function PhysicalSign({ node, end, label, mountStyle }: PhysicalSignProps
   )
 }
 
+/**
+ * 3D Aisle Upright Signs Renderer.
+ * Strictly non-reactive: zero subscriptions to useScene.
+ */
 export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
   const [{ isFirst, isLast }, setIsEndRack] = useState<{
     isFirst: boolean
@@ -227,7 +278,8 @@ export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
   })
 
   useEffect(() => {
-    if (!node.rowLabel) {
+    const signLabel = resolveAisleSignLabel(node)
+    if (!signLabel) {
       setIsEndRack({ isFirst: false, isLast: false })
       return
     }
@@ -237,9 +289,17 @@ export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
       isFirst: isFirstRackOfRow(nodes, node.id),
       isLast: isLastRackOfRow(nodes, node.id),
     })
-  }, [node.id, node.rowLabel, node.position, node.rotation])
+  }, [
+    node.id,
+    node.rowLabel,
+    node.frontAisleLabel,
+    node.rearAisleLabel,
+    node.position,
+    node.rotation,
+  ])
 
-  if (!node.rowLabel) return null
+  const signLabel = resolveAisleSignLabel(node)
+  if (!signLabel) return null
   if (!isFirst && !isLast) return null
 
   const mountStyle: SignMountStyle = node.signMountStyle ?? 'flag'
@@ -247,11 +307,157 @@ export function RowLabelRenderer({ node }: { node: PalletRackNode }) {
   return (
     <group name={`rack-signs-${node.id}`}>
       {isFirst && (
-        <PhysicalSign end="left" label={node.rowLabel} mountStyle={mountStyle} node={node} />
+        <PhysicalSign end="left" label={signLabel} mountStyle={mountStyle} node={node} />
       )}
       {isLast && (
-        <PhysicalSign end="right" label={node.rowLabel} mountStyle={mountStyle} node={node} />
+        <PhysicalSign end="right" label={signLabel} mountStyle={mountStyle} node={node} />
       )}
+    </group>
+  )
+}
+
+// ── 3D Ground Bay Stencils (Feature 7) ──────────────────────────────────────────
+
+const stencilTextureCache = new Map<string, THREE.CanvasTexture>()
+
+function useStencilTexture(bayText: string): THREE.Texture | null {
+  const texture = useMemo(() => {
+    if (stencilTextureCache.has(bayText)) {
+      return stencilTextureCache.get(bayText)!
+    }
+    if (typeof document === 'undefined') return null
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 512
+      canvas.height = 384
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
+
+      // Dark background with industrial border
+      ctx.fillStyle = '#18181b'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.lineWidth = 16
+      ctx.strokeStyle = '#facc15'
+      ctx.strokeRect(8, 8, canvas.width - 16, canvas.height - 16)
+
+      // Stencil numerals
+      ctx.fillStyle = '#facc15'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = '900 240px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+      ctx.fillText(bayText, canvas.width / 2, canvas.height / 2)
+
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.needsUpdate = true
+      stencilTextureCache.set(bayText, tex)
+      return tex
+    } catch {
+      return null
+    }
+  }, [bayText])
+
+  return texture
+}
+
+export function GroundBayStencil({ node }: { node: PalletRackNode }) {
+  const bayText = String(node.bayIndex ?? 1).padStart(2, '0')
+  const texture = useStencilTexture(bayText)
+  const depth = rowDepth(node)
+  const zOffset = depth / 2 + 0.35
+  const isDual = node.accessMode === 'dual-facing'
+
+  return (
+    <group name={`ground-stencil-${node.id}`}>
+      {/* Front aisle floor stencil */}
+      <mesh
+        position={[0, GROUND_STENCIL_Y_OFFSET, zOffset]}
+        rotation={[-Math.PI / 2, 0, 0]}
+      >
+        <planeGeometry args={[GROUND_STENCIL_WIDTH, GROUND_STENCIL_HEIGHT]} />
+        <meshStandardMaterial
+          map={texture}
+          color={texture ? '#ffffff' : '#facc15'}
+          transparent={true}
+          opacity={0.92}
+          roughness={0.8}
+          metalness={0.1}
+          depthWrite={false}
+          polygonOffset={true}
+          polygonOffsetFactor={-2}
+          polygonOffsetUnits={-2}
+        />
+      </mesh>
+
+      {/* Rear aisle floor stencil for dual-facing bays */}
+      {isDual && (
+        <mesh
+          position={[0, GROUND_STENCIL_Y_OFFSET, -zOffset]}
+          rotation={[-Math.PI / 2, 0, Math.PI]}
+        >
+          <planeGeometry args={[GROUND_STENCIL_WIDTH, GROUND_STENCIL_HEIGHT]} />
+          <meshStandardMaterial
+            map={texture}
+            color={texture ? '#ffffff' : '#facc15'}
+            transparent={true}
+            opacity={0.92}
+            roughness={0.8}
+            metalness={0.1}
+            depthWrite={false}
+            polygonOffset={true}
+            polygonOffsetFactor={-2}
+            polygonOffsetUnits={-2}
+          />
+        </mesh>
+      )}
+    </group>
+  )
+}
+
+// ── 3D Upright Level Color Badges (Feature 8) ──────────────────────────────────
+
+export function UprightLevelColorBadges({ node }: { node: PalletRackNode }) {
+  const [isLast, setIsLast] = useState(false)
+
+  useEffect(() => {
+    const nodes = (useScene.getState?.()?.nodes ?? {}) as Record<string, unknown>
+    setIsLast(isLastRackOfRow(nodes, node.id))
+  }, [node.id, node.position, node.rotation])
+
+  const pitch = bayPitch(node)
+  const depth = rowDepth(node)
+  const xLeft = -pitch / 2
+  const xRight = pitch / 2
+  const zFront = depth / 2 + 0.003
+
+  const levels = useMemo(() => storageLevelsPresent(node), [node])
+
+  return (
+    <group name={`level-badges-${node.id}`}>
+      {levels.map((lvl) => {
+        const letter = getLevelLetter(lvl)
+        const color = LEVEL_COLOR_PALETTE[letter] ?? '#ea580c'
+        const beamH = levelBeamHeight(node, lvl)
+        const y = lvl === 0 ? 0.15 : levelSurfaceY(node, lvl) - beamH / 2
+
+        return (
+          <React.Fragment key={`level-badge-${lvl}`}>
+            {/* Left upright post badge */}
+            <mesh position={[xLeft, y, zFront]}>
+              <boxGeometry args={[BADGE_WIDTH, BADGE_HEIGHT, BADGE_THICKNESS]} />
+              <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
+            </mesh>
+
+            {/* Right upright post badge on the end of row */}
+            {isLast && (
+              <mesh position={[xRight, y, zFront]}>
+                <boxGeometry args={[BADGE_WIDTH, BADGE_HEIGHT, BADGE_THICKNESS]} />
+                <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
+              </mesh>
+            )}
+          </React.Fragment>
+        )
+      })}
     </group>
   )
 }

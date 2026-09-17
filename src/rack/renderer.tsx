@@ -20,7 +20,7 @@ import { getPalletFarGeometry, getPalletGeometry } from '../pallet/geometry-buil
 import { getPalletFarMaterial, getPalletMaterial } from '../pallet/materials'
 import { specOf } from '../pallet/presets'
 import { useStaticTransform } from '../static-transform'
-import { lodScaleSq } from '../store'
+import { lodScaleSq, useWarehouseStore } from '../store'
 import {
   getRackGeometry,
   rackGeometryKey,
@@ -30,7 +30,13 @@ import {
 import { getRackMaterial } from './materials'
 import { hasRightNeighbour } from './neighbours'
 import { occupiedSlots, slotDraw } from './occupancy'
-import { RowLabelRenderer } from './row-labels-renderer'
+import {
+  BeamLipBarcodeLabels,
+  GroundBayStencil,
+  resolveAisleSignLabel,
+  RowLabelRenderer,
+  UprightLevelColorBadges,
+} from './row-labels-renderer'
 import type { PalletRackNode } from './schema'
 import { orientedPalletFootprint, palletSlotsOf, totalDepth, totalWidth } from './slots'
 
@@ -127,6 +133,11 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
 
   const appearance = useAppearance()
   const material = getRackMaterial(appearance)
+
+  const showAisleSigns = useWarehouseStore((s) => s.showAisleSigns)
+  const showGroundStencils = useWarehouseStore((s) => s.showGroundStencils)
+  const showLevelColorBadges = useWarehouseStore((s) => s.showLevelColorBadges)
+  const showBeamLipBarcodes = useWarehouseStore((s) => s.showBeamLipBarcodes)
 
   /**
    * Kolektif çizici — bu düğümü havuza kaydeder ve kendi mesh'ini çizip
@@ -269,7 +280,12 @@ function PalletRackBody({ node }: { node: PalletRackNode }) {
         />
       )}
       {node.ghostFill > 0 && <GhostStock node={node} />}
-      {node.rowLabel && <RowLabelRenderer node={node} />}
+      {showAisleSigns && Boolean(resolveAisleSignLabel(node)) && (
+        <RowLabelRenderer node={node} />
+      )}
+      {showGroundStencils && <GroundBayStencil node={node} />}
+      {showLevelColorBadges && <UprightLevelColorBadges node={node} />}
+      {showBeamLipBarcodes && <BeamLipBarcodeLabels node={node} />}
     </group>
   )
 }

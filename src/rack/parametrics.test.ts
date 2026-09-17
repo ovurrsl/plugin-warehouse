@@ -226,6 +226,16 @@ describe('coverage', () => {
     'bayIndex',
     // Tabela montaj stili ('flag' | 'flush'). Trailing paneldeki SegmentedControl ile değiştirilir.
     'signMountStyle',
+    // Depo bölge kodu (Zone Code). Sıra isimlendirme ve adresleme motoru tarafından atanır.
+    'zoneCode',
+    // Erişim modu ('single-face' | 'dual-facing'). Çift taraflı koridor erişimini belirler.
+    'accessMode',
+    // Ön koridor etiketi. Sıra isimlendirme ve adresleme motoru tarafından hesaplanır.
+    'frontAisleLabel',
+    // Arka koridor etiketi. Çift taraflı rafta arka koridor adreslemesi için atanır.
+    'rearAisleLabel',
+    // Sıra isimlendirme stratejisi ('aisle-pairs' | 'face-split' | 'odd-even').
+    'namingStrategy',
   ])
 
   const DELIBERATELY_HIDDEN = new Set([

@@ -3,7 +3,7 @@
 <!-- BADGES:START -->
 [![CI](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml/badge.svg)](https://github.com/ovurrsl/plugin-warehouse/actions/workflows/codeql.yml)
-![Version](https://img.shields.io/badge/version-0.1.5-blue)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Plugin API](https://img.shields.io/badge/plugin%20API-v1-8957e5)
 ![License](https://img.shields.io/github/license/ovurrsl/plugin-warehouse)
 ![Last commit](https://img.shields.io/github/last-commit/ovurrsl/plugin-warehouse)
@@ -212,7 +212,7 @@ bunx git-cliff --output CHANGELOG.md
 ## Recent changes
 
 <!-- CHANGELOG:START -->
-## Unreleased
+## 0.2.0 — 2026-09-17
 
 
 ### Build and CI
@@ -229,13 +229,13 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4c9e00b`](https://github.com/ovurrsl/plugin-warehouse/commit/4c9e00b1cf3d07aa68d0c6c102063b25a96e22e4))
 - Refresh generated README blocks [skip ci] ([`055d819`](https://github.com/ovurrsl/plugin-warehouse/commit/055d8193314f21fdf9764a51b5dae577b270c6ef))
 - Refresh generated README blocks [skip ci] ([`68e1568`](https://github.com/ovurrsl/plugin-warehouse/commit/68e156822750394ef58c84091315b9f1defae3b3))
 - Refresh generated README blocks [skip ci] ([`5d7a65a`](https://github.com/ovurrsl/plugin-warehouse/commit/5d7a65a7884402a1ea54e4f3ec6193de6521b201))
 - Refresh generated README blocks [skip ci] ([`11b9647`](https://github.com/ovurrsl/plugin-warehouse/commit/11b964779b241324ec793a61fd64df01c91b0cc5))
 - Refresh generated README blocks [skip ci] ([`4bbdf56`](https://github.com/ovurrsl/plugin-warehouse/commit/4bbdf56119a79c983becf4c690f625f2065c84d1))
 - Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
-- Refresh generated README blocks [skip ci] ([`2df3286`](https://github.com/ovurrsl/plugin-warehouse/commit/2df3286c2e8688f3db935cb5299cc0f35deaeaba))
 
 …
 

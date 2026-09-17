@@ -3,7 +3,7 @@
 Generated from the commit history. Every entry links the commit that made the
 change, because the commit message is where the reasoning is — this file is an
 index to it, not a replacement for it.
-## Unreleased
+## 0.2.0 — 2026-09-17
 
 
 ### Build and CI
@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`4c9e00b`](https://github.com/ovurrsl/plugin-warehouse/commit/4c9e00b1cf3d07aa68d0c6c102063b25a96e22e4))
 - Refresh generated README blocks [skip ci] ([`055d819`](https://github.com/ovurrsl/plugin-warehouse/commit/055d8193314f21fdf9764a51b5dae577b270c6ef))
 - Refresh generated README blocks [skip ci] ([`68e1568`](https://github.com/ovurrsl/plugin-warehouse/commit/68e156822750394ef58c84091315b9f1defae3b3))
 - Refresh generated README blocks [skip ci] ([`5d7a65a`](https://github.com/ovurrsl/plugin-warehouse/commit/5d7a65a7884402a1ea54e4f3ec6193de6521b201))

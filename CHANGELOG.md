@@ -20,6 +20,7 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`055d819`](https://github.com/ovurrsl/plugin-warehouse/commit/055d8193314f21fdf9764a51b5dae577b270c6ef))
 - Refresh generated README blocks [skip ci] ([`68e1568`](https://github.com/ovurrsl/plugin-warehouse/commit/68e156822750394ef58c84091315b9f1defae3b3))
 - Refresh generated README blocks [skip ci] ([`5d7a65a`](https://github.com/ovurrsl/plugin-warehouse/commit/5d7a65a7884402a1ea54e4f3ec6193de6521b201))
 - Refresh generated README blocks [skip ci] ([`11b9647`](https://github.com/ovurrsl/plugin-warehouse/commit/11b964779b241324ec793a61fd64df01c91b0cc5))
@@ -208,6 +209,7 @@ index to it, not a replacement for it.
 
 ### Features
 
+- Implement industrial addressing, dual-access bays, 3D beam barcodes and 2D floorplan level filtering ([`ad30e56`](https://github.com/ovurrsl/plugin-warehouse/commit/ad30e5688dfd5cc1b0f1207dfe972fd904e3efcb))
 - Remediate H1, H4-H7 logic errors in warehouse routes and rack row naming ([`b712c44`](https://github.com/ovurrsl/plugin-warehouse/commit/b712c44ba5981306ddbfe6377c21a79e7c048944))
 - Replace HTML row labels with 3D physical signs ([`3bd4590`](https://github.com/ovurrsl/plugin-warehouse/commit/3bd4590b2125d8f6f1fc94bdf99035da017819ce))
 - Add rack row capacities and HUD labeling ([`4d188eb`](https://github.com/ovurrsl/plugin-warehouse/commit/4d188eb5d1f2d321a46532ed0884a5a9447e2625))

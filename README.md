@@ -217,12 +217,14 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`74ca9ca`](https://github.com/ovurrsl/plugin-warehouse/commit/74ca9ca3bef3bdf781d4880e438ee51f9bc69f5a))
 - Refresh generated README blocks [skip ci] ([`98131b9`](https://github.com/ovurrsl/plugin-warehouse/commit/98131b92c56637ad8f827d825bf28553347cbb73))
 - Refresh generated README blocks [skip ci] ([`50cfb35`](https://github.com/ovurrsl/plugin-warehouse/commit/50cfb35a5091d370d8394840b29517b625091c3b))
 - Refresh generated README blocks [skip ci] ([`d40b781`](https://github.com/ovurrsl/plugin-warehouse/commit/d40b7812fa1496922d31ccdf8f2790f7442561d8))
 
 ### Features
 
+- Automate aisle/bay numbering on multiply, convert RowNaming to read-only info card, and expand real-time sync ([`ad6d38c`](https://github.com/ovurrsl/plugin-warehouse/commit/ad6d38c74c1b2af877b235992e829b6b262e2073))
 - Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
 
 ### Performance

@@ -18,7 +18,6 @@ import { runExtent } from './multiply'
 import { multiplyRack, pendingPlacements } from './multiply-command'
 import { occupiedSlots } from './occupancy'
 import { palletRackParametrics } from './parametrics'
-import { RowNaming } from './rack-row-naming'
 import type { PalletRackNode } from './schema'
 import { directAccessSlotCount, fittedLevelCount, palletSlotCount, pickingSlotCount } from './slots'
 
@@ -133,7 +132,6 @@ export default function RackPanel({ node: provided }: { node?: PalletRackNode })
       <IssueList issues={issues} />
 
       <Capacity node={node} />
-      <RowNaming node={node} />
 
       <PanelSection title="Multiply">
         {/*

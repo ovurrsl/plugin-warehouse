@@ -827,6 +827,7 @@ if (typeof window !== 'undefined') {
           if (frontAisleLabel !== undefined) nodePatch.frontAisleLabel = frontAisleLabel
           if (rearAisleLabel !== undefined) nodePatch.rearAisleLabel = rearAisleLabel
           if (zoneCode !== undefined) nodePatch.zoneCode = zoneCode
+          if (data.levels !== undefined) nodePatch.levels = data.levels
           scene.updateNode(rackId as never, nodePatch as never)
           if (typeof scene.markDirty === 'function') {
             scene.markDirty(rackId as never)

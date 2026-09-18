@@ -1,5 +1,6 @@
 import { useScene } from '@pascal-app/core'
-import React, { useEffect, useMemo, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import {
   LEVEL_COLOR_PALETTE,
@@ -43,6 +44,48 @@ export const GROUND_STENCIL_Y_OFFSET = 0.002
 export const BADGE_WIDTH = 0.06
 export const BADGE_HEIGHT = 0.04
 export const BADGE_THICKNESS = 0.006
+
+// Distance culling thresholds (with hysteresis to prevent rapid flickering)
+export const SIGN_CULL_DISTANCE_FAR = 65
+export const SIGN_CULL_DISTANCE_NEAR = 55
+export const GROUND_STENCIL_CULL_FAR = 25
+export const GROUND_STENCIL_CULL_NEAR = 20
+export const LEVEL_BADGE_CULL_FAR = 22
+export const LEVEL_BADGE_CULL_NEAR = 18
+
+// Module-level shared singleton geometries (eliminates thousands of per-rack allocations)
+export const BADGE_BOX_GEOMETRY = new THREE.BoxGeometry(
+  BADGE_WIDTH,
+  BADGE_HEIGHT,
+  BADGE_THICKNESS,
+)
+export const GROUND_STENCIL_GEOMETRY = new THREE.PlaneGeometry(
+  GROUND_STENCIL_WIDTH,
+  GROUND_STENCIL_HEIGHT,
+)
+
+// Pre-allocated materials for level badges (A through F)
+export const LEVEL_BADGE_MATERIALS: Record<string, THREE.MeshStandardMaterial> = {
+  A: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.A, roughness: 0.4, metalness: 0.2 }),
+  B: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.B, roughness: 0.4, metalness: 0.2 }),
+  C: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.C, roughness: 0.4, metalness: 0.2 }),
+  D: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.D, roughness: 0.4, metalness: 0.2 }),
+  E: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.E, roughness: 0.4, metalness: 0.2 }),
+  F: new THREE.MeshStandardMaterial({ color: LEVEL_COLOR_PALETTE.F, roughness: 0.4, metalness: 0.2 }),
+}
+
+// Module-level scratch vectors for zero-GC distance calculations
+const scratchCameraPos = new THREE.Vector3()
+const rackWorldPos = new THREE.Vector3()
+
+export function stringHash(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
 
 /**
  * Resolves the text string to display on the physical aisle sign.
@@ -109,78 +152,104 @@ export function computeSignTransform(
 }
 
 /**
- * High-performance 2D Canvas texture generator.
+ * Global cache for sign textures by label string to avoid reallocating 1024x512 canvases
  */
-function useSignTexture(label: string): THREE.CanvasTexture | null {
-  const texture = useMemo(() => {
-    if (typeof document === 'undefined') return null
-    try {
-      const canvas = document.createElement('canvas')
-      canvas.width = 1024
-      canvas.height = 512
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return null
+export const signTextureCache = new Map<string, THREE.CanvasTexture>()
 
-      // 1. Warehouse Safety Yellow Background
-      ctx.fillStyle = '#facc15'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+export function getSignTexture(label: string): THREE.CanvasTexture | null {
+  const trimmed = (label || '').trim()
+  if (!trimmed) return null
+  if (signTextureCache.has(trimmed)) {
+    return signTextureCache.get(trimmed)!
+  }
+  if (typeof document === 'undefined') return null
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = 1024
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
 
-      // 2. Heavy industrial black outer border
-      ctx.lineWidth = 28
-      ctx.strokeStyle = '#18181b'
-      ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28)
+    // 1. Warehouse Safety Yellow Background
+    ctx.fillStyle = '#facc15'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      // 3. Inner subtle contrast border
-      ctx.lineWidth = 6
-      ctx.strokeStyle = '#ca8a04'
-      ctx.strokeRect(38, 38, canvas.width - 76, canvas.height - 76)
+    // 2. Heavy industrial black outer border
+    ctx.lineWidth = 28
+    ctx.strokeStyle = '#18181b'
+    ctx.strokeRect(14, 14, canvas.width - 28, canvas.height - 28)
 
-      // 4. Corner mounting bolt visual details
-      const boltRadius = 14
-      const boltOffset = 55
-      const corners: [number, number][] = [
-        [boltOffset, boltOffset],
-        [canvas.width - boltOffset, boltOffset],
-        [boltOffset, canvas.height - boltOffset],
-        [canvas.width - boltOffset, canvas.height - boltOffset],
-      ]
-      ctx.fillStyle = '#27272a'
-      for (const [bx, by] of corners) {
-        ctx.beginPath()
-        ctx.arc(bx, by, boltRadius, 0, Math.PI * 2)
-        ctx.fill()
-      }
+    // 3. Inner subtle contrast border
+    ctx.lineWidth = 6
+    ctx.strokeStyle = '#ca8a04'
+    ctx.strokeRect(38, 38, canvas.width - 76, canvas.height - 76)
 
-      // 5. Crisp, bold, high-contrast black text
-      ctx.fillStyle = '#09090b'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-
-      const text = (label || '').trim()
-      let fontSize = 240
-      if (text.length > 3) fontSize = 180
-      if (text.length > 6) fontSize = 130
-      if (text.length > 10) fontSize = 90
-
-      ctx.font = `900 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2)
-
-      const tex = new THREE.CanvasTexture(canvas)
-      tex.colorSpace = THREE.SRGBColorSpace
-      tex.needsUpdate = true
-      return tex
-    } catch {
-      return null
+    // 4. Corner mounting bolt visual details
+    const boltRadius = 14
+    const boltOffset = 55
+    const corners: [number, number][] = [
+      [boltOffset, boltOffset],
+      [canvas.width - boltOffset, boltOffset],
+      [boltOffset, canvas.height - boltOffset],
+      [canvas.width - boltOffset, canvas.height - boltOffset],
+    ]
+    ctx.fillStyle = '#27272a'
+    for (const [bx, by] of corners) {
+      ctx.beginPath()
+      ctx.arc(bx, by, boltRadius, 0, Math.PI * 2)
+      ctx.fill()
     }
-  }, [label])
 
-  useEffect(() => {
-    return () => {
-      texture?.dispose()
-    }
-  }, [texture])
+    // 5. Crisp, bold, high-contrast black text
+    ctx.fillStyle = '#09090b'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
 
-  return texture
+    let fontSize = 240
+    if (trimmed.length > 3) fontSize = 180
+    if (trimmed.length > 6) fontSize = 130
+    if (trimmed.length > 10) fontSize = 90
+
+    ctx.font = `900 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+    ctx.fillText(trimmed, canvas.width / 2, canvas.height / 2)
+
+    const tex = new THREE.CanvasTexture(canvas)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.needsUpdate = true
+    signTextureCache.set(trimmed, tex)
+    return tex
+  } catch {
+    return null
+  }
+}
+
+/**
+ * High-performance 2D Canvas texture generator with global caching.
+ */
+export function useSignTexture(label: string): THREE.CanvasTexture | null {
+  return useMemo(() => getSignTexture(label), [label])
+}
+
+// Module-level shared materials for sign backplates and brackets
+export const SIGN_BACKPLATE_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#facc15',
+  metalness: 0.15,
+  roughness: 0.35,
+})
+export const SIGN_BRACKET_MATERIAL = new THREE.MeshStandardMaterial({
+  color: '#27272a',
+  metalness: 0.6,
+  roughness: 0.4,
+})
+
+const signFaceMaterialCache = new Map<string, THREE.MeshStandardMaterial>()
+export function getSignFaceMaterial(label: string, texture: THREE.Texture): THREE.MeshStandardMaterial {
+  let mat = signFaceMaterialCache.get(label)
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3, metalness: 0.1 })
+    signFaceMaterialCache.set(label, mat)
+  }
+  return mat
 }
 
 export interface PhysicalSignProps {
@@ -191,9 +260,35 @@ export interface PhysicalSignProps {
 }
 
 export function PhysicalSign({ node, end, label, mountStyle }: PhysicalSignProps) {
+  const groupRef = useRef<THREE.Group>(null)
+  const rackHash = useMemo(() => stringHash(node.id), [node.id])
+
+  // Staggered distance culling check (1 in 8 frames)
+  useFrame(({ camera, clock }) => {
+    const group = groupRef.current
+    if (!group || !camera?.position) return
+    const tick = Math.floor(clock.elapsedTime * 60)
+    if ((tick + rackHash) % 8 !== 0) return
+
+    scratchCameraPos.copy(camera.position)
+    const rackPos = node.position ?? [0, 0, 0]
+    rackWorldPos.set(rackPos[0], rackPos[1], rackPos[2])
+    const dSq = scratchCameraPos.distanceToSquared(rackWorldPos)
+
+    if (group.visible && dSq > SIGN_CULL_DISTANCE_FAR * SIGN_CULL_DISTANCE_FAR) {
+      group.visible = false
+    } else if (!group.visible && dSq < SIGN_CULL_DISTANCE_NEAR * SIGN_CULL_DISTANCE_NEAR) {
+      group.visible = true
+    }
+  })
+
   const { position, rotation } = computeSignTransform(node, end, mountStyle)
   const signLength = signSpanLength(node)
   const texture = useSignTexture(label)
+  const faceMaterial = useMemo(
+    () => (texture ? getSignFaceMaterial(label, texture) : null),
+    [label, texture],
+  )
 
   const postSpanZ = rowDepth(node) / 2 - node.uprightDepth / 2
   const bracketLengthX =
@@ -208,27 +303,24 @@ export function PhysicalSign({ node, end, label, mountStyle }: PhysicalSignProps
           : SIGN_BACKPLATE_THICKNESS / 2)
 
   return (
-    <group position={position} rotation={rotation}>
+    <group ref={groupRef} position={position} rotation={rotation}>
       {/* Physical backplate: yellow steel sign plate spanning between uprights */}
-      <mesh castShadow receiveShadow>
+      <mesh castShadow receiveShadow material={SIGN_BACKPLATE_MATERIAL}>
         <boxGeometry args={[SIGN_BACKPLATE_THICKNESS, SIGN_BACKPLATE_HEIGHT, signLength]} />
-        <meshStandardMaterial color="#facc15" metalness={0.15} roughness={0.35} />
       </mesh>
 
       {/* Front mounting bracket connecting to front upright post */}
-      <mesh position={[bracketOffsetX, 0, postSpanZ]} castShadow receiveShadow>
+      <mesh position={[bracketOffsetX, 0, postSpanZ]} castShadow receiveShadow material={SIGN_BRACKET_MATERIAL}>
         <boxGeometry args={[bracketLengthX, 0.08, 0.05]} />
-        <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.4} />
       </mesh>
 
       {/* Rear mounting bracket connecting to rear upright post */}
-      <mesh position={[bracketOffsetX, 0, -postSpanZ]} castShadow receiveShadow>
+      <mesh position={[bracketOffsetX, 0, -postSpanZ]} castShadow receiveShadow material={SIGN_BRACKET_MATERIAL}>
         <boxGeometry args={[bracketLengthX, 0.08, 0.05]} />
-        <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.4} />
       </mesh>
 
       {/* Textured face: Outer face facing aisle */}
-      {texture && (
+      {faceMaterial && (
         <mesh
           position={[
             end === 'left'
@@ -238,14 +330,14 @@ export function PhysicalSign({ node, end, label, mountStyle }: PhysicalSignProps
             0,
           ]}
           rotation={[0, end === 'left' ? -Math.PI / 2 : Math.PI / 2, 0]}
+          material={faceMaterial}
         >
           <planeGeometry args={[signLength, SIGN_BACKPLATE_HEIGHT]} />
-          <meshStandardMaterial map={texture} roughness={0.3} metalness={0.1} />
         </mesh>
       )}
 
       {/* Textured face: Inner face facing bay (double-sided unmirrored visibility) */}
-      {texture && (
+      {faceMaterial && (
         <mesh
           position={[
             end === 'left'
@@ -255,9 +347,9 @@ export function PhysicalSign({ node, end, label, mountStyle }: PhysicalSignProps
             0,
           ]}
           rotation={[0, end === 'left' ? Math.PI / 2 : -Math.PI / 2, 0]}
+          material={faceMaterial}
         >
           <planeGeometry args={[signLength, SIGN_BACKPLATE_HEIGHT]} />
-          <meshStandardMaterial map={texture} roughness={0.3} metalness={0.1} />
         </mesh>
       )}
     </group>
@@ -360,55 +452,80 @@ function useStencilTexture(bayText: string): THREE.Texture | null {
   return texture
 }
 
+export const stencilMaterialCache = new Map<string, THREE.MeshStandardMaterial>()
+
+export function getStencilMaterial(bayText: string, texture: THREE.Texture | null): THREE.MeshStandardMaterial {
+  let mat = stencilMaterialCache.get(bayText)
+  if (!mat) {
+    mat = new THREE.MeshStandardMaterial({
+      map: texture,
+      color: texture ? '#ffffff' : '#facc15',
+      transparent: true,
+      opacity: 0.92,
+      roughness: 0.8,
+      metalness: 0.1,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    })
+    stencilMaterialCache.set(bayText, mat)
+  }
+  return mat
+}
+
 export function GroundBayStencil({ node }: { node: PalletRackNode }) {
+  const groupRef = useRef<THREE.Group>(null)
+  const rackHash = useMemo(() => stringHash(node.id), [node.id])
+
   const bayText = String(node.bayIndex ?? 1).padStart(2, '0')
   const texture = useStencilTexture(bayText)
+  const stencilMaterial = useMemo(
+    () => getStencilMaterial(bayText, texture),
+    [bayText, texture],
+  )
+
   const depth = rowDepth(node)
   const zOffset = depth / 2 + 0.35
   const isDual = node.accessMode === 'dual-facing'
 
+  // Staggered distance culling check (1 in 8 frames)
+  useFrame(({ camera, clock }) => {
+    const group = groupRef.current
+    if (!group || !camera?.position) return
+    const tick = Math.floor(clock.elapsedTime * 60)
+    if ((tick + rackHash) % 8 !== 0) return
+
+    scratchCameraPos.copy(camera.position)
+    const rackPos = node.position ?? [0, 0, 0]
+    rackWorldPos.set(rackPos[0], rackPos[1], rackPos[2])
+    const dSq = scratchCameraPos.distanceToSquared(rackWorldPos)
+
+    if (group.visible && dSq > GROUND_STENCIL_CULL_FAR * GROUND_STENCIL_CULL_FAR) {
+      group.visible = false
+    } else if (!group.visible && dSq < GROUND_STENCIL_CULL_NEAR * GROUND_STENCIL_CULL_NEAR) {
+      group.visible = true
+    }
+  })
+
   return (
-    <group name={`ground-stencil-${node.id}`}>
+    <group ref={groupRef} name={`ground-stencil-${node.id}`}>
       {/* Front aisle floor stencil */}
       <mesh
         position={[0, GROUND_STENCIL_Y_OFFSET, zOffset]}
         rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <planeGeometry args={[GROUND_STENCIL_WIDTH, GROUND_STENCIL_HEIGHT]} />
-        <meshStandardMaterial
-          map={texture}
-          color={texture ? '#ffffff' : '#facc15'}
-          transparent={true}
-          opacity={0.92}
-          roughness={0.8}
-          metalness={0.1}
-          depthWrite={false}
-          polygonOffset={true}
-          polygonOffsetFactor={-2}
-          polygonOffsetUnits={-2}
-        />
-      </mesh>
+        geometry={GROUND_STENCIL_GEOMETRY}
+        material={stencilMaterial}
+      />
 
       {/* Rear aisle floor stencil for dual-facing bays */}
       {isDual && (
         <mesh
           position={[0, GROUND_STENCIL_Y_OFFSET, -zOffset]}
           rotation={[-Math.PI / 2, 0, Math.PI]}
-        >
-          <planeGeometry args={[GROUND_STENCIL_WIDTH, GROUND_STENCIL_HEIGHT]} />
-          <meshStandardMaterial
-            map={texture}
-            color={texture ? '#ffffff' : '#facc15'}
-            transparent={true}
-            opacity={0.92}
-            roughness={0.8}
-            metalness={0.1}
-            depthWrite={false}
-            polygonOffset={true}
-            polygonOffsetFactor={-2}
-            polygonOffsetUnits={-2}
-          />
-        </mesh>
+          geometry={GROUND_STENCIL_GEOMETRY}
+          material={stencilMaterial}
+        />
       )}
     </group>
   )
@@ -417,6 +534,8 @@ export function GroundBayStencil({ node }: { node: PalletRackNode }) {
 // ── 3D Upright Level Color Badges (Feature 8) ──────────────────────────────────
 
 export function UprightLevelColorBadges({ node }: { node: PalletRackNode }) {
+  const groupRef = useRef<THREE.Group>(null)
+  const rackHash = useMemo(() => stringHash(node.id), [node.id])
   const [isLast, setIsLast] = useState(false)
 
   useEffect(() => {
@@ -432,28 +551,49 @@ export function UprightLevelColorBadges({ node }: { node: PalletRackNode }) {
 
   const levels = useMemo(() => storageLevelsPresent(node), [node])
 
+  // Staggered distance culling check (1 in 8 frames)
+  useFrame(({ camera, clock }) => {
+    const group = groupRef.current
+    if (!group || !camera?.position) return
+    const tick = Math.floor(clock.elapsedTime * 60)
+    if ((tick + rackHash) % 8 !== 0) return
+
+    scratchCameraPos.copy(camera.position)
+    const rackPos = node.position ?? [0, 0, 0]
+    rackWorldPos.set(rackPos[0], rackPos[1], rackPos[2])
+    const dSq = scratchCameraPos.distanceToSquared(rackWorldPos)
+
+    if (group.visible && dSq > LEVEL_BADGE_CULL_FAR * LEVEL_BADGE_CULL_FAR) {
+      group.visible = false
+    } else if (!group.visible && dSq < LEVEL_BADGE_CULL_NEAR * LEVEL_BADGE_CULL_NEAR) {
+      group.visible = true
+    }
+  })
+
   return (
-    <group name={`level-badges-${node.id}`}>
+    <group ref={groupRef} name={`level-badges-${node.id}`}>
       {levels.map((lvl) => {
         const letter = getLevelLetter(lvl)
-        const color = LEVEL_COLOR_PALETTE[letter] ?? '#ea580c'
+        const mat = LEVEL_BADGE_MATERIALS[letter] ?? LEVEL_BADGE_MATERIALS.A
         const beamH = levelBeamHeight(node, lvl)
         const y = lvl === 0 ? 0.15 : levelSurfaceY(node, lvl) - beamH / 2
 
         return (
           <React.Fragment key={`level-badge-${lvl}`}>
             {/* Left upright post badge */}
-            <mesh position={[xLeft, y, zFront]}>
-              <boxGeometry args={[BADGE_WIDTH, BADGE_HEIGHT, BADGE_THICKNESS]} />
-              <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
-            </mesh>
+            <mesh
+              position={[xLeft, y, zFront]}
+              geometry={BADGE_BOX_GEOMETRY}
+              material={mat}
+            />
 
             {/* Right upright post badge on the end of row */}
             {isLast && (
-              <mesh position={[xRight, y, zFront]}>
-                <boxGeometry args={[BADGE_WIDTH, BADGE_HEIGHT, BADGE_THICKNESS]} />
-                <meshStandardMaterial color={color} roughness={0.4} metalness={0.2} />
-              </mesh>
+              <mesh
+                position={[xRight, y, zFront]}
+                geometry={BADGE_BOX_GEOMETRY}
+                material={mat}
+              />
             )}
           </React.Fragment>
         )

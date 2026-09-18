@@ -278,6 +278,7 @@ function CatalogTab() {
       <FleetSwitch />
       <InstancingSwitch />
       <DetailRangeSwitch />
+      <LabelsVisibilitySwitch />
     </div>
   )
 }
@@ -368,6 +369,189 @@ function DetailRangeSwitch() {
           {label}
         </button>
       ))}
+    </div>
+  )
+}
+
+/**
+ * 3D Etiket ve Tabela görünürlük anahtarları.
+ * Kullanıcıya koridor tabelaları, zemin bay numaraları, kat rozetleri ve barkodları
+ * bağımsız olarak veya tek tıkla yüksek performans modunda açıp kapatma imkânı sunar.
+ */
+function LabelsVisibilitySwitch() {
+  const showAisleSigns = useWarehouseStore((s) => s.showAisleSigns)
+  const setShowAisleSigns = useWarehouseStore((s) => s.setShowAisleSigns)
+  const showGroundStencils = useWarehouseStore((s) => s.showGroundStencils)
+  const setShowGroundStencils = useWarehouseStore((s) => s.setShowGroundStencils)
+  const showLevelColorBadges = useWarehouseStore((s) => s.showLevelColorBadges)
+  const setShowLevelColorBadges = useWarehouseStore((s) => s.setShowLevelColorBadges)
+  const showBeamLipBarcodes = useWarehouseStore((s) => s.showBeamLipBarcodes)
+  const setShowBeamLipBarcodes = useWarehouseStore((s) => s.setShowBeamLipBarcodes)
+  const setLabelToggles = useWarehouseStore((s) => s.setLabelToggles)
+
+  const [expanded, setExpanded] = useState(false)
+
+  const allOff =
+    !showAisleSigns &&
+    !showGroundStencils &&
+    !showLevelColorBadges &&
+    !showBeamLipBarcodes
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.25rem',
+        width: '100%',
+        marginTop: '0.375rem',
+        padding: '0.375rem 0.5rem',
+        borderRadius: '0.375rem',
+        border: '1px solid var(--border)',
+        background: 'color-mix(in oklab, var(--foreground) 2%, transparent)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            fontSize: '0.6875rem',
+            fontWeight: 500,
+            color: 'var(--foreground)',
+            cursor: 'pointer',
+          }}
+          type="button"
+        >
+          <Icon height={12} icon={expanded ? 'lucide:chevron-down' : 'lucide:chevron-right'} width={12} />
+          <span>3D Etiket & Tabelalar</span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (allOff) {
+              setLabelToggles({
+                showAisleSigns: true,
+                showGroundStencils: true,
+                showLevelColorBadges: true,
+                showBeamLipBarcodes: true,
+              })
+            } else {
+              setLabelToggles({
+                showAisleSigns: false,
+                showGroundStencils: false,
+                showLevelColorBadges: false,
+                showBeamLipBarcodes: false,
+              })
+            }
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            fontSize: '0.625rem',
+            color: allOff ? 'var(--muted-foreground)' : 'var(--accent)',
+            cursor: 'pointer',
+            padding: '0.125rem 0.25rem',
+          }}
+          title={allOff ? 'Tüm etiketleri aç' : 'Yüksek performans için tüm etiketleri gizle'}
+          type="button"
+        >
+          {allOff ? 'Tümünü Aç' : 'Gizle (Hızlı)'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.25rem', marginTop: '0.25rem' }}>
+          <button
+            onClick={() => setShowAisleSigns(!showAisleSigns)}
+            style={{
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.25rem',
+              border: `1px solid ${showAisleSigns ? 'color-mix(in oklab, var(--foreground) 30%, transparent)' : 'var(--border)'}`,
+              background: showAisleSigns ? 'color-mix(in oklab, var(--foreground) 6%, transparent)' : 'transparent',
+              fontSize: '0.625rem',
+              color: showAisleSigns ? 'var(--foreground)' : 'var(--muted-foreground)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+            type="button"
+          >
+            <span>{showAisleSigns ? '✓' : '—'}</span>
+            <span>Koridor Tabela</span>
+          </button>
+
+          <button
+            onClick={() => setShowGroundStencils(!showGroundStencils)}
+            style={{
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.25rem',
+              border: `1px solid ${showGroundStencils ? 'color-mix(in oklab, var(--foreground) 30%, transparent)' : 'var(--border)'}`,
+              background: showGroundStencils ? 'color-mix(in oklab, var(--foreground) 6%, transparent)' : 'transparent',
+              fontSize: '0.625rem',
+              color: showGroundStencils ? 'var(--foreground)' : 'var(--muted-foreground)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+            type="button"
+          >
+            <span>{showGroundStencils ? '✓' : '—'}</span>
+            <span>Zemin No</span>
+          </button>
+
+          <button
+            onClick={() => setShowLevelColorBadges(!showLevelColorBadges)}
+            style={{
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.25rem',
+              border: `1px solid ${showLevelColorBadges ? 'color-mix(in oklab, var(--foreground) 30%, transparent)' : 'var(--border)'}`,
+              background: showLevelColorBadges ? 'color-mix(in oklab, var(--foreground) 6%, transparent)' : 'transparent',
+              fontSize: '0.625rem',
+              color: showLevelColorBadges ? 'var(--foreground)' : 'var(--muted-foreground)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+            type="button"
+          >
+            <span>{showLevelColorBadges ? '✓' : '—'}</span>
+            <span>Kat Rozeti</span>
+          </button>
+
+          <button
+            onClick={() => setShowBeamLipBarcodes(!showBeamLipBarcodes)}
+            style={{
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.25rem',
+              border: `1px solid ${showBeamLipBarcodes ? 'color-mix(in oklab, var(--foreground) 30%, transparent)' : 'var(--border)'}`,
+              background: showBeamLipBarcodes ? 'color-mix(in oklab, var(--foreground) 6%, transparent)' : 'transparent',
+              fontSize: '0.625rem',
+              color: showBeamLipBarcodes ? 'var(--foreground)' : 'var(--muted-foreground)',
+              cursor: 'pointer',
+              textAlign: 'left',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+            }}
+            type="button"
+          >
+            <span>{showBeamLipBarcodes ? '✓' : '—'}</span>
+            <span>Barkod</span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }

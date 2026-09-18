@@ -157,13 +157,26 @@ export function BeamLipLabelMesh({
     culledRef.current = new Array(instanceIdx).fill(false)
   }, [nodes, atlas, geometry, coordinateSpace])
 
-  // 5. Distance culling loop (hysteresis 20-25m)
-  useFrame(({ camera }) => {
+  const rackHash = useMemo(() => {
+    const firstId = nodes[0]?.id ?? ''
+    let hash = 0
+    for (let i = 0; i < firstId.length; i++) {
+      hash = ((hash << 5) - hash) + firstId.charCodeAt(i)
+      hash |= 0
+    }
+    return Math.abs(hash)
+  }, [nodes])
+
+  // 5. Distance culling loop (hysteresis 20-25m, staggered 1 in 8 frames for massive CPU relief)
+  useFrame(({ camera, clock }) => {
     const mesh = meshRef.current
     if (!mesh || !visible) return
 
     const records = slotRecordsRef.current
     if (records.length === 0) return
+
+    const tick = Math.floor(clock.elapsedTime * 60)
+    if ((tick + rackHash) % 8 !== 0) return
 
     scratchCameraPos.copy(camera.position)
     const cullDistSq = cullingDistance * cullingDistance

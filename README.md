@@ -217,12 +217,17 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`98131b9`](https://github.com/ovurrsl/plugin-warehouse/commit/98131b92c56637ad8f827d825bf28553347cbb73))
 - Refresh generated README blocks [skip ci] ([`50cfb35`](https://github.com/ovurrsl/plugin-warehouse/commit/50cfb35a5091d370d8394840b29517b625091c3b))
 - Refresh generated README blocks [skip ci] ([`d40b781`](https://github.com/ovurrsl/plugin-warehouse/commit/d40b7812fa1496922d31ccdf8f2790f7442561d8))
 
 ### Features
 
 - Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
+
+### Performance
+
+- Optimize 3D labels with distance culling, shared geometries, material caching, and visibility controls ([`4191d7e`](https://github.com/ovurrsl/plugin-warehouse/commit/4191d7ec3bb8e1fd26781dc88f25c4b58a243bc5))
 
 ### Refactors
 

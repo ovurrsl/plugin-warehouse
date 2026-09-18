@@ -78,7 +78,7 @@ function siblingsOf(
     if (placement.rowIndex > 0 && spec.backToBack && placement.flipped) {
       if (rack.rowLabel) {
         const matchLR = rack.rowLabel.match(/^(\d+)([LR])$/i)
-        if (matchLR) {
+        if (matchLR && matchLR[1] && matchLR[2]) {
           const num = matchLR[1]
           const side = matchLR[2].toUpperCase()
           rowLabel = `${num}${side === 'L' ? 'R' : 'L'}`

@@ -217,6 +217,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`caaaad6`](https://github.com/ovurrsl/plugin-warehouse/commit/caaaad661afbbfd0868a39ce4b90b2e49f85a133))
 - Refresh generated README blocks [skip ci] ([`d6793fe`](https://github.com/ovurrsl/plugin-warehouse/commit/d6793fe7b338053b86d4b3d07a80b96eed8e91ce))
 - Refresh generated README blocks [skip ci] ([`74ca9ca`](https://github.com/ovurrsl/plugin-warehouse/commit/74ca9ca3bef3bdf781d4880e438ee51f9bc69f5a))
 - Refresh generated README blocks [skip ci] ([`98131b9`](https://github.com/ovurrsl/plugin-warehouse/commit/98131b92c56637ad8f827d825bf28553347cbb73))
@@ -225,6 +226,7 @@ bunx git-cliff --output CHANGELOG.md
 
 ### Features
 
+- Remove 3D detail labels from racks and preserve aisle signs ([`63beeda`](https://github.com/ovurrsl/plugin-warehouse/commit/63beeda4316326460423a8f7f1c731003fa14f2e))
 - Automate aisle/bay numbering on multiply, convert RowNaming to read-only info card, and expand real-time sync ([`ad6d38c`](https://github.com/ovurrsl/plugin-warehouse/commit/ad6d38c74c1b2af877b235992e829b6b262e2073))
 - Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
 
@@ -233,8 +235,6 @@ bunx git-cliff --output CHANGELOG.md
 - Ensure null safety on regex capture group for rowLabel ([`ba0664f`](https://github.com/ovurrsl/plugin-warehouse/commit/ba0664f9490b530c2e9e5d17aefa8b2c46dd68c4))
 
 ### Performance
-
-- Optimize 3D labels with distance culling, shared geometries, material caching, and visibility controls ([`4191d7e`](https://github.com/ovurrsl/plugin-warehouse/commit/4191d7ec3bb8e1fd26781dc88f25c4b58a243bc5))
 
 
 …

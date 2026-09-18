@@ -8,11 +8,16 @@ index to it, not a replacement for it.
 
 ### Documentation
 
+- Refresh generated README blocks [skip ci] ([`50cfb35`](https://github.com/ovurrsl/plugin-warehouse/commit/50cfb35a5091d370d8394840b29517b625091c3b))
 - Refresh generated README blocks [skip ci] ([`d40b781`](https://github.com/ovurrsl/plugin-warehouse/commit/d40b7812fa1496922d31ccdf8f2790f7442561d8))
 
 ### Features
 
 - Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
+
+### Refactors
+
+- Remove RowNaming from 3D inspector and handle levels in sync ([`bfb8f8e`](https://github.com/ovurrsl/plugin-warehouse/commit/bfb8f8ef071e70f8b266938f3ad3dd41bc04e4f1))
 ## 0.2.0 — 2026-09-17
 
 

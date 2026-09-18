@@ -789,3 +789,91 @@ export function lodScaleSq(): number {
   const k = LOD_QUALITY_SCALE[useWarehouseStore.getState().lodQuality]
   return k * k
 }
+
+// ── Real-Time Warehouse Synchronization Bridge ──────────────────────────────
+/**
+ * Broadcast helper to communicate warehouse updates between 2D panel, 3D viewer, and store.
+ */
+export function broadcastWarehouseSync(payload: Record<string, unknown>): void {
+  if (typeof window === 'undefined') return
+  try {
+    const bc = new BroadcastChannel('dt_warehouse_sync')
+    bc.postMessage(payload)
+    bc.close()
+  } catch (_e) {}
+
+  try {
+    window.dispatchEvent(new CustomEvent('dt_warehouse_sync', { detail: payload }))
+  } catch (_e) {}
+}
+
+/**
+ * Synchronizes rack label edits (rowLabel, bayIndex, aisle signs, level filters, etc.)
+ * in real-time across tabs/windows without reloading.
+ */
+if (typeof window !== 'undefined') {
+  const handleWarehouseSync = (data: any) => {
+    if (!data || typeof data !== 'object') return
+    const { type, rackId, rowLabel, bayIndex, frontAisleLabel, rearAisleLabel, zoneCode, patch, updates, levelFilter, toggles } = data
+
+    // 1. Single Rack Label & Addressing Update
+    if (type === 'RACK_LABEL_UPDATED' && rackId) {
+      try {
+        const scene = useScene.getState?.()
+        if (scene && typeof scene.updateNode === 'function') {
+          const nodePatch: Record<string, unknown> = { ...(patch || {}) }
+          if (rowLabel !== undefined) nodePatch.rowLabel = rowLabel
+          if (bayIndex !== undefined) nodePatch.bayIndex = bayIndex
+          if (frontAisleLabel !== undefined) nodePatch.frontAisleLabel = frontAisleLabel
+          if (rearAisleLabel !== undefined) nodePatch.rearAisleLabel = rearAisleLabel
+          if (zoneCode !== undefined) nodePatch.zoneCode = zoneCode
+          scene.updateNode(rackId as never, nodePatch as never)
+          if (typeof scene.markDirty === 'function') {
+            scene.markDirty(rackId as never)
+          }
+        }
+      } catch (_e) {}
+    }
+
+    // 2. Batch Racks Update
+    if (type === 'BATCH_RACK_UPDATE' && Array.isArray(updates)) {
+      try {
+        const scene = useScene.getState?.()
+        if (scene && typeof scene.updateNode === 'function') {
+          for (const item of updates) {
+            if (item.rackId && item.patch) {
+              scene.updateNode(item.rackId as never, item.patch as never)
+              if (typeof scene.markDirty === 'function') {
+                scene.markDirty(item.rackId as never)
+              }
+            }
+          }
+        }
+      } catch (_e) {}
+    }
+
+    // 3. Level Filter Sync
+    if (type === 'LEVEL_FILTER_CHANGED' && levelFilter !== undefined) {
+      try {
+        useWarehouseStore.getState?.().setActiveFloorplanLevelFilter(levelFilter)
+      } catch (_e) {}
+    }
+
+    // 4. Label Visibility Toggles Sync
+    if (type === 'LABEL_TOGGLES_CHANGED' && toggles) {
+      try {
+        useWarehouseStore.getState?.().setLabelToggles(toggles)
+      } catch (_e) {}
+    }
+  }
+
+  // 1. Cross-tab BroadcastChannel
+  try {
+    const bc = new BroadcastChannel('dt_warehouse_sync')
+    bc.onmessage = (ev) => handleWarehouseSync(ev.data)
+  } catch (_e) {}
+
+  // 2. Same-window CustomEvent
+  window.addEventListener('dt_warehouse_sync', (ev: any) => handleWarehouseSync(ev.detail))
+}
+

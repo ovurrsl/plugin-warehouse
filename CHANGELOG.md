@@ -3,6 +3,16 @@
 Generated from the commit history. Every entry links the commit that made the
 change, because the commit message is where the reasoning is — this file is an
 index to it, not a replacement for it.
+## Unreleased
+
+
+### Documentation
+
+- Refresh generated README blocks [skip ci] ([`d40b781`](https://github.com/ovurrsl/plugin-warehouse/commit/d40b7812fa1496922d31ccdf8f2790f7442561d8))
+
+### Features
+
+- Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
 ## 0.2.0 — 2026-09-17
 
 

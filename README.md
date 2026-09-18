@@ -212,32 +212,16 @@ bunx git-cliff --output CHANGELOG.md
 ## Recent changes
 
 <!-- CHANGELOG:START -->
-## 0.2.0 — 2026-09-17
+## Unreleased
 
-
-### Build and CI
-
-- Repair the dependency ranges that block `bun install` ([`375d24f`](https://github.com/ovurrsl/plugin-warehouse/commit/375d24f663cf1f736ee25bfc81b02a9a8a73c5bf))
-- Drop npm version updates — Dependabot cannot maintain bun.lock ([`9e9e849`](https://github.com/ovurrsl/plugin-warehouse/commit/9e9e849910c5b4bdce037ec6f5617860f468b824))
-- CI, CodeQL, changelog automation and repo scaffolding ([`a5f6e2b`](https://github.com/ovurrsl/plugin-warehouse/commit/a5f6e2bc0b941a7885a726477374f045d6176d3f))
-
-### Chores
-
-- Kullanılmayan rectsOverlap importunu düşür ([`3f0d924`](https://github.com/ovurrsl/plugin-warehouse/commit/3f0d9247cc79b17182f8ce51fbf6974990425c6a))
-- Obsidian gitignore girdilerini geri al ([`e80016a`](https://github.com/ovurrsl/plugin-warehouse/commit/e80016a9dd165ed0bcedc01a9832f5b493834b5b))
-- Obsidian kasasını ve yerel notları gitignore'a al ([`c54aaf5`](https://github.com/ovurrsl/plugin-warehouse/commit/c54aaf59ed19ee8e3cd7c8bcac055090ba0e6b98))
 
 ### Documentation
 
-- Refresh generated README blocks [skip ci] ([`4c9e00b`](https://github.com/ovurrsl/plugin-warehouse/commit/4c9e00b1cf3d07aa68d0c6c102063b25a96e22e4))
-- Refresh generated README blocks [skip ci] ([`055d819`](https://github.com/ovurrsl/plugin-warehouse/commit/055d8193314f21fdf9764a51b5dae577b270c6ef))
-- Refresh generated README blocks [skip ci] ([`68e1568`](https://github.com/ovurrsl/plugin-warehouse/commit/68e156822750394ef58c84091315b9f1defae3b3))
-- Refresh generated README blocks [skip ci] ([`5d7a65a`](https://github.com/ovurrsl/plugin-warehouse/commit/5d7a65a7884402a1ea54e4f3ec6193de6521b201))
-- Refresh generated README blocks [skip ci] ([`11b9647`](https://github.com/ovurrsl/plugin-warehouse/commit/11b964779b241324ec793a61fd64df01c91b0cc5))
-- Refresh generated README blocks [skip ci] ([`4bbdf56`](https://github.com/ovurrsl/plugin-warehouse/commit/4bbdf56119a79c983becf4c690f625f2065c84d1))
-- Refresh generated README blocks [skip ci] ([`cae1aaf`](https://github.com/ovurrsl/plugin-warehouse/commit/cae1aaf4aacf55807f9c8cc99f01105f35b01076))
+- Refresh generated README blocks [skip ci] ([`d40b781`](https://github.com/ovurrsl/plugin-warehouse/commit/d40b7812fa1496922d31ccdf8f2790f7442561d8))
 
-…
+### Features
+
+- Add bidirectional real-time warehouse sync bridge for rack labels, addressing, and level filters ([`e6f9f06`](https://github.com/ovurrsl/plugin-warehouse/commit/e6f9f06d25093d9c1790e1b24d22c19d32f6075d))
 
 Full history in [CHANGELOG.md](CHANGELOG.md).
 <!-- CHANGELOG:END -->

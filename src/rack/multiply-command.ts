@@ -67,17 +67,40 @@ function siblingsOf(
   // placed.
   const slabs = levelId ? collectSlabs(nodes, levelId) : []
 
-  return pendingPlacements(rack, spec, nodes).map((placement) =>
-    PalletRackNode.parse({
+  const baseBayIndex = rack.bayIndex ?? 1
+
+  return pendingPlacements(rack, spec, nodes).map((placement) => {
+    let rowLabel = rack.rowLabel
+    let frontAisleLabel = rack.frontAisleLabel
+    let rearAisleLabel = rack.rearAisleLabel
+    const bayIndex = baseBayIndex + (placement.bayIndex ?? 0)
+
+    if (placement.rowIndex > 0 && spec.backToBack && placement.flipped) {
+      if (rack.rowLabel) {
+        const matchLR = rack.rowLabel.match(/^(\d+)([LR])$/i)
+        if (matchLR) {
+          const num = matchLR[1]
+          const side = matchLR[2].toUpperCase()
+          rowLabel = `${num}${side === 'L' ? 'R' : 'L'}`
+          frontAisleLabel = rowLabel
+        }
+      }
+    }
+
+    return PalletRackNode.parse({
       ...rest,
+      rowLabel,
+      bayIndex,
+      frontAisleLabel,
+      rearAisleLabel,
       position: placement.position,
       rotation: placement.rotation,
       // Re-elected per sibling rather than inherited: a twenty-bay run is 57 m
       // long and can easily start on one slab and finish on another, and the
       // slab is what the host lifts the bay onto.
       supportSlabId: slabAt(slabs, placement.position[0], placement.position[2])?.id ?? null,
-    }),
-  )
+    })
+  })
 }
 
 /**

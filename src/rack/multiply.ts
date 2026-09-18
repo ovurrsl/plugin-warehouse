@@ -50,10 +50,13 @@ export const DEFAULT_MULTIPLY: MultiplySpec = {
   aisleWidth: 3.2,
 }
 
-/** One sibling to place: where it goes and which way it looks. */
+/** One sibling to place: where it goes, which way it looks, and its relative row/bay indices. */
 export type MultiplyPlacement = {
   position: [number, number, number]
   rotation: [number, number, number]
+  rowIndex: number
+  bayIndex: number
+  flipped: boolean
 }
 
 /**
@@ -187,6 +190,9 @@ export function multiplyPlacements(rack: PalletRackNode, spec: MultiplySpec): Mu
       placements.push({
         position: localToWorld(rack, localX, row.z),
         rotation: [tiltX, rotationY + (row.flipped ? Math.PI : 0), rollZ],
+        rowIndex,
+        bayIndex,
+        flipped: row.flipped,
       })
     })
   })

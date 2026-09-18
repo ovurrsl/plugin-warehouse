@@ -828,6 +828,11 @@ if (typeof window !== 'undefined') {
           if (rearAisleLabel !== undefined) nodePatch.rearAisleLabel = rearAisleLabel
           if (zoneCode !== undefined) nodePatch.zoneCode = zoneCode
           if (data.levels !== undefined) nodePatch.levels = data.levels
+          if (data.accessMode !== undefined) nodePatch.accessMode = data.accessMode
+          if (data.namingStrategy !== undefined) nodePatch.namingStrategy = data.namingStrategy
+          if (data.signMountStyle !== undefined) nodePatch.signMountStyle = data.signMountStyle
+          if (data.palletsPerLevel !== undefined) nodePatch.palletsPerLevel = data.palletsPerLevel
+          if (data.bayClearWidth !== undefined) nodePatch.bayClearWidth = data.bayClearWidth
           scene.updateNode(rackId as never, nodePatch as never)
           if (typeof scene.markDirty === 'function') {
             scene.markDirty(rackId as never)
